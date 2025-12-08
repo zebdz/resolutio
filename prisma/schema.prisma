@@ -1,0 +1,209 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  output        = "../node_modules/.prisma/client"
+  engineType    = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Authentication Models
+model User {
+  id          String   @id @default(cuid())
+  firstName   String   @map("first_name")
+  lastName    String   @map("last_name")
+  middleName  String?  @map("middle_name")
+  phoneNumber String   @unique @map("phone_number")
+  password    String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  sessions           Session[]
+  organizationsOwned Organization[]
+  memberships        OrganizationUser[]
+  adminRoles         OrganizationAdminUser[]
+  boardMemberships   BoardUser[]
+  votes              Vote[]
+  superAdmin         SuperAdmin?
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model SuperAdmin {
+  id        String   @id @default(cuid())
+  userId    String   @unique @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("superadmins")
+}
+
+// Organization Models
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  parentId    String?  @map("parent_id")
+  createdById String   @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  archivedAt  DateTime? @map("archived_at")
+
+  // Relations
+  createdBy   User                    @relation(fields: [createdById], references: [id])
+  parent      Organization?           @relation("OrganizationHierarchy", fields: [parentId], references: [id])
+  children    Organization[]          @relation("OrganizationHierarchy")
+  members     OrganizationUser[]
+  admins      OrganizationAdminUser[]
+  boards      Board[]
+
+  @@index([parentId])
+  @@index([createdById])
+  @@map("organizations")
+}
+
+model OrganizationUser {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  userId         String    @map("user_id")
+  status         String    @default("pending") // "pending" | "accepted" | "rejected"
+  createdAt      DateTime  @default(now()) @map("created_at")
+  acceptedAt     DateTime? @map("accepted_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_users")
+}
+
+model OrganizationAdminUser {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_admin_users")
+}
+
+// Board Models
+model Board {
+  id             String    @id @default(cuid())
+  name           String
+  organizationId String    @map("organization_id")
+  isGeneral      Boolean   @default(false) @map("is_general")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  archivedAt     DateTime? @map("archived_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members      BoardUser[]
+  polls        Poll[]
+
+  @@index([organizationId])
+  @@map("boards")
+}
+
+model BoardUser {
+  id        String   @id @default(cuid())
+  boardId   String   @map("board_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, userId])
+  @@index([userId])
+  @@map("board_users")
+}
+
+// Poll Models
+model Poll {
+  id          String    @id @default(cuid())
+  title       String
+  description String
+  boardId     String    @map("board_id")
+  startDate   DateTime  @map("start_date")
+  endDate     DateTime  @map("end_date")
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  archivedAt  DateTime? @map("archived_at")
+
+  board     Board      @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  questions Question[]
+
+  @@index([boardId])
+  @@index([active])
+  @@map("polls")
+}
+
+model Question {
+  id        String    @id @default(cuid())
+  text      String
+  pollId    String    @map("poll_id")
+  order     Int       @default(0)
+  createdAt DateTime  @default(now()) @map("created_at")
+  archivedAt DateTime? @map("archived_at")
+
+  poll    Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  answers Answer[]
+  votes   Vote[]
+
+  @@index([pollId])
+  @@map("questions")
+}
+
+model Answer {
+  id         String    @id @default(cuid())
+  text       String
+  questionId String    @map("question_id")
+  order      Int       @default(0)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  archivedAt DateTime? @map("archived_at")
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  votes    Vote[]
+
+  @@index([questionId])
+  @@map("answers")
+}
+
+model Vote {
+  id         String   @id @default(cuid())
+  questionId String   @map("question_id")
+  answerId   String   @map("answer_id")
+  userId     String   @map("user_id")
+  userWeight Decimal  @default(1.0) @map("user_weight") @db.Decimal(10, 2)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answer   Answer   @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([questionId, userId])
+  @@index([answerId])
+  @@index([userId])
+  @@map("votes")
+}
