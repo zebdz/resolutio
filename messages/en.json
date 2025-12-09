@@ -52,6 +52,7 @@
   },
   "account": {
     "title": "Account Settings",
+    "button": "Account",
     "subtitle": "Manage your personal information and preferences",
     "personalInfo": "Personal Information",
     "firstName": "First Name",

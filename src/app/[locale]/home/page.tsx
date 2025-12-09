@@ -8,6 +8,7 @@ import { Link } from '@/src/i18n/routing';
 
 export default async function HomePage() {
   const t = await getTranslations('home');
+  const tAccount = await getTranslations('account');
   const user = await getCurrentUser();
 
   if (!user) {
@@ -26,7 +27,7 @@ export default async function HomePage() {
             </Text>
           </div>
           <Link href="/account">
-            <Button color="zinc">Account</Button>
+            <Button color="zinc">{tAccount('button')}</Button>
           </Link>
         </div>
 
