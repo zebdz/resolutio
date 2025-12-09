@@ -13,7 +13,7 @@ export async function authMiddleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Allow public routes
-  if (publicRoutes.some(route => pathname.startsWith(route))) {
+  if (publicRoutes.some((route) => pathname.startsWith(route))) {
     return NextResponse.next();
   }
 
@@ -24,6 +24,7 @@ export async function authMiddleware(request: NextRequest) {
     // No session, redirect to login
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
+
     return NextResponse.redirect(loginUrl);
   }
 
@@ -34,6 +35,7 @@ export async function authMiddleware(request: NextRequest) {
     // Invalid session, redirect to login
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
+
     return NextResponse.redirect(loginUrl);
   }
 
@@ -43,6 +45,7 @@ export async function authMiddleware(request: NextRequest) {
     await sessionRepository.delete(sessionId);
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
+
     return NextResponse.redirect(loginUrl);
   }
 

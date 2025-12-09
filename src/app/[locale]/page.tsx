@@ -6,7 +6,7 @@ import { LocaleSwitcher } from '@/web/components/LocaleSwitcher';
 
 export async function generateMetadata() {
   const t = await getTranslations('landing');
-  
+
   return {
     title: t('title'),
   };
@@ -14,13 +14,13 @@ export async function generateMetadata() {
 
 export default async function HomePage() {
   const t = await getTranslations('landing');
-  
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-6 bg-linear-to-b from-zinc-50 to-zinc-100 dark:from-zinc-900 dark:to-zinc-950">
       <div className="absolute top-6 right-6">
         <LocaleSwitcher />
       </div>
-      
+
       <div className="max-w-3xl mx-auto text-center space-y-8">
         <div className="space-y-4">
           <Heading className="text-4xl sm:text-5xl md:text-6xl font-bold">

@@ -1,5 +1,5 @@
-import type React from 'react'
-import { LocaleSwitcher } from '@/web/components/LocaleSwitcher'
+import type React from 'react';
+import { LocaleSwitcher } from '@/web/components/LocaleSwitcher';
 
 export function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -11,5 +11,5 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
         {children}
       </div>
     </main>
-  )
+  );
 }

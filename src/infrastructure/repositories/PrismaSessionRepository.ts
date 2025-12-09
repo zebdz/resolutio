@@ -1,4 +1,7 @@
-import type { SessionRepository, Session } from '@/domain/user/SessionRepository';
+import type {
+  SessionRepository,
+  Session,
+} from '@/domain/user/SessionRepository';
 import type { PrismaClient } from '@prisma/client';
 
 export class PrismaSessionRepository implements SessionRepository {

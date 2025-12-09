@@ -9,6 +9,6 @@ export const config = {
     // Match all pathnames except for
     // - … if they have a file extension
     // - … if they are in the /api or /_next folders
-    '/((?!api|_next/static|_next/image|favicon.ico|.*\\..*|dev-sw.js).*)'
-  ]
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\..*|dev-sw.js).*)',
+  ],
 };

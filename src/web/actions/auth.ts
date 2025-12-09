@@ -2,8 +2,8 @@
 
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { RegisterUserUseCase, type RegisterUserInput } from '@/application/auth/RegisterUserUseCase';
-import { LoginUserUseCase, type LoginUserInput } from '@/application/auth/LoginUserUseCase';
+import { RegisterUserUseCase } from '@/application/auth/RegisterUserUseCase';
+import { LoginUserUseCase } from '@/application/auth/LoginUserUseCase';
 import { LogoutUserUseCase } from '@/application/auth/LogoutUserUseCase';
 import {
   prisma,
@@ -12,39 +12,50 @@ import {
   Argon2PasswordHasher,
   Argon2PasswordVerifier,
 } from '@/infrastructure/index';
-import { setSessionCookie, getSessionCookie, deleteSessionCookie } from '../lib/session';
+import {
+  setSessionCookie,
+  getSessionCookie,
+  deleteSessionCookie,
+} from '../lib/session';
 import { RegisterUserSchema } from '@/application/auth/RegisterUserSchema';
 import { LoginUserSchema } from '@/application/auth/LoginUserSchema';
 import { UnauthorizedError, DuplicateError } from '@/domain/shared/errors';
 
 // Helper function to check if error is a Prisma connection error
 function isDatabaseConnectionError(error: unknown): boolean {
-  if (!error) return false;
-  
+  if (!error) {
+    return false;
+  }
+
   // Check error message
   const errorMessage = error instanceof Error ? error.message : String(error);
-  if (errorMessage.includes('Connection terminated') ||
-      errorMessage.includes('Can\'t reach database') ||
-      errorMessage.includes('Connection refused') ||
-      errorMessage.includes('ECONNREFUSED') ||
-      errorMessage.includes('timeout')) {
+  if (
+    errorMessage.includes('Connection terminated') ||
+    errorMessage.includes("Can't reach database") ||
+    errorMessage.includes('Connection refused') ||
+    errorMessage.includes('ECONNREFUSED') ||
+    errorMessage.includes('timeout')
+  ) {
     return true;
   }
-  
+
   // Check Prisma error codes
   if (typeof error === 'object' && error !== null && 'code' in error) {
     const prismaError = error as { code?: string };
-    return prismaError.code === 'P1001' || // Can't reach database server
-           prismaError.code === 'P1002' || // Database server timeout
-           prismaError.code === 'P1008' || // Operations timed out
-           prismaError.code === 'P1017';   // Server has closed the connection
+
+    return (
+      prismaError.code === 'P1001' || // Can't reach database server
+      prismaError.code === 'P1002' || // Database server timeout
+      prismaError.code === 'P1008' || // Operations timed out
+      prismaError.code === 'P1017'
+    ); // Server has closed the connection
   }
-  
+
   return false;
 }
 
 // Action result type for client-side handling
-export type ActionResult<T = void> = 
+export type ActionResult<T = void> =
   | { success: true; data: T }
   | { success: false; error: string; fieldErrors?: Record<string, string[]> };
 
@@ -55,13 +66,22 @@ const passwordHasher = new Argon2PasswordHasher();
 const passwordVerifier = new Argon2PasswordVerifier();
 
 // Use cases
-const registerUserUseCase = new RegisterUserUseCase(userRepository, passwordHasher);
-const loginUserUseCase = new LoginUserUseCase(userRepository, sessionRepository, passwordVerifier);
+const registerUserUseCase = new RegisterUserUseCase(
+  userRepository,
+  passwordHasher
+);
+const loginUserUseCase = new LoginUserUseCase(
+  userRepository,
+  sessionRepository,
+  passwordVerifier
+);
 const logoutUserUseCase = new LogoutUserUseCase(sessionRepository);
 
-export async function registerAction(formData: FormData): Promise<ActionResult<{ userId: string }>> {
+export async function registerAction(
+  formData: FormData
+): Promise<ActionResult<{ userId: string }>> {
   const t = await getTranslations('common.errors');
-  
+
   try {
     // Extract form data
     const input = {
@@ -77,14 +97,14 @@ export async function registerAction(formData: FormData): Promise<ActionResult<{
     const validation = RegisterUserSchema.safeParse(input);
     if (!validation.success) {
       const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err: any) => {
+      validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
         fieldErrors[path].push(err.message);
       });
-      
+
       return {
         success: false,
         error: t('validationFailed'),
@@ -93,8 +113,9 @@ export async function registerAction(formData: FormData): Promise<ActionResult<{
     }
 
     // Execute use case (remove confirmPassword as it's not in the use case input)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { confirmPassword, ...registerInput } = validation.data;
-    
+
     let result;
     try {
       result = await registerUserUseCase.execute(registerInput);
@@ -117,7 +138,7 @@ export async function registerAction(formData: FormData): Promise<ActionResult<{
           error: t('phoneExists'),
         };
       }
-      
+
       return {
         success: false,
         error: result.error.message,
@@ -130,7 +151,7 @@ export async function registerAction(formData: FormData): Promise<ActionResult<{
     };
   } catch (error) {
     console.error('Register action error:', error);
-    
+
     // Check for database connection errors
     if (isDatabaseConnectionError(error)) {
       return {
@@ -138,7 +159,7 @@ export async function registerAction(formData: FormData): Promise<ActionResult<{
         error: t('databaseConnection'),
       };
     }
-    
+
     return {
       success: false,
       error: t('unexpected'),
@@ -146,9 +167,11 @@ export async function registerAction(formData: FormData): Promise<ActionResult<{
   }
 }
 
-export async function loginAction(formData: FormData): Promise<ActionResult<{ userId: string }>> {
+export async function loginAction(
+  formData: FormData
+): Promise<ActionResult<{ userId: string }>> {
   const t = await getTranslations('common.errors');
-  
+
   try {
     // Extract form data
     const input = {
@@ -160,14 +183,14 @@ export async function loginAction(formData: FormData): Promise<ActionResult<{ us
     const validation = LoginUserSchema.safeParse(input);
     if (!validation.success) {
       const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err: any) => {
+      validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
         fieldErrors[path].push(err.message);
       });
-      
+
       return {
         success: false,
         error: t('validationFailed'),
@@ -198,7 +221,7 @@ export async function loginAction(formData: FormData): Promise<ActionResult<{ us
           error: t('databaseConnection'),
         };
       }
-      
+
       // Handle specific error types
       if (result.error instanceof UnauthorizedError) {
         return {
@@ -206,7 +229,7 @@ export async function loginAction(formData: FormData): Promise<ActionResult<{ us
           error: t('invalidCredentials'),
         };
       }
-      
+
       return {
         success: false,
         error: result.error.message,
@@ -222,7 +245,7 @@ export async function loginAction(formData: FormData): Promise<ActionResult<{ us
     };
   } catch (error) {
     console.error('Login action error:', error);
-    
+
     // Check for database connection errors
     if (isDatabaseConnectionError(error)) {
       return {
@@ -230,7 +253,7 @@ export async function loginAction(formData: FormData): Promise<ActionResult<{ us
         error: t('databaseConnection'),
       };
     }
-    
+
     return {
       success: false,
       error: t('unexpected'),
@@ -246,7 +269,7 @@ export async function logoutAction(): Promise<void> {
     if (sessionId) {
       // Execute use case
       await logoutUserUseCase.execute(sessionId);
-      
+
       // Delete cookie
       await deleteSessionCookie();
     }
@@ -261,20 +284,26 @@ export async function logoutAction(): Promise<void> {
 }
 
 // Helper function to get current user from session
-export async function getCurrentUser(): Promise<{ id: string; firstName: string; lastName: string; phoneNumber: string } | null> {
+export async function getCurrentUser(): Promise<{
+  id: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+} | null> {
   try {
     const sessionId = await getSessionCookie();
-    
+
     if (!sessionId) {
       return null;
     }
 
     // Find session
     const session = await sessionRepository.findById(sessionId);
-    
+
     if (!session) {
       // Invalid session, clean up cookie
       await deleteSessionCookie();
+
       return null;
     }
 
@@ -283,16 +312,18 @@ export async function getCurrentUser(): Promise<{ id: string; firstName: string;
       // Expired session, clean up
       await sessionRepository.delete(sessionId);
       await deleteSessionCookie();
+
       return null;
     }
 
     // Get user
     const user = await userRepository.findById(session.userId);
-    
+
     if (!user) {
       // User not found, clean up session
       await sessionRepository.delete(sessionId);
       await deleteSessionCookie();
+
       return null;
     }
 
@@ -304,6 +335,7 @@ export async function getCurrentUser(): Promise<{ id: string; firstName: string;
     };
   } catch (error) {
     console.error('Get current user error:', error);
+
     return null;
   }
 }

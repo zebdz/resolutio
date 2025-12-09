@@ -14,7 +14,7 @@ describe('User', () => {
   describe('create', () => {
     it('should create a user with valid props', () => {
       const user = User.create(validProps);
-      
+
       expect(user.firstName).toBe('John');
       expect(user.lastName).toBe('Doe');
       expect(user.middleName).toBe('Smith');
@@ -24,9 +24,10 @@ describe('User', () => {
     });
 
     it('should create a user without middle name', () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { middleName, ...propsWithoutMiddleName } = validProps;
       const user = User.create(propsWithoutMiddleName);
-      
+
       expect(user.middleName).toBeUndefined();
     });
 
@@ -58,6 +59,7 @@ describe('User', () => {
     });
 
     it('should return full name without middle name', () => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { middleName, ...propsWithoutMiddleName } = validProps;
       const user = User.create(propsWithoutMiddleName);
       expect(user.getFullName()).toBe('John Doe');
@@ -83,7 +85,7 @@ describe('User', () => {
       };
 
       const user = User.reconstitute(props);
-      
+
       expect(user.id).toBe('user-123');
       expect(user.firstName).toBe('John');
       expect(user.createdAt).toEqual(new Date('2024-01-01'));

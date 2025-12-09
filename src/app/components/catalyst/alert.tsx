@@ -1,7 +1,7 @@
-import * as Headless from '@headlessui/react'
-import clsx from 'clsx'
-import type React from 'react'
-import { Text } from './text'
+import * as Headless from '@headlessui/react';
+import clsx from 'clsx';
+import type React from 'react';
+import { Text } from './text';
 
 const sizes = {
   xs: 'sm:max-w-xs',
@@ -13,7 +13,7 @@ const sizes = {
   '3xl': 'sm:max-w-3xl',
   '4xl': 'sm:max-w-4xl',
   '5xl': 'sm:max-w-5xl',
-}
+};
 
 export function Alert({
   open = true,
@@ -23,11 +23,11 @@ export function Alert({
   children,
   ...props
 }: {
-  open?: boolean
-  onClose?: (value: boolean) => void
-  size?: keyof typeof sizes
-  className?: string
-  children: React.ReactNode
+  open?: boolean;
+  onClose?: (value: boolean) => void;
+  size?: keyof typeof sizes;
+  className?: string;
+  children: React.ReactNode;
 } & Omit<Headless.DialogProps, 'as' | 'className' | 'open' | 'onClose'>) {
   return (
     <Headless.Dialog open={open} onClose={onClose} {...props}>
@@ -52,13 +52,16 @@ export function Alert({
         </div>
       </div>
     </Headless.Dialog>
-  )
+  );
 }
 
 export function AlertTitle({
   className,
   ...props
-}: { className?: string } & Omit<Headless.DialogTitleProps, 'as' | 'className'>) {
+}: { className?: string } & Omit<
+  Headless.DialogTitleProps,
+  'as' | 'className'
+>) {
   return (
     <Headless.DialogTitle
       {...props}
@@ -67,27 +70,36 @@ export function AlertTitle({
         'text-center text-base/6 font-semibold text-balance text-zinc-950 sm:text-left sm:text-sm/6 sm:text-wrap dark:text-white'
       )}
     />
-  )
+  );
 }
 
 export function AlertDescription({
   className,
   ...props
-}: { className?: string } & Omit<Headless.DescriptionProps<typeof Text>, 'as' | 'className'>) {
+}: { className?: string } & Omit<
+  Headless.DescriptionProps<typeof Text>,
+  'as' | 'className'
+>) {
   return (
     <Headless.Description
       as={Text}
       {...props}
       className={clsx(className, 'mt-2 text-center text-pretty sm:text-left')}
     />
-  )
+  );
 }
 
-export function AlertBody({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
-  return <div {...props} className={clsx(className, 'mt-4')} />
+export function AlertBody({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<'div'>) {
+  return <div {...props} className={clsx(className, 'mt-4')} />;
 }
 
-export function AlertActions({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
+export function AlertActions({
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<'div'>) {
   return (
     <div
       {...props}
@@ -96,5 +108,5 @@ export function AlertActions({ className, ...props }: React.ComponentPropsWithou
         'mt-6 flex flex-col-reverse items-center justify-end gap-3 *:w-full sm:mt-4 sm:flex-row sm:*:w-auto'
       )}
     />
-  )
+  );
 }

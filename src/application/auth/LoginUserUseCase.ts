@@ -2,7 +2,7 @@ import { User } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { SessionRepository, Session } from '@/domain/user/SessionRepository';
-import { UnauthorizedError, NotFoundError } from '@/domain/shared/errors';
+import { UnauthorizedError } from '@/domain/shared/errors';
 import { Result, success, failure } from '@/domain/shared/Result';
 
 export interface PasswordVerifier {
@@ -34,7 +34,9 @@ export class LoginUserUseCase {
       // Find user by phone number
       const user = await this.userRepository.findByPhoneNumber(phoneNumber);
       if (!user) {
-        return failure(new UnauthorizedError('Invalid phone number or password'));
+        return failure(
+          new UnauthorizedError('Invalid phone number or password')
+        );
       }
 
       // Verify password
@@ -44,7 +46,9 @@ export class LoginUserUseCase {
       );
 
       if (!isPasswordValid) {
-        return failure(new UnauthorizedError('Invalid phone number or password'));
+        return failure(
+          new UnauthorizedError('Invalid phone number or password')
+        );
       }
 
       // Create session (expires in 30 days)

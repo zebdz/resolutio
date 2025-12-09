@@ -65,7 +65,7 @@ export class User {
   }
 
   getFullName(): string {
-    return this.middleName 
+    return this.middleName
       ? `${this.firstName} ${this.middleName} ${this.lastName}`
       : `${this.firstName} ${this.lastName}`;
   }

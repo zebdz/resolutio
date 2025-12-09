@@ -7,6 +7,7 @@ export class LogoutUserUseCase {
   async execute(sessionId: string): Promise<Result<void, Error>> {
     try {
       await this.sessionRepository.delete(sessionId);
+
       return success(undefined);
     } catch (error) {
       return failure(error as Error);

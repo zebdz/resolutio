@@ -14,23 +14,33 @@ describe('PhoneNumber', () => {
     });
 
     it('should throw error for invalid format without plus', () => {
-      expect(() => PhoneNumber.create('79161234567')).toThrow('Invalid phone number format');
+      expect(() => PhoneNumber.create('79161234567')).toThrow(
+        'Invalid phone number format'
+      );
     });
 
     it('should throw error for invalid format with spaces', () => {
-      expect(() => PhoneNumber.create('+7 916 123 45 67')).toThrow('Invalid phone number format');
+      expect(() => PhoneNumber.create('+7 916 123 45 67')).toThrow(
+        'Invalid phone number format'
+      );
     });
 
     it('should throw error for invalid format with dashes', () => {
-      expect(() => PhoneNumber.create('+7-916-123-45-67')).toThrow('Invalid phone number format');
+      expect(() => PhoneNumber.create('+7-916-123-45-67')).toThrow(
+        'Invalid phone number format'
+      );
     });
 
     it('should throw error for phone number starting with 0', () => {
-      expect(() => PhoneNumber.create('+09161234567')).toThrow('Invalid phone number format');
+      expect(() => PhoneNumber.create('+09161234567')).toThrow(
+        'Invalid phone number format'
+      );
     });
 
     it('should throw error for empty string', () => {
-      expect(() => PhoneNumber.create('')).toThrow('Invalid phone number format');
+      expect(() => PhoneNumber.create('')).toThrow(
+        'Invalid phone number format'
+      );
     });
   });
 

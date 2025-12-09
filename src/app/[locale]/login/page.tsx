@@ -6,7 +6,7 @@ import { getCurrentUser } from '@/web/lib/session';
 
 export async function generateMetadata() {
   const t = await getTranslations('auth.login');
-  
+
   return {
     title: t('title'),
   };
