@@ -1,12 +1,13 @@
 import { defineRouting } from 'next-intl/routing';
 import { createNavigation } from 'next-intl/navigation';
+import { locales, defaultLocale } from './locales';
 
 export const routing = defineRouting({
   // A list of all locales that are supported
-  locales: ['en', 'ru'],
+  locales: locales as unknown as string[],
 
   // Used when no locale matches
-  defaultLocale: 'ru',
+  defaultLocale,
 
   // Always show locale in URL (even for default locale)
   // With this, /register will be redirected to /en/register

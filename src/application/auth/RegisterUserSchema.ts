@@ -10,6 +10,7 @@ export const RegisterUserSchema = z
       .regex(/^\+[1-9]\d{1,14}$/, 'Invalid phone number format'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
     confirmPassword: z.string(),
+    language: z.enum(['en', 'ru']).optional().default('ru'),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",

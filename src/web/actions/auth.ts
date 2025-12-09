@@ -5,6 +5,7 @@ import { getTranslations } from 'next-intl/server';
 import { RegisterUserUseCase } from '@/application/auth/RegisterUserUseCase';
 import { LoginUserUseCase } from '@/application/auth/LoginUserUseCase';
 import { LogoutUserUseCase } from '@/application/auth/LogoutUserUseCase';
+import { Locale, defaultLocale } from '@/src/i18n/locales';
 import {
   prisma,
   PrismaUserRepository,
@@ -91,6 +92,7 @@ export async function registerAction(
       phoneNumber: formData.get('phoneNumber') as string,
       password: formData.get('password') as string,
       confirmPassword: formData.get('confirmPassword') as string,
+      language: (formData.get('language') as Locale) || defaultLocale,
     };
 
     // Validate with Zod

@@ -19,6 +19,7 @@ model User {
   middleName  String?  @map("middle_name")
   phoneNumber String   @unique @map("phone_number")
   password    String
+  language    String   @default("ru")
   createdAt   DateTime @default(now()) @map("created_at")
 
   // Relations

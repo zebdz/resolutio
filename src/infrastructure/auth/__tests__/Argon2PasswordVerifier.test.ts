@@ -15,7 +15,7 @@ describe('Argon2PasswordVerifier', () => {
     const password = 'CorrectPassword123!';
     const hashed = await hasher.hash(password);
 
-    const isValid = await verifier.verify(hashed, password);
+    const isValid = await verifier.verify(password, hashed);
 
     expect(isValid).toBe(true);
   });
@@ -25,7 +25,7 @@ describe('Argon2PasswordVerifier', () => {
     const wrongPassword = 'WrongPassword123!';
     const hashed = await hasher.hash(password);
 
-    const isValid = await verifier.verify(hashed, wrongPassword);
+    const isValid = await verifier.verify(wrongPassword, hashed);
 
     expect(isValid).toBe(false);
   });
@@ -35,7 +35,7 @@ describe('Argon2PasswordVerifier', () => {
     const wrongCase = 'password123!';
     const hashed = await hasher.hash(password);
 
-    const isValid = await verifier.verify(hashed, wrongCase);
+    const isValid = await verifier.verify(wrongCase, hashed);
 
     expect(isValid).toBe(false);
   });
@@ -44,7 +44,7 @@ describe('Argon2PasswordVerifier', () => {
     const password = 'Password123!';
     const hashed = await hasher.hash(password);
 
-    const isValid = await verifier.verify(hashed, '');
+    const isValid = await verifier.verify('', hashed);
 
     expect(isValid).toBe(false);
   });
@@ -53,7 +53,7 @@ describe('Argon2PasswordVerifier', () => {
     const password = '';
     const hashed = await hasher.hash(password);
 
-    const isValid = await verifier.verify(hashed, password);
+    const isValid = await verifier.verify(password, hashed);
 
     expect(isValid).toBe(true);
   });
@@ -62,7 +62,7 @@ describe('Argon2PasswordVerifier', () => {
     const invalidHash = 'not-a-valid-argon2-hash';
     const password = 'SomePassword123!';
 
-    const isValid = await verifier.verify(invalidHash, password);
+    const isValid = await verifier.verify(password, invalidHash);
 
     expect(isValid).toBe(false);
   });
@@ -71,7 +71,7 @@ describe('Argon2PasswordVerifier', () => {
     const password = '!@#$%^&*()_+{}|:"<>?[];,./`~';
     const hashed = await hasher.hash(password);
 
-    const isValid = await verifier.verify(hashed, password);
+    const isValid = await verifier.verify(password, hashed);
 
     expect(isValid).toBe(true);
   });
@@ -80,7 +80,7 @@ describe('Argon2PasswordVerifier', () => {
     const password = 'a'.repeat(500);
     const hashed = await hasher.hash(password);
 
-    const isValid = await verifier.verify(hashed, password);
+    const isValid = await verifier.verify(password, hashed);
 
     expect(isValid).toBe(true);
   });

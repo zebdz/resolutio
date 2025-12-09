@@ -3,6 +3,7 @@ import { PhoneNumber } from '@/domain/user/PhoneNumber';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { DuplicateError } from '@/domain/shared/errors';
 import { Result, success, failure } from '@/domain/shared/Result';
+import type { Language } from '@/domain/user/User';
 
 export interface PasswordHasher {
   hash(password: string): Promise<string>;
@@ -14,6 +15,7 @@ export interface RegisterUserInput {
   middleName?: string;
   phoneNumber: string;
   password: string;
+  language?: Language;
 }
 
 export class RegisterUserUseCase {
@@ -43,6 +45,7 @@ export class RegisterUserUseCase {
         middleName: input.middleName,
         phoneNumber,
         password: hashedPassword,
+        language: input.language || 'ru',
       });
 
       // Save user

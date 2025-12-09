@@ -50,6 +50,24 @@
     "noOrganizations": "Вы пока не состоите ни в одной организации.",
     "logout": "Выйти"
   },
+  "account": {
+    "title": "Настройки аккаунта",
+    "subtitle": "Управляйте своей личной информацией и предпочтениями",
+    "personalInfo": "Личная информация",
+    "firstName": "Имя",
+    "lastName": "Фамилия",
+    "middleName": "Отчество",
+    "phoneNumber": "Номер телефона",
+    "memberSince": "Зарегистрирован с",
+    "preferences": "Предпочтения",
+    "language": "Язык",
+    "languageEn": "Английский",
+    "languageRu": "Русский",
+    "save": "Сохранить изменения",
+    "saving": "Сохранение...",
+    "updateSuccess": "Профиль успешно обновлён",
+    "logout": "Выйти"
+  },
   "organization": {
     "title": "Организация",
     "description": "Описание",

@@ -48,7 +48,25 @@
     "pendingRequests": "Pending join requests",
     "createOrganization": "Create Organization",
     "noOrganizations": "You are not a member of any organizations yet.",
-    "logout": "Log out"
+    "logout": "Logout"
+  },
+  "account": {
+    "title": "Account Settings",
+    "subtitle": "Manage your personal information and preferences",
+    "personalInfo": "Personal Information",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "middleName": "Middle Name",
+    "phoneNumber": "Phone Number",
+    "memberSince": "Member Since",
+    "preferences": "Preferences",
+    "language": "Language",
+    "languageEn": "English",
+    "languageRu": "Russian",
+    "save": "Save Changes",
+    "saving": "Saving...",
+    "updateSuccess": "Profile updated successfully",
+    "logout": "Logout"
   },
   "organization": {
     "title": "Organization",

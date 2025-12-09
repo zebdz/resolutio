@@ -10,8 +10,13 @@ import { Text } from '@/app/components/catalyst/text';
 import { AlertBanner } from '@/app/components/catalyst/alert-banner';
 import { registerAction } from '@/web/actions/auth';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/16/solid';
+import { Locale } from '@/src/i18n/locales';
 
-export function RegisterForm() {
+type Props = {
+  locale: Locale;
+};
+
+export function RegisterForm({ locale }: Props) {
   const t = useTranslations('auth');
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -53,6 +58,9 @@ export function RegisterForm() {
   async function handleSubmit(formData: FormData) {
     setError(null);
     setFieldErrors({});
+
+    // Add the locale to form data
+    formData.append('language', locale);
 
     startTransition(async () => {
       const result = await registerAction(formData);

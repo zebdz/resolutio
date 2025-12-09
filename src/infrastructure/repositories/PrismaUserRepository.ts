@@ -1,5 +1,5 @@
 import type { UserRepository } from '@/domain/user/UserRepository';
-import { User } from '@/domain/user/User';
+import { User, type Language } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
 import type { PrismaClient } from '@prisma/client';
 
@@ -9,6 +9,16 @@ export class PrismaUserRepository implements UserRepository {
   async findById(id: string): Promise<User | null> {
     const user = await this.prisma.user.findUnique({
       where: { id },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        middleName: true,
+        phoneNumber: true,
+        password: true,
+        language: true,
+        createdAt: true,
+      },
     });
 
     if (!user) {
@@ -21,6 +31,16 @@ export class PrismaUserRepository implements UserRepository {
   async findByPhoneNumber(phoneNumber: PhoneNumber): Promise<User | null> {
     const user = await this.prisma.user.findUnique({
       where: { phoneNumber: phoneNumber.getValue() },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        middleName: true,
+        phoneNumber: true,
+        password: true,
+        language: true,
+        createdAt: true,
+      },
     });
 
     if (!user) {
@@ -31,15 +51,16 @@ export class PrismaUserRepository implements UserRepository {
   }
 
   async save(user: User): Promise<User> {
-    await this.prisma.user.upsert({
-      where: { id: user.id },
+    const savedUser = await this.prisma.user.upsert({
+      where: { id: user.id || 'new-user' }, // Use a non-existent ID for new users
       create: {
-        id: user.id,
+        // Don't include id - let Prisma generate it
         firstName: user.firstName,
         lastName: user.lastName,
         middleName: user.middleName,
         phoneNumber: user.phoneNumber.getValue(),
         password: user.password,
+        language: user.language,
         createdAt: user.createdAt,
       },
       update: {
@@ -48,10 +69,22 @@ export class PrismaUserRepository implements UserRepository {
         middleName: user.middleName,
         phoneNumber: user.phoneNumber.getValue(),
         password: user.password,
+        language: user.language,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        middleName: true,
+        phoneNumber: true,
+        password: true,
+        language: true,
+        createdAt: true,
       },
     });
 
-    return user;
+    // Return the reconstituted user with the actual ID from database
+    return this.toDomain(savedUser);
   }
 
   async exists(phoneNumber: PhoneNumber): Promise<boolean> {
@@ -69,6 +102,7 @@ export class PrismaUserRepository implements UserRepository {
     middleName: string | null;
     phoneNumber: string;
     password: string;
+    language: string;
     createdAt: Date;
   }): User {
     // PhoneNumber.create throws if invalid, which is correct here
@@ -82,6 +116,7 @@ export class PrismaUserRepository implements UserRepository {
       middleName: user.middleName ?? undefined,
       phoneNumber: phoneNumber,
       password: user.password,
+      language: (user.language as Language) || 'ru',
       createdAt: user.createdAt,
     });
   }
