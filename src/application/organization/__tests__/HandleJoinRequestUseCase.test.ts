@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { HandleJoinRequestUseCase } from '../HandleJoinRequestUseCase';
 import { PrismaClient } from '@prisma/client';
 import { OrganizationErrors } from '../OrganizationErrors';
+import { BoardRepository } from '../../../domain/board/BoardRepository';
+import { Board } from '../../../domain/board/Board';
 
 // Mock PrismaClient
 class MockPrismaClient {
@@ -15,14 +17,84 @@ class MockPrismaClient {
   };
 }
 
+// Mock BoardRepository
+class MockBoardRepository implements BoardRepository {
+  private boards: Map<string, any> = new Map();
+  private boardMembers: Map<string, Set<string>> = new Map();
+
+  async save(board: Board): Promise<Board> {
+    return board;
+  }
+
+  async findById(id: string): Promise<Board | null> {
+    return this.boards.get(id) || null;
+  }
+
+  async findByOrganizationId(organizationId: string): Promise<Board[]> {
+    return [];
+  }
+
+  async findGeneralBoardByOrganizationId(
+    organizationId: string
+  ): Promise<Board | null> {
+    const board = Array.from(this.boards.values()).find(
+      (b) => b.organizationId === organizationId && b.isGeneral
+    );
+
+    return board || null;
+  }
+
+  async isUserMember(userId: string, boardId: string): Promise<boolean> {
+    const members = this.boardMembers.get(boardId);
+
+    return members ? members.has(userId) : false;
+  }
+
+  async addUserToBoard(userId: string, boardId: string): Promise<void> {
+    if (!this.boardMembers.has(boardId)) {
+      this.boardMembers.set(boardId, new Set());
+    }
+    this.boardMembers.get(boardId)!.add(userId);
+  }
+
+  async removeUserFromBoard(userId: string, boardId: string): Promise<void> {
+    const members = this.boardMembers.get(boardId);
+    if (members) {
+      members.delete(userId);
+    }
+  }
+
+  async update(board: Board): Promise<Board> {
+    return board;
+  }
+
+  // Helper methods for testing
+  setGeneralBoard(organizationId: string, boardId: string): void {
+    this.boards.set(boardId, {
+      id: boardId,
+      name: 'General Board',
+      organizationId,
+      isGeneral: true,
+    });
+  }
+
+  getBoardMembers(boardId: string): string[] {
+    const members = this.boardMembers.get(boardId);
+
+    return members ? Array.from(members) : [];
+  }
+}
+
 describe('HandleJoinRequestUseCase', () => {
   let useCase: HandleJoinRequestUseCase;
   let prisma: MockPrismaClient;
+  let boardRepository: MockBoardRepository;
   let requests: Map<string, any>;
   let adminRoles: Map<string, Set<string>>;
 
   beforeEach(() => {
     prisma = new MockPrismaClient();
+    boardRepository = new MockBoardRepository();
     requests = new Map();
     adminRoles = new Map();
 
@@ -61,6 +133,7 @@ describe('HandleJoinRequestUseCase', () => {
 
     useCase = new HandleJoinRequestUseCase({
       prisma: prisma as unknown as PrismaClient,
+      boardRepository,
     });
   });
 
@@ -291,6 +364,51 @@ describe('HandleJoinRequestUseCase', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toBe(OrganizationErrors.NOT_PENDING);
+    }
+  });
+
+  it('should automatically add accepted user to general board', async () => {
+    const organizationId = 'org-123';
+    const requesterId = 'user-456';
+    const adminId = 'admin-789';
+    const generalBoardId = 'board-general';
+
+    // Set up: admin role
+    if (!adminRoles.has(organizationId)) {
+      adminRoles.set(organizationId, new Set());
+    }
+    adminRoles.get(organizationId)!.add(adminId);
+
+    // Set up: general board exists
+    boardRepository.setGeneralBoard(organizationId, generalBoardId);
+
+    // Set up: pending request
+    const key = `${organizationId}-${requesterId}`;
+    requests.set(key, {
+      id: 'request-1',
+      organizationId,
+      userId: requesterId,
+      status: 'pending',
+      createdAt: new Date(),
+      acceptedAt: null,
+      rejectedAt: null,
+      rejectionReason: null,
+      acceptedByUserId: null,
+      rejectedByUserId: null,
+    });
+
+    const result = await useCase.execute({
+      organizationId,
+      requesterId,
+      adminId,
+      action: 'accept',
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // Verify user was added to general board
+      const members = boardRepository.getBoardMembers(generalBoardId);
+      expect(members).toContain(requesterId);
     }
   });
 });

@@ -132,6 +132,7 @@ model Board {
 
   @@unique([name, organizationId])
   @@index([organizationId])
+  @@index([organizationId, isGeneral])
   @@map("boards")
 }
 
@@ -169,12 +170,13 @@ model Poll {
 }
 
 model Question {
-  id        String    @id @default(cuid())
-  text      String
-  pollId    String    @map("poll_id")
-  order     Int       @default(0)
-  createdAt DateTime  @default(now()) @map("created_at")
-  archivedAt DateTime? @map("archived_at")
+  id           String    @id @default(cuid())
+  text         String
+  pollId       String    @map("poll_id")
+  order        Int       @default(0)
+  questionType String    @default("single-choice") @map("question_type") // "single-choice" | "multiple-choice"
+  createdAt    DateTime  @default(now()) @map("created_at")
+  archivedAt   DateTime? @map("archived_at")
 
   poll    Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
   answers Answer[]
@@ -211,7 +213,7 @@ model Vote {
   answer   Answer   @relation(fields: [answerId], references: [id], onDelete: Cascade)
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([questionId, userId])
+  @@unique([questionId, userId, answerId])
   @@index([answerId])
   @@index([userId])
   @@map("votes")

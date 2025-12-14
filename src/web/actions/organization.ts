@@ -52,6 +52,7 @@ const getPendingRequestsUseCase = new GetPendingRequestsUseCase({
 
 const handleJoinRequestUseCase = new HandleJoinRequestUseCase({
   prisma,
+  boardRepository,
 });
 
 const joinOrganizationUseCase = new JoinOrganizationUseCase({

@@ -2,9 +2,11 @@ import { PrismaClient } from '@prisma/client';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { HandleJoinRequestInput } from './HandleJoinRequestSchema';
 import { OrganizationErrors } from './OrganizationErrors';
+import { BoardRepository } from '../../domain/board/BoardRepository';
 
 export interface HandleJoinRequestDependencies {
   prisma: PrismaClient;
+  boardRepository: BoardRepository;
 }
 
 export class HandleJoinRequestUseCase {
@@ -64,6 +66,19 @@ export class HandleJoinRequestUseCase {
           acceptedByUserId: adminId,
         },
       });
+
+      // Add user to the general board
+      const generalBoard =
+        await this.deps.boardRepository.findGeneralBoardByOrganizationId(
+          organizationId
+        );
+
+      if (generalBoard) {
+        await this.deps.boardRepository.addUserToBoard(
+          requesterId,
+          generalBoard.id
+        );
+      }
     } else {
       await this.deps.prisma.organizationUser.update({
         where: {

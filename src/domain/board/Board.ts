@@ -1,4 +1,5 @@
 import { Result, success, failure } from '../shared/Result';
+import { DomainErrors } from '../shared/DomainErrors';
 
 export interface BoardProps {
   id: string;
@@ -19,11 +20,11 @@ export class Board {
   ): Result<Board, string> {
     // Validate name
     if (!name || name.trim().length === 0) {
-      return failure('Board name cannot be empty');
+      return failure(DomainErrors.BOARD_NAME_EMPTY);
     }
 
     if (name.length > 255) {
-      return failure('Board name cannot exceed 255 characters');
+      return failure(DomainErrors.BOARD_NAME_TOO_LONG);
     }
 
     const board = new Board({
@@ -73,7 +74,7 @@ export class Board {
 
   public archive(): Result<void, string> {
     if (this.isArchived()) {
-      return failure('Board is already archived');
+      return failure(DomainErrors.BOARD_ALREADY_ARCHIVED);
     }
 
     this.props.archivedAt = new Date();

@@ -180,5 +180,17 @@
       "generic": "Что-то пошло не так. Пожалуйста, попробуйте еще раз.",
       "duplicate_name": "Организация с таким названием уже существует"
     }
+  },
+  "domain": {
+    "errors": {
+      "organizationNameEmpty": "Название организации не может быть пустым",
+      "organizationNameTooLong": "Название организации не может превышать 255 символов",
+      "organizationDescriptionEmpty": "Описание организации не может быть пустым",
+      "organizationDescriptionTooLong": "Описание организации не может превышать 1000 символов",
+      "organizationAlreadyArchived": "Организация уже архивирована",
+      "boardNameEmpty": "Название доски не может быть пустым",
+      "boardNameTooLong": "Название доски не может превышать 255 символов",
+      "boardAlreadyArchived": "Доска уже архивирована"
+    }
   }
 }

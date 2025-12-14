@@ -1,4 +1,5 @@
 import { Result, success, failure } from '../shared/Result';
+import { DomainErrors } from '../shared/DomainErrors';
 
 export interface OrganizationProps {
   id: string;
@@ -21,20 +22,20 @@ export class Organization {
   ): Result<Organization, string> {
     // Validate name
     if (!name || name.trim().length === 0) {
-      return failure('Organization name cannot be empty');
+      return failure(DomainErrors.ORGANIZATION_NAME_EMPTY);
     }
 
     if (name.length > 255) {
-      return failure('Organization name cannot exceed 255 characters');
+      return failure(DomainErrors.ORGANIZATION_NAME_TOO_LONG);
     }
 
     // Validate description
     if (!description || description.trim().length === 0) {
-      return failure('Organization description cannot be empty');
+      return failure(DomainErrors.ORGANIZATION_DESCRIPTION_EMPTY);
     }
 
     if (description.length > 2000) {
-      return failure('Organization description cannot exceed 2000 characters');
+      return failure(DomainErrors.ORGANIZATION_DESCRIPTION_TOO_LONG);
     }
 
     const organization = new Organization({
@@ -89,7 +90,7 @@ export class Organization {
 
   public archive(): Result<void, string> {
     if (this.isArchived()) {
-      return failure('Organization is already archived');
+      return failure(DomainErrors.ORGANIZATION_ALREADY_ARCHIVED);
     }
 
     this.props.archivedAt = new Date();
