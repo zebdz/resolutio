@@ -30,6 +30,8 @@ model User {
   boardMemberships   BoardUser[]
   votes              Vote[]
   superAdmin         SuperAdmin?
+  acceptedRequests   OrganizationUser[] @relation("AcceptedByAdmin")
+  rejectedRequests   OrganizationUser[] @relation("RejectedByAdmin")
 
   @@map("users")
 }
@@ -47,8 +49,7 @@ model Session {
 }
 
 model SuperAdmin {
-  id        String   @id @default(cuid())
-  userId    String   @unique @map("user_id")
+  userId    String   @id @map("user_id")
   createdAt DateTime @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -59,7 +60,7 @@ model SuperAdmin {
 // Organization Models
 model Organization {
   id          String   @id @default(cuid())
-  name        String
+  name        String   @unique
   description String
   parentId    String?  @map("parent_id")
   createdById String   @map("created_by_id")
@@ -80,23 +81,30 @@ model Organization {
 }
 
 model OrganizationUser {
-  id             String    @id @default(cuid())
-  organizationId String    @map("organization_id")
-  userId         String    @map("user_id")
-  status         String    @default("pending") // "pending" | "accepted" | "rejected"
-  createdAt      DateTime  @default(now()) @map("created_at")
-  acceptedAt     DateTime? @map("accepted_at")
+  id                String    @id @default(cuid())
+  organizationId    String    @map("organization_id")
+  userId            String    @map("user_id")
+  status            String    @default("pending") // "pending" | "accepted" | "rejected"
+  createdAt         DateTime  @default(now()) @map("created_at")
+  acceptedAt        DateTime? @map("accepted_at")
+  rejectedAt        DateTime? @map("rejected_at")
+  rejectionReason   String?   @map("rejection_reason")
+  acceptedByUserId  String?   @map("accepted_by_user_id")
+  rejectedByUserId  String?   @map("rejected_by_user_id")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  acceptedBy   User?        @relation("AcceptedByAdmin", fields: [acceptedByUserId], references: [id])
+  rejectedBy   User?        @relation("RejectedByAdmin", fields: [rejectedByUserId], references: [id])
 
   @@unique([organizationId, userId])
   @@index([userId])
+  @@index([acceptedByUserId])
+  @@index([rejectedByUserId])
   @@map("organization_users")
 }
 
 model OrganizationAdminUser {
-  id             String   @id @default(cuid())
   organizationId String   @map("organization_id")
   userId         String   @map("user_id")
   createdAt      DateTime @default(now()) @map("created_at")
@@ -104,7 +112,7 @@ model OrganizationAdminUser {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, userId])
+  @@id([organizationId, userId])
   @@index([userId])
   @@map("organization_admin_users")
 }
@@ -122,12 +130,12 @@ model Board {
   members      BoardUser[]
   polls        Poll[]
 
+  @@unique([name, organizationId])
   @@index([organizationId])
   @@map("boards")
 }
 
 model BoardUser {
-  id        String   @id @default(cuid())
   boardId   String   @map("board_id")
   userId    String   @map("user_id")
   createdAt DateTime @default(now()) @map("created_at")
@@ -135,7 +143,7 @@ model BoardUser {
   board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([boardId, userId])
+  @@id([boardId, userId])
   @@index([userId])
   @@map("board_users")
 }

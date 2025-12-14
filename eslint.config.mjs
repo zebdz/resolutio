@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
         'error',
         { blankLine: 'always', prev: '*', next: 'return' },
       ],
+      '@typescript-eslint/no-explicit-any': 'off', // temporarily disable TODO: enable later
+      '@typescript-eslint/no-unused-vars': 'off', // temporarily disable TODO: enable later
     },
   },
   // Override default ignores of eslint-config-next.

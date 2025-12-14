@@ -45,10 +45,23 @@
   "home": {
     "title": "My Organizations",
     "myOrganizations": "Organizations I'm a member of",
+    "browseOrganizations": "Browse Organizations",
+    "managePendingRequests": "Manage Join Requests",
     "pendingRequests": "Pending join requests",
+    "rejectedRequests": "Rejected join requests",
     "createOrganization": "Create Organization",
     "noOrganizations": "You are not a member of any organizations yet.",
-    "logout": "Logout"
+    "member": "Member",
+    "joinedAt": "Joined",
+    "logout": "Logout",
+    "joinRequest": {
+      "requested": "Requested",
+      "pending": "Pending",
+      "rejected": "Rejected",
+      "reason": "Reason",
+      "rejectedBy": "Rejected by",
+      "rejectedOn": "on"
+    }
   },
   "account": {
     "title": "Account Settings",
@@ -76,9 +89,80 @@
     "join": "Request to Join",
     "polls": "Polls",
     "noPolis": "No polls available",
-    "members": "Members"
+    "members": "Members",
+    "defaultBoardName": "General Meeting",
+    "errors": {
+      "notFound": "Organization not found",
+      "archived": "Cannot join an archived organization",
+      "nameExists": "An organization with this name already exists",
+      "alreadyMember": "You are already a member of this organization",
+      "pendingRequest": "You already have a pending request to join this organization",
+      "rejectedRequest": "Your previous request to join this organization was rejected",
+      "hierarchyConflict": "You cannot join this organization because you are already a member of an organization in its hierarchy",
+      "parentNotFound": "Parent organization not found",
+      "parentArchived": "Cannot create organization under an archived parent",
+      "parentHierarchyConflict": "You cannot create an organization under a parent where you are already a member",
+      "notAdmin": "You are not an admin of this organization",
+      "invalidStatus": "Invalid request status",
+      "requestNotFound": "Join request not found",
+      "notPending": "Join request is not pending"
+    },
+    "create": {
+      "title": "Create Organization",
+      "name": "Organization Name",
+      "namePlaceholder": "Enter organization name",
+      "description": "Description",
+      "descriptionPlaceholder": "Describe the purpose and goals of the organization",
+      "parentOrganization": "Parent Organization",
+      "parentOrganizationPlaceholder": "Select a parent organization (optional)",
+      "noParent": "None - Create as root organization",
+      "submit": "Create Organization",
+      "creating": "Creating...",
+      "cancel": "Cancel",
+      "success": "Organization created successfully",
+      "errors": {
+        "nameRequired": "Organization name is required",
+        "descriptionRequired": "Description is required",
+        "parentNotFound": "Parent organization not found",
+        "hierarchyConflict": "You cannot create an organization under a parent where you are already a member"
+      }
+    },
+    "list": {
+      "title": "Browse Organizations",
+      "subtitle": "Find and join organizations",
+      "search": "Search organizations...",
+      "memberCount": "{count, plural, =0 {No members} =1 {1 member} other {# members}}",
+      "admin": "Admin",
+      "joinButton": "Request to Join",
+      "joining": "Requesting...",
+      "noOrganizations": "No organizations available",
+      "joinSuccess": "Join request sent successfully",
+      "errors": {
+        "alreadyMember": "You are already a member of this organization",
+        "pendingRequest": "You already have a pending request",
+        "hierarchyConflict": "You cannot join this organization due to hierarchy constraints"
+      }
+    },
+    "pendingRequests": {
+      "title": "Pending Join Requests",
+      "subtitle": "Review and approve or reject join requests for your organizations",
+      "noPending": "No pending join requests",
+      "noPendingDescription": "When users request to join your organizations, they will appear here.",
+      "statusPending": "Pending",
+      "requestedOn": "Requested on",
+      "phoneNumber": "Phone",
+      "accept": "Accept",
+      "reject": "Reject",
+      "rejectDialogTitle": "Reject Join Request",
+      "rejectDialogDescription": "Are you sure you want to reject {name}'s request to join {organization}?",
+      "rejectionReasonLabel": "Reason for rejection (optional)",
+      "rejectionReasonPlaceholder": "Explain why this request is being rejected...",
+      "confirmReject": "Reject Request",
+      "rejecting": "Rejecting..."
+    }
   },
   "common": {
+    "back": "Back",
     "loading": "Loading...",
     "error": "An error occurred",
     "success": "Success",
@@ -92,7 +176,9 @@
       "invalidCredentials": "Invalid phone number or password",
       "phoneExists": "User with this phone number already exists",
       "unauthorized": "Unauthorized",
-      "databaseConnection": "Unable to connect to the database. Please try again later."
+      "databaseConnection": "Unable to connect to the database. Please try again later.",
+      "generic": "Something went wrong. Please try again.",
+      "duplicate_name": "An organization with this name already exists"
     }
   }
 }

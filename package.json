@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 8080",
     "prebuild": "yarn run format && yarn run test:run && yarn run lint",
     "prerelease": "yarn run prebuild && yarn run test:e2e",
     "build": "next build",
@@ -17,7 +17,8 @@
     "test:run": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:debug": "playwright test --debug"
+    "test:e2e:debug": "playwright test --debug",
+    "prisma:generate": "prisma generate"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.0",

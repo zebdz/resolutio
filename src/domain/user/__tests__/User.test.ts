@@ -24,7 +24,6 @@ describe('User', () => {
     });
 
     it('should create a user without middle name', () => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { middleName, ...propsWithoutMiddleName } = validProps;
       const user = User.create(propsWithoutMiddleName);
 
@@ -75,7 +74,6 @@ describe('User', () => {
     });
 
     it('should return full name without middle name', () => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { middleName, ...propsWithoutMiddleName } = validProps;
       const user = User.create(propsWithoutMiddleName);
       expect(user.getFullName()).toBe('John Doe');

@@ -115,7 +115,7 @@ export async function registerAction(
     }
 
     // Execute use case (remove confirmPassword as it's not in the use case input)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     const { confirmPassword, ...registerInput } = validation.data;
 
     let result;
