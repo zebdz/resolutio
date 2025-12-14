@@ -95,6 +95,32 @@ export class PrismaUserRepository implements UserRepository {
     return count > 0;
   }
 
+  async searchUsers(query: string): Promise<User[]> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        OR: [
+          { firstName: { contains: query, mode: 'insensitive' } },
+          { lastName: { contains: query, mode: 'insensitive' } },
+          { middleName: { contains: query, mode: 'insensitive' } },
+          { phoneNumber: { contains: query } },
+        ],
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        middleName: true,
+        phoneNumber: true,
+        password: true,
+        language: true,
+        createdAt: true,
+      },
+      take: 20, // Limit results to 20 users
+    });
+
+    return users.map((user) => this.toDomain(user));
+  }
+
   private toDomain(user: {
     id: string;
     firstName: string;

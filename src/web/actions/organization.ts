@@ -12,6 +12,8 @@ import { HandleJoinRequestUseCase } from '@/application/organization/HandleJoinR
 import { HandleJoinRequestSchema } from '@/application/organization/HandleJoinRequestSchema';
 import { JoinOrganizationUseCase } from '@/application/organization/JoinOrganizationUseCase';
 import { JoinOrganizationSchema } from '@/application/organization/JoinOrganizationSchema';
+import { GetOrganizationDetailsUseCase } from '@/application/organization/GetOrganizationDetailsUseCase';
+import { GetOrganizationPendingRequestsUseCase } from '@/application/organization/GetOrganizationPendingRequestsUseCase';
 import {
   prisma,
   PrismaOrganizationRepository,
@@ -59,6 +61,17 @@ const joinOrganizationUseCase = new JoinOrganizationUseCase({
   organizationRepository,
   prisma,
 });
+
+const getOrganizationDetailsUseCase = new GetOrganizationDetailsUseCase({
+  organizationRepository,
+  boardRepository,
+  prisma,
+});
+
+const getOrganizationPendingRequestsUseCase =
+  new GetOrganizationPendingRequestsUseCase({
+    prisma,
+  });
 
 export async function createOrganizationAction(
   formData: FormData
@@ -542,6 +555,129 @@ export async function handleJoinRequestAction(
     };
   } catch (error) {
     console.error('Error handling join request:', error);
+
+    return {
+      success: false,
+      error: t('generic'),
+    };
+  }
+}
+
+export async function getOrganizationDetailsAction(
+  organizationId: string
+): Promise<
+  ActionResult<{
+    organization: {
+      id: string;
+      name: string;
+      description: string;
+      createdAt: Date;
+    };
+    boards: Array<{
+      id: string;
+      name: string;
+      isGeneral: boolean;
+      memberCount: number;
+      isUserMember: boolean;
+    }>;
+    isUserMember: boolean;
+    isUserAdmin: boolean;
+    firstAdmin: { id: string; firstName: string; lastName: string } | null;
+  }>
+> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    const result = await getOrganizationDetailsUseCase.execute({
+      organizationId,
+      userId: user?.id,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error,
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        organization: {
+          id: result.value.organization.id,
+          name: result.value.organization.name,
+          description: result.value.organization.description,
+          createdAt: result.value.organization.createdAt,
+        },
+        boards: result.value.boards.map((b) => ({
+          id: b.board.id,
+          name: b.board.name,
+          isGeneral: b.board.isGeneral,
+          memberCount: b.memberCount,
+          isUserMember: b.isUserMember,
+        })),
+        isUserMember: result.value.isUserMember,
+        isUserAdmin: result.value.isUserAdmin,
+        firstAdmin: result.value.firstAdmin,
+      },
+    };
+  } catch (error) {
+    console.error('Error getting organization details:', error);
+
+    return {
+      success: false,
+      error: t('generic'),
+    };
+  }
+}
+
+export async function getOrganizationPendingRequestsAction(
+  organizationId: string
+): Promise<
+  ActionResult<{
+    requests: Array<{
+      userId: string;
+      firstName: string;
+      lastName: string;
+      middleName?: string;
+      phoneNumber: string;
+      requestedAt: Date;
+    }>;
+  }>
+> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    const result = await getOrganizationPendingRequestsUseCase.execute({
+      organizationId,
+      adminUserId: user.id,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error,
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        requests: result.value.requests,
+      },
+    };
+  } catch (error) {
+    console.error('Error getting organization pending requests:', error);
 
     return {
       success: false,

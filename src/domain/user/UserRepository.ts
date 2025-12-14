@@ -6,4 +6,5 @@ export interface UserRepository {
   findByPhoneNumber(phoneNumber: PhoneNumber): Promise<User | null>;
   save(user: User): Promise<User>;
   exists(phoneNumber: PhoneNumber): Promise<boolean>;
+  searchUsers(query: string): Promise<User[]>;
 }

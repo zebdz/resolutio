@@ -6,6 +6,7 @@ import { Badge } from '@/app/components/catalyst/badge';
 import { Heading } from '@/app/components/catalyst/heading';
 import { Text } from '@/app/components/catalyst/text';
 import { Divider } from '@/app/components/catalyst/divider';
+import { Link } from '@/src/i18n/routing';
 import { getUserOrganizationsAction } from '@/web/actions/organization';
 
 interface UserOrganization {
@@ -103,9 +104,10 @@ export function UserOrganizationsList() {
           </Heading>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {member.map((org) => (
-              <div
+              <Link
                 key={org.id}
-                className="rounded-lg border border-zinc-200 bg-white p-6 transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
+                href={`/organizations/${org.id}`}
+                className="block rounded-lg border border-zinc-200 bg-white p-6 transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
               >
                 <div className="flex items-start justify-between">
                   <Heading level={3} className="text-lg font-semibold">
@@ -121,7 +123,7 @@ export function UserOrganizationsList() {
                     {t('joinedAt')} {org.joinedAt.toLocaleDateString()}
                   </Text>
                 )}
-              </div>
+              </Link>
             ))}
           </div>
         </div>
@@ -137,9 +139,10 @@ export function UserOrganizationsList() {
             </Heading>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {pending.map((org) => (
-                <div
+                <Link
                   key={org.id}
-                  className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
+                  href={`/organizations/${org.id}`}
+                  className="block rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
                 >
                   <div className="flex items-start justify-between">
                     <Heading level={3} className="text-lg font-semibold">
@@ -156,7 +159,7 @@ export function UserOrganizationsList() {
                       {org.requestedAt.toLocaleDateString()}
                     </Text>
                   )}
-                </div>
+                </Link>
               ))}
             </div>
           </div>
@@ -175,9 +178,10 @@ export function UserOrganizationsList() {
             </Heading>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {rejected.map((org) => (
-                <div
+                <Link
                   key={org.id}
-                  className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950"
+                  href={`/organizations/${org.id}`}
+                  className="block rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950"
                 >
                   <div className="flex items-start justify-between">
                     <Heading level={3} className="text-lg font-semibold">
@@ -205,7 +209,7 @@ export function UserOrganizationsList() {
                       {org.rejectedAt.toLocaleDateString()}
                     </Text>
                   )}
-                </div>
+                </Link>
               ))}
             </div>
           </div>

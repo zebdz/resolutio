@@ -90,7 +90,7 @@
     "polls": "Polls",
     "noPolis": "No polls available",
     "members": "Members",
-    "defaultBoardName": "General Meeting",
+    "defaultBoardName": "General Board",
     "errors": {
       "notFound": "Organization not found",
       "archived": "Cannot join an archived organization",
@@ -159,11 +159,110 @@
       "rejectionReasonPlaceholder": "Explain why this request is being rejected...",
       "confirmReject": "Reject Request",
       "rejecting": "Rejecting..."
+    },
+    "detail": {
+      "description": "Description",
+      "firstAdmin": "First Administrator",
+      "joinOrganization": "Request to Join",
+      "joining": "Requesting...",
+      "boards": "Boards",
+      "boardMemberCount": "{count, plural, =0 {No members} =1 {1 member} other {# members}}",
+      "boardMember": "Member",
+      "manageBoards": "Manage Boards",
+      "pendingRequests": "Manage Join Requests",
+      "recentPolls": "Recent Polls",
+      "noPolis": "No polls yet",
+      "pollBoard": "Board",
+      "pollStartDate": "Start Date",
+      "pollEndDate": "End Date",
+      "pollActive": "Active",
+      "pollFinished": "Finished",
+      "pollActiveYes": "Yes",
+      "pollActiveNo": "No",
+      "voteButton": "Vote",
+      "showResults": "Show Results",
+      "viewDetails": "View Details",
+      "noBoards": "No boards available",
+      "createBoard": "Create Board"
+    },
+    "pendingRequestsPage": {
+      "title": "Pending Join Requests",
+      "subtitle": "Review join requests for {organization}",
+      "noPending": "No pending requests",
+      "noPendingDescription": "When users request to join this organization, they will appear here.",
+      "requestedAt": "Requested on",
+      "phoneNumber": "Phone",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approving": "Approving...",
+      "rejecting": "Rejecting...",
+      "actions": "Actions"
+    },
+    "boards": {
+      "isGeneral": "general",
+      "manage": {
+        "title": "Manage Organization Boards",
+        "subtitle": "Manage boards for {organization}",
+        "createBoard": "Create Board",
+        "boardName": "Board Name",
+        "memberCount": "{count, plural, =0 {No members} =1 {1 member} other {# members}}",
+        "viewPolls": "View Polls",
+        "manageBoard": "Manage Board",
+        "archiveBoard": "Archive",
+        "archiveBoardConfirm": "Are you sure you want to archive the board: {board}? This action cannot be undone.",
+        "general": "General Board",
+        "noBoards": "No boards yet",
+        "archiving": "Archiving...",
+        "archiveSuccess": "Board archived successfully"
+      },
+      "manageSingle": {
+        "title": "Manage Board Members",
+        "subtitle": "Add and remove members for board: {board}",
+        "members": "Board Members",
+        "addMember": "Add Member",
+        "addOutsideMember": "Add an Outside Member",
+        "searchPlaceholder": "Search users by name or phone...",
+        "noMembers": "No members yet",
+        "noResults": "No users found",
+        "searching": "Searching...",
+        "minSearchLength": "Enter at least 2 characters to search",
+        "removeMember": "Remove",
+        "removing": "Removing...",
+        "removeDialogTitle": "Remove Board Member",
+        "removeDialogDescription": "Are you sure you want to remove {name} from this board?",
+        "removalReasonLabel": "Reason for removal (optional)",
+        "removalReasonPlaceholder": "Explain why this member is being removed...",
+        "confirmRemove": "Remove Member",
+        "addedBy": "Added by",
+        "addedAt": "Added on",
+        "removedBy": "Removed by",
+        "removedAt": "Removed on",
+        "removedReason": "Reason",
+        "selectUser": "Select a user to add",
+        "add": "Add",
+        "adding": "Adding...",
+        "addSuccess": "Member added successfully",
+        "removeSuccess": "Member removed successfully"
+      },
+      "create": {
+        "title": "Create Board",
+        "name": "Board Name",
+        "namePlaceholder": "Enter board name",
+        "submit": "Create Board",
+        "creating": "Creating...",
+        "cancel": "Cancel",
+        "success": "Board created successfully",
+        "errors": {
+          "nameRequired": "Board name is required",
+          "nameExists": "A board with this name already exists in this organization"
+        }
+      }
     }
   },
   "common": {
     "back": "Back",
     "loading": "Loading...",
+    "creating": "Creating...",
     "error": "An error occurred",
     "success": "Success",
     "cancel": "Cancel",
@@ -179,6 +278,16 @@
       "databaseConnection": "Unable to connect to the database. Please try again later.",
       "generic": "Something went wrong. Please try again.",
       "duplicate_name": "An organization with this name already exists"
+    }
+  },
+  "board": {
+    "errors": {
+      "notFound": "Board not found",
+      "cannotArchiveGeneral": "Cannot archive the general board",
+      "userNotOrgMember": "User is not a member of the organization",
+      "alreadyMember": "User is already a member of this board",
+      "boardArchived": "Cannot modify an archived board",
+      "notMember": "User is not a member of this board"
     }
   },
   "domain": {

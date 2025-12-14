@@ -8,6 +8,7 @@ import { Button } from '@/app/components/catalyst/button';
 import { Heading } from '@/app/components/catalyst/heading';
 import { Text } from '@/app/components/catalyst/text';
 import { Badge } from '@/app/components/catalyst/badge';
+import { Link } from '@/src/i18n/routing';
 import { joinOrganizationAction } from '@/web/actions/organization';
 
 interface Organization {
@@ -101,14 +102,17 @@ export function OrganizationsList({ organizations }: OrganizationsListProps) {
               className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
             >
               <div className="space-y-4">
-                <div>
-                  <Heading level={3} className="text-lg font-semibold">
+                <Link href={`/organizations/${org.id}`}>
+                  <Heading
+                    level={3}
+                    className="text-lg font-semibold hover:text-blue-600 dark:hover:text-blue-400"
+                  >
                     {org.name}
                   </Heading>
-                  <Text className="mt-2 line-clamp-3 text-sm text-zinc-600 dark:text-zinc-400">
-                    {org.description}
-                  </Text>
-                </div>
+                </Link>
+                <Text className="line-clamp-3 text-sm text-zinc-600 dark:text-zinc-400">
+                  {org.description}
+                </Text>
 
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">

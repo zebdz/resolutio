@@ -98,25 +98,75 @@ export class PrismaBoardRepository implements BoardRepository {
       },
     });
 
-    return !!membership;
+    // User is a member only if they exist and haven't been removed
+    return !!membership && !membership.removedAt;
   }
 
-  async addUserToBoard(userId: string, boardId: string): Promise<void> {
-    await this.prisma.boardUser.create({
-      data: {
-        boardId,
-        userId,
-      },
-    });
-  }
-
-  async removeUserFromBoard(userId: string, boardId: string): Promise<void> {
-    await this.prisma.boardUser.delete({
+  async addUserToBoard(
+    userId: string,
+    boardId: string,
+    addedBy?: string
+  ): Promise<void> {
+    // Check if user was previously a member (and removed)
+    const existingMembership = await this.prisma.boardUser.findUnique({
       where: {
         boardId_userId: {
           boardId,
           userId,
         },
+      },
+    });
+
+    if (existingMembership) {
+      // If the user was previously removed, update the record to add them back
+      if (existingMembership.removedAt) {
+        await this.prisma.boardUser.update({
+          where: {
+            boardId_userId: {
+              boardId,
+              userId,
+            },
+          },
+          data: {
+            addedBy,
+            addedAt: new Date(),
+            removedAt: null,
+            removedBy: null,
+            removedReason: null,
+          },
+        });
+      }
+      // If user is already an active member, do nothing
+    } else {
+      // Create new membership
+      await this.prisma.boardUser.create({
+        data: {
+          boardId,
+          userId,
+          addedBy,
+          addedAt: new Date(),
+        },
+      });
+    }
+  }
+
+  async removeUserFromBoard(
+    userId: string,
+    boardId: string,
+    removedBy?: string,
+    removedReason?: string
+  ): Promise<void> {
+    await this.prisma.boardUser.update({
+      where: {
+        boardId_userId: {
+          boardId,
+          userId,
+        },
+      },
+      data: {
+        removedAt: new Date(),
+        removedBy,
+        removedReason,
       },
     });
   }

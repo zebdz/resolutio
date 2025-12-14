@@ -33,7 +33,6 @@ export function CreateOrganizationDialog({
   locale,
 }: CreateOrganizationDialogProps) {
   const t = useTranslations('organization.create');
-  const tCommon = useTranslations('common');
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
 

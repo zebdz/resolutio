@@ -54,7 +54,7 @@ export default async function HomePage({
         </div>
 
         {/* User Organizations List */}
-        <UserOrganizationsList locale={locale} />
+        <UserOrganizationsList />
       </div>
     </main>
   );

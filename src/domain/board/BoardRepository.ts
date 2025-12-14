@@ -31,12 +31,21 @@ export interface BoardRepository {
   /**
    * Adds a user to a board
    */
-  addUserToBoard(userId: string, boardId: string): Promise<void>;
+  addUserToBoard(
+    userId: string,
+    boardId: string,
+    addedBy?: string
+  ): Promise<void>;
 
   /**
    * Removes a user from a board
    */
-  removeUserFromBoard(userId: string, boardId: string): Promise<void>;
+  removeUserFromBoard(
+    userId: string,
+    boardId: string,
+    removedBy?: string,
+    removedReason?: string
+  ): Promise<void>;
 
   /**
    * Updates an existing board

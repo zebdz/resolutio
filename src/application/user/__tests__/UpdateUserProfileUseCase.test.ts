@@ -25,6 +25,7 @@ describe('UpdateUserProfileUseCase', () => {
       findByPhoneNumber: vi.fn(),
       save: vi.fn(),
       exists: vi.fn(),
+      searchUsers: vi.fn(),
     };
     useCase = new UpdateUserProfileUseCase(userRepository);
   });
@@ -66,10 +67,9 @@ describe('UpdateUserProfileUseCase', () => {
     it('should return failure when invalid language provided', async () => {
       vi.mocked(userRepository.findById).mockResolvedValue(existingUser);
 
-      // @ts-expect-error - Testing invalid language value
       const result = await useCase.execute({
         userId: 'user-123',
-        language: 'invalid',
+        language: 'invalid' as any,
       });
 
       expect(result.success).toBe(false);

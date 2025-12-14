@@ -28,6 +28,8 @@ model User {
   memberships        OrganizationUser[]
   adminRoles         OrganizationAdminUser[]
   boardMemberships   BoardUser[]
+  boardMembersAdded  BoardUser[]        @relation("AddedBoardMember")
+  boardMembersRemoved BoardUser[]       @relation("RemovedBoardMember")
   votes              Vote[]
   superAdmin         SuperAdmin?
   acceptedRequests   OrganizationUser[] @relation("AcceptedByAdmin")
@@ -137,15 +139,25 @@ model Board {
 }
 
 model BoardUser {
-  boardId   String   @map("board_id")
-  userId    String   @map("user_id")
-  createdAt DateTime @default(now()) @map("created_at")
+  id            String    @id @default(cuid())
+  boardId       String    @map("board_id")
+  userId        String    @map("user_id")
+  addedBy       String?   @map("added_by")
+  addedAt       DateTime  @default(now()) @map("added_at")
+  removedBy     String?   @map("removed_by")
+  removedAt     DateTime? @map("removed_at")
+  removedReason String?   @map("removed_reason")
+  createdAt     DateTime  @default(now()) @map("created_at")
 
-  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  board         Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user          User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  addedByUser   User? @relation("AddedBoardMember", fields: [addedBy], references: [id])
+  removedByUser User? @relation("RemovedBoardMember", fields: [removedBy], references: [id])
 
-  @@id([boardId, userId])
+  @@unique([boardId, userId])
   @@index([userId])
+  @@index([addedBy])
+  @@index([removedBy])
   @@map("board_users")
 }
 
