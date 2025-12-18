@@ -18,7 +18,8 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "postinstall": "test \"$PRISMA_GENERATE_SKIP\" = \"true\" && echo 'Skipping prisma generate' || prisma generate"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.0",
