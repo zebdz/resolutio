@@ -79,17 +79,32 @@ jobs:
       - name: Health check
         run: |
           echo "🏥 Running health check..."
-          sleep 5
+          echo "Waiting for server to fully start..."
+          sleep 10
           
-          # Check if the site responds
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://resolutio.org/ru || echo "000")
+          # Try multiple times in case server is still starting
+          MAX_ATTEMPTS=3
+          ATTEMPT=1
           
-          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
-            echo "✅ Site is responding (HTTP $HTTP_CODE)"
-          else
-            echo "⚠️  Warning: Site returned HTTP $HTTP_CODE"
-            echo "The deployment may need manual verification"
-          fi
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://resolutio.org/ru || echo "000")
+            
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
+              echo "✅ Site is responding (HTTP $HTTP_CODE)"
+              break
+            else
+              echo "⚠️  Site returned HTTP $HTTP_CODE"
+              if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
+                echo "Waiting 5 seconds before retrying..."
+                sleep 5
+              else
+                echo "⚠️  Warning: Site may need manual verification"
+                echo "However, deployment was completed and ISP panel should have restarted the app"
+              fi
+            fi
+            ATTEMPT=$((ATTEMPT + 1))
+          done
 
       - name: Cleanup
         if: always()

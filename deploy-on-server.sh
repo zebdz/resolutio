@@ -74,32 +74,54 @@ else
     log "No existing process found"
 fi
 
-# Wait a moment for port to be released
-sleep 2
+# Wait a moment for port to be released and for ISP panel to restart the app
+log "Waiting for ISP panel to restart the application..."
+sleep 5
 
-# Start the application
-log "Starting Next.js server..."
-cd "$DEPLOY_DIR"
-nohup "$YARN_BIN" start >> "$LOG_FILE" 2>&1 &
-NEW_PID=$!
+# Check if ISP panel already restarted the server
+NEW_PID=$(pgrep -f "next-server" || true)
 
-log "Started new process with PID: $NEW_PID"
-
-# Wait and verify the process started
-sleep 3
-if ps -p $NEW_PID > /dev/null 2>&1; then
-    log "✅ Next.js server started successfully!"
+if [ -n "$NEW_PID" ]; then
+    log "✅ ISP panel automatically restarted the server (PID: $NEW_PID)"
     
-    # Check if port 3000 is listening
+    # Verify port 3000 is listening
     if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1; then
         log "✅ Server is listening on port 3000"
     else
-        log "⚠️  Warning: Server process is running but port 3000 is not listening yet"
+        log "⚠️  Warning: Process is running but port 3000 is not listening yet"
+        log "Waiting a bit more..."
+        sleep 3
+        if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+            log "✅ Server is now listening on port 3000"
+        else
+            log "⚠️  Server may still be starting up"
+        fi
     fi
 else
-    log "❌ ERROR: Failed to start Next.js server"
-    log "Check the logs at: $LOG_FILE"
-    exit 1
+    # ISP panel didn't restart, start manually
+    log "ISP panel did not restart automatically, starting manually..."
+    cd "$DEPLOY_DIR"
+    nohup "$YARN_BIN" start >> "$LOG_FILE" 2>&1 &
+    NEW_PID=$!
+    
+    log "Started new process with PID: $NEW_PID"
+    
+    # Wait and verify the process started
+    sleep 3
+    if ps -p $NEW_PID > /dev/null 2>&1; then
+        log "✅ Next.js server started successfully!"
+        
+        # Check if port 3000 is listening
+        if lsof -Pi :3000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+            log "✅ Server is listening on port 3000"
+        else
+            log "⚠️  Warning: Server process is running but port 3000 is not listening yet"
+        fi
+    else
+        log "❌ ERROR: Failed to start Next.js server"
+        log "Check the logs at: $LOG_FILE"
+        exit 1
+    fi
 fi
 
 # Cleanup deployment package
