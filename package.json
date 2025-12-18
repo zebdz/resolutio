@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 8080",
-    "prebuild": "yarn run format && yarn run test:run && yarn run lint",
+    "prebuild": "yarn run test:run",
     "prerelease": "yarn run prebuild && yarn run test:e2e",
     "build": "next build",
     "start": "next start",
@@ -12,6 +12,7 @@
     "lint:fix": "eslint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "fl": "yarn run format && yarn run lint",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",

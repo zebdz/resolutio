@@ -1,8 +1,8 @@
+import { PrismaClient } from '@/generated/prisma/client';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { JoinOrganizationInput } from './JoinOrganizationSchema';
 import { OrganizationErrors } from './OrganizationErrors';
-import { PrismaClient } from '@prisma/client';
 
 export interface JoinOrganizationDependencies {
   organizationRepository: OrganizationRepository;

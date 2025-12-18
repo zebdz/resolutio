@@ -1,6 +1,6 @@
+import { PrismaClient } from '@/generated/prisma/client';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { HandleJoinRequestUseCase } from '../HandleJoinRequestUseCase';
-import { PrismaClient } from '@prisma/client';
 import { OrganizationErrors } from '../OrganizationErrors';
 import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { Board } from '../../../domain/board/Board';

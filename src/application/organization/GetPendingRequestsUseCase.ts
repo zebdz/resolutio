@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@/generated/prisma/client';
 import { Result, success } from '../../domain/shared/Result';
 
 export interface PendingRequest {

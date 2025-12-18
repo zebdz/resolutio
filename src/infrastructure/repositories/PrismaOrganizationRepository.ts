@@ -1,9 +1,6 @@
-import {
-  Organization,
-  OrganizationProps,
-} from '../../domain/organization/Organization';
+import { PrismaClient } from '@/generated/prisma/client';
+import { Organization } from '../../domain/organization/Organization';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
-import { PrismaClient } from '@prisma/client';
 
 export class PrismaOrganizationRepository implements OrganizationRepository {
   constructor(private prisma: PrismaClient) {}

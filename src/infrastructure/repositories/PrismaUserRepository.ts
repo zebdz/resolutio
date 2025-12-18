@@ -1,7 +1,7 @@
 import type { UserRepository } from '@/domain/user/UserRepository';
 import { User, type Language } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
-import type { PrismaClient } from '@prisma/client';
+import type { PrismaClient } from '@/generated/prisma/client';
 
 export class PrismaUserRepository implements UserRepository {
   constructor(private readonly prisma: PrismaClient) {}

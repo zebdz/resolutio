@@ -1,6 +1,6 @@
-import { Board, BoardProps } from '../../domain/board/Board';
+import { PrismaClient } from '@/generated/prisma/client';
+import { Board } from '../../domain/board/Board';
 import { BoardRepository } from '../../domain/board/BoardRepository';
-import { PrismaClient } from '@prisma/client';
 
 export class PrismaBoardRepository implements BoardRepository {
   constructor(private prisma: PrismaClient) {}

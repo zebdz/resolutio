@@ -2,7 +2,7 @@ import type {
   SessionRepository,
   Session,
 } from '@/domain/user/SessionRepository';
-import type { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@/generated/prisma/client';
 
 export class PrismaSessionRepository implements SessionRepository {
   constructor(private readonly prisma: PrismaClient) {}

@@ -1,6 +1,6 @@
+import { PrismaClient } from '@/generated/prisma/client';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GetPendingRequestsUseCase } from '../GetPendingRequestsUseCase';
-import { PrismaClient } from '@prisma/client';
 
 // Mock PrismaClient
 class MockPrismaClient {

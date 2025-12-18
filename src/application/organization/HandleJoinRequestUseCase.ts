@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@/generated/prisma/client';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { HandleJoinRequestInput } from './HandleJoinRequestSchema';
 import { OrganizationErrors } from './OrganizationErrors';

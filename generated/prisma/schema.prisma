@@ -2,9 +2,9 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider      = "prisma-client-js"
-  output        = "../generated/prisma"
-  engineType    = "client"
+  provider   = "prisma-client-js"
+  output     = "../generated/prisma"
+  engineType = "client"
 }
 
 datasource db {
@@ -23,17 +23,17 @@ model User {
   createdAt   DateTime @default(now()) @map("created_at")
 
   // Relations
-  sessions           Session[]
-  organizationsOwned Organization[]
-  memberships        OrganizationUser[]
-  adminRoles         OrganizationAdminUser[]
-  boardMemberships   BoardUser[]
-  boardMembersAdded  BoardUser[]        @relation("AddedBoardMember")
-  boardMembersRemoved BoardUser[]       @relation("RemovedBoardMember")
-  votes              Vote[]
-  superAdmin         SuperAdmin?
-  acceptedRequests   OrganizationUser[] @relation("AcceptedByAdmin")
-  rejectedRequests   OrganizationUser[] @relation("RejectedByAdmin")
+  sessions            Session[]
+  organizationsOwned  Organization[]
+  memberships         OrganizationUser[]
+  adminRoles          OrganizationAdminUser[]
+  boardMemberships    BoardUser[]
+  boardMembersAdded   BoardUser[]             @relation("AddedBoardMember")
+  boardMembersRemoved BoardUser[]             @relation("RemovedBoardMember")
+  votes               Vote[]
+  superAdmin          SuperAdmin?
+  acceptedRequests    OrganizationUser[]      @relation("AcceptedByAdmin")
+  rejectedRequests    OrganizationUser[]      @relation("RejectedByAdmin")
 
   @@map("users")
 }
@@ -61,21 +61,21 @@ model SuperAdmin {
 
 // Organization Models
 model Organization {
-  id          String   @id @default(cuid())
-  name        String   @unique
+  id          String    @id @default(cuid())
+  name        String    @unique
   description String
-  parentId    String?  @map("parent_id")
-  createdById String   @map("created_by_id")
-  createdAt   DateTime @default(now()) @map("created_at")
+  parentId    String?   @map("parent_id")
+  createdById String    @map("created_by_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
   archivedAt  DateTime? @map("archived_at")
 
   // Relations
-  createdBy   User                    @relation(fields: [createdById], references: [id])
-  parent      Organization?           @relation("OrganizationHierarchy", fields: [parentId], references: [id])
-  children    Organization[]          @relation("OrganizationHierarchy")
-  members     OrganizationUser[]
-  admins      OrganizationAdminUser[]
-  boards      Board[]
+  createdBy User                    @relation(fields: [createdById], references: [id])
+  parent    Organization?           @relation("OrganizationHierarchy", fields: [parentId], references: [id])
+  children  Organization[]          @relation("OrganizationHierarchy")
+  members   OrganizationUser[]
+  admins    OrganizationAdminUser[]
+  boards    Board[]
 
   @@index([parentId])
   @@index([createdById])
@@ -83,16 +83,16 @@ model Organization {
 }
 
 model OrganizationUser {
-  id                String    @id @default(cuid())
-  organizationId    String    @map("organization_id")
-  userId            String    @map("user_id")
-  status            String    @default("pending") // "pending" | "accepted" | "rejected"
-  createdAt         DateTime  @default(now()) @map("created_at")
-  acceptedAt        DateTime? @map("accepted_at")
-  rejectedAt        DateTime? @map("rejected_at")
-  rejectionReason   String?   @map("rejection_reason")
-  acceptedByUserId  String?   @map("accepted_by_user_id")
-  rejectedByUserId  String?   @map("rejected_by_user_id")
+  id               String    @id @default(cuid())
+  organizationId   String    @map("organization_id")
+  userId           String    @map("user_id")
+  status           String    @default("pending") // "pending" | "accepted" | "rejected"
+  createdAt        DateTime  @default(now()) @map("created_at")
+  acceptedAt       DateTime? @map("accepted_at")
+  rejectedAt       DateTime? @map("rejected_at")
+  rejectionReason  String?   @map("rejection_reason")
+  acceptedByUserId String?   @map("accepted_by_user_id")
+  rejectedByUserId String?   @map("rejected_by_user_id")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
