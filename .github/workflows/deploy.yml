@@ -39,7 +39,8 @@ jobs:
             next.config.ts \
             prisma.config.ts \
             migrate-production.sh \
-            deploy-on-server.sh
+            deploy-on-server.sh \
+            start-production.sh
 
       - name: Setup SSH
         run: |

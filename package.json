@@ -7,7 +7,7 @@
     "prebuild": "yarn run test:run",
     "prerelease": "yarn run prebuild && yarn run test:e2e",
     "build": "prisma generate && next build",
-    "start": "PORT=3000 NODE_ENV=production node node_modules/next/dist/bin/next start",
+    "start": "./start-production.sh",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "format": "prettier --write .",
