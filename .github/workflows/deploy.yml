@@ -81,7 +81,7 @@ jobs:
           sleep 5
           
           # Check if the site responds
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://resolutio.org/ || echo "000")
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://resolutio.org/ru || echo "000")
           
           if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
             echo "✅ Site is responding (HTTP $HTTP_CODE)"
