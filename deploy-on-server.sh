@@ -8,6 +8,16 @@ set -e  # Exit on any error
 DEPLOY_DIR="/var/www/www-root/data/www/resolutio.org"
 LOG_FILE="$DEPLOY_DIR/deploy.log"
 
+# Load NVM if available
+if [ -f "$HOME/.nvm/nvm.sh" ]; then
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+fi
+
+# Find node and yarn binaries
+NODE_BIN=$(command -v node || echo "/var/www/www-root/data/.nvm/versions/node/v24.12.0/bin/node")
+YARN_BIN=$(command -v yarn || echo "/var/www/www-root/data/.nvm/versions/node/v24.12.0/bin/yarn")
+
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
 }
@@ -15,6 +25,8 @@ log() {
 log "========================================="
 log "Starting deployment process..."
 log "========================================="
+log "Node binary: $NODE_BIN"
+log "Yarn binary: $YARN_BIN"
 
 # Navigate to deployment directory
 cd "$DEPLOY_DIR"
@@ -68,7 +80,7 @@ sleep 2
 # Start the application
 log "Starting Next.js server..."
 cd "$DEPLOY_DIR"
-nohup yarn start >> "$LOG_FILE" 2>&1 &
+nohup "$YARN_BIN" start >> "$LOG_FILE" 2>&1 &
 NEW_PID=$!
 
 log "Started new process with PID: $NEW_PID"

@@ -7,6 +7,15 @@
 # Set the base directory (adjust if needed)
 BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Detect Node.js path (works with NVM)
+if [ -f "$HOME/.nvm/nvm.sh" ]; then
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+fi
+
+# Find node binary
+NODE_BIN=$(command -v node || echo "/var/www/www-root/data/.nvm/versions/node/v24.12.0/bin/node")
+
 # Set Prisma engine paths to use local binaries
 export PRISMA_QUERY_ENGINE_BINARY="$BASE_DIR/node_modules/@prisma/engines/libquery_engine-debian-openssl-3.0.x.so.node"
 export PRISMA_SCHEMA_ENGINE_BINARY="$BASE_DIR/node_modules/@prisma/engines/schema-engine-debian-openssl-3.0.x"
@@ -15,9 +24,10 @@ export PRISMA_SCHEMA_ENGINE_BINARY="$BASE_DIR/node_modules/@prisma/engines/schem
 export PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1
 
 echo "Running Prisma migrations..."
+echo "Node binary: $NODE_BIN"
 echo "Schema engine: $PRISMA_SCHEMA_ENGINE_BINARY"
 
 # Run migrations using node directly to avoid symlink issues
-node "$BASE_DIR/node_modules/prisma/build/index.js" migrate deploy
+"$NODE_BIN" "$BASE_DIR/node_modules/prisma/build/index.js" migrate deploy
 
 echo "Migrations complete!"
