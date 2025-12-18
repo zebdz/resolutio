@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 8080",
-    "checkbuild": "yarn run format && yarn run test:run && yarn run lint",
-    "prerelease": "yarn run checkbuild && yarn run test:e2e",
+    "prebuild": "yarn run format && yarn run test:run && yarn run lint",
+    "prerelease": "yarn run prebuild && yarn run test:e2e",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -18,8 +18,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
-    "prisma:generate": "prisma generate",
-    "postinstall": "test \"$PRISMA_GENERATE_SKIP\" = \"true\" && echo 'Skipping prisma generate' || prisma generate"
+    "prisma:generate": "prisma generate"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.0",
@@ -29,6 +28,7 @@
     "@prisma/client": "^7.1.0",
     "arctic": "^3.7.0",
     "clsx": "^2.1.1",
+    "motion": "^12.23.26",
     "next": "16.0.7",
     "next-intl": "^4.5.8",
     "pg": "^8.16.3",
