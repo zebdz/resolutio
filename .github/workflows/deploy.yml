@@ -1,0 +1,93 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build application
+        run: yarn build
+
+      - name: Create deployment package
+        run: |
+          tar -czf deploy.tar.gz \
+            .next/ \
+            node_modules/ \
+            generated/ \
+            prisma/ \
+            public/ \
+            package.json \
+            next.config.ts \
+            prisma.config.ts \
+            migrate-production.sh \
+            deploy-on-server.sh
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H 89.111.171.11 >> ~/.ssh/known_hosts
+
+      - name: Deploy to production server
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          # Upload deployment package
+          echo "📦 Uploading deployment package..."
+          scp -i ~/.ssh/id_ed25519 deploy.tar.gz www-root@89.111.171.11:/var/www/www-root/data/www/resolutio.org/
+          
+          # Execute deployment on server
+          echo "🚀 Deploying on production server..."
+          ssh -i ~/.ssh/id_ed25519 www-root@89.111.171.11 << 'EOF'
+            cd /var/www/www-root/data/www/resolutio.org
+            
+            # Make deployment script executable
+            chmod +x deploy-on-server.sh
+            
+            # Run deployment script
+            ./deploy-on-server.sh
+            
+            # Show the last few lines of the log
+            echo ""
+            echo "Recent deployment log:"
+            tail -20 deploy.log
+          EOF
+          
+          echo "✅ Deployment complete!"
+
+      - name: Health check
+        run: |
+          echo "🏥 Running health check..."
+          sleep 5
+          
+          # Check if the site responds
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://resolutio.org/ || echo "000")
+          
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
+            echo "✅ Site is responding (HTTP $HTTP_CODE)"
+          else
+            echo "⚠️  Warning: Site returned HTTP $HTTP_CODE"
+            echo "The deployment may need manual verification"
+          fi
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519
