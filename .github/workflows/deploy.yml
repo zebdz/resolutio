@@ -23,6 +23,8 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Build application
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: yarn build
 
       - name: Create deployment package
