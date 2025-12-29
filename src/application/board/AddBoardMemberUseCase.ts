@@ -2,6 +2,7 @@ import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { BoardErrors } from './BoardErrors';
+import { OrganizationErrors } from '../organization/OrganizationErrors';
 
 export interface AddBoardMemberInput {
   boardId: string;
@@ -43,7 +44,7 @@ export class AddBoardMemberUseCase {
     );
 
     if (!isAdmin) {
-      return failure('organization.errors.notAdmin');
+      return failure(OrganizationErrors.NOT_ADMIN);
     }
 
     // Check if the user being added is a member of the organization

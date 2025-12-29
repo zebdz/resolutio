@@ -2,6 +2,7 @@ import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { BoardErrors } from './BoardErrors';
+import { OrganizationErrors } from '../organization/OrganizationErrors';
 
 export interface RemoveBoardMemberInput {
   boardId: string;
@@ -44,7 +45,7 @@ export class RemoveBoardMemberUseCase {
     );
 
     if (!isAdmin) {
-      return failure('organization.errors.notAdmin');
+      return failure(OrganizationErrors.NOT_ADMIN);
     }
 
     // Check if user is a member of the board

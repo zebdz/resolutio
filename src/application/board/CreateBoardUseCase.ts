@@ -2,6 +2,7 @@ import { Board } from '../../domain/board/Board';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
+import { OrganizationErrors } from '../organization/OrganizationErrors';
 
 export interface CreateBoardInput {
   name: string;
@@ -44,7 +45,7 @@ export class CreateBoardUseCase {
     );
 
     if (!organization) {
-      return failure('organization.errors.notFound');
+      return failure(OrganizationErrors.NOT_FOUND);
     }
 
     // Check if user is an admin of the organization
@@ -54,7 +55,7 @@ export class CreateBoardUseCase {
     );
 
     if (!isAdmin) {
-      return failure('organization.errors.notAdmin');
+      return failure(OrganizationErrors.NOT_ADMIN);
     }
 
     // Create the board entity
