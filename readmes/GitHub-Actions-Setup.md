@@ -5,6 +5,7 @@
 ### 1. Generate SSH Key (if you haven't already)
 
 On your local machine:
+
 ```bash
 # This key should already exist
 cat ~/.ssh/id_ed25519_www_root_resolutio
@@ -13,18 +14,20 @@ cat ~/.ssh/id_ed25519_www_root_resolutio
 ### 2. Add Secrets to GitHub
 
 Go to your repository on GitHub:
+
 1. Navigate to: **Settings** → **Secrets and variables** → **Actions**
 2. Click **New repository secret**
 3. Add these secrets:
 
 #### Required Secrets:
 
-| Secret Name | Value | Where to get it |
-|-------------|-------|-----------------|
-| `SSH_PRIVATE_KEY` | Your SSH private key | `cat ~/.ssh/id_ed25519_www_root_resolutio` |
-| `DATABASE_URL` | Production database URL | Format: `postgresql://user:password@host:port/database` |
+| Secret Name       | Value                   | Where to get it                                         |
+| ----------------- | ----------------------- | ------------------------------------------------------- |
+| `SSH_PRIVATE_KEY` | Your SSH private key    | `cat ~/.ssh/id_ed25519_www_root_resolutio`              |
+| `DATABASE_URL`    | Production database URL | Format: `postgresql://user:password@host:port/database` |
 
 **Example DATABASE_URL:**
+
 ```
 postgresql://reso:jWokEbO6*9@@127.0.0.1:11495/postgres
 ```
@@ -98,6 +101,7 @@ lsof -i :3000
 ### Check Deployment Logs
 
 On production server:
+
 ```bash
 tail -100 /var/www/www-root/data/www/resolutio.org/deploy.log
 ```
@@ -126,16 +130,19 @@ yarn start
 ### Common Issues:
 
 **SSH Connection Failed:**
+
 - Verify `SSH_PRIVATE_KEY` secret is correctly set
 - Ensure server IP (89.111.171.11) is correct
 - Check if SSH key has access to the server
 
 **Migration Failed:**
+
 - Check `DATABASE_URL` secret is correct
 - Verify database is accessible from server
 - Check migration logs in `deploy.log`
 
 **Server Won't Start:**
+
 - Port 3000 might be in use: `lsof -i :3000`
 - Check for errors in `deploy.log`
 - Verify environment variables are set correctly
@@ -145,20 +152,23 @@ yarn start
 To test without pushing to master:
 
 1. Create a test branch:
+
    ```bash
    git checkout -b test-deployment
    ```
 
 2. Update `.github/workflows/deploy.yml` temporarily:
+
    ```yaml
    on:
      push:
        branches:
          - master
-         - test-deployment  # Add this
+         - test-deployment # Add this
    ```
 
 3. Push and watch the action run:
+
    ```bash
    git push origin test-deployment
    ```
@@ -171,4 +181,4 @@ To test without pushing to master:
 - ✅ Database URL is stored as a GitHub secret (encrypted)
 - ✅ Secrets are never exposed in logs
 - ✅ SSH key is deleted after deployment
-- ⚠️  Make sure your SSH key doesn't have a passphrase (or use ssh-agent)
+- ⚠️ Make sure your SSH key doesn't have a passphrase (or use ssh-agent)

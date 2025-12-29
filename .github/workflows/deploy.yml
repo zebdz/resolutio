@@ -8,7 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -56,7 +56,7 @@ jobs:
           # Upload deployment package
           echo "📦 Uploading deployment package..."
           scp -i ~/.ssh/id_ed25519 deploy.tar.gz www-root@89.111.171.11:/var/www/www-root/data/www/resolutio.org/
-          
+
           # Execute deployment on server
           echo "🚀 Deploying on production server..."
           ssh -i ~/.ssh/id_ed25519 www-root@89.111.171.11 << 'EOF'
@@ -73,7 +73,7 @@ jobs:
             echo "Recent deployment log:"
             tail -20 deploy.log
           EOF
-          
+
           echo "✅ Deployment complete!"
 
       - name: Health check
@@ -81,11 +81,11 @@ jobs:
           echo "🏥 Running health check..."
           echo "Waiting for server to fully start..."
           sleep 10
-          
+
           # Try multiple times in case server is still starting
           MAX_ATTEMPTS=3
           ATTEMPT=1
-          
+
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
             echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://resolutio.org/ru || echo "000")

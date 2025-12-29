@@ -32,6 +32,7 @@ model User {
   boardMembersAdded  BoardUser[]        @relation("AddedBoardMember")
   boardMembersRemoved BoardUser[]       @relation("RemovedBoardMember")
   votes              Vote[]
+  pollsCreated       Poll[]
   superAdmin         SuperAdmin?
   acceptedRequests   OrganizationUser[] @relation("AcceptedByAdmin")
   rejectedRequests   OrganizationUser[] @relation("RejectedByAdmin")
@@ -171,21 +172,27 @@ model Poll {
   startDate   DateTime  @map("start_date")
   endDate     DateTime  @map("end_date")
   active      Boolean   @default(true)
+  finished    Boolean   @default(false)
+  createdBy   String    @map("created_by")
   createdAt   DateTime  @default(now()) @map("created_at")
   archivedAt  DateTime? @map("archived_at")
 
-  board     Board      @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  questions Question[]
+  board       Board      @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  creator     User       @relation(fields: [createdBy], references: [id])
+  questions   Question[]
 
   @@index([boardId])
   @@index([active])
+  @@index([createdBy])
   @@map("polls")
 }
 
 model Question {
   id           String    @id @default(cuid())
   text         String
+  details      String?
   pollId       String    @map("poll_id")
+  page         Int       @default(1)
   order        Int       @default(0)
   questionType String    @default("single-choice") @map("question_type") // "single-choice" | "multiple-choice"
   createdAt    DateTime  @default(now()) @map("created_at")
@@ -196,6 +203,7 @@ model Question {
   votes   Vote[]
 
   @@index([pollId])
+  @@index([pollId, page, order])
   @@map("questions")
 }
 

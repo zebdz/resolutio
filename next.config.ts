@@ -5,7 +5,6 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const nextConfig: NextConfig = {
   /* config options here */
-
   // Uncomment only if can't configure nginx to serve _next/static properly:
   // Ensure static files are served correctly
   // assetPrefix: process.env.NODE_ENV === 'production' ? '' : undefined,

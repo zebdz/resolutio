@@ -416,6 +416,73 @@ export async function getBoardDetailsAction(boardId: string): Promise<
   }
 }
 
+export async function getUserBoardsAction(): Promise<
+  ActionResult<
+    Array<{
+      id: string;
+      name: string;
+      organizationId: string;
+      organizationName: string;
+      isGeneral: boolean;
+    }>
+  >
+> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    // Get boards where user is a member
+    const boardUsers = await prisma.boardUser.findMany({
+      where: {
+        userId: user.id,
+        removedAt: null,
+      },
+      include: {
+        board: {
+          include: {
+            organization: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        addedAt: 'desc',
+      },
+    });
+
+    const boards = boardUsers.map((bu) => ({
+      id: bu.board.id,
+      name: bu.board.name,
+      organizationId: bu.board.organizationId,
+      organizationName: bu.board.organization.name,
+      isGeneral: bu.board.isGeneral,
+    }));
+
+    return {
+      success: true,
+      data: boards,
+    };
+  } catch (error) {
+    console.error('Error getting user boards:', error);
+
+    return {
+      success: false,
+      error: t('generic'),
+    };
+  }
+}
+
 export async function searchUsersForBoardAction(
   boardId: string,
   query: string

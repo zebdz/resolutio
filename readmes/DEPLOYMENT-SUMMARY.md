@@ -3,6 +3,7 @@
 ## What We've Set Up
 
 ### 1. **Automated GitHub Actions Deployment** ✅
+
 - File: `.github/workflows/deploy.yml`
 - Triggers on every push to `master` branch
 - Automatically builds, packages, deploys, and restarts your app
@@ -10,11 +11,13 @@
 ### 2. **Production Scripts** ✅
 
 #### `migrate-production.sh`
+
 - Runs Prisma migrations on production
 - Uses local Prisma engines (no download needed)
 - Usage: `./migrate-production.sh`
 
 #### `deploy-on-server.sh`
+
 - Complete deployment automation on server
 - Creates backups before deploying
 - Gracefully restarts Next.js server
@@ -22,6 +25,7 @@
 - Usage: `./deploy-on-server.sh`
 
 #### `create-deploy-package.sh`
+
 - Alternative manual deployment helper
 - Creates minimal package without node_modules
 - For when you want to run `yarn install` on server
@@ -29,22 +33,27 @@
 ### 3. **Updated Configurations** ✅
 
 #### `package.json`
+
 ```json
 "start": "PORT=3000 NODE_ENV=production node node_modules/next/dist/bin/next start"
 ```
+
 - Direct Node.js invocation (bypasses broken symlinks)
 - ISP panel compatible
 
 #### `prisma/schema.prisma`
+
 ```prisma
 generator client {
   binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 ```
+
 - Pre-downloads correct Prisma engines for production
 - No network downloads needed on server
 
 #### `nginx-production.conf`
+
 - Properly serves `/_next/static/` files
 - Handles both HTTP and HTTPS
 - Proxies to Node.js on port 3000
@@ -56,6 +65,7 @@ generator client {
 Go to: https://github.com/zebdz/resolutio/settings/secrets/actions
 
 Add these two secrets:
+
 - `SSH_PRIVATE_KEY` - Your SSH private key
 - `DATABASE_URL` - Production database connection string
 
@@ -66,6 +76,7 @@ Upload `nginx-production.conf` to your server and configure it in the ISP panel.
 ### 3. Test the Workflow
 
 Option A: Push to master
+
 ```bash
 git add .
 git commit -m "Setup automated deployment"
@@ -73,6 +84,7 @@ git push origin master
 ```
 
 Option B: Test manually first
+
 ```bash
 yarn build
 tar -czf deploy.tar.gz .next/ node_modules/ generated/ prisma/ public/ package.json next.config.ts prisma.config.ts migrate-production.sh deploy-on-server.sh
@@ -123,6 +135,7 @@ cd /var/www/www-root/data/www/resolutio.org
 ## Understanding the Process Stack
 
 ### What runs what:
+
 ```
 ISP Panel → sh → node → next-server
                   ↑
@@ -131,11 +144,13 @@ ISP Panel → sh → node → next-server
 ```
 
 ### Port 3000:
+
 - Next.js listens on port 3000
 - Nginx proxies requests to it
 - Only localhost access (not exposed directly)
 
 ### Files on Production Server:
+
 ```
 /var/www/www-root/data/www/resolutio.org/
 ├── .next/              # Built Next.js app
@@ -155,17 +170,20 @@ ISP Panel → sh → node → next-server
 ## Troubleshooting Quick Reference
 
 ### Check if server is running:
+
 ```bash
 ps aux | grep next-server
 lsof -i :3000
 ```
 
 ### View logs:
+
 ```bash
 tail -f /var/www/www-root/data/www/resolutio.org/deploy.log
 ```
 
 ### Restart server manually:
+
 ```bash
 cd /var/www/www-root/data/www/resolutio.org
 pkill -f "next-server"
@@ -173,9 +191,11 @@ yarn start
 ```
 
 ### Check GitHub Actions:
+
 https://github.com/zebdz/resolutio/actions
 
 ### Rollback:
+
 ```bash
 cd /var/www/www-root/data/www/resolutio.org
 tar -xzf backup-YYYYMMDD-HHMMSS.tar.gz
@@ -186,6 +206,7 @@ yarn start
 ## Documentation Files
 
 All documentation is in `readmes/`:
+
 - `Deployment.md` - Detailed deployment guide
 - `GitHub-Actions-Setup.md` - GitHub Actions setup guide
 - `Migrations.md` - Database migrations guide
@@ -201,13 +222,13 @@ All documentation is in `readmes/`:
 
 ## Common Issues Solved
 
-| Issue | Solution |
-|-------|----------|
-| Cannot find module 'require-hook' | Use direct node invocation in start script |
-| Prisma engine download fails | Pre-generate with binaryTargets in schema.prisma |
-| Failed to load chunk .js | Add `/_next/static/` location in nginx |
-| Socket connection refused | Use TCP port 3000 instead of Unix socket |
-| Migrations fail on production | Use migrate-production.sh with local engines |
+| Issue                             | Solution                                         |
+| --------------------------------- | ------------------------------------------------ |
+| Cannot find module 'require-hook' | Use direct node invocation in start script       |
+| Prisma engine download fails      | Pre-generate with binaryTargets in schema.prisma |
+| Failed to load chunk .js          | Add `/_next/static/` location in nginx           |
+| Socket connection refused         | Use TCP port 3000 instead of Unix socket         |
+| Migrations fail on production     | Use migrate-production.sh with local engines     |
 
 ---
 

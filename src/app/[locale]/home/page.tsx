@@ -46,6 +46,9 @@ export default async function HomePage({
           <Link href="/organizations">
             <Button color="zinc">{t('browseOrganizations')}</Button>
           </Link>
+          <Link href="/polls">
+            <Button color="blue">{t('viewPolls')}</Button>
+          </Link>
           {isAdmin && (
             <Link href="/organizations/pending-requests">
               <Button color="amber">{t('managePendingRequests')}</Button>

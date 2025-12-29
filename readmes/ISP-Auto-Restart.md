@@ -3,6 +3,7 @@
 ## What Happens
 
 Your ISP panel (reg.ru) has automatic process management that:
+
 1. Monitors your Node.js application
 2. Automatically restarts it when it stops or crashes
 3. Keeps it running 24/7
@@ -10,6 +11,7 @@ Your ISP panel (reg.ru) has automatic process management that:
 ## During Deployment
 
 ### Expected Behavior:
+
 ```
 1. Deploy script kills old Next.js process
 2. ISP panel detects the process stopped
@@ -18,6 +20,7 @@ Your ISP panel (reg.ru) has automatic process management that:
 ```
 
 ### What You'll See in Logs:
+
 ```
 [2025-12-18 19:48:30] Found existing process: 403141
 [2025-12-18 19:48:31] Process stopped gracefully
@@ -26,6 +29,7 @@ Your ISP panel (reg.ru) has automatic process management that:
 ```
 
 **This is NORMAL!** The "error" occurs because:
+
 - Deploy script tries to start the server manually
 - But ISP panel already auto-restarted it
 - Port 3000 is already in use by the ISP-managed process
@@ -34,21 +38,25 @@ Your ISP panel (reg.ru) has automatic process management that:
 ## How to Verify Deployment Success
 
 ### 1. Check the site loads:
+
 ```bash
 curl -I https://resolutio.org
 ```
 
 ### 2. Check process is running:
+
 ```bash
 ps aux | grep next-server
 ```
 
 ### 3. Check port 3000:
+
 ```bash
 lsof -i :3000
 ```
 
 ### 4. Check recent changes:
+
 Visit the site and verify your changes are live.
 
 ## Updated Deploy Script
@@ -75,6 +83,7 @@ The `deploy-on-server.sh` script now handles this intelligently:
    Look in your ISP control panel for application logs
 
 2. **Check deploy.log:**
+
    ```bash
    tail -100 /var/www/www-root/data/www/resolutio.org/deploy.log
    ```
@@ -88,6 +97,7 @@ The `deploy-on-server.sh` script now handles this intelligently:
 ### If you see "EADDRINUSE" error:
 
 This is **expected and normal**! It means:
+
 - ISP panel already restarted the app
 - The deployment succeeded
 - Just check that the site loads
@@ -111,6 +121,7 @@ yarn start
 ## GitHub Actions Considerations
 
 The GitHub Actions workflow now:
+
 - Waits 10 seconds after deployment
 - Retries health check 3 times
 - Accounts for ISP auto-restart delay
