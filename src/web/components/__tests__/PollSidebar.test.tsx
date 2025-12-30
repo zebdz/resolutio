@@ -22,6 +22,7 @@ function reorderQuestions(
     if (!grouped[q.page]) {
       grouped[q.page] = [];
     }
+
     grouped[q.page].push(q);
   });
 

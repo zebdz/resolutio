@@ -105,6 +105,7 @@ export async function createOrganizationAction(
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
+
         fieldErrors[path].push(err.message);
       });
 
@@ -256,6 +257,7 @@ export async function joinOrganizationAction(
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
+
         fieldErrors[path].push(err.message);
       });
 
@@ -525,6 +527,7 @@ export async function handleJoinRequestAction(
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
+
         fieldErrors[path].push(err.message);
       });
 

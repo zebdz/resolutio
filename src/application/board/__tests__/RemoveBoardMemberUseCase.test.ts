@@ -50,6 +50,7 @@ class MockBoardRepository implements BoardRepository {
     if (!this.members.has(boardId)) {
       this.members.set(boardId, new Set());
     }
+
     this.members.get(boardId)!.add(userId);
   }
 
@@ -160,6 +161,7 @@ class MockOrganizationRepository implements OrganizationRepository {
     if (!this.admins.has(organizationId)) {
       this.admins.set(organizationId, new Set());
     }
+
     this.admins.get(organizationId)!.add(userId);
   }
 

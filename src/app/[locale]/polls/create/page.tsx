@@ -93,6 +93,7 @@ export default function CreatePollPage() {
         setIsLoadingBoards(false);
       }
     }
+
     loadBoards();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -286,6 +287,7 @@ export default function CreatePollPage() {
         if (question.details) {
           questionFormData.append('details', question.details);
         }
+
         questionFormData.append('questionType', question.questionType);
         questionFormData.append('page', question.page.toString());
         questionFormData.append('order', question.order.toString());

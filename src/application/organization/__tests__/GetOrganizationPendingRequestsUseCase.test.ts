@@ -64,6 +64,7 @@ class MockPrisma {
     if (!this.organizationAdmins.has(organizationId)) {
       this.organizationAdmins.set(organizationId, new Set());
     }
+
     this.organizationAdmins.get(organizationId)!.add(userId);
   }
 

@@ -53,6 +53,7 @@ class MockPollRepository implements PollRepository {
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
     }
+
     poll.archive();
 
     return success(undefined);
@@ -137,6 +138,7 @@ class MockPollRepository implements PollRepository {
     if (!question) {
       return failure(PollErrors.QUESTION_NOT_FOUND);
     }
+
     question.archive();
 
     return success(undefined);
@@ -177,6 +179,7 @@ class MockPollRepository implements PollRepository {
     if (!answer) {
       return failure(PollErrors.ANSWER_NOT_FOUND);
     }
+
     answer.archive();
 
     return success(undefined);

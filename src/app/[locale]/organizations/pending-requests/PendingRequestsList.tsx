@@ -145,6 +145,7 @@ export function PendingRequestsList({
           requests: [],
         };
       }
+
       acc[orgId].requests.push(request);
 
       return acc;

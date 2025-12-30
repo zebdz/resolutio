@@ -54,6 +54,7 @@ class MockBoardRepository implements BoardRepository {
     if (!this.boardMembers.has(boardId)) {
       this.boardMembers.set(boardId, new Set());
     }
+
     this.boardMembers.get(boardId)!.add(userId);
   }
 
@@ -146,6 +147,7 @@ describe('HandleJoinRequestUseCase', () => {
     if (!adminRoles.has(organizationId)) {
       adminRoles.set(organizationId, new Set());
     }
+
     adminRoles.get(organizationId)!.add(adminId);
 
     // Set up: pending request
@@ -191,6 +193,7 @@ describe('HandleJoinRequestUseCase', () => {
     if (!adminRoles.has(organizationId)) {
       adminRoles.set(organizationId, new Set());
     }
+
     adminRoles.get(organizationId)!.add(adminId);
 
     // Set up: pending request
@@ -237,6 +240,7 @@ describe('HandleJoinRequestUseCase', () => {
     if (!adminRoles.has(organizationId)) {
       adminRoles.set(organizationId, new Set());
     }
+
     adminRoles.get(organizationId)!.add(adminId);
 
     // Set up: pending request
@@ -313,6 +317,7 @@ describe('HandleJoinRequestUseCase', () => {
     if (!adminRoles.has(organizationId)) {
       adminRoles.set(organizationId, new Set());
     }
+
     adminRoles.get(organizationId)!.add(adminId);
 
     const result = await useCase.execute({
@@ -337,6 +342,7 @@ describe('HandleJoinRequestUseCase', () => {
     if (!adminRoles.has(organizationId)) {
       adminRoles.set(organizationId, new Set());
     }
+
     adminRoles.get(organizationId)!.add(adminId);
 
     // Set up: already accepted request
@@ -377,6 +383,7 @@ describe('HandleJoinRequestUseCase', () => {
     if (!adminRoles.has(organizationId)) {
       adminRoles.set(organizationId, new Set());
     }
+
     adminRoles.get(organizationId)!.add(adminId);
 
     // Set up: general board exists

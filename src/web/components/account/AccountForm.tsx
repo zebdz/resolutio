@@ -55,6 +55,7 @@ export function AccountForm({ user }: Props) {
     if (error) {
       setError(null);
     }
+
     if (success) {
       setSuccess(null);
     }

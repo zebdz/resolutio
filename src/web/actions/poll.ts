@@ -69,6 +69,7 @@ export async function createPollAction(
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
+
         fieldErrors[path].push(err.message);
       });
 
@@ -149,6 +150,7 @@ export async function addQuestionAction(
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
+
         fieldErrors[path].push(err.message);
       });
 
@@ -213,6 +215,7 @@ export async function updateQuestionOrderAction(input: {
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
+
         fieldErrors[path].push(err.message);
       });
 

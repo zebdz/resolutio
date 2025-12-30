@@ -48,6 +48,7 @@ export async function updateProfileAction(
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
+
         fieldErrors[path].push(err.message);
       });
 

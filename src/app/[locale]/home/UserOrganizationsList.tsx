@@ -60,8 +60,10 @@ export function UserOrganizationsList() {
       } else {
         setError(result.error);
       }
+
       setIsLoading(false);
     };
+
     loadOrganizations();
   }, []);
 

@@ -104,6 +104,7 @@ export async function registerAction(
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
+
         fieldErrors[path].push(err.message);
       });
 
@@ -129,6 +130,7 @@ export async function registerAction(
           error: t('databaseConnection'),
         };
       }
+
       throw useCaseError; // Re-throw to be caught by outer catch
     }
 
@@ -190,6 +192,7 @@ export async function loginAction(
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
+
         fieldErrors[path].push(err.message);
       });
 
@@ -212,6 +215,7 @@ export async function loginAction(
           error: t('databaseConnection'),
         };
       }
+
       throw useCaseError; // Re-throw to be caught by outer catch
     }
 

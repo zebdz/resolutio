@@ -46,6 +46,7 @@ describe('UpdateUserProfileUseCase', () => {
       if (result.success) {
         expect(result.value.language).toBe('ru');
       }
+
       expect(userRepository.save).toHaveBeenCalled();
     });
 
@@ -61,6 +62,7 @@ describe('UpdateUserProfileUseCase', () => {
       if (!result.success) {
         expect(result.error.message).toContain('not found');
       }
+
       expect(userRepository.save).not.toHaveBeenCalled();
     });
 

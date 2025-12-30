@@ -80,6 +80,7 @@ export async function createBoardAction(
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
+
         fieldErrors[path].push(err.message);
       });
 

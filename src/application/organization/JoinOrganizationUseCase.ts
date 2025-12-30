@@ -45,9 +45,11 @@ export class JoinOrganizationUseCase {
       if (existingMembership.status === 'accepted') {
         return failure(OrganizationErrors.ALREADY_MEMBER);
       }
+
       if (existingMembership.status === 'pending') {
         return failure(OrganizationErrors.PENDING_REQUEST);
       }
+
       if (existingMembership.status === 'rejected') {
         return failure(OrganizationErrors.REJECTED_REQUEST);
       }

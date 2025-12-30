@@ -269,6 +269,7 @@ export function PollSidebar({
       if (!acc[question.page]) {
         acc[question.page] = [];
       }
+
       acc[question.page].push(question);
 
       return acc;
@@ -313,6 +314,7 @@ export function PollSidebar({
       if (!grouped[q.page]) {
         grouped[q.page] = [];
       }
+
       grouped[q.page].push(q);
     });
 

@@ -107,6 +107,7 @@ class MockOrganizationRepository implements OrganizationRepository {
     if (!this.adminRoles.has(userId)) {
       this.adminRoles.set(userId, new Set());
     }
+
     this.adminRoles.get(userId)!.add(orgId);
   }
 }

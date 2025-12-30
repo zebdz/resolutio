@@ -52,6 +52,7 @@ export function CreateOrganizationDialog({
       if (result.success) {
         setAdminOrganizations(result.data.organizations);
       }
+
       setIsLoadingOrgs(false);
     };
 
@@ -91,6 +92,7 @@ export function CreateOrganizationDialog({
       if (result.fieldErrors) {
         setFieldErrors(result.fieldErrors);
       }
+
       setIsSubmitting(false);
     }
   };

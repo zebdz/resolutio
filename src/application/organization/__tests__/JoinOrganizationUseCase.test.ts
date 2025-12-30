@@ -139,6 +139,7 @@ class MockOrganizationRepository implements OrganizationRepository {
     if (!this.memberships.has(userId)) {
       this.memberships.set(userId, new Set());
     }
+
     this.memberships.get(userId)!.add(organizationId);
   }
 

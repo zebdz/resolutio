@@ -31,9 +31,11 @@ export class User {
     if (!props.firstName?.trim()) {
       throw new Error('First name is required');
     }
+
     if (!props.lastName?.trim()) {
       throw new Error('Last name is required');
     }
+
     if (!props.password?.trim()) {
       throw new Error('Password is required');
     }
