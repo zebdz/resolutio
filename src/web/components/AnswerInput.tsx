@@ -5,6 +5,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Input } from '@/app/components/catalyst/input';
 import { Button } from '@/app/components/catalyst/button';
+import { useTranslations } from 'next-intl';
 
 interface AnswerInputProps {
   id: string;
@@ -23,6 +24,8 @@ export function AnswerInput({
   onDelete,
   disabled = false,
 }: AnswerInputProps) {
+  const t = useTranslations('poll');
+
   const {
     attributes,
     listeners,
@@ -72,7 +75,7 @@ export function AnswerInput({
         <Input
           value={text}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={`Answer ${order + 1}`}
+          placeholder={`${t('answer')} ${order + 1}`}
           disabled={disabled}
         />
       </div>

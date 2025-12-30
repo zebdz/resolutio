@@ -97,6 +97,8 @@ function QuestionItem({
     }
   };
 
+  const t = useTranslations('poll');
+
   return (
     <div
       ref={setNodeRef}
@@ -123,7 +125,7 @@ function QuestionItem({
 
       {/* Question text */}
       <div className="flex-1 text-sm truncate">
-        {question.text || 'Untitled Question'}
+        {question.text || t('untitledQuestion')}
       </div>
 
       {/* Delete button */}
@@ -378,7 +380,7 @@ export function PollSidebar({
         {activeId ? (
           <div className="bg-white dark:bg-zinc-900 p-2 rounded-md shadow-lg border border-zinc-200 dark:border-zinc-800">
             {questions.find((q) => q.id === activeId)?.text ||
-              'Untitled Question'}
+              t('untitledQuestion')}
           </div>
         ) : null}
       </DragOverlay>

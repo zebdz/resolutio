@@ -315,6 +315,7 @@
     "questionType": "Тип вопроса",
     "singleChoice": "Один вариант",
     "multipleChoice": "Несколько вариантов",
+    "answer": "Ответ",
     "answers": "Ответы",
     "addAnswer": "Добавить ответ",
     "answerText": "Текст ответа",
@@ -331,6 +332,7 @@
     "delete": "Удалить",
     "edit": "Редактировать",
     "view": "Просмотр",
+    "untitledQuestion": "Вопрос без названия",
     "errors": {
       "pollNotFound": "Опрос не найден",
       "questionNotFound": "Вопрос не найден",
@@ -346,7 +348,8 @@
       "invalidDates": "Дата начала должна быть раньше даты окончания",
       "questionTextRequired": "Текст вопроса обязателен",
       "atLeastOneAnswer": "Вопрос должен иметь хотя бы один ответ",
-      "answerTextRequired": "Текст ответа обязателен"
+      "answerTextRequired": "Текст ответа обязателен",
+      "loadBoards": "Не удалось загрузить органы управления"
     }
   },
   "domain": {

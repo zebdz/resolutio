@@ -315,6 +315,7 @@
     "questionType": "Question Type",
     "singleChoice": "Single Choice",
     "multipleChoice": "Multiple Choice",
+    "answer": "Answer",
     "answers": "Answers",
     "addAnswer": "Add Answer",
     "answerText": "Answer Text",
@@ -331,6 +332,7 @@
     "delete": "Delete",
     "edit": "Edit",
     "view": "View",
+    "untitledQuestion": "Untitled Question",
     "errors": {
       "pollNotFound": "Poll not found",
       "questionNotFound": "Question not found",
@@ -346,7 +348,8 @@
       "invalidDates": "Start date must be before end date",
       "questionTextRequired": "Question text is required",
       "atLeastOneAnswer": "Question must have at least one answer",
-      "answerTextRequired": "Answer text is required"
+      "answerTextRequired": "Answer text is required",
+      "loadBoards": "Failed to load boards"
     }
   },
   "domain": {

@@ -88,7 +88,7 @@ export default function CreatePollPage() {
           setError(result.error);
         }
       } catch (err) {
-        setError('Failed to load boards');
+        setError(t('errors.loadBoards'));
       } finally {
         setIsLoadingBoards(false);
       }
