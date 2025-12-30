@@ -350,12 +350,14 @@
     }
   },
   "domain": {
-    "errors": {
+    "organization": {
       "organizationNameEmpty": "Organization name cannot be empty",
       "organizationNameTooLong": "Organization name cannot exceed 255 characters",
       "organizationDescriptionEmpty": "Organization description cannot be empty",
       "organizationDescriptionTooLong": "Organization description cannot exceed 1000 characters",
-      "organizationAlreadyArchived": "Organization is already archived",
+      "organizationAlreadyArchived": "Organization is already archived"
+    },
+    "board": {
       "boardNameEmpty": "Board name cannot be empty",
       "boardNameTooLong": "Board name cannot exceed 255 characters",
       "boardAlreadyArchived": "Board is already archived"

@@ -1,6 +1,6 @@
 import { Result, success, failure } from '../shared/Result';
 import { Question, QuestionProps } from './Question';
-import { PollDomainErrors } from './PollDomainErrors';
+import { PollDomainCodes } from './PollDomainCodes';
 
 export interface PollProps {
   id: string;
@@ -30,25 +30,25 @@ export class Poll {
   ): Result<Poll, string> {
     // Validate title
     if (!title || title.trim().length === 0) {
-      return failure(PollDomainErrors.POLL_TITLE_EMPTY);
+      return failure(PollDomainCodes.POLL_TITLE_EMPTY);
     }
 
     if (title.length > 500) {
-      return failure(PollDomainErrors.POLL_TITLE_TOO_LONG);
+      return failure(PollDomainCodes.POLL_TITLE_TOO_LONG);
     }
 
     // Validate description
     if (!description || description.trim().length === 0) {
-      return failure(PollDomainErrors.POLL_DESCRIPTION_EMPTY);
+      return failure(PollDomainCodes.POLL_DESCRIPTION_EMPTY);
     }
 
     if (description.length > 5000) {
-      return failure(PollDomainErrors.POLL_DESCRIPTION_TOO_LONG);
+      return failure(PollDomainCodes.POLL_DESCRIPTION_TOO_LONG);
     }
 
     // Validate dates
     if (startDate >= endDate) {
-      return failure(PollDomainErrors.POLL_INVALID_DATES);
+      return failure(PollDomainCodes.POLL_INVALID_DATES);
     }
 
     const poll = new Poll({
@@ -136,15 +136,15 @@ export class Poll {
 
   public updateTitle(newTitle: string): Result<void, string> {
     if (this.isFinished()) {
-      return failure(PollDomainErrors.POLL_CANNOT_UPDATE_FINISHED);
+      return failure(PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED);
     }
 
     if (!newTitle || newTitle.trim().length === 0) {
-      return failure(PollDomainErrors.POLL_TITLE_EMPTY);
+      return failure(PollDomainCodes.POLL_TITLE_EMPTY);
     }
 
     if (newTitle.length > 500) {
-      return failure(PollDomainErrors.POLL_TITLE_TOO_LONG);
+      return failure(PollDomainCodes.POLL_TITLE_TOO_LONG);
     }
 
     this.props.title = newTitle.trim();
@@ -154,15 +154,15 @@ export class Poll {
 
   public updateDescription(newDescription: string): Result<void, string> {
     if (this.isFinished()) {
-      return failure(PollDomainErrors.POLL_CANNOT_UPDATE_FINISHED);
+      return failure(PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED);
     }
 
     if (!newDescription || newDescription.trim().length === 0) {
-      return failure(PollDomainErrors.POLL_DESCRIPTION_EMPTY);
+      return failure(PollDomainCodes.POLL_DESCRIPTION_EMPTY);
     }
 
     if (newDescription.length > 5000) {
-      return failure(PollDomainErrors.POLL_DESCRIPTION_TOO_LONG);
+      return failure(PollDomainCodes.POLL_DESCRIPTION_TOO_LONG);
     }
 
     this.props.description = newDescription.trim();
@@ -172,11 +172,11 @@ export class Poll {
 
   public updateDates(startDate: Date, endDate: Date): Result<void, string> {
     if (this.isFinished()) {
-      return failure(PollDomainErrors.POLL_CANNOT_UPDATE_FINISHED);
+      return failure(PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED);
     }
 
     if (startDate >= endDate) {
-      return failure(PollDomainErrors.POLL_INVALID_DATES);
+      return failure(PollDomainCodes.POLL_INVALID_DATES);
     }
 
     this.props.startDate = startDate;
@@ -187,15 +187,15 @@ export class Poll {
 
   public activate(): Result<void, string> {
     if (this.isFinished()) {
-      return failure(PollDomainErrors.POLL_CANNOT_ACTIVATE_FINISHED);
+      return failure(PollDomainCodes.POLL_CANNOT_ACTIVATE_FINISHED);
     }
 
     if (this.isActive()) {
-      return failure(PollDomainErrors.POLL_ALREADY_ACTIVE);
+      return failure(PollDomainCodes.POLL_ALREADY_ACTIVE);
     }
 
     if (this.props.questions.length === 0) {
-      return failure(PollDomainErrors.POLL_NO_QUESTIONS);
+      return failure(PollDomainCodes.POLL_NO_QUESTIONS);
     }
 
     this.props.active = true;
@@ -205,11 +205,11 @@ export class Poll {
 
   public deactivate(): Result<void, string> {
     if (this.isFinished()) {
-      return failure(PollDomainErrors.POLL_CANNOT_DEACTIVATE_FINISHED);
+      return failure(PollDomainCodes.POLL_CANNOT_DEACTIVATE_FINISHED);
     }
 
     if (!this.isActive()) {
-      return failure(PollDomainErrors.POLL_ALREADY_INACTIVE);
+      return failure(PollDomainCodes.POLL_ALREADY_INACTIVE);
     }
 
     this.props.active = false;
@@ -219,7 +219,7 @@ export class Poll {
 
   public finish(): Result<void, string> {
     if (this.isFinished()) {
-      return failure(PollDomainErrors.POLL_ALREADY_FINISHED);
+      return failure(PollDomainCodes.POLL_ALREADY_FINISHED);
     }
 
     this.props.finished = true;
@@ -230,11 +230,11 @@ export class Poll {
 
   public addQuestion(question: Question): Result<void, string> {
     if (this.isFinished()) {
-      return failure(PollDomainErrors.POLL_CANNOT_ADD_QUESTION_FINISHED);
+      return failure(PollDomainCodes.POLL_CANNOT_ADD_QUESTION_FINISHED);
     }
 
     if (this.isArchived()) {
-      return failure(PollDomainErrors.POLL_CANNOT_ADD_QUESTION_ARCHIVED);
+      return failure(PollDomainCodes.POLL_CANNOT_ADD_QUESTION_ARCHIVED);
     }
 
     this.props.questions.push(question);
@@ -244,16 +244,16 @@ export class Poll {
 
   public removeQuestion(questionId: string): Result<void, string> {
     if (this.isFinished()) {
-      return failure(PollDomainErrors.POLL_CANNOT_REMOVE_QUESTION_FINISHED);
+      return failure(PollDomainCodes.POLL_CANNOT_REMOVE_QUESTION_FINISHED);
     }
 
     if (this.isArchived()) {
-      return failure(PollDomainErrors.POLL_CANNOT_REMOVE_QUESTION_ARCHIVED);
+      return failure(PollDomainCodes.POLL_CANNOT_REMOVE_QUESTION_ARCHIVED);
     }
 
     const question = this.props.questions.find((q) => q.id === questionId);
     if (!question) {
-      return failure(PollDomainErrors.QUESTION_NOT_FOUND);
+      return failure(PollDomainCodes.QUESTION_NOT_FOUND);
     }
 
     // Archive the question instead of removing it
@@ -267,7 +267,7 @@ export class Poll {
 
   public archive(): Result<void, string> {
     if (this.isArchived()) {
-      return failure(PollDomainErrors.POLL_ALREADY_ARCHIVED);
+      return failure(PollDomainCodes.POLL_ALREADY_ARCHIVED);
     }
 
     this.props.archivedAt = new Date();

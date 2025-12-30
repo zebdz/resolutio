@@ -1,5 +1,5 @@
 import { Result, success, failure } from '../shared/Result';
-import { PollDomainErrors } from './PollDomainErrors';
+import { PollDomainCodes } from './PollDomainCodes';
 
 export interface AnswerProps {
   id: string;
@@ -19,15 +19,15 @@ export class Answer {
     questionId: string
   ): Result<Answer, string> {
     if (!text || text.trim().length === 0) {
-      return failure(PollDomainErrors.ANSWER_TEXT_EMPTY);
+      return failure(PollDomainCodes.ANSWER_TEXT_EMPTY);
     }
 
     if (text.length > 1000) {
-      return failure(PollDomainErrors.ANSWER_TEXT_TOO_LONG);
+      return failure(PollDomainCodes.ANSWER_TEXT_TOO_LONG);
     }
 
     if (order < 0) {
-      return failure(PollDomainErrors.ANSWER_INVALID_ORDER);
+      return failure(PollDomainCodes.ANSWER_INVALID_ORDER);
     }
 
     const answer = new Answer({
@@ -77,11 +77,11 @@ export class Answer {
 
   public updateText(newText: string): Result<void, string> {
     if (!newText || newText.trim().length === 0) {
-      return failure(PollDomainErrors.ANSWER_TEXT_EMPTY);
+      return failure(PollDomainCodes.ANSWER_TEXT_EMPTY);
     }
 
     if (newText.length > 1000) {
-      return failure(PollDomainErrors.ANSWER_TEXT_TOO_LONG);
+      return failure(PollDomainCodes.ANSWER_TEXT_TOO_LONG);
     }
 
     this.props.text = newText.trim();
@@ -91,7 +91,7 @@ export class Answer {
 
   public updateOrder(newOrder: number): Result<void, string> {
     if (newOrder < 0) {
-      return failure(PollDomainErrors.ANSWER_INVALID_ORDER);
+      return failure(PollDomainCodes.ANSWER_INVALID_ORDER);
     }
 
     this.props.order = newOrder;
@@ -101,7 +101,7 @@ export class Answer {
 
   public archive(): Result<void, string> {
     if (this.isArchived()) {
-      return failure(PollDomainErrors.ANSWER_ALREADY_ARCHIVED);
+      return failure(PollDomainCodes.ANSWER_ALREADY_ARCHIVED);
     }
 
     this.props.archivedAt = new Date();

@@ -5,7 +5,7 @@ import { OrganizationRepository } from '../../../domain/organization/Organizatio
 import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { Board } from '../../../domain/board/Board';
 import { OrganizationErrors } from '../OrganizationErrors';
-import { DomainErrors } from '../../../domain/shared/DomainErrors';
+import { OrganizationDomainCodes } from '@/src/domain/organization/OrganizationDomainCodes';
 
 // Mock repositories
 class MockOrganizationRepository implements OrganizationRepository {
@@ -238,7 +238,7 @@ describe('CreateOrganizationUseCase', () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toBe(DomainErrors.ORGANIZATION_NAME_EMPTY);
+      expect(result.error).toBe(OrganizationDomainCodes.ORGANIZATION_NAME_EMPTY);
     }
   });
 
@@ -253,7 +253,7 @@ describe('CreateOrganizationUseCase', () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toBe(DomainErrors.ORGANIZATION_DESCRIPTION_EMPTY);
+      expect(result.error).toBe(OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_EMPTY);
     }
   });
 

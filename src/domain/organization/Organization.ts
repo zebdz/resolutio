@@ -1,5 +1,5 @@
 import { Result, success, failure } from '../shared/Result';
-import { DomainErrors } from '../shared/DomainErrors';
+import { OrganizationDomainCodes } from './OrganizationDomainCodes';
 
 export interface OrganizationProps {
   id: string;
@@ -22,20 +22,20 @@ export class Organization {
   ): Result<Organization, string> {
     // Validate name
     if (!name || name.trim().length === 0) {
-      return failure(DomainErrors.ORGANIZATION_NAME_EMPTY);
+      return failure(OrganizationDomainCodes.ORGANIZATION_NAME_EMPTY);
     }
 
     if (name.length > 255) {
-      return failure(DomainErrors.ORGANIZATION_NAME_TOO_LONG);
+      return failure(OrganizationDomainCodes.ORGANIZATION_NAME_TOO_LONG);
     }
 
     // Validate description
     if (!description || description.trim().length === 0) {
-      return failure(DomainErrors.ORGANIZATION_DESCRIPTION_EMPTY);
+      return failure(OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_EMPTY);
     }
 
     if (description.length > 2000) {
-      return failure(DomainErrors.ORGANIZATION_DESCRIPTION_TOO_LONG);
+      return failure(OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_TOO_LONG);
     }
 
     const organization = new Organization({
@@ -90,7 +90,7 @@ export class Organization {
 
   public archive(): Result<void, string> {
     if (this.isArchived()) {
-      return failure(DomainErrors.ORGANIZATION_ALREADY_ARCHIVED);
+      return failure(OrganizationDomainCodes.ORGANIZATION_ALREADY_ARCHIVED);
     }
 
     this.props.archivedAt = new Date();

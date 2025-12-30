@@ -1,6 +1,6 @@
-// Poll domain error codes
+// Poll domain codes
 // These should be translated at the presentation layer
-export const PollDomainErrors = {
+export const PollDomainCodes = {
   // Poll validation
   POLL_TITLE_EMPTY: 'domain.poll.titleEmpty',
   POLL_TITLE_TOO_LONG: 'domain.poll.titleTooLong',
@@ -46,5 +46,5 @@ export const PollDomainErrors = {
   ANSWER_ALREADY_ARCHIVED: 'domain.poll.answerAlreadyArchived',
 } as const;
 
-export type PollDomainError =
-  (typeof PollDomainErrors)[keyof typeof PollDomainErrors];
+export type PollDomainCode =
+  (typeof PollDomainCodes)[keyof typeof PollDomainCodes];

@@ -1,7 +1,7 @@
 import { Result, success, failure } from '../shared/Result';
 import { QuestionType, isValidQuestionType } from './QuestionType';
 import { Answer, AnswerProps } from './Answer';
-import { PollDomainErrors } from './PollDomainErrors';
+import { PollDomainCodes } from './PollDomainCodes';
 
 export interface QuestionProps {
   id: string;
@@ -28,27 +28,27 @@ export class Question {
     details?: string
   ): Result<Question, string> {
     if (!text || text.trim().length === 0) {
-      return failure(PollDomainErrors.QUESTION_TEXT_EMPTY);
+      return failure(PollDomainCodes.QUESTION_TEXT_EMPTY);
     }
 
     if (text.length > 1000) {
-      return failure(PollDomainErrors.QUESTION_TEXT_TOO_LONG);
+      return failure(PollDomainCodes.QUESTION_TEXT_TOO_LONG);
     }
 
     if (details && details.length > 5000) {
-      return failure(PollDomainErrors.QUESTION_DETAILS_TOO_LONG);
+      return failure(PollDomainCodes.QUESTION_DETAILS_TOO_LONG);
     }
 
     if (page < 1) {
-      return failure(PollDomainErrors.QUESTION_INVALID_PAGE);
+      return failure(PollDomainCodes.QUESTION_INVALID_PAGE);
     }
 
     if (order < 0) {
-      return failure(PollDomainErrors.QUESTION_INVALID_ORDER);
+      return failure(PollDomainCodes.QUESTION_INVALID_ORDER);
     }
 
     if (!isValidQuestionType(questionType)) {
-      return failure(PollDomainErrors.QUESTION_INVALID_TYPE);
+      return failure(PollDomainCodes.QUESTION_INVALID_TYPE);
     }
 
     const question = new Question({
@@ -118,11 +118,11 @@ export class Question {
 
   public updateText(newText: string): Result<void, string> {
     if (!newText || newText.trim().length === 0) {
-      return failure(PollDomainErrors.QUESTION_TEXT_EMPTY);
+      return failure(PollDomainCodes.QUESTION_TEXT_EMPTY);
     }
 
     if (newText.length > 1000) {
-      return failure(PollDomainErrors.QUESTION_TEXT_TOO_LONG);
+      return failure(PollDomainCodes.QUESTION_TEXT_TOO_LONG);
     }
 
     this.props.text = newText.trim();
@@ -132,7 +132,7 @@ export class Question {
 
   public updateDetails(newDetails: string | null): Result<void, string> {
     if (newDetails && newDetails.length > 5000) {
-      return failure(PollDomainErrors.QUESTION_DETAILS_TOO_LONG);
+      return failure(PollDomainCodes.QUESTION_DETAILS_TOO_LONG);
     }
 
     this.props.details = newDetails?.trim() || null;
@@ -142,7 +142,7 @@ export class Question {
 
   public updatePage(newPage: number): Result<void, string> {
     if (newPage < 1) {
-      return failure(PollDomainErrors.QUESTION_INVALID_PAGE);
+      return failure(PollDomainCodes.QUESTION_INVALID_PAGE);
     }
 
     this.props.page = newPage;
@@ -152,7 +152,7 @@ export class Question {
 
   public updateOrder(newOrder: number): Result<void, string> {
     if (newOrder < 0) {
-      return failure(PollDomainErrors.QUESTION_INVALID_ORDER);
+      return failure(PollDomainCodes.QUESTION_INVALID_ORDER);
     }
 
     this.props.order = newOrder;
@@ -162,7 +162,7 @@ export class Question {
 
   public updateType(newType: QuestionType): Result<void, string> {
     if (!isValidQuestionType(newType)) {
-      return failure(PollDomainErrors.QUESTION_INVALID_TYPE);
+      return failure(PollDomainCodes.QUESTION_INVALID_TYPE);
     }
 
     this.props.questionType = newType;
@@ -172,7 +172,7 @@ export class Question {
 
   public addAnswer(answer: Answer): Result<void, string> {
     if (this.isArchived()) {
-      return failure(PollDomainErrors.QUESTION_CANNOT_ADD_ANSWER_ARCHIVED);
+      return failure(PollDomainCodes.QUESTION_CANNOT_ADD_ANSWER_ARCHIVED);
     }
 
     this.props.answers.push(answer);
@@ -182,12 +182,12 @@ export class Question {
 
   public removeAnswer(answerId: string): Result<void, string> {
     if (this.isArchived()) {
-      return failure(PollDomainErrors.QUESTION_CANNOT_REMOVE_ANSWER_ARCHIVED);
+      return failure(PollDomainCodes.QUESTION_CANNOT_REMOVE_ANSWER_ARCHIVED);
     }
 
     const index = this.props.answers.findIndex((a) => a.id === answerId);
     if (index === -1) {
-      return failure(PollDomainErrors.QUESTION_ANSWER_NOT_FOUND);
+      return failure(PollDomainCodes.QUESTION_ANSWER_NOT_FOUND);
     }
 
     // Archive the answer instead of removing it
@@ -201,7 +201,7 @@ export class Question {
 
   public archive(): Result<void, string> {
     if (this.isArchived()) {
-      return failure(PollDomainErrors.QUESTION_ALREADY_ARCHIVED);
+      return failure(PollDomainCodes.QUESTION_ALREADY_ARCHIVED);
     }
 
     this.props.archivedAt = new Date();

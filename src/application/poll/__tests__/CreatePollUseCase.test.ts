@@ -11,7 +11,7 @@ import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { Board } from '../../../domain/board/Board';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
-import { PollDomainErrors } from '../../../domain/poll/PollDomainErrors';
+import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
 
 // Mock PollRepository
 class MockPollRepository implements PollRepository {
@@ -54,7 +54,7 @@ class MockPollRepository implements PollRepository {
   async deletePoll(pollId: string): Promise<Result<void, string>> {
     const poll = this.polls.get(pollId);
     if (!poll) {
-      return failure('Poll not found');
+      return failure(PollErrors.NOT_FOUND);
     }
     poll.archive();
 
@@ -108,7 +108,7 @@ class MockPollRepository implements PollRepository {
   async deleteQuestion(questionId: string): Promise<Result<void, string>> {
     const question = this.questions.get(questionId);
     if (!question) {
-      return failure('Question not found');
+      return failure(PollErrors.QUESTION_NOT_FOUND);
     }
     question.archive();
 
@@ -148,7 +148,7 @@ class MockPollRepository implements PollRepository {
   async deleteAnswer(answerId: string): Promise<Result<void, string>> {
     const answer = this.answers.get(answerId);
     if (!answer) {
-      return failure('Answer not found');
+      return failure(PollErrors.ANSWER_NOT_FOUND);
     }
     answer.archive();
 
@@ -415,7 +415,7 @@ describe('CreatePollUseCase', () => {
     // Assert
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toBe(PollDomainErrors.POLL_INVALID_DATES);
+      expect(result.error).toBe(PollDomainCodes.POLL_INVALID_DATES);
     }
   });
 });

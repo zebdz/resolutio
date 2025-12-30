@@ -273,7 +273,7 @@ describe('CreateBoardUseCase', () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe('domain.errors.boardNameEmpty');
+        expect(result.error).toBe('domain.board.boardNameEmpty');
       }
     });
 
@@ -287,7 +287,7 @@ describe('CreateBoardUseCase', () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe('domain.errors.boardNameTooLong');
+        expect(result.error).toBe('domain.board.boardNameTooLong');
       }
     });
 

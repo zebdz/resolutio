@@ -1,5 +1,5 @@
 import { Result, success, failure } from '../shared/Result';
-import { DomainErrors } from '../shared/DomainErrors';
+import { BoardDomainCodes } from './BoardDomainCodes';
 
 export interface BoardProps {
   id: string;
@@ -20,11 +20,11 @@ export class Board {
   ): Result<Board, string> {
     // Validate name
     if (!name || name.trim().length === 0) {
-      return failure(DomainErrors.BOARD_NAME_EMPTY);
+      return failure(BoardDomainCodes.BOARD_NAME_EMPTY);
     }
 
     if (name.length > 255) {
-      return failure(DomainErrors.BOARD_NAME_TOO_LONG);
+      return failure(BoardDomainCodes.BOARD_NAME_TOO_LONG);
     }
 
     const board = new Board({
@@ -74,7 +74,7 @@ export class Board {
 
   public archive(): Result<void, string> {
     if (this.isArchived()) {
-      return failure(DomainErrors.BOARD_ALREADY_ARCHIVED);
+      return failure(BoardDomainCodes.BOARD_ALREADY_ARCHIVED);
     }
 
     this.props.archivedAt = new Date();

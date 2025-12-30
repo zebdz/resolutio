@@ -21,6 +21,7 @@ export class JoinOrganizationUseCase {
     // Check if organization exists
     const organization =
       await this.deps.organizationRepository.findById(organizationId);
+
     if (!organization) {
       return failure(OrganizationErrors.NOT_FOUND);
     }
