@@ -7,4 +7,5 @@ export const BoardDomainCodes = {
   BOARD_ALREADY_ARCHIVED: 'domain.board.boardAlreadyArchived',
 } as const;
 
-export type BoardDomainCode = (typeof BoardDomainCodes)[keyof typeof BoardDomainCodes];
+export type BoardDomainCode =
+  (typeof BoardDomainCodes)[keyof typeof BoardDomainCodes];

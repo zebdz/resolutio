@@ -238,7 +238,9 @@ describe('CreateOrganizationUseCase', () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toBe(OrganizationDomainCodes.ORGANIZATION_NAME_EMPTY);
+      expect(result.error).toBe(
+        OrganizationDomainCodes.ORGANIZATION_NAME_EMPTY
+      );
     }
   });
 
@@ -253,7 +255,9 @@ describe('CreateOrganizationUseCase', () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toBe(OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_EMPTY);
+      expect(result.error).toBe(
+        OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_EMPTY
+      );
     }
   });
 

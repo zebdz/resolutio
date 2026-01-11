@@ -19,6 +19,25 @@ export const CreatePollSchema = z
     path: ['endDate'],
   });
 
+export const UpdatePollSchema = z
+  .object({
+    pollId: z.string().min(1, 'Poll ID is required'),
+    title: z
+      .string()
+      .min(1, 'Poll title is required')
+      .max(500, 'Poll title is too long'),
+    description: z
+      .string()
+      .min(1, 'Poll description is required')
+      .max(5000, 'Poll description is too long'),
+    startDate: z.coerce.date(),
+    endDate: z.coerce.date(),
+  })
+  .refine((data) => data.startDate < data.endDate, {
+    message: 'Start date must be before end date',
+    path: ['endDate'],
+  });
+
 export const AddQuestionSchema = z.object({
   pollId: z.string().min(1, 'Poll ID is required'),
   text: z

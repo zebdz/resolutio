@@ -17,6 +17,7 @@ export interface PollRepository {
   getPollsByUserId(userId: string): Promise<Result<Poll[], string>>;
   updatePoll(poll: Poll): Promise<Result<void, string>>;
   deletePoll(pollId: string): Promise<Result<void, string>>;
+  pollHasVotes(pollId: string): Promise<Result<boolean, string>>;
 
   // Question operations
   createQuestion(question: Question): Promise<Result<Question, string>>;

@@ -268,6 +268,7 @@
     "success": "Success",
     "cancel": "Cancel",
     "save": "Save",
+    "saving": "Saving...",
     "delete": "Delete",
     "edit": "Edit",
     "errors": {
@@ -331,6 +332,7 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "edit": "Edit",
+    "editPoll": "Edit Poll",
     "view": "View",
     "untitledQuestion": "Untitled Question",
     "errors": {
@@ -338,6 +340,9 @@
       "questionNotFound": "Question not found",
       "answerNotFound": "Answer not found",
       "cannotModifyFinished": "Cannot modify a finished poll",
+      "cannotModifyActive": "Cannot modify an active poll",
+      "cannotModifyHasVotes": "Cannot modify a poll that has votes",
+      "notPollCreator": "Only the poll creator can edit it",
       "notBoardMember": "You must be a board member to create polls",
       "boardNotFound": "Board not found",
       "noUpdates": "No updates provided",

@@ -4,10 +4,12 @@ export const OrganizationDomainCodes = {
   // Organization validation
   ORGANIZATION_NAME_EMPTY: 'domain.organization.organizationNameEmpty',
   ORGANIZATION_NAME_TOO_LONG: 'domain.organization.organizationNameTooLong',
-  ORGANIZATION_DESCRIPTION_EMPTY: 'domain.organization.organizationDescriptionEmpty',
+  ORGANIZATION_DESCRIPTION_EMPTY:
+    'domain.organization.organizationDescriptionEmpty',
   ORGANIZATION_DESCRIPTION_TOO_LONG:
     'domain.organization.organizationDescriptionTooLong',
-  ORGANIZATION_ALREADY_ARCHIVED: 'domain.organization.organizationAlreadyArchived',
+  ORGANIZATION_ALREADY_ARCHIVED:
+    'domain.organization.organizationAlreadyArchived',
 } as const;
 
 export type OrganizationDomainCode =

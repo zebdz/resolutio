@@ -2,10 +2,17 @@
 
 import { getTranslations } from 'next-intl/server';
 import { CreatePollUseCase } from '@/application/poll/CreatePollUseCase';
+import { UpdatePollUseCase } from '@/application/poll/UpdatePollUseCase';
 import { AddQuestionUseCase } from '@/application/poll/AddQuestionUseCase';
+import { UpdateQuestionUseCase } from '@/application/poll/UpdateQuestionUseCase';
+import { DeleteQuestionUseCase } from '@/application/poll/DeleteQuestionUseCase';
+import { CreateAnswerUseCase } from '@/application/poll/CreateAnswerUseCase';
+import { UpdateAnswerUseCase } from '@/application/poll/UpdateAnswerUseCase';
+import { DeleteAnswerUseCase } from '@/application/poll/DeleteAnswerUseCase';
 import { UpdateQuestionOrderUseCase } from '@/application/poll/UpdateQuestionOrderUseCase';
 import {
   CreatePollSchema,
+  UpdatePollSchema,
   AddQuestionSchema,
   UpdateQuestionOrderSchema,
 } from '@/application/poll/PollSchemas';
@@ -31,7 +38,13 @@ const createPollUseCase = new CreatePollUseCase(
   pollRepository,
   boardRepository
 );
+const updatePollUseCase = new UpdatePollUseCase(pollRepository);
 const addQuestionUseCase = new AddQuestionUseCase(pollRepository);
+const updateQuestionUseCase = new UpdateQuestionUseCase(pollRepository);
+const deleteQuestionUseCase = new DeleteQuestionUseCase(pollRepository);
+const createAnswerUseCase = new CreateAnswerUseCase(pollRepository);
+const updateAnswerUseCase = new UpdateAnswerUseCase(pollRepository);
+const deleteAnswerUseCase = new DeleteAnswerUseCase(pollRepository);
 const updateQuestionOrderUseCase = new UpdateQuestionOrderUseCase(
   pollRepository
 );
@@ -126,23 +139,33 @@ export async function addQuestionAction(
       };
     }
 
-    // Extract form data
-    const answersJson = formData.get('answers') as string;
-    const answers = answersJson ? JSON.parse(answersJson) : [];
+    // Parse FormData (same format as create page)
     const detailsValue = formData.get('details') as string | null;
+    const answersJson = formData.get('answers') as string;
 
-    const input = {
+    let answerTexts: string[] = [];
+    if (answersJson) {
+      try {
+        answerTexts = (JSON.parse(answersJson) as string[])
+          .filter((text) => text.trim())
+          .map((text) => text.trim());
+      } catch (e) {
+        // Invalid JSON, leave answers empty
+      }
+    }
+
+    const parsedInput = {
       pollId: formData.get('pollId') as string,
       text: formData.get('text') as string,
       details: detailsValue && detailsValue.trim() ? detailsValue : undefined,
       page: parseInt(formData.get('page') as string),
       order: parseInt(formData.get('order') as string),
       questionType: formData.get('questionType') as QuestionType,
-      answers,
+      answers: answerTexts,
     };
 
     // Validate with Zod
-    const validation = AddQuestionSchema.safeParse(input);
+    const validation = AddQuestionSchema.safeParse(parsedInput);
     if (!validation.success) {
       const fieldErrors: Record<string, string[]> = {};
       validation.error.issues.forEach((err) => {
@@ -392,6 +415,379 @@ export async function getPollByIdAction(
     return {
       success: false,
       error: t('generic'),
+    };
+  }
+}
+
+export async function updatePollAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    // Get current user
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    // Extract form data
+    const input = {
+      pollId: formData.get('pollId') as string,
+      title: formData.get('title') as string,
+      description: formData.get('description') as string,
+      startDate: new Date(formData.get('startDate') as string),
+      endDate: new Date(formData.get('endDate') as string),
+    };
+
+    // Validate with Zod
+    const validation = UpdatePollSchema.safeParse(input);
+    if (!validation.success) {
+      const fieldErrors: Record<string, string[]> = {};
+      validation.error.issues.forEach((err) => {
+        const path = err.path.join('.');
+        if (!fieldErrors[path]) {
+          fieldErrors[path] = [];
+        }
+
+        fieldErrors[path].push(err.message);
+      });
+
+      return {
+        success: false,
+        error: t('validationFailed'),
+        fieldErrors,
+      };
+    }
+
+    // Execute use case
+    const result = await updatePollUseCase.execute({
+      ...validation.data,
+      userId: user.id,
+    });
+
+    if (!result.success) {
+      const tError = await getTranslations(result.error.split('.')[0]);
+
+      return {
+        success: false,
+        error: tError(result.error),
+      };
+    }
+
+    return {
+      success: true,
+      data: undefined,
+    };
+  } catch (error) {
+    console.error('Error updating poll:', error);
+
+    return {
+      success: false,
+      error: t('unexpected'),
+    };
+  }
+}
+
+export async function canEditPollAction(
+  pollId: string
+): Promise<ActionResult<{ canEdit: boolean; reason?: string }>> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    // Get current user
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    // Get poll
+    const pollResult = await pollRepository.getPollById(pollId);
+    if (!pollResult.success) {
+      return {
+        success: false,
+        error: pollResult.error,
+      };
+    }
+
+    const poll = pollResult.value;
+    if (!poll) {
+      return {
+        success: false,
+        error: 'Poll not found',
+      };
+    }
+
+    // Check if user is creator
+    if (poll.createdBy !== user.id) {
+      return {
+        success: true,
+        data: {
+          canEdit: false,
+          reason: 'notCreator',
+        },
+      };
+    }
+
+    // Check if poll has votes
+    const hasVotesResult = await pollRepository.pollHasVotes(pollId);
+    if (!hasVotesResult.success) {
+      return {
+        success: false,
+        error: hasVotesResult.error,
+      };
+    }
+
+    const hasVotes = hasVotesResult.value;
+
+    // Check if poll can be edited
+    const canEditResult = poll.canEdit(hasVotes);
+    if (!canEditResult.success) {
+      return {
+        success: false,
+        error: canEditResult.error,
+      };
+    }
+
+    if (!canEditResult.value) {
+      let reason = 'unknown';
+      if (poll.isActive()) {
+        reason = 'active';
+      } else if (poll.isFinished()) {
+        reason = 'finished';
+      } else if (hasVotes) {
+        reason = 'hasVotes';
+      }
+
+      return {
+        success: true,
+        data: {
+          canEdit: false,
+          reason,
+        },
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        canEdit: true,
+      },
+    };
+  } catch (error) {
+    console.error('Error checking if poll can be edited:', error);
+
+    return {
+      success: false,
+      error: t('unexpected'),
+    };
+  }
+}
+
+export async function updateQuestionAction(data: {
+  questionId: string;
+  text?: string;
+  details?: string | null;
+  questionType?: QuestionType;
+}): Promise<ActionResult> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    const result = await updateQuestionUseCase.execute({
+      questionId: data.questionId,
+      userId: user.id,
+      text: data.text,
+      details: data.details,
+      questionType: data.questionType,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error,
+      };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error updating question:', error);
+
+    return {
+      success: false,
+      error: t('unexpected'),
+    };
+  }
+}
+
+export async function deleteQuestionAction(
+  questionId: string
+): Promise<ActionResult> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    const result = await deleteQuestionUseCase.execute({
+      questionId,
+      userId: user.id,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error,
+      };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error deleting question:', error);
+
+    return {
+      success: false,
+      error: t('unexpected'),
+    };
+  }
+}
+
+export async function updateAnswerAction(data: {
+  answerId: string;
+  text?: string;
+  order?: number;
+}): Promise<ActionResult> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    const result = await updateAnswerUseCase.execute({
+      answerId: data.answerId,
+      userId: user.id,
+      text: data.text,
+      order: data.order,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error,
+      };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error updating answer:', error);
+
+    return {
+      success: false,
+      error: t('unexpected'),
+    };
+  }
+}
+
+export async function createAnswerAction(data: {
+  questionId: string;
+  text: string;
+  order: number;
+}): Promise<ActionResult<{ answerId: string }>> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    const result = await createAnswerUseCase.execute({
+      questionId: data.questionId,
+      userId: user.id,
+      text: data.text,
+      order: data.order,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error,
+      };
+    }
+
+    return {
+      success: true,
+      data: { answerId: result.value.id },
+    };
+  } catch (error) {
+    console.error('Error creating answer:', error);
+
+    return {
+      success: false,
+      error: t('unexpected'),
+    };
+  }
+}
+
+export async function deleteAnswerAction(
+  answerId: string
+): Promise<ActionResult> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    const result = await deleteAnswerUseCase.execute({
+      answerId,
+      userId: user.id,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: result.error,
+      };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error deleting answer:', error);
+
+    return {
+      success: false,
+      error: t('unexpected'),
     };
   }
 }

@@ -134,8 +134,31 @@ export class Poll {
     return this.props.active;
   }
 
-  public updateTitle(newTitle: string): Result<void, string> {
+  /**
+   * Check if this poll can be edited
+   * A poll can only be edited if:
+   * - It is not active
+   * - It is not finished
+   * - It has no votes
+   */
+  public canEdit(hasVotes: boolean): Result<boolean, string> {
+    if (this.isActive()) {
+      return success(false);
+    }
+
     if (this.isFinished()) {
+      return success(false);
+    }
+
+    if (hasVotes) {
+      return success(false);
+    }
+
+    return success(true);
+  }
+
+  public updateTitle(newTitle: string): Result<void, string> {
+    if (this.isFinished() || this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED);
     }
 
@@ -153,7 +176,7 @@ export class Poll {
   }
 
   public updateDescription(newDescription: string): Result<void, string> {
-    if (this.isFinished()) {
+    if (this.isFinished() || this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED);
     }
 
@@ -171,7 +194,7 @@ export class Poll {
   }
 
   public updateDates(startDate: Date, endDate: Date): Result<void, string> {
-    if (this.isFinished()) {
+    if (this.isFinished() || this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED);
     }
 
@@ -229,7 +252,7 @@ export class Poll {
   }
 
   public addQuestion(question: Question): Result<void, string> {
-    if (this.isFinished()) {
+    if (this.isFinished() || this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_ADD_QUESTION_FINISHED);
     }
 
@@ -243,7 +266,7 @@ export class Poll {
   }
 
   public removeQuestion(questionId: string): Result<void, string> {
-    if (this.isFinished()) {
+    if (this.isFinished() || this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_REMOVE_QUESTION_FINISHED);
     }
 

@@ -4,6 +4,9 @@ export const PollErrors = {
   // Poll
   NOT_FOUND: 'poll.errors.pollNotFound',
   CANNOT_MODIFY_FINISHED: 'poll.errors.cannotModifyFinished',
+  CANNOT_MODIFY_ACTIVE: 'poll.errors.cannotModifyActive',
+  CANNOT_MODIFY_HAS_VOTES: 'poll.errors.cannotModifyHasVotes',
+  NOT_POLL_CREATOR: 'poll.errors.notPollCreator',
   NOT_BOARD_MEMBER: 'poll.errors.notBoardMember',
   BOARD_NOT_FOUND: 'poll.errors.boardNotFound',
 

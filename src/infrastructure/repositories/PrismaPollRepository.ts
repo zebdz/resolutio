@@ -174,6 +174,23 @@ export class PrismaPollRepository implements PollRepository {
     }
   }
 
+  async pollHasVotes(pollId: string): Promise<Result<boolean, string>> {
+    try {
+      // Check if any votes exist for questions belonging to this poll
+      const voteCount = await this.prisma.vote.count({
+        where: {
+          question: {
+            pollId: pollId,
+          },
+        },
+      });
+
+      return success(voteCount > 0);
+    } catch (error) {
+      return failure(`Failed to check poll votes: ${error}`);
+    }
+  }
+
   // Question operations
   async createQuestion(question: Question): Promise<Result<Question, string>> {
     try {
