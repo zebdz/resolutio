@@ -6,6 +6,9 @@
 echo "Creating deployment package..."
 
 # Create package with built files only (no node_modules)
+# Copy .env.production as .env for deployment
+cp .env.production .env
+
 tar -czf deploy.tar.gz \
   .next/ \
   generated/ \
@@ -21,7 +24,11 @@ tar -czf deploy.tar.gz \
   tsconfig.json \
   eslint.config.mjs \
   postcss.config.mjs \
-  next-env.d.ts
+  next-env.d.ts \
+  .env
+
+# Clean up temporary .env file
+rm .env
 
 echo "✅ Deployment package created: deploy.tar.gz"
 echo ""

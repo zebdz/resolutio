@@ -34,7 +34,12 @@ jobs:
         run: yarn build
 
       - name: Create deployment package
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
+          # Create .env file for production
+          echo "DATABASE_URL=$DATABASE_URL" > .env
+          
           tar -czf deploy.tar.gz \
             .next/ \
             node_modules/ \
@@ -46,7 +51,11 @@ jobs:
             prisma.config.ts \
             migrate-production.sh \
             deploy-on-server.sh \
-            start-production.sh
+            start-production.sh \
+            .env
+          
+          # Clean up temporary .env file
+          rm .env
 
       - name: Setup SSH
         run: |
