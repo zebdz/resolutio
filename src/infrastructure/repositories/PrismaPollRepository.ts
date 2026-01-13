@@ -4,9 +4,6 @@ import { Question } from '../../domain/poll/Question';
 import { Answer } from '../../domain/poll/Answer';
 import {
   PollRepository,
-  CreatePollData,
-  CreateQuestionData,
-  CreateAnswerData,
   UpdateQuestionOrderData,
 } from '../../domain/poll/PollRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
