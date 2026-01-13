@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 8080",
-    "prebuild": "yarn run test:run",
+    "prebuild": "yarn run test",
     "prerelease": "yarn run prebuild && yarn run test:e2e",
     "build": "prisma generate && next build",
     "start": "./start-production.sh",
