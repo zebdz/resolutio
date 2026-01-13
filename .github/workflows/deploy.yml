@@ -55,12 +55,12 @@ jobs:
         run: |
           # Upload deployment package
           echo "📦 Uploading deployment package..."
-          scp -i ~/.ssh/id_ed25519 deploy.tar.gz www-root@89.111.171.11:/var/www/www-root/data/www/resolutio.org/
+          scp -i ~/.ssh/id_ed25519 deploy.tar.gz www-root@89.111.171.11:/var/www/www-root/data/www/resolutio.site/
 
           # Execute deployment on server
           echo "🚀 Deploying on production server..."
           ssh -i ~/.ssh/id_ed25519 www-root@89.111.171.11 << 'EOF'
-            cd /var/www/www-root/data/www/resolutio.org
+            cd /var/www/www-root/data/www/resolutio.site
             
             # Make deployment script executable
             chmod +x deploy-on-server.sh
@@ -88,7 +88,7 @@ jobs:
 
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
             echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://resolutio.org/ru || echo "000")
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://resolutio.site/ru || echo "000")
             
             if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
               echo "✅ Site is responding (HTTP $HTTP_CODE)"

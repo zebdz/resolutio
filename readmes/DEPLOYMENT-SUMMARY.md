@@ -88,9 +88,9 @@ Option B: Test manually first
 ```bash
 yarn build
 tar -czf deploy.tar.gz .next/ node_modules/ generated/ prisma/ public/ package.json next.config.ts prisma.config.ts migrate-production.sh deploy-on-server.sh
-scp -i ~/.ssh/id_ed25519_www_root_resolutio deploy.tar.gz www-root@89.111.171.11:/var/www/www-root/data/www/resolutio.org/
+scp -i ~/.ssh/id_ed25519_www_root_resolutio deploy.tar.gz www-root@89.111.171.11:/var/www/www-root/data/www/resolutio.site/
 ssh -i ~/.ssh/id_ed25519_www_root_resolutio www-root@89.111.171.11
-cd /var/www/www-root/data/www/resolutio.org
+cd /var/www/www-root/data/www/resolutio.site
 ./deploy-on-server.sh
 ```
 
@@ -128,7 +128,7 @@ cd /var/www/www-root/data/www/resolutio.org
 ┌─────────────────────┐
 │  Health Check       │
 │  https://           │
-│  resolutio.org      │
+│  resolutio.site      │
 └─────────────────────┘
 ```
 
@@ -152,7 +152,7 @@ ISP Panel → sh → node → next-server
 ### Files on Production Server:
 
 ```
-/var/www/www-root/data/www/resolutio.org/
+/var/www/www-root/data/www/resolutio.site/
 ├── .next/              # Built Next.js app
 ├── node_modules/       # Dependencies + Prisma engines
 ├── generated/          # Generated Prisma client
@@ -179,13 +179,13 @@ lsof -i :3000
 ### View logs:
 
 ```bash
-tail -f /var/www/www-root/data/www/resolutio.org/deploy.log
+tail -f /var/www/www-root/data/www/resolutio.site/deploy.log
 ```
 
 ### Restart server manually:
 
 ```bash
-cd /var/www/www-root/data/www/resolutio.org
+cd /var/www/www-root/data/www/resolutio.site
 pkill -f "next-server"
 yarn start
 ```
@@ -197,7 +197,7 @@ https://github.com/zebdz/resolutio/actions
 ### Rollback:
 
 ```bash
-cd /var/www/www-root/data/www/resolutio.org
+cd /var/www/www-root/data/www/resolutio.site
 tar -xzf backup-YYYYMMDD-HHMMSS.tar.gz
 pkill -f "next-server"
 yarn start
@@ -215,7 +215,7 @@ All documentation is in `readmes/`:
 ## Success Indicators
 
 ✅ GitHub Action completes without errors
-✅ https://resolutio.org loads successfully
+✅ https://resolutio.site loads successfully
 ✅ `ps aux | grep next-server` shows running process
 ✅ `lsof -i :3000` shows Next.js listening
 ✅ No errors in `deploy.log`

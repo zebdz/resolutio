@@ -40,7 +40,7 @@ Your ISP panel (reg.ru) has automatic process management that:
 ### 1. Check the site loads:
 
 ```bash
-curl -I https://resolutio.org
+curl -I https://resolutio.site
 ```
 
 ### 2. Check process is running:
@@ -85,7 +85,7 @@ The `deploy-on-server.sh` script now handles this intelligently:
 2. **Check deploy.log:**
 
    ```bash
-   tail -100 /var/www/www-root/data/www/resolutio.org/deploy.log
+   tail -100 /var/www/www-root/data/www/resolutio.site/deploy.log
    ```
 
 3. **Manually restart via ISP panel:**
@@ -114,7 +114,7 @@ Use the restart button in the Node.js application section
 pkill -f "next-server"
 # Wait 5 seconds for ISP to auto-restart
 # Or start manually:
-cd /var/www/www-root/data/www/resolutio.org
+cd /var/www/www-root/data/www/resolutio.site
 yarn start
 ```
 

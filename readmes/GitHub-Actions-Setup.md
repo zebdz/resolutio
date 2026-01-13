@@ -54,7 +54,7 @@ When you push to `master` branch:
    - Gracefully stops old Next.js server
    - Starts new Next.js server
    - Verifies it's running
-7. ✅ Runs health check on https://resolutio.org
+7. ✅ Runs health check on https://resolutio.site
 
 ## Manual Deployment
 
@@ -68,11 +68,11 @@ yarn build
 tar -czf deploy.tar.gz .next/ node_modules/ generated/ prisma/ public/ package.json next.config.ts prisma.config.ts migrate-production.sh deploy-on-server.sh
 
 # Upload to server
-scp -i ~/.ssh/id_ed25519_www_root_resolutio deploy.tar.gz www-root@89.111.171.11:/var/www/www-root/data/www/resolutio.org/
+scp -i ~/.ssh/id_ed25519_www_root_resolutio deploy.tar.gz www-root@89.111.171.11:/var/www/www-root/data/www/resolutio.site/
 
 # SSH to server and deploy
 ssh -i ~/.ssh/id_ed25519_www_root_resolutio www-root@89.111.171.11
-cd /var/www/www-root/data/www/resolutio.org
+cd /var/www/www-root/data/www/resolutio.site
 chmod +x deploy-on-server.sh
 ./deploy-on-server.sh
 ```
@@ -80,7 +80,7 @@ chmod +x deploy-on-server.sh
 ### On Production Server Only:
 
 ```bash
-cd /var/www/www-root/data/www/resolutio.org
+cd /var/www/www-root/data/www/resolutio.site
 
 # Check if server is running
 ps aux | grep next-server
@@ -103,7 +103,7 @@ lsof -i :3000
 On production server:
 
 ```bash
-tail -100 /var/www/www-root/data/www/resolutio.org/deploy.log
+tail -100 /var/www/www-root/data/www/resolutio.site/deploy.log
 ```
 
 ### Check Next.js Logs
@@ -113,7 +113,7 @@ Look for the nohup output in deploy.log or check ISP panel logs.
 ### Rollback to Previous Version
 
 ```bash
-cd /var/www/www-root/data/www/resolutio.org
+cd /var/www/www-root/data/www/resolutio.site
 ls -lt backup-*.tar.gz | head -1  # Find latest backup
 tar -xzf backup-20251218-123456.tar.gz  # Replace with actual filename
 pkill -f "next-server"

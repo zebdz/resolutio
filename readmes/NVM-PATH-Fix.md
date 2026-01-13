@@ -92,11 +92,11 @@ This approach:
 tar -czf deploy.tar.gz .next/ node_modules/ generated/ prisma/ public/ package.json next.config.ts prisma.config.ts migrate-production.sh deploy-on-server.sh start-production.sh
 
 # Upload to server
-scp -i ~/.ssh/id_ed25519_www_root_resolutio deploy.tar.gz www-root@89.111.171.11:/var/www/www-root/data/www/resolutio.org/
+scp -i ~/.ssh/id_ed25519_www_root_resolutio deploy.tar.gz www-root@89.111.171.11:/var/www/www-root/data/www/resolutio.site/
 
 # Deploy on server
 ssh -i ~/.ssh/id_ed25519_www_root_resolutio www-root@89.111.171.11
-cd /var/www/www-root/data/www/resolutio.org
+cd /var/www/www-root/data/www/resolutio.site
 ./deploy-on-server.sh
 ```
 
@@ -107,7 +107,7 @@ Or just push to master and GitHub Actions will do it automatically!
 After deployment, check the logs:
 
 ```bash
-tail -50 /var/www/www-root/data/www/resolutio.org/deploy.log
+tail -50 /var/www/www-root/data/www/resolutio.site/deploy.log
 ```
 
 You should see:

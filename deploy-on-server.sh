@@ -5,7 +5,7 @@
 
 set -e  # Exit on any error
 
-DEPLOY_DIR="/var/www/www-root/data/www/resolutio.org"
+DEPLOY_DIR="/var/www/www-root/data/www/resolutio.site"
 LOG_FILE="$DEPLOY_DIR/deploy.log"
 
 # Load NVM if available
