@@ -8,6 +8,12 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    
+    env:
+      SERVER_USER: www-root
+      SERVER_IP: 89.111.171.11
+      DEPLOY_DIR: /var/www/www-root/data/www/resolutio.site
+      SITE_URL: https://resolutio.site
 
     steps:
       - name: Checkout code
@@ -47,20 +53,25 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H 89.111.171.11 >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ env.SERVER_IP }} >> ~/.ssh/known_hosts
 
       - name: Deploy to production server
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DEPLOY_DIR: ${{ env.DEPLOY_DIR }}
         run: |
           # Upload deployment package
           echo "📦 Uploading deployment package..."
-          scp -i ~/.ssh/id_ed25519 deploy.tar.gz www-root@89.111.171.11:/var/www/www-root/data/www/resolutio.site/
+          scp -i ~/.ssh/id_ed25519 deploy.tar.gz ${{ env.SERVER_USER }}@${{ env.SERVER_IP }}:${DEPLOY_DIR}/
 
           # Execute deployment on server
           echo "🚀 Deploying on production server..."
-          ssh -i ~/.ssh/id_ed25519 www-root@89.111.171.11 << 'EOF'
-            cd /var/www/www-root/data/www/resolutio.site
+          ssh -i ~/.ssh/id_ed25519 ${{ env.SERVER_USER }}@${{ env.SERVER_IP }} << EOF
+            cd ${DEPLOY_DIR}
+            
+            # Extract the deployment package
+            echo "📂 Extracting deployment package..."
+            tar -xzf deploy.tar.gz
             
             # Make deployment script executable
             chmod +x deploy-on-server.sh
@@ -68,10 +79,14 @@ jobs:
             # Run deployment script
             ./deploy-on-server.sh
             
-            # Show the last few lines of the log
+            # Show the last few lines of the log if it exists
             echo ""
-            echo "Recent deployment log:"
-            tail -20 deploy.log
+            if [ -f deploy.log ]; then
+              echo "Recent deployment log:"
+              tail -20 deploy.log
+            else
+              echo "No deployment log found (deploy.log doesn't exist yet)"
+            fi
           EOF
 
           echo "✅ Deployment complete!"
@@ -88,7 +103,7 @@ jobs:
 
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
             echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://resolutio.site/ru || echo "000")
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" ${{ env.SITE_URL }}/ru || echo "000")
             
             if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
               echo "✅ Site is responding (HTTP $HTTP_CODE)"
