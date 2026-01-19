@@ -87,7 +87,8 @@ export default async function ParticipantsPage({
   return (
     <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
-        <Link href={`/polls/${pollId}/edit`}>
+        {/* <Link href={`/polls/${pollId}/edit`}> */}
+        <Link href={`/polls`}>
           <Button color="zinc" className="inline-flex items-center mb-4">
             <ArrowLeftIcon className="w-4 h-4 mr-2" />
             {commonT('back')}
