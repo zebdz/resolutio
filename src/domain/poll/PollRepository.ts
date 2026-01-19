@@ -1,6 +1,10 @@
 import { Poll } from './Poll';
 import { Question } from './Question';
 import { Answer } from './Answer';
+import { Vote } from './Vote';
+import { VoteDraft } from './VoteDraft';
+import { PollParticipant } from './PollParticipant';
+import { ParticipantWeightHistory } from './ParticipantWeightHistory';
 import { Result } from '../shared/Result';
 
 export interface UpdateQuestionOrderData {
@@ -35,4 +39,65 @@ export interface PollRepository {
   getAnswersByQuestionId(questionId: string): Promise<Result<Answer[], string>>;
   updateAnswer(answer: Answer): Promise<Result<void, string>>;
   deleteAnswer(answerId: string): Promise<Result<void, string>>;
+
+  // Vote operations
+  createVote(vote: Vote): Promise<Result<Vote, string>>;
+  createVotes(votes: Vote[]): Promise<Result<void, string>>;
+  getUserVotes(pollId: string, userId: string): Promise<Result<Vote[], string>>;
+  hasUserFinishedVoting(
+    pollId: string,
+    userId: string
+  ): Promise<Result<boolean, string>>;
+  getVotesByPoll(pollId: string): Promise<Result<Vote[], string>>;
+
+  // Participant operations
+  createParticipants(
+    participants: PollParticipant[]
+  ): Promise<Result<void, string>>;
+  getParticipants(pollId: string): Promise<Result<PollParticipant[], string>>;
+  getParticipantById(
+    participantId: string
+  ): Promise<Result<PollParticipant | null, string>>;
+  getParticipantByUserAndPoll(
+    pollId: string,
+    userId: string
+  ): Promise<Result<PollParticipant | null, string>>;
+  updateParticipantWeight(
+    participant: PollParticipant
+  ): Promise<Result<void, string>>;
+  deleteParticipant(participantId: string): Promise<Result<void, string>>;
+
+  // Weight history operations
+  createWeightHistory(
+    history: ParticipantWeightHistory
+  ): Promise<Result<ParticipantWeightHistory, string>>;
+  getWeightHistory(
+    pollId: string
+  ): Promise<Result<ParticipantWeightHistory[], string>>;
+  getParticipantWeightHistory(
+    participantId: string
+  ): Promise<Result<ParticipantWeightHistory[], string>>;
+
+  // Draft operations
+  saveDraft(draft: VoteDraft): Promise<Result<VoteDraft, string>>;
+  getUserDrafts(
+    pollId: string,
+    userId: string
+  ): Promise<Result<VoteDraft[], string>>;
+  deleteUserDrafts(
+    pollId: string,
+    userId: string
+  ): Promise<Result<void, string>>;
+  deleteAllPollDrafts(pollId: string): Promise<Result<void, string>>;
+  deleteDraftsByQuestion(
+    pollId: string,
+    questionId: string,
+    userId: string
+  ): Promise<Result<void, string>>;
+  deleteDraftByAnswer(
+    pollId: string,
+    questionId: string,
+    answerId: string,
+    userId: string
+  ): Promise<Result<void, string>>;
 }

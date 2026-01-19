@@ -23,6 +23,8 @@ export interface BoardRepository {
     organizationId: string
   ): Promise<Board | null>;
 
+  findBoardMembers(boardId: string): Promise<{ userId: string }[]>;
+
   /**
    * Checks if a user is a member of a board
    */

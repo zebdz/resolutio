@@ -88,6 +88,18 @@ export class PrismaBoardRepository implements BoardRepository {
     });
   }
 
+  async findBoardMembers(boardId: string): Promise<{ userId: string }[]> {
+    return await this.prisma.boardUser.findMany({
+      where: {
+        boardId,
+        removedAt: null,
+      },
+      select: {
+        userId: true,
+      },
+    });
+  }
+
   async isUserMember(userId: string, boardId: string): Promise<boolean> {
     const membership = await this.prisma.boardUser.findUnique({
       where: {

@@ -28,6 +28,24 @@ export class PrismaUserRepository implements UserRepository {
     return this.toDomain(user);
   }
 
+  async findByIds(ids: string[]): Promise<User[]> {
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        middleName: true,
+        phoneNumber: true,
+        password: true,
+        language: true,
+        createdAt: true,
+      },
+    });
+
+    return users.map((user) => this.toDomain(user));
+  }
+
   async findByPhoneNumber(phoneNumber: PhoneNumber): Promise<User | null> {
     const user = await this.prisma.user.findUnique({
       where: { phoneNumber: phoneNumber.getValue() },

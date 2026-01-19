@@ -1,7 +1,11 @@
-import { PrismaClient } from '@/generated/prisma/client';
+import { Prisma, PrismaClient } from '@/generated/prisma/client';
 import { Poll } from '../../domain/poll/Poll';
 import { Question } from '../../domain/poll/Question';
 import { Answer } from '../../domain/poll/Answer';
+import { Vote } from '../../domain/poll/Vote';
+import { VoteDraft } from '../../domain/poll/VoteDraft';
+import { PollParticipant } from '../../domain/poll/PollParticipant';
+import { ParticipantWeightHistory } from '../../domain/poll/ParticipantWeightHistory';
 import {
   PollRepository,
   UpdateQuestionOrderData,
@@ -26,6 +30,8 @@ export class PrismaPollRepository implements PollRepository {
           endDate: poll.endDate,
           active: false,
           finished: false,
+          participantsSnapshotTaken: false,
+          weightCriteria: poll.weightCriteria,
         },
         include: {
           questions: {
@@ -148,6 +154,8 @@ export class PrismaPollRepository implements PollRepository {
           endDate: poll.endDate,
           active: poll.active,
           finished: poll.finished,
+          participantsSnapshotTaken: poll.participantsSnapshotTaken,
+          weightCriteria: poll.weightCriteria,
           archivedAt: poll.archivedAt,
         },
       });
@@ -403,6 +411,381 @@ export class PrismaPollRepository implements PollRepository {
     }
   }
 
+  // Vote operations
+  async createVote(vote: Vote): Promise<Result<Vote, string>> {
+    try {
+      const created = await this.prisma.vote.create({
+        data: {
+          questionId: vote.questionId,
+          answerId: vote.answerId,
+          userId: vote.userId,
+          userWeight: new Prisma.Decimal(vote.userWeight),
+        },
+      });
+
+      return success(this.toDomainVote(created));
+    } catch (error) {
+      return failure(`Failed to create vote: ${error}`);
+    }
+  }
+
+  async createVotes(votes: Vote[]): Promise<Result<void, string>> {
+    try {
+      await this.prisma.vote.createMany({
+        data: votes.map((vote) => ({
+          questionId: vote.questionId,
+          answerId: vote.answerId,
+          userId: vote.userId,
+          userWeight: new Prisma.Decimal(vote.userWeight),
+        })),
+      });
+
+      return success(undefined);
+    } catch (error) {
+      return failure(`Failed to create votes: ${error}`);
+    }
+  }
+
+  async getUserVotes(
+    pollId: string,
+    userId: string
+  ): Promise<Result<Vote[], string>> {
+    try {
+      const votes = await this.prisma.vote.findMany({
+        where: {
+          userId,
+          question: {
+            pollId,
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      return success(votes.map((v) => this.toDomainVote(v)));
+    } catch (error) {
+      return failure(`Failed to get user votes: ${error}`);
+    }
+  }
+
+  async hasUserFinishedVoting(
+    pollId: string,
+    userId: string
+  ): Promise<Result<boolean, string>> {
+    try {
+      // Check if user has votes for this poll
+      const voteCount = await this.prisma.vote.count({
+        where: {
+          userId,
+          question: {
+            pollId,
+          },
+        },
+      });
+
+      return success(voteCount > 0);
+    } catch (error) {
+      return failure(`Failed to check if user finished voting: ${error}`);
+    }
+  }
+
+  async getVotesByPoll(pollId: string): Promise<Result<Vote[], string>> {
+    try {
+      const votes = await this.prisma.vote.findMany({
+        where: {
+          question: {
+            pollId,
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      return success(votes.map((v) => this.toDomainVote(v)));
+    } catch (error) {
+      return failure(`Failed to get votes by poll: ${error}`);
+    }
+  }
+
+  // Participant operations
+  async createParticipants(
+    participants: PollParticipant[]
+  ): Promise<Result<void, string>> {
+    try {
+      await this.prisma.pollParticipant.createMany({
+        data: participants.map((p) => ({
+          pollId: p.pollId,
+          userId: p.userId,
+          userWeight: new Prisma.Decimal(p.userWeight),
+          snapshotAt: p.snapshotAt,
+        })),
+      });
+
+      return success(undefined);
+    } catch (error) {
+      return failure(`Failed to create participants: ${error}`);
+    }
+  }
+
+  async getParticipants(
+    pollId: string
+  ): Promise<Result<PollParticipant[], string>> {
+    try {
+      const participants = await this.prisma.pollParticipant.findMany({
+        where: { pollId },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      return success(participants.map((p) => this.toDomainParticipant(p)));
+    } catch (error) {
+      return failure(`Failed to get participants: ${error}`);
+    }
+  }
+
+  async getParticipantById(
+    participantId: string
+  ): Promise<Result<PollParticipant | null, string>> {
+    try {
+      const participant = await this.prisma.pollParticipant.findUnique({
+        where: { id: participantId },
+      });
+
+      if (!participant) {
+        return success(null);
+      }
+
+      return success(this.toDomainParticipant(participant));
+    } catch (error) {
+      return failure(`Failed to get participant: ${error}`);
+    }
+  }
+
+  async getParticipantByUserAndPoll(
+    pollId: string,
+    userId: string
+  ): Promise<Result<PollParticipant | null, string>> {
+    try {
+      const participant = await this.prisma.pollParticipant.findUnique({
+        where: {
+          pollId_userId: {
+            pollId,
+            userId,
+          },
+        },
+      });
+
+      if (!participant) {
+        return success(null);
+      }
+
+      return success(this.toDomainParticipant(participant));
+    } catch (error) {
+      return failure(`Failed to get participant: ${error}`);
+    }
+  }
+
+  async updateParticipantWeight(
+    participant: PollParticipant
+  ): Promise<Result<void, string>> {
+    try {
+      await this.prisma.pollParticipant.update({
+        where: { id: participant.id },
+        data: {
+          userWeight: new Prisma.Decimal(participant.userWeight),
+        },
+      });
+
+      return success(undefined);
+    } catch (error) {
+      return failure(`Failed to update participant weight: ${error}`);
+    }
+  }
+
+  async deleteParticipant(
+    participantId: string
+  ): Promise<Result<void, string>> {
+    try {
+      await this.prisma.pollParticipant.delete({
+        where: { id: participantId },
+      });
+
+      return success(undefined);
+    } catch (error) {
+      return failure(`Failed to delete participant: ${error}`);
+    }
+  }
+
+  // Weight history operations
+  async createWeightHistory(
+    history: ParticipantWeightHistory
+  ): Promise<Result<ParticipantWeightHistory, string>> {
+    try {
+      const created = await this.prisma.participantWeightHistory.create({
+        data: {
+          participantId: history.participantId,
+          pollId: history.pollId,
+          userId: history.userId,
+          oldWeight: new Prisma.Decimal(history.oldWeight),
+          newWeight: new Prisma.Decimal(history.newWeight),
+          changedBy: history.changedBy,
+          reason: history.reason,
+        },
+      });
+
+      return success(this.toDomainWeightHistory(created));
+    } catch (error) {
+      return failure(`Failed to create weight history: ${error}`);
+    }
+  }
+
+  async getWeightHistory(
+    pollId: string
+  ): Promise<Result<ParticipantWeightHistory[], string>> {
+    try {
+      const history = await this.prisma.participantWeightHistory.findMany({
+        where: { pollId },
+        orderBy: { changedAt: 'desc' },
+      });
+
+      return success(history.map((h) => this.toDomainWeightHistory(h)));
+    } catch (error) {
+      return failure(`Failed to get weight history: ${error}`);
+    }
+  }
+
+  async getParticipantWeightHistory(
+    participantId: string
+  ): Promise<Result<ParticipantWeightHistory[], string>> {
+    try {
+      const history = await this.prisma.participantWeightHistory.findMany({
+        where: { participantId },
+        orderBy: { changedAt: 'desc' },
+      });
+
+      return success(history.map((h) => this.toDomainWeightHistory(h)));
+    } catch (error) {
+      return failure(`Failed to get participant weight history: ${error}`);
+    }
+  }
+
+  // Draft operations
+  async saveDraft(draft: VoteDraft): Promise<Result<VoteDraft, string>> {
+    try {
+      const created = await this.prisma.voteDraft.upsert({
+        where: {
+          pollId_questionId_userId_answerId: {
+            pollId: draft.pollId,
+            questionId: draft.questionId,
+            userId: draft.userId,
+            answerId: draft.answerId,
+          },
+        },
+        create: {
+          pollId: draft.pollId,
+          questionId: draft.questionId,
+          answerId: draft.answerId,
+          userId: draft.userId,
+        },
+        update: {
+          updatedAt: new Date(),
+        },
+      });
+
+      return success(this.toDomainDraft(created));
+    } catch (error) {
+      return failure(`Failed to save draft: ${error}`);
+    }
+  }
+
+  async getUserDrafts(
+    pollId: string,
+    userId: string
+  ): Promise<Result<VoteDraft[], string>> {
+    try {
+      const drafts = await this.prisma.voteDraft.findMany({
+        where: {
+          pollId,
+          userId,
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+
+      return success(drafts.map((d) => this.toDomainDraft(d)));
+    } catch (error) {
+      return failure(`Failed to get user drafts: ${error}`);
+    }
+  }
+
+  async deleteUserDrafts(
+    pollId: string,
+    userId: string
+  ): Promise<Result<void, string>> {
+    try {
+      await this.prisma.voteDraft.deleteMany({
+        where: {
+          pollId,
+          userId,
+        },
+      });
+
+      return success(undefined);
+    } catch (error) {
+      return failure(`Failed to delete user drafts: ${error}`);
+    }
+  }
+
+  async deleteAllPollDrafts(pollId: string): Promise<Result<void, string>> {
+    try {
+      await this.prisma.voteDraft.deleteMany({
+        where: { pollId },
+      });
+
+      return success(undefined);
+    } catch (error) {
+      return failure(`Failed to delete all poll drafts: ${error}`);
+    }
+  }
+
+  async deleteDraftsByQuestion(
+    pollId: string,
+    questionId: string,
+    userId: string
+  ): Promise<Result<void, string>> {
+    try {
+      await this.prisma.voteDraft.deleteMany({
+        where: {
+          pollId,
+          questionId,
+          userId,
+        },
+      });
+
+      return success(undefined);
+    } catch (error) {
+      return failure(`Failed to delete drafts by question: ${error}`);
+    }
+  }
+
+  async deleteDraftByAnswer(
+    pollId: string,
+    questionId: string,
+    answerId: string,
+    userId: string
+  ): Promise<Result<void, string>> {
+    try {
+      await this.prisma.voteDraft.deleteMany({
+        where: {
+          pollId,
+          questionId,
+          answerId,
+          userId,
+        },
+      });
+
+      return success(undefined);
+    } catch (error) {
+      return failure(`Failed to delete draft by answer: ${error}`);
+    }
+  }
+
   // Helper methods to convert Prisma models to domain entities
   private toDomainPoll(prismaData: any): Poll {
     const questions = prismaData.questions
@@ -418,6 +801,8 @@ export class PrismaPollRepository implements PollRepository {
       endDate: prismaData.endDate,
       active: prismaData.active,
       finished: prismaData.finished,
+      participantsSnapshotTaken: prismaData.participantsSnapshotTaken || false,
+      weightCriteria: prismaData.weightCriteria || null,
       createdBy: prismaData.createdBy,
       createdAt: prismaData.createdAt,
       archivedAt: prismaData.archivedAt,
@@ -452,6 +837,54 @@ export class PrismaPollRepository implements PollRepository {
       questionId: prismaData.questionId,
       createdAt: prismaData.createdAt,
       archivedAt: prismaData.archivedAt,
+    });
+  }
+
+  private toDomainVote(prismaData: any): Vote {
+    return Vote.reconstitute({
+      id: prismaData.id,
+      questionId: prismaData.questionId,
+      answerId: prismaData.answerId,
+      userId: prismaData.userId,
+      userWeight: prismaData.userWeight.toNumber(),
+      createdAt: prismaData.createdAt,
+    });
+  }
+
+  private toDomainDraft(prismaData: any): VoteDraft {
+    return VoteDraft.reconstitute({
+      id: prismaData.id,
+      pollId: prismaData.pollId,
+      questionId: prismaData.questionId,
+      answerId: prismaData.answerId,
+      userId: prismaData.userId,
+      createdAt: prismaData.createdAt,
+      updatedAt: prismaData.updatedAt,
+    });
+  }
+
+  private toDomainParticipant(prismaData: any): PollParticipant {
+    return PollParticipant.reconstitute({
+      id: prismaData.id,
+      pollId: prismaData.pollId,
+      userId: prismaData.userId,
+      userWeight: prismaData.userWeight.toNumber(),
+      snapshotAt: prismaData.snapshotAt,
+      createdAt: prismaData.createdAt,
+    });
+  }
+
+  private toDomainWeightHistory(prismaData: any): ParticipantWeightHistory {
+    return ParticipantWeightHistory.reconstitute({
+      id: prismaData.id,
+      participantId: prismaData.participantId,
+      pollId: prismaData.pollId,
+      userId: prismaData.userId,
+      oldWeight: prismaData.oldWeight.toNumber(),
+      newWeight: prismaData.newWeight.toNumber(),
+      changedBy: prismaData.changedBy,
+      reason: prismaData.reason,
+      changedAt: prismaData.changedAt,
     });
   }
 }

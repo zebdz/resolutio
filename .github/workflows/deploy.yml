@@ -8,7 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     env:
       SERVER_USER: www-root
       SERVER_IP: 89.111.171.11
@@ -39,7 +39,7 @@ jobs:
         run: |
           # Create .env file for production
           echo "DATABASE_URL=$DATABASE_URL" > .env
-          
+
           tar -czf deploy.tar.gz \
             .next/ \
             node_modules/ \
@@ -53,7 +53,7 @@ jobs:
             deploy-on-server.sh \
             start-production.sh \
             .env
-          
+
           # Clean up temporary .env file
           rm .env
 

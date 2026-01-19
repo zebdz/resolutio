@@ -1,0 +1,192 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { GetParticipantsUseCase } from '../GetParticipantsUseCase';
+import { Poll } from '../../../domain/poll/Poll';
+import { PollParticipant } from '../../../domain/poll/PollParticipant';
+import { Vote } from '../../../domain/poll/Vote';
+import { PollRepository } from '../../../domain/poll/PollRepository';
+import { BoardRepository } from '../../../domain/board/BoardRepository';
+import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
+import { Board } from '../../../domain/board/Board';
+import { Result, success, failure } from '../../../domain/shared/Result';
+import { PollErrors } from '../PollErrors';
+import { OrganizationErrors } from '../../organization/OrganizationErrors';
+import { Decimal } from 'decimal.js';
+
+describe('GetParticipantsUseCase', () => {
+  let pollRepository: Partial<PollRepository>;
+  let boardRepository: Partial<BoardRepository>;
+  let organizationRepository: Partial<OrganizationRepository>;
+  let prisma: any;
+  let useCase: GetParticipantsUseCase;
+  let poll: Poll;
+  let board: Board;
+
+  beforeEach(() => {
+    // Create a poll
+    const pollResult = Poll.create(
+      'Test Poll',
+      'Test Description',
+      'board-1',
+      'user-admin',
+      new Date('2026-01-15'),
+      new Date('2026-02-15')
+    );
+    expect(pollResult.success).toBe(true);
+    if (pollResult.success) {
+      poll = pollResult.value;
+      (poll as any).props.id = 'poll-1';
+      poll.activate();
+      poll.takeParticipantsSnapshot();
+    }
+
+    // Create board
+    const boardResult = Board.create('org-1', 'Test Board', 'user-admin');
+    expect(boardResult.success).toBe(true);
+    if (boardResult.success) {
+      board = boardResult.value;
+      (board as any).props.id = 'board-1';
+    }
+
+    // Mock repositories
+    const participant1Result = PollParticipant.create(
+      'poll-1',
+      'user-1',
+      new Decimal(1.5).toNumber()
+    );
+    expect(participant1Result.success).toBe(true);
+    const participant1 = participant1Result.value!;
+    (participant1 as any).props.id = 'participant-1';
+
+    pollRepository = {
+      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getParticipants: vi.fn().mockResolvedValue(success([participant1])),
+      pollHasVotes: vi.fn().mockResolvedValue(success(false)),
+    };
+
+    boardRepository = {
+      findById: vi.fn().mockResolvedValue(board),
+    };
+
+    organizationRepository = {
+      isUserAdmin: vi.fn().mockResolvedValue(true),
+    };
+
+    prisma = {
+      user: {
+        findUnique: vi.fn().mockResolvedValue({
+          id: 'user-1',
+          firstName: 'John',
+          lastName: 'Doe',
+          phoneNumber: '+1234567890',
+        }),
+      },
+    };
+
+    useCase = new GetParticipantsUseCase(
+      pollRepository as PollRepository,
+      boardRepository as BoardRepository,
+      organizationRepository as OrganizationRepository,
+      prisma
+    );
+  });
+
+  it('should return participants with user details', async () => {
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      adminUserId: 'user-admin',
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.participants.length).toBe(1);
+      expect(result.value.participants[0].user.id).toBe('user-1');
+      expect(result.value.participants[0].user.firstName).toBe('John');
+      expect(result.value.canModify).toBe(true);
+    }
+  });
+
+  it('should indicate canModify=false when votes exist', async () => {
+    pollRepository.pollHasVotes = vi.fn().mockResolvedValue(success(true));
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      adminUserId: 'user-admin',
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.canModify).toBe(false);
+    }
+  });
+
+  it('should reject when poll not found', async () => {
+    pollRepository.getPollById = vi.fn().mockResolvedValue(success(null));
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      adminUserId: 'user-admin',
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe(PollErrors.NOT_FOUND);
+    }
+  });
+
+  it('should reject when board not found', async () => {
+    boardRepository.findById = vi.fn().mockResolvedValue(null);
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      adminUserId: 'user-admin',
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe(PollErrors.BOARD_NOT_FOUND);
+    }
+  });
+
+  it('should reject when user is not admin', async () => {
+    organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      adminUserId: 'user-non-admin',
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe(OrganizationErrors.NOT_ADMIN);
+    }
+  });
+
+  it('should indicate canModify=false when snapshot not taken', async () => {
+    // Create poll without snapshot
+    const pollWithoutSnapshot = Poll.create(
+      'Test Poll',
+      'Test Description',
+      'board-1',
+      'user-admin',
+      new Date('2026-01-15'),
+      new Date('2026-02-15')
+    );
+    if (pollWithoutSnapshot.success) {
+      (pollWithoutSnapshot.value as any).props.id = 'poll-2';
+      pollWithoutSnapshot.value.activate();
+      pollRepository.getPollById = vi
+        .fn()
+        .mockResolvedValue(success(pollWithoutSnapshot.value));
+    }
+
+    const result = await useCase.execute({
+      pollId: 'poll-2',
+      adminUserId: 'user-admin',
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.canModify).toBe(false);
+    }
+  });
+});

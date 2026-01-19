@@ -36,6 +36,9 @@ model User {
   superAdmin         SuperAdmin?
   acceptedRequests   OrganizationUser[] @relation("AcceptedByAdmin")
   rejectedRequests   OrganizationUser[] @relation("RejectedByAdmin")
+  pollParticipants   PollParticipant[]
+  voteDrafts         VoteDraft[]
+  weightChanges      ParticipantWeightHistory[] @relation("WeightChangedBy")
 
   @@map("users")
 }
@@ -165,21 +168,25 @@ model BoardUser {
 
 // Poll Models
 model Poll {
-  id          String    @id @default(cuid())
-  title       String
-  description String
-  boardId     String    @map("board_id")
-  startDate   DateTime  @map("start_date")
-  endDate     DateTime  @map("end_date")
-  active      Boolean   @default(true)
-  finished    Boolean   @default(false)
-  createdBy   String    @map("created_by")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  archivedAt  DateTime? @map("archived_at")
+  id                        String    @id @default(cuid())
+  title                     String
+  description               String
+  boardId                   String    @map("board_id")
+  startDate                 DateTime  @map("start_date")
+  endDate                   DateTime  @map("end_date")
+  active                    Boolean   @default(true)
+  finished                  Boolean   @default(false)
+  participantsSnapshotTaken Boolean   @default(false) @map("participants_snapshot_taken")
+  weightCriteria            String?   @map("weight_criteria")
+  createdBy                 String    @map("created_by")
+  createdAt                 DateTime  @default(now()) @map("created_at")
+  archivedAt                DateTime? @map("archived_at")
 
-  board       Board      @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  creator     User       @relation(fields: [createdBy], references: [id])
-  questions   Question[]
+  board        Board                          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  creator      User                           @relation(fields: [createdBy], references: [id])
+  questions    Question[]
+  participants PollParticipant[]
+  voteDrafts   VoteDraft[]
 
   @@index([boardId])
   @@index([active])
@@ -201,6 +208,7 @@ model Question {
   poll    Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
   answers Answer[]
   votes   Vote[]
+  voteDrafts VoteDraft[]
 
   @@index([pollId])
   @@index([pollId, page, order])
@@ -217,6 +225,7 @@ model Answer {
 
   question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
   votes    Vote[]
+  voteDrafts VoteDraft[]
 
   @@index([questionId])
   @@map("answers")
@@ -238,4 +247,65 @@ model Vote {
   @@index([answerId])
   @@index([userId])
   @@map("votes")
+}
+
+model PollParticipant {
+  id         String   @id @default(cuid())
+  pollId     String   @map("poll_id")
+  userId     String   @map("user_id")
+  userWeight Decimal  @default(1.0) @map("user_weight") @db.Decimal(10, 2)
+  snapshotAt DateTime @default(now()) @map("snapshot_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  poll          Poll                           @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  user          User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weightHistory ParticipantWeightHistory[]
+
+  @@unique([pollId, userId])
+  @@index([pollId])
+  @@index([userId])
+  @@map("poll_participants")
+}
+
+model ParticipantWeightHistory {
+  id            String   @id @default(cuid())
+  participantId String   @map("participant_id")
+  pollId        String   @map("poll_id")
+  userId        String   @map("user_id")
+  oldWeight     Decimal  @db.Decimal(10, 2) @map("old_weight")
+  newWeight     Decimal  @db.Decimal(10, 2) @map("new_weight")
+  changedBy     String   @map("changed_by")
+  reason        String?
+  changedAt     DateTime @default(now()) @map("changed_at")
+
+  participant    PollParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  changedByUser  User            @relation("WeightChangedBy", fields: [changedBy], references: [id])
+
+  @@index([participantId])
+  @@index([pollId])
+  @@index([userId])
+  @@index([changedBy])
+  @@map("participant_weight_history")
+}
+
+model VoteDraft {
+  id         String   @id @default(cuid())
+  pollId     String   @map("poll_id")
+  questionId String   @map("question_id")
+  answerId   String   @map("answer_id")
+  userId     String   @map("user_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  poll     Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answer   Answer   @relation(fields: [answerId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, questionId, userId, answerId])
+  @@index([pollId])
+  @@index([questionId])
+  @@index([userId])
+  @@index([pollId, userId])
+  @@map("vote_drafts")
 }

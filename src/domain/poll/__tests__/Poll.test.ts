@@ -229,4 +229,151 @@ describe('Poll Domain', () => {
       expect(result.error).toBe(PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED);
     });
   });
+
+  describe('Participant Snapshot Management', () => {
+    it('should not have snapshot taken initially', () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+
+      expect(pollResult.success).toBe(true);
+      if (pollResult.success) {
+        const poll = pollResult.value;
+        expect(poll.participantsSnapshotTaken).toBe(false);
+      }
+    });
+
+    it('should mark snapshot as taken', () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+
+      expect(pollResult.success).toBe(true);
+      if (pollResult.success) {
+        const poll = pollResult.value;
+        poll.takeParticipantsSnapshot();
+        expect(poll.participantsSnapshotTaken).toBe(true);
+      }
+    });
+
+    it('should allow modifying participants when snapshot taken but no votes', () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+
+      expect(pollResult.success).toBe(true);
+      if (pollResult.success) {
+        const poll = pollResult.value;
+        poll.takeParticipantsSnapshot();
+        expect(poll.canModifyParticipants(false)).toBe(true);
+      }
+    });
+
+    it('should not allow modifying participants when votes exist', () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+
+      expect(pollResult.success).toBe(true);
+      if (pollResult.success) {
+        const poll = pollResult.value;
+        poll.takeParticipantsSnapshot();
+        expect(poll.canModifyParticipants(true)).toBe(false);
+      }
+    });
+
+    it('should not allow modifying participants when snapshot not taken', () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+
+      expect(pollResult.success).toBe(true);
+      if (pollResult.success) {
+        const poll = pollResult.value;
+        expect(poll.canModifyParticipants(false)).toBe(false);
+      }
+    });
+  });
+
+  describe('Weight Criteria', () => {
+    it('should have null weight criteria initially', () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+
+      expect(pollResult.success).toBe(true);
+      if (pollResult.success) {
+        const poll = pollResult.value;
+        expect(poll.weightCriteria).toBeNull();
+      }
+    });
+
+    it('should set weight criteria', () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+
+      expect(pollResult.success).toBe(true);
+      if (pollResult.success) {
+        const poll = pollResult.value;
+        poll.setWeightCriteria('property_area');
+        expect(poll.weightCriteria).toBe('property_area');
+      }
+    });
+
+    it('should allow clearing weight criteria', () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+
+      expect(pollResult.success).toBe(true);
+      if (pollResult.success) {
+        const poll = pollResult.value;
+        poll.setWeightCriteria('property_area');
+        expect(poll.weightCriteria).toBe('property_area');
+        poll.setWeightCriteria(null);
+        expect(poll.weightCriteria).toBeNull();
+      }
+    });
+  });
 });

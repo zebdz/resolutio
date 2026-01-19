@@ -11,6 +11,7 @@ export const PollDomainCodes = {
   // Poll state
   POLL_ALREADY_ACTIVE: 'domain.poll.alreadyActive',
   POLL_ALREADY_INACTIVE: 'domain.poll.alreadyInactive',
+  POLL_FINISHED: 'domain.poll.pollFinished',
   POLL_ALREADY_FINISHED: 'domain.poll.alreadyFinished',
   POLL_ALREADY_ARCHIVED: 'domain.poll.alreadyArchived',
   POLL_NO_QUESTIONS: 'domain.poll.noQuestions',
@@ -44,6 +45,15 @@ export const PollDomainCodes = {
   ANSWER_TEXT_TOO_LONG: 'domain.poll.answerTextTooLong',
   ANSWER_INVALID_ORDER: 'domain.poll.answerInvalidOrder',
   ANSWER_ALREADY_ARCHIVED: 'domain.poll.answerAlreadyArchived',
+
+  // Vote validation
+  INVALID_WEIGHT: 'domain.poll.invalidWeight',
+  ALREADY_VOTED: 'domain.poll.alreadyVoted',
+  NOT_PARTICIPANT: 'domain.poll.notParticipant',
+  POLL_NOT_ACTIVE: 'domain.poll.pollNotActive',
+  MUST_ANSWER_ALL_QUESTIONS: 'domain.poll.mustAnswerAllQuestions',
+  CANNOT_MODIFY_PARTICIPANTS_HAS_VOTES:
+    'domain.poll.cannotModifyParticipantsHasVotes',
 } as const;
 
 export type PollDomainCode =

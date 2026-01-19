@@ -10,6 +10,9 @@ import { CreateAnswerUseCase } from '@/application/poll/CreateAnswerUseCase';
 import { UpdateAnswerUseCase } from '@/application/poll/UpdateAnswerUseCase';
 import { DeleteAnswerUseCase } from '@/application/poll/DeleteAnswerUseCase';
 import { UpdateQuestionOrderUseCase } from '@/application/poll/UpdateQuestionOrderUseCase';
+import { ActivatePollUseCase } from '@/application/poll/ActivatePollUseCase';
+import { DeactivatePollUseCase } from '@/application/poll/DeactivatePollUseCase';
+import { FinishPollUseCase } from '@/application/poll/FinishPollUseCase';
 import {
   CreatePollSchema,
   UpdatePollSchema,
@@ -48,6 +51,12 @@ const deleteAnswerUseCase = new DeleteAnswerUseCase(pollRepository);
 const updateQuestionOrderUseCase = new UpdateQuestionOrderUseCase(
   pollRepository
 );
+const activatePollUseCase = new ActivatePollUseCase(
+  pollRepository,
+  boardRepository
+);
+const deactivatePollUseCase = new DeactivatePollUseCase(pollRepository);
+const finishPollUseCase = new FinishPollUseCase(pollRepository);
 
 export async function createPollAction(
   formData: FormData
@@ -299,9 +308,46 @@ export async function getUserPollsAction(): Promise<ActionResult<any[]>> {
       };
     }
 
+    // For each poll, check if user can vote and voting progress
+    const pollsWithVotingStatus = await Promise.all(
+      result.value.map(async (poll) => {
+        const pollJson: any = poll.toJSON();
+
+        // Check if user can vote
+        const participant = await prisma.pollParticipant.findFirst({
+          where: {
+            pollId: poll.id,
+            userId: user.id,
+          },
+        });
+
+        pollJson.canVote = !!participant;
+
+        // Check if user has finished voting
+        if (participant) {
+          const votesCount = await prisma.vote.count({
+            where: {
+              userId: user.id,
+              question: {
+                pollId: poll.id,
+              },
+            },
+          });
+
+          const totalQuestions = pollJson.questions?.length || 0;
+          pollJson.hasFinishedVoting =
+            votesCount >= totalQuestions && totalQuestions > 0;
+        } else {
+          pollJson.hasFinishedVoting = false;
+        }
+
+        return pollJson;
+      })
+    );
+
     return {
       success: true,
-      data: result.value.map((poll) => poll.toJSON()),
+      data: pollsWithVotingStatus,
     };
   } catch (error) {
     console.error('Error getting user polls:', error);
@@ -380,18 +426,23 @@ export async function getPollByIdAction(
     const result = await pollRepository.getPollById(pollId);
 
     if (!result.success) {
-      const tError = await getTranslations(result.error.split('.')[0]);
+      const translationKey = result.error.split('.')[0];
+      const tError = translationKey
+        ? await getTranslations(translationKey)
+        : null;
+
+      console.error(`getPollByIdAction error: ${result.error}`);
 
       return {
         success: false,
-        error: tError(result.error),
+        error: tError ? tError(result.error) : t('generic'),
       };
     }
 
     if (!result.value) {
       return {
         success: false,
-        error: 'Poll not found',
+        error: t('poll.errors.pollNotFound'),
       };
     }
 
@@ -401,7 +452,7 @@ export async function getPollByIdAction(
     if (!isMember) {
       return {
         success: false,
-        error: 'User is not a member of this board',
+        error: t('board.errors.notMember'),
       };
     }
 
@@ -784,6 +835,132 @@ export async function deleteAnswerAction(
     return { success: true, data: undefined };
   } catch (error) {
     console.error('Error deleting answer:', error);
+
+    return {
+      success: false,
+      error: t('unexpected'),
+    };
+  }
+}
+
+/**
+ * Activate a poll
+ */
+export async function activatePollAction(
+  pollId: string
+): Promise<ActionResult<void>> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    const result = await activatePollUseCase.execute({
+      pollId,
+      userId: user.id,
+    });
+
+    if (!result.success) {
+      const errorT = await getTranslations();
+
+      return {
+        success: false,
+        error: errorT(result.error as any),
+      };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error activating poll:', error);
+
+    return {
+      success: false,
+      error: t('unexpected'),
+    };
+  }
+}
+
+/**
+ * Deactivate a poll
+ */
+export async function deactivatePollAction(
+  pollId: string
+): Promise<ActionResult<void>> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    const result = await deactivatePollUseCase.execute({
+      pollId,
+      userId: user.id,
+    });
+
+    if (!result.success) {
+      const errorT = await getTranslations();
+
+      return {
+        success: false,
+        error: errorT(result.error as any),
+      };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error deactivating poll:', error);
+
+    return {
+      success: false,
+      error: t('unexpected'),
+    };
+  }
+}
+
+/**
+ * Finish a poll
+ */
+export async function finishPollAction(
+  pollId: string
+): Promise<ActionResult<void>> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    const result = await finishPollUseCase.execute({
+      pollId,
+      userId: user.id,
+    });
+
+    if (!result.success) {
+      const errorT = await getTranslations();
+
+      return {
+        success: false,
+        error: errorT(result.error as any),
+      };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error finishing poll:', error);
 
     return {
       success: false,

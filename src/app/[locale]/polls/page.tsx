@@ -5,13 +5,10 @@ import { Heading, Subheading } from '@/app/components/catalyst/heading';
 import { Button } from '@/app/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import { PlusIcon } from '@heroicons/react/20/solid';
-import {
-  ClockIcon,
-  CalendarIcon,
-  PencilIcon,
-} from '@heroicons/react/24/outline';
 import { getUserBoardsAction } from '@/web/actions/board';
-import { getUserPollsAction, canEditPollAction } from '@/web/actions/poll';
+import { getUserPollsAction } from '@/web/actions/poll';
+import { PollCard } from '@/web/components/PollCard';
+import { Toaster } from 'sonner';
 
 export default async function PollsPage() {
   const t = await getTranslations('poll');
@@ -32,6 +29,7 @@ export default async function PollsPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <Toaster />
       <div className="space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -73,80 +71,9 @@ export default async function PollsPage() {
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {polls.map((poll: any) => {
-              const now = new Date();
-              const startDate = new Date(poll.startDate);
-              const endDate = new Date(poll.endDate);
-              const isActive = poll.active;
-              const isUpcoming = now < startDate;
-              const isFinished = now > endDate;
-              const isCreator = poll.createdBy === user.id;
-
-              return (
-                <div
-                  key={poll.id}
-                  className="relative p-6 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors"
-                >
-                  {/* Edit button for creator if poll can be edited */}
-                  {isCreator && !isActive && !isFinished && (
-                    <Link
-                      href={`/polls/${poll.id}/edit`}
-                      className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
-                      title={t('editPoll')}
-                    >
-                      <PencilIcon className="w-5 h-5" />
-                    </Link>
-                  )}
-
-                  <Link href={`/polls/${poll.id}`} className="block">
-                    <div className="space-y-4">
-                      {/* Title and status */}
-                      <div>
-                        <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 pr-8">
-                          {poll.title}
-                        </h3>
-                        <div className="mt-1">
-                          {isActive && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20 rounded-full">
-                              <ClockIcon className="w-3 h-3" />
-                              {t('active')}
-                            </span>
-                          )}
-                          {isUpcoming && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20 rounded-full">
-                              <CalendarIcon className="w-3 h-3" />
-                              {t('upcoming')}
-                            </span>
-                          )}
-                          {isFinished && (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-zinc-500 bg-zinc-50 dark:text-zinc-400 dark:bg-zinc-800 rounded-full">
-                              {t('finished')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Description */}
-                      {poll.description && (
-                        <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
-                          {poll.description}
-                        </p>
-                      )}
-
-                      {/* Stats */}
-                      <div className="flex items-center gap-4 text-xs text-zinc-500 dark:text-zinc-400">
-                        <span>
-                          {t('questionsNumber')}{' '}
-                          {poll.questions?.length || 0}{' '}
-                        </span>
-                        <span>•</span>
-                        <span>{endDate.toLocaleDateString()}</span>
-                      </div>
-                    </div>
-                  </Link>
-                </div>
-              );
-            })}
+            {polls.map((poll: any) => (
+              <PollCard key={poll.id} poll={poll} userId={user.id} />
+            ))}
           </div>
         )}
       </div>

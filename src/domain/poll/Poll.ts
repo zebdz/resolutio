@@ -11,6 +11,8 @@ export interface PollProps {
   endDate: Date;
   active: boolean;
   finished: boolean;
+  participantsSnapshotTaken: boolean;
+  weightCriteria: string | null;
   createdBy: string;
   createdAt: Date;
   archivedAt: Date | null;
@@ -60,6 +62,8 @@ export class Poll {
       endDate,
       active: false,
       finished: false,
+      participantsSnapshotTaken: false,
+      weightCriteria: null,
       createdBy,
       createdAt: new Date(),
       archivedAt: null,
@@ -104,6 +108,14 @@ export class Poll {
 
   public get finished(): boolean {
     return this.props.finished;
+  }
+
+  public get participantsSnapshotTaken(): boolean {
+    return this.props.participantsSnapshotTaken;
+  }
+
+  public get weightCriteria(): string | null {
+    return this.props.weightCriteria;
   }
 
   public get createdBy(): string {
@@ -303,5 +315,28 @@ export class Poll {
       ...this.props,
       questions: this.props.questions.map((q) => q.toJSON()),
     };
+  }
+
+  /**
+   * Mark that participants snapshot has been taken
+   * This should only be called once when the poll is first activated
+   */
+  public takeParticipantsSnapshot(): void {
+    this.props.participantsSnapshotTaken = true;
+  }
+
+  /**
+   * Check if participants can be modified
+   * Participants can be modified if snapshot has been taken but no votes exist
+   */
+  public canModifyParticipants(hasVotes: boolean): boolean {
+    return this.props.participantsSnapshotTaken && !hasVotes;
+  }
+
+  /**
+   * Set weight criteria for the poll
+   */
+  public setWeightCriteria(criteria: string | null): void {
+    this.props.weightCriteria = criteria;
   }
 }

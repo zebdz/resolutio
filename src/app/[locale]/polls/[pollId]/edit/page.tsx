@@ -24,8 +24,10 @@ import { Link } from '@/src/i18n/routing';
 import { QuestionType } from '@/domain/poll/QuestionType';
 import { PollSidebar } from '@/web/components/PollSidebar';
 import { QuestionForm } from '@/web/components/QuestionForm';
+import PollControls from '@/web/components/PollControls';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { validateHeaderName } from 'http';
+import { Toaster } from 'sonner';
 
 interface Answer {
   id: string;
@@ -48,6 +50,8 @@ interface PollData {
   description: string;
   startDate: string;
   endDate: string;
+  isActive: boolean;
+  isFinished: boolean;
 }
 
 export default function EditPollPage() {
@@ -62,6 +66,8 @@ export default function EditPollPage() {
     description: '',
     startDate: '',
     endDate: '',
+    isActive: false,
+    isFinished: false,
   });
 
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -117,6 +123,8 @@ export default function EditPollPage() {
             description: poll.description,
             startDate: new Date(poll.startDate).toISOString().split('T')[0],
             endDate: new Date(poll.endDate).toISOString().split('T')[0],
+            isActive: poll.isActive,
+            isFinished: poll.isFinished,
           });
 
           // Load questions
@@ -587,6 +595,16 @@ export default function EditPollPage() {
           </div>
         )}
 
+        {/* Poll Controls */}
+        {canEdit && (
+          <PollControls
+            pollId={pollId}
+            isActive={pollData.isActive}
+            isFinished={pollData.isFinished}
+            hasQuestions={questions.length > 0}
+          />
+        )}
+
         {/* Poll Basic Info */}
         <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-4">
           <Field>
@@ -716,6 +734,8 @@ export default function EditPollPage() {
           </div>
         </div>
       </div>
+
+      <Toaster />
     </main>
   );
 }
