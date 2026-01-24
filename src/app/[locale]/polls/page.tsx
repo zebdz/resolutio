@@ -9,6 +9,14 @@ import { getUserBoardsAction } from '@/web/actions/board';
 import { getUserPollsAction } from '@/web/actions/poll';
 import { PollCard } from '@/web/components/PollCard';
 import { Toaster } from 'sonner';
+import {
+  prisma,
+  PrismaOrganizationRepository,
+  PrismaUserRepository,
+} from '@/infrastructure/index';
+
+const organizationRepository = new PrismaOrganizationRepository(prisma);
+const userRepository = new PrismaUserRepository(prisma);
 
 export default async function PollsPage() {
   const t = await getTranslations('poll');
@@ -26,6 +34,12 @@ export default async function PollsPage() {
   // Fetch user's polls
   const pollsResult = await getUserPollsAction();
   const polls = pollsResult.success ? pollsResult.data : [];
+
+  // Fetch user's admin organizations and superadmin status for authorization
+  const adminOrgs =
+    await organizationRepository.findAdminOrganizationsByUserId(user.id);
+  const adminOrgIds = new Set(adminOrgs.map((o) => o.id));
+  const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
@@ -72,7 +86,14 @@ export default async function PollsPage() {
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {polls.map((poll: any) => (
-              <PollCard key={poll.id} poll={poll} userId={user.id} />
+              <PollCard
+                key={poll.id}
+                poll={poll}
+                userId={user.id}
+                canManage={
+                  isSuperAdmin || adminOrgIds.has(poll.organizationId)
+                }
+              />
             ))}
           </div>
         )}

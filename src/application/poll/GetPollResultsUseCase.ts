@@ -80,10 +80,17 @@ export class GetPollResultsUseCase {
     // 3. Check authorization
     // If poll is active (not finished), only admins can view results
     // If poll is finished, any organization member can view
-    const isAdmin = await this.organizationRepository.isUserAdmin(
+
+    const isSuperAdmin = await this.userRepository.isSuperAdmin(
+      userId
+    );
+
+    const isOrganizationAdmin = await this.organizationRepository.isUserAdmin(
       userId,
       board.organizationId
     );
+
+    const isAdmin = isSuperAdmin || isOrganizationAdmin;
 
     if (poll.isActive() && !poll.isFinished()) {
       if (!isAdmin) {

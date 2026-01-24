@@ -149,6 +149,7 @@ describe('GetPollResultsUseCase', () => {
         { id: 'user-1', firstName: 'Alice', lastName: 'Smith' } as User,
         { id: 'user-2', firstName: 'Bob', lastName: 'Johnson' } as User,
       ]),
+      isSuperAdmin: vi.fn(userId => Promise.resolve(userId === 'user-superadmin')),
     };
 
     useCase = new GetPollResultsUseCase(
@@ -229,6 +230,21 @@ describe('GetPollResultsUseCase', () => {
     if (!result.success) {
       expect(result.error).toBe('poll.errors.resultsAdminOnly');
     }
+  });
+
+  it('should allow superadmin to view results of active poll', async() => {
+    // Make poll active but not finished
+    (poll as any).props.active = true;
+    (poll as any).props.finished = false;
+    organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
+    organizationRepository.isUserMember = vi.fn().mockResolvedValue(false);
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      userId: 'user-superadmin',
+    });
+
+    expect(result.success).toBe(true);
   });
 
   it('should allow organization members to view results of finished poll', async () => {

@@ -140,6 +140,7 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
         isActive={poll.isActive}
         isFinished={poll.isFinished}
         isPollCreator={isPollCreator}
+        canViewVoters={canViewVoters}
       />
     </main>
   );

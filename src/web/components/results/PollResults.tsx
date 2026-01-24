@@ -41,6 +41,7 @@ interface PollResultsProps {
   isActive: boolean;
   isFinished: boolean;
   isPollCreator: boolean;
+  canViewVoters: boolean;
 }
 
 export default function PollResults({
@@ -48,14 +49,13 @@ export default function PollResults({
   isActive,
   isFinished,
   isPollCreator,
+  canViewVoters,
 }: PollResultsProps) {
   const t = useTranslations('poll.results');
   const [selectedAnswer, setSelectedAnswer] = useState<AnswerResult | null>(
     null
   );
   const [breakdownOpen, setBreakdownOpen] = useState(false);
-
-  const canViewVoterBreakdown = isPollCreator;
 
   const handleViewVoters = (answer: AnswerResult) => {
     setSelectedAnswer(answer);
@@ -113,12 +113,19 @@ export default function PollResults({
 
         {/* Question results */}
         {results.questions.map((question) => {
-          const winner =
-            question.questionType === 'single-choice'
-              ? question.answers.reduce((max, answer) =>
-                  answer.weightedVotes > max.weightedVotes ? answer : max
-                )
-              : null;
+          const winner = (() => {
+            if (question.questionType !== 'single-choice') return null;
+            if (question.answers.length === 0) return null;
+
+            const maxVotes = Math.max(
+              ...question.answers.map((a) => a.weightedVotes)
+            );
+            const topAnswers = question.answers.filter(
+              (a) => a.weightedVotes === maxVotes
+            );
+
+            return topAnswers.length === 1 ? topAnswers[0] : null;
+          })();
 
           return (
             <div
@@ -177,7 +184,7 @@ export default function PollResults({
                           <div className="text-2xl font-semibold text-zinc-900 dark:text-white">
                             {answer.percentage.toFixed(1)}%
                           </div>
-                          {canViewVoterBreakdown && answer.voteCount > 0 && (
+                          {canViewVoters && answer.voteCount > 0 && (
                             <Button
                               type="button"
                               color="zinc"
@@ -209,7 +216,7 @@ export default function PollResults({
           );
         })}
 
-        {!isFinished && canViewVoterBreakdown && (
+        {!isFinished && canViewVoters && (
           <div className="rounded-lg border border-amber-200 dark:border-amber-700 p-4 bg-amber-50 dark:bg-amber-950/20">
             <p className="text-sm text-amber-800 dark:text-amber-200">
               {t('adminOnly')}

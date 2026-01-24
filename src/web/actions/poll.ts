@@ -366,6 +366,10 @@ export async function getUserPollsAction(): Promise<ActionResult<any[]>> {
       result.value.map(async (poll) => {
         const pollJson: any = poll.toJSON();
 
+        // Get organizationId from board
+        const board = await boardRepository.findById(poll.boardId);
+        pollJson.organizationId = board?.organizationId || null;
+
         // Check if user can vote
         const participant = await prisma.pollParticipant.findFirst({
           where: {

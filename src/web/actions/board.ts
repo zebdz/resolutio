@@ -345,6 +345,7 @@ export async function getBoardDetailsAction(boardId: string): Promise<
       user.id,
       board.organizationId
     );
+
     if (!isAdmin) {
       return {
         success: false,

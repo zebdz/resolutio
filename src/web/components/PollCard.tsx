@@ -10,26 +10,34 @@ import {
   CalendarIcon,
   PencilIcon,
 } from '@heroicons/react/24/outline';
-import { deactivatePollAction } from '@/web/actions/poll';
+import { activatePollAction, deactivatePollAction, finishPollAction } from '@/web/actions/poll';
 import { toast } from 'sonner';
 
 interface PollCardProps {
   poll: any;
   userId: string;
+  canManage: boolean;
 }
 
-export function PollCard({ poll, userId }: PollCardProps) {
+export function PollCard({ poll, userId, canManage }: PollCardProps) {
   const t = useTranslations('poll');
   const router = useRouter();
   const [isDeactivating, setIsDeactivating] = useState(false);
+  const [isActivating, setIsActivating] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
 
   const now = new Date();
   const startDate = new Date(poll.startDate);
   const endDate = new Date(poll.endDate);
   const isActive = poll.active;
   const isUpcoming = now < startDate;
-  const isFinished = poll.isFinished;
+  const isFinished = poll.finished;
   const isCreator = poll.createdBy === userId;
+
+  const canEditPoll = isCreator;
+  const canManageParticipants = canManage;
+  const canActivateAndDeactivatePoll = canManage;
+  const canViewResultsBeforePollEnds = canManage;
 
   const handleDeactivate = async () => {
     if (!confirm(t('confirmDeactivatePoll'))) {
@@ -54,10 +62,52 @@ export function PollCard({ poll, userId }: PollCardProps) {
     }
   };
 
+  const handleActivate = async () => {
+    if (!confirm(t('confirmActivatePoll'))) {
+      return;
+    }
+
+    setIsActivating(true);
+
+    try {
+      const result = await activatePollAction(poll.id);
+
+      if (result.success) {
+        toast.success(t('pollActivated'));
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      toast.error(t('errors.generic'));
+    } finally {
+      setIsActivating(false);
+    }
+  };
+
+  const handleFinish = async () => {
+    setIsFinishing(true);
+
+    try {
+      const result = await finishPollAction(poll.id);
+
+      if (result.success) {
+        toast.success(t('pollFinished'));
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (error) {
+      toast.error(t('errors.generic'));
+    } finally {
+      setIsFinishing(false);
+    }
+  };
+
   return (
     <div className="relative p-6 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors">
       {/* Edit button for creator if poll can be edited */}
-      {isCreator && !isActive && !isFinished && (
+      {canEditPoll && !isActive && !isFinished && (
         <Link
           href={`/polls/${poll.id}/edit`}
           className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
@@ -123,7 +173,7 @@ export function PollCard({ poll, userId }: PollCardProps) {
             )}
 
             {/* Results button */}
-            {(isFinished || poll.hasFinishedVoting) && (
+            {(isFinished || canViewResultsBeforePollEnds) && (
               <Link href={`/polls/${poll.id}/results`} className="flex-1">
                 <Button color="zinc" className="w-full">
                   {t('viewResults')}
@@ -131,8 +181,8 @@ export function PollCard({ poll, userId }: PollCardProps) {
               </Link>
             )}
 
-            {/* Manage participants for creators */}
-            {isCreator && (
+            {/* Manage participants */}
+            {canManageParticipants && (
               <Link href={`/polls/${poll.id}/participants`} className="flex-1">
                 <Button color="zinc" className="w-full text-sm">
                   {t('manageParticipants')}
@@ -141,8 +191,20 @@ export function PollCard({ poll, userId }: PollCardProps) {
             )}
           </div>
 
-          {/* Deactivate button for creator on active polls */}
-          {isCreator && isActive && (
+          {/* Activate button on inactive polls */}
+          {canActivateAndDeactivatePoll && !isActive && !isFinished && (
+            <Button
+              color="green"
+              onClick={handleActivate}
+              disabled={isActivating}
+              className="w-full"
+            >
+              {isActivating ? t('activating') : t('activatePoll')}
+            </Button>
+          )}
+
+          {/* Deactivate button on active polls */}
+          {canActivateAndDeactivatePoll && isActive && !isFinished && (
             <Button
               color="yellow"
               onClick={handleDeactivate}
@@ -150,6 +212,18 @@ export function PollCard({ poll, userId }: PollCardProps) {
               className="w-full"
             >
               {isDeactivating ? t('deactivating') : t('deactivatePoll')}
+            </Button>
+          )}
+
+          {/* Finish button on polls */}
+          {canActivateAndDeactivatePoll && !isActive && !isFinished && (
+            <Button
+              color="red"
+              onClick={handleFinish}
+              disabled={isFinishing}
+              className="w-full"
+            >
+              {isFinishing ? t('finishing') : t('finishPoll')}
             </Button>
           )}
         </div>
