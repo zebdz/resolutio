@@ -78,6 +78,13 @@ export interface PollRepository {
     participantId: string
   ): Promise<Result<ParticipantWeightHistory[], string>>;
 
+  // Transactional operations
+  executeActivation(
+    poll: Poll,
+    participants: PollParticipant[],
+    historyRecords: ParticipantWeightHistory[]
+  ): Promise<Result<PollParticipant[], string>>;
+
   // Draft operations
   saveDraft(draft: VoteDraft): Promise<Result<VoteDraft, string>>;
   getUserDrafts(

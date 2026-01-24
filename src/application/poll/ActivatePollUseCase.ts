@@ -82,53 +82,41 @@ export class ActivatePollUseCase {
         }
 
         participants.push(participantResult.value);
-      }
 
-      // Save participants
-      if (participants.length > 0) {
-        const createParticipantsResult =
-          await this.pollRepository.createParticipants(participants);
+        // Pre-create history record (participantId will be assigned in transaction)
+        const historyResult = ParticipantWeightHistory.create(
+          '', // participantId assigned in transaction
+          poll.id,
+          boardUser.userId,
+          0, // oldWeight (initial)
+          1.0, // newWeight
+          command.userId, // changedBy (admin activating)
+          'Initial snapshot on poll activation'
+        );
 
-        if (!createParticipantsResult.success) {
-          return failure(createParticipantsResult.error);
-        }
-
-        // Get the saved participants to get their IDs
-        const savedParticipantsResult =
-          await this.pollRepository.getParticipants(poll.id);
-
-        if (!savedParticipantsResult.success) {
-          return failure(savedParticipantsResult.error);
-        }
-
-        // Create initial weight history records
-        for (const participant of savedParticipantsResult.value) {
-          const historyResult = ParticipantWeightHistory.create(
-            participant.id,
-            poll.id,
-            participant.userId,
-            0, // oldWeight (initial)
-            participant.userWeight, // newWeight
-            command.userId, // changedBy (admin activating)
-            'Initial snapshot on poll activation'
-          );
-
-          if (historyResult.success) {
-            historyRecords.push(historyResult.value);
-          }
-        }
-
-        // Save history records
-        for (const history of historyRecords) {
-          await this.pollRepository.createWeightHistory(history);
+        if (historyResult.success) {
+          historyRecords.push(historyResult.value);
         }
       }
 
-      // Mark snapshot as taken
+      // Mark snapshot as taken before transaction
       poll.takeParticipantsSnapshot();
+
+      // Execute activation in a single transaction
+      const activationResult = await this.pollRepository.executeActivation(
+        poll,
+        participants,
+        historyRecords
+      );
+
+      if (!activationResult.success) {
+        return failure(activationResult.error);
+      }
+
+      return success(undefined);
     }
 
-    // Save the updated poll
+    // No participant snapshot needed - just update the poll
     const updateResult = await this.pollRepository.updatePoll(poll);
     if (!updateResult.success) {
       return failure(updateResult.error);

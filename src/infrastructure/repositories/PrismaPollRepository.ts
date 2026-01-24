@@ -680,6 +680,76 @@ export class PrismaPollRepository implements PollRepository {
     }
   }
 
+  // Transactional operations
+  async executeActivation(
+    poll: Poll,
+    participants: PollParticipant[],
+    historyRecords: ParticipantWeightHistory[]
+  ): Promise<Result<PollParticipant[], string>> {
+    try {
+      const savedParticipants = await this.prisma.$transaction(async (tx) => {
+        // 1. Create participants
+        if (participants.length > 0) {
+          await tx.pollParticipant.createMany({
+            data: participants.map((p) => ({
+              pollId: p.pollId,
+              userId: p.userId,
+              userWeight: new Prisma.Decimal(p.userWeight),
+              snapshotAt: p.snapshotAt,
+            })),
+          });
+        }
+
+        // 2. Fetch created participants to get IDs
+        const createdParticipants = await tx.pollParticipant.findMany({
+          where: { pollId: poll.id },
+          orderBy: { createdAt: 'asc' },
+        });
+
+        // 3. Create weight history records with participant IDs
+        if (historyRecords.length > 0) {
+          const historyData = historyRecords.map((h, idx) => ({
+            participantId: createdParticipants[idx]?.id || h.participantId,
+            pollId: h.pollId,
+            userId: h.userId,
+            oldWeight: new Prisma.Decimal(h.oldWeight),
+            newWeight: new Prisma.Decimal(h.newWeight),
+            changedBy: h.changedBy,
+            reason: h.reason,
+          }));
+
+          await tx.participantWeightHistory.createMany({
+            data: historyData,
+          });
+        }
+
+        // 4. Update poll
+        await tx.poll.update({
+          where: { id: poll.id },
+          data: {
+            title: poll.title,
+            description: poll.description,
+            startDate: poll.startDate,
+            endDate: poll.endDate,
+            active: poll.active,
+            finished: poll.finished,
+            participantsSnapshotTaken: poll.participantsSnapshotTaken,
+            weightCriteria: poll.weightCriteria,
+            archivedAt: poll.archivedAt,
+          },
+        });
+
+        return createdParticipants;
+      });
+
+      return success(
+        savedParticipants.map((p) => this.toDomainParticipant(p))
+      );
+    } catch (error) {
+      return failure(`Failed to execute activation: ${error}`);
+    }
+  }
+
   // Draft operations
   async saveDraft(draft: VoteDraft): Promise<Result<VoteDraft, string>> {
     try {

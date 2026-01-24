@@ -231,6 +231,41 @@ class MockPollRepository implements PollRepository {
   ): Promise<Result<void, string>> {
     return success(undefined);
   }
+
+  async deleteDraftByAnswer(
+    pollId: string,
+    questionId: string,
+    answerId: string,
+    userId: string
+  ): Promise<Result<void, string>> {
+    return success(undefined);
+  }
+
+  async executeActivation(
+    poll: Poll,
+    participants: PollParticipant[],
+    historyRecords: ParticipantWeightHistory[]
+  ): Promise<Result<PollParticipant[], string>> {
+    // Simulate transactional behavior - all or nothing
+    // Assign IDs to participants
+    participants.forEach((p, index) => {
+      (p as any).props.id = `participant-${index + 1}`;
+    });
+
+    // Store participants
+    this.participants.push(...participants);
+
+    // Store history records with participant IDs
+    historyRecords.forEach((h, index) => {
+      (h as any).props.participantId = participants[index]?.id || h.participantId;
+      this.historyRecords.push(h);
+    });
+
+    // Update poll in our store
+    this.polls.set(poll.id, poll);
+
+    return success(participants);
+  }
 }
 
 class MockBoardRepository implements BoardRepository {
@@ -661,6 +696,71 @@ describe('ActivatePollUseCase', () => {
     expect(history.newWeight).toBe(1.0);
     expect(history.changedBy).toBe(adminId);
     expect(history.reason).toContain('Initial snapshot');
+  });
+
+  // Transaction tests
+  describe('transaction', () => {
+    it('should return error and not persist participants if executeActivation fails', async () => {
+      // Override executeActivation to fail
+      pollRepository.executeActivation = async () => {
+        return failure('Database error');
+      };
+
+      const result = await useCase.execute({
+        pollId: poll.id,
+        userId: 'admin-1',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Database error');
+
+      // Participants should not be persisted (transaction rolled back)
+      expect(pollRepository.participants.length).toBe(0);
+      // Note: In-memory poll object is mutated but in real DB it would rollback
+    });
+
+    it('should use executeActivation for first activation', async () => {
+      let executeActivationCalled = false;
+      const originalExecuteActivation =
+        pollRepository.executeActivation.bind(pollRepository);
+
+      pollRepository.executeActivation = async (poll, participants, history) => {
+        executeActivationCalled = true;
+        return originalExecuteActivation(poll, participants, history);
+      };
+
+      await useCase.execute({
+        pollId: poll.id,
+        userId: 'admin-1',
+      });
+
+      expect(executeActivationCalled).toBe(true);
+    });
+
+    it('should pass all data to executeActivation in single call', async () => {
+      let receivedPoll: Poll | null = null;
+      let receivedParticipants: PollParticipant[] = [];
+      let receivedHistory: ParticipantWeightHistory[] = [];
+
+      pollRepository.executeActivation = async (poll, participants, history) => {
+        receivedPoll = poll;
+        receivedParticipants = participants;
+        receivedHistory = history;
+        return success(participants);
+      };
+
+      await useCase.execute({
+        pollId: poll.id,
+        userId: 'admin-1',
+      });
+
+      // Verify all data passed together for atomic operation
+      expect(receivedPoll).not.toBeNull();
+      expect(receivedPoll!.active).toBe(true);
+      expect(receivedPoll!.participantsSnapshotTaken).toBe(true);
+      expect(receivedParticipants.length).toBe(3);
+      expect(receivedHistory.length).toBe(3);
+    });
   });
 
   // Authorization tests
