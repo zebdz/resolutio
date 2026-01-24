@@ -10,6 +10,8 @@ import {
   PrismaPollRepository,
   PrismaOrganizationRepository,
   PrismaBoardRepository,
+  PrismaParticipantRepository,
+  PrismaVoteRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
 import { z } from 'zod';
@@ -21,28 +23,37 @@ export type ActionResult<T = void> =
 
 // Initialize dependencies
 const pollRepository = new PrismaPollRepository(prisma);
+const participantRepository = new PrismaParticipantRepository(prisma);
+const voteRepository = new PrismaVoteRepository(prisma);
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const boardRepository = new PrismaBoardRepository(prisma);
 
 // Use cases
 const getParticipantsUseCase = new GetParticipantsUseCase(
   pollRepository,
+  participantRepository,
+  voteRepository,
   boardRepository,
   organizationRepository,
   prisma
 );
 const updateParticipantWeightUseCase = new UpdateParticipantWeightUseCase(
   pollRepository,
+  participantRepository,
+  voteRepository,
   boardRepository,
   organizationRepository
 );
 const removeParticipantUseCase = new RemoveParticipantUseCase(
   pollRepository,
+  participantRepository,
+  voteRepository,
   boardRepository,
   organizationRepository
 );
 const getWeightHistoryUseCase = new GetWeightHistoryUseCase(
   pollRepository,
+  participantRepository,
   boardRepository,
   organizationRepository,
   prisma

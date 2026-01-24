@@ -3,7 +3,10 @@ import { CreateBoardUseCase } from '../CreateBoardUseCase';
 import { Board } from '../../../domain/board/Board';
 import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
+import { UserRepository } from '../../../domain/user/UserRepository';
 import { Organization } from '../../../domain/organization/Organization';
+import { User } from '../../../domain/user/User';
+import { PhoneNumber } from '../../../domain/user/PhoneNumber';
 
 // Mock BoardRepository
 class MockBoardRepository implements BoardRepository {
@@ -163,17 +166,62 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
 }
 
+// Mock UserRepository
+class MockUserRepository implements UserRepository {
+  private superAdmins: Set<string> = new Set();
+
+  async findById(id: string): Promise<User | null> {
+    return null;
+  }
+
+  async findByIds(ids: string[]): Promise<User[]> {
+    return [];
+  }
+
+  async findByPhoneNumber(phoneNumber: PhoneNumber): Promise<User | null> {
+    return null;
+  }
+
+  async save(user: User): Promise<User> {
+    return user;
+  }
+
+  async exists(phoneNumber: PhoneNumber): Promise<boolean> {
+    return false;
+  }
+
+  async searchUsers(query: string): Promise<User[]> {
+    return [];
+  }
+
+  async isSuperAdmin(userId: string): Promise<boolean> {
+    return this.superAdmins.has(userId);
+  }
+
+  // Helper for testing
+  addSuperAdmin(userId: string): void {
+    this.superAdmins.add(userId);
+  }
+
+  clear(): void {
+    this.superAdmins.clear();
+  }
+}
+
 describe('CreateBoardUseCase', () => {
   let useCase: CreateBoardUseCase;
   let boardRepository: MockBoardRepository;
   let organizationRepository: MockOrganizationRepository;
+  let userRepository: MockUserRepository;
 
   beforeEach(() => {
     boardRepository = new MockBoardRepository();
     organizationRepository = new MockOrganizationRepository();
+    userRepository = new MockUserRepository();
     useCase = new CreateBoardUseCase({
       boardRepository,
       organizationRepository,
+      userRepository,
     });
   });
 
@@ -310,6 +358,36 @@ describe('CreateBoardUseCase', () => {
 
       if (result1.success && result2.success) {
         expect(result1.value.board.id).not.toBe(result2.value.board.id);
+      }
+    });
+  });
+
+  describe('when user is a superadmin', () => {
+    beforeEach(() => {
+      const orgResult = Organization.create(
+        'Test Organization',
+        'Test Desc',
+        'creator-1'
+      );
+      if (orgResult.success) {
+        const org = orgResult.value;
+        (org as any).props.id = 'org-1';
+        organizationRepository.addOrganization(org);
+      }
+      // NOT adding as admin - superadmin should bypass
+      userRepository.addSuperAdmin('superadmin-1');
+    });
+
+    it('should create board without being org admin', async () => {
+      const result = await useCase.execute({
+        name: 'Test Board',
+        organizationId: 'org-1',
+        adminUserId: 'superadmin-1',
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.value.board.name).toBe('Test Board');
       }
     });
   });

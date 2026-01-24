@@ -25,6 +25,11 @@ import {
   PrismaBoardRepository,
   PrismaOrganizationRepository,
   PrismaUserRepository,
+  PrismaParticipantRepository,
+  PrismaVoteRepository,
+  PrismaQuestionRepository,
+  PrismaAnswerRepository,
+  PrismaDraftRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
 import { QuestionType } from '@/domain/poll/QuestionType';
@@ -36,27 +41,58 @@ export type ActionResult<T = void> =
 
 // Initialize dependencies
 const pollRepository = new PrismaPollRepository(prisma);
+const participantRepository = new PrismaParticipantRepository(prisma);
+const voteRepository = new PrismaVoteRepository(prisma);
+const questionRepository = new PrismaQuestionRepository(prisma);
+const answerRepository = new PrismaAnswerRepository(prisma);
+const draftRepository = new PrismaDraftRepository(prisma);
 const boardRepository = new PrismaBoardRepository(prisma);
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 
 // Use cases
-const createPollUseCase = new CreatePollUseCase(
+const createPollUseCase = new CreatePollUseCase(pollRepository, boardRepository);
+const updatePollUseCase = new UpdatePollUseCase(pollRepository, voteRepository);
+const addQuestionUseCase = new AddQuestionUseCase(
   pollRepository,
-  boardRepository
+  questionRepository,
+  answerRepository
 );
-const updatePollUseCase = new UpdatePollUseCase(pollRepository);
-const addQuestionUseCase = new AddQuestionUseCase(pollRepository);
-const updateQuestionUseCase = new UpdateQuestionUseCase(pollRepository);
-const deleteQuestionUseCase = new DeleteQuestionUseCase(pollRepository);
-const createAnswerUseCase = new CreateAnswerUseCase(pollRepository);
-const updateAnswerUseCase = new UpdateAnswerUseCase(pollRepository);
-const deleteAnswerUseCase = new DeleteAnswerUseCase(pollRepository);
+const updateQuestionUseCase = new UpdateQuestionUseCase(
+  pollRepository,
+  questionRepository,
+  voteRepository
+);
+const deleteQuestionUseCase = new DeleteQuestionUseCase(
+  pollRepository,
+  questionRepository,
+  voteRepository
+);
+const createAnswerUseCase = new CreateAnswerUseCase(
+  pollRepository,
+  questionRepository,
+  answerRepository,
+  voteRepository
+);
+const updateAnswerUseCase = new UpdateAnswerUseCase(
+  pollRepository,
+  questionRepository,
+  answerRepository,
+  voteRepository
+);
+const deleteAnswerUseCase = new DeleteAnswerUseCase(
+  pollRepository,
+  questionRepository,
+  answerRepository,
+  voteRepository
+);
 const updateQuestionOrderUseCase = new UpdateQuestionOrderUseCase(
-  pollRepository
+  pollRepository,
+  questionRepository
 );
 const activatePollUseCase = new ActivatePollUseCase(
   pollRepository,
+  participantRepository,
   boardRepository,
   organizationRepository,
   userRepository
@@ -69,6 +105,7 @@ const deactivatePollUseCase = new DeactivatePollUseCase(
 );
 const finishPollUseCase = new FinishPollUseCase(
   pollRepository,
+  draftRepository,
   boardRepository,
   organizationRepository,
   userRepository
@@ -603,7 +640,7 @@ export async function canEditPollAction(
     }
 
     // Check if poll has votes
-    const hasVotesResult = await pollRepository.pollHasVotes(pollId);
+    const hasVotesResult = await voteRepository.pollHasVotes(pollId);
     if (!hasVotesResult.success) {
       return {
         success: false,

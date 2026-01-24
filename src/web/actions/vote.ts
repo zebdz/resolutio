@@ -11,6 +11,9 @@ import {
   PrismaOrganizationRepository,
   PrismaBoardRepository,
   PrismaUserRepository,
+  PrismaParticipantRepository,
+  PrismaVoteRepository,
+  PrismaDraftRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
 import { z } from 'zod';
@@ -22,18 +25,36 @@ export type ActionResult<T = void> =
 
 // Initialize dependencies
 const pollRepository = new PrismaPollRepository(prisma);
+const participantRepository = new PrismaParticipantRepository(prisma);
+const voteRepository = new PrismaVoteRepository(prisma);
+const draftRepository = new PrismaDraftRepository(prisma);
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const boardRepository = new PrismaBoardRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 
 // Use cases
-const submitDraftUseCase = new SubmitDraftUseCase(pollRepository);
-const finishVotingUseCase = new FinishVotingUseCase(pollRepository);
+const submitDraftUseCase = new SubmitDraftUseCase(
+  pollRepository,
+  participantRepository,
+  voteRepository,
+  draftRepository
+);
+const finishVotingUseCase = new FinishVotingUseCase(
+  pollRepository,
+  participantRepository,
+  voteRepository,
+  draftRepository
+);
 const getUserVotingProgressUseCase = new GetUserVotingProgressUseCase(
-  pollRepository
+  pollRepository,
+  participantRepository,
+  voteRepository,
+  draftRepository
 );
 const getPollResultsUseCase = new GetPollResultsUseCase(
   pollRepository,
+  participantRepository,
+  voteRepository,
   boardRepository,
   organizationRepository,
   userRepository
@@ -313,10 +334,8 @@ export async function canUserVoteAction(
     }
 
     // Check if user is a participant
-    const participantResult = await pollRepository.getParticipantByUserAndPoll(
-      pollId,
-      user.id
-    );
+    const participantResult =
+      await participantRepository.getParticipantByUserAndPoll(pollId, user.id);
 
     if (!participantResult.success) {
       return {
@@ -336,7 +355,7 @@ export async function canUserVoteAction(
     }
 
     // Check if user has already finished voting
-    const hasFinishedResult = await pollRepository.hasUserFinishedVoting(
+    const hasFinishedResult = await voteRepository.hasUserFinishedVoting(
       pollId,
       user.id
     );

@@ -1,5 +1,6 @@
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { BoardErrors } from './BoardErrors';
 import { OrganizationErrors } from '../organization/OrganizationErrors';
@@ -14,15 +15,18 @@ export interface RemoveBoardMemberInput {
 export interface RemoveBoardMemberDependencies {
   boardRepository: BoardRepository;
   organizationRepository: OrganizationRepository;
+  userRepository: UserRepository;
 }
 
 export class RemoveBoardMemberUseCase {
   private boardRepository: BoardRepository;
   private organizationRepository: OrganizationRepository;
+  private userRepository: UserRepository;
 
   constructor(dependencies: RemoveBoardMemberDependencies) {
     this.boardRepository = dependencies.boardRepository;
     this.organizationRepository = dependencies.organizationRepository;
+    this.userRepository = dependencies.userRepository;
   }
 
   async execute(input: RemoveBoardMemberInput): Promise<Result<void, string>> {
@@ -38,14 +42,20 @@ export class RemoveBoardMemberUseCase {
       return failure(BoardErrors.BOARD_ARCHIVED);
     }
 
-    // Check if admin user is an admin of the organization
-    const isAdmin = await this.organizationRepository.isUserAdmin(
-      input.adminUserId,
-      board.organizationId
+    // Check authorization: superadmin or org admin
+    const isSuperAdmin = await this.userRepository.isSuperAdmin(
+      input.adminUserId
     );
 
-    if (!isAdmin) {
-      return failure(OrganizationErrors.NOT_ADMIN);
+    if (!isSuperAdmin) {
+      const isAdmin = await this.organizationRepository.isUserAdmin(
+        input.adminUserId,
+        board.organizationId
+      );
+
+      if (!isAdmin) {
+        return failure(OrganizationErrors.NOT_ADMIN);
+      }
     }
 
     // Check if user is a member of the board

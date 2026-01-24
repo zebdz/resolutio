@@ -32,21 +32,25 @@ const userRepository = new PrismaUserRepository(prisma);
 const createBoardUseCase = new CreateBoardUseCase({
   boardRepository,
   organizationRepository,
+  userRepository,
 });
 
 const archiveBoardUseCase = new ArchiveBoardUseCase({
   boardRepository,
   organizationRepository,
+  userRepository,
 });
 
 const addBoardMemberUseCase = new AddBoardMemberUseCase({
   boardRepository,
   organizationRepository,
+  userRepository,
 });
 
 const removeBoardMemberUseCase = new RemoveBoardMemberUseCase({
   boardRepository,
   organizationRepository,
+  userRepository,
 });
 
 export async function createBoardAction(
