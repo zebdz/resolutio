@@ -1,5 +1,7 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { QuestionRepository } from '../../domain/poll/QuestionRepository';
+import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { PollErrors } from './PollErrors';
 import { QuestionType } from '../../domain/poll/QuestionType';
 
@@ -12,11 +14,15 @@ export interface UpdateQuestionInput {
 }
 
 export class UpdateQuestionUseCase {
-  constructor(private pollRepository: PollRepository) {}
+  constructor(
+    private pollRepository: PollRepository,
+    private questionRepository: QuestionRepository,
+    private voteRepository: VoteRepository
+  ) {}
 
   async execute(input: UpdateQuestionInput): Promise<Result<void, string>> {
     // Get the question
-    const questionResult = await this.pollRepository.getQuestionById(
+    const questionResult = await this.questionRepository.getQuestionById(
       input.questionId
     );
 
@@ -46,7 +52,7 @@ export class UpdateQuestionUseCase {
     }
 
     // Check if poll can be edited
-    const hasVotesResult = await this.pollRepository.pollHasVotes(poll.id);
+    const hasVotesResult = await this.voteRepository.pollHasVotes(poll.id);
     if (!hasVotesResult.success) {
       return failure(hasVotesResult.error);
     }
@@ -87,7 +93,7 @@ export class UpdateQuestionUseCase {
     }
 
     // Save updated question
-    const updateResult = await this.pollRepository.updateQuestion(question);
+    const updateResult = await this.questionRepository.updateQuestion(question);
     if (!updateResult.success) {
       return failure(updateResult.error);
     }

@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GetParticipantsUseCase } from '../GetParticipantsUseCase';
 import { Poll } from '../../../domain/poll/Poll';
 import { PollParticipant } from '../../../domain/poll/PollParticipant';
-import { Vote } from '../../../domain/poll/Vote';
 import { PollRepository } from '../../../domain/poll/PollRepository';
+import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
+import { VoteRepository } from '../../../domain/poll/VoteRepository';
 import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { Board } from '../../../domain/board/Board';
@@ -14,12 +15,15 @@ import { Decimal } from 'decimal.js';
 
 describe('GetParticipantsUseCase', () => {
   let pollRepository: Partial<PollRepository>;
+  let participantRepository: Partial<ParticipantRepository>;
+  let voteRepository: Partial<VoteRepository>;
   let boardRepository: Partial<BoardRepository>;
   let organizationRepository: Partial<OrganizationRepository>;
   let prisma: any;
   let useCase: GetParticipantsUseCase;
   let poll: Poll;
   let board: Board;
+  let participant: PollParticipant;
 
   beforeEach(() => {
     // Create a poll
@@ -32,34 +36,37 @@ describe('GetParticipantsUseCase', () => {
       new Date('2026-02-15')
     );
     expect(pollResult.success).toBe(true);
-    if (pollResult.success) {
-      poll = pollResult.value;
-      (poll as any).props.id = 'poll-1';
-      poll.activate();
-      poll.takeParticipantsSnapshot();
-    }
+    poll = pollResult.value;
+    (poll as any).props.id = 'poll-1';
+    poll.activate();
+    poll.takeParticipantsSnapshot();
 
     // Create board
     const boardResult = Board.create('org-1', 'Test Board', 'user-admin');
     expect(boardResult.success).toBe(true);
-    if (boardResult.success) {
-      board = boardResult.value;
-      (board as any).props.id = 'board-1';
-    }
+    board = boardResult.value;
+    (board as any).props.id = 'board-1';
 
-    // Mock repositories
-    const participant1Result = PollParticipant.create(
+    // Create participant
+    const participantResult = PollParticipant.create(
       'poll-1',
       'user-1',
       new Decimal(1.5).toNumber()
     );
-    expect(participant1Result.success).toBe(true);
-    const participant1 = participant1Result.value!;
-    (participant1 as any).props.id = 'participant-1';
+    expect(participantResult.success).toBe(true);
+    participant = participantResult.value;
+    (participant as any).props.id = 'participant-1';
 
+    // Mock repositories
     pollRepository = {
       getPollById: vi.fn().mockResolvedValue(success(poll)),
-      getParticipants: vi.fn().mockResolvedValue(success([participant1])),
+    };
+
+    participantRepository = {
+      getParticipants: vi.fn().mockResolvedValue(success([participant])),
+    };
+
+    voteRepository = {
       pollHasVotes: vi.fn().mockResolvedValue(success(false)),
     };
 
@@ -84,6 +91,8 @@ describe('GetParticipantsUseCase', () => {
 
     useCase = new GetParticipantsUseCase(
       pollRepository as PollRepository,
+      participantRepository as ParticipantRepository,
+      voteRepository as VoteRepository,
       boardRepository as BoardRepository,
       organizationRepository as OrganizationRepository,
       prisma
@@ -106,7 +115,7 @@ describe('GetParticipantsUseCase', () => {
   });
 
   it('should indicate canModify=false when votes exist', async () => {
-    pollRepository.pollHasVotes = vi.fn().mockResolvedValue(success(true));
+    voteRepository.pollHasVotes = vi.fn().mockResolvedValue(success(true));
 
     const result = await useCase.execute({
       pollId: 'poll-1',

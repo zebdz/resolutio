@@ -1,6 +1,7 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { ParticipantWeightHistory } from '../../domain/poll/ParticipantWeightHistory';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { PollErrors } from './PollErrors';
@@ -32,6 +33,7 @@ export interface GetWeightHistoryResult {
 export class GetWeightHistoryUseCase {
   constructor(
     private pollRepository: PollRepository,
+    private participantRepository: ParticipantRepository,
     private boardRepository: BoardRepository,
     private organizationRepository: OrganizationRepository,
     private prisma: any
@@ -69,7 +71,7 @@ export class GetWeightHistoryUseCase {
     }
 
     // 3. Get weight history
-    const historyResult = await this.pollRepository.getWeightHistory(pollId);
+    const historyResult = await this.participantRepository.getWeightHistory(pollId);
     if (!historyResult.success) {
       return failure(historyResult.error);
     }

@@ -1,5 +1,7 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
+import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { PollErrors } from './PollErrors';
@@ -14,6 +16,8 @@ export interface RemoveParticipantInput {
 export class RemoveParticipantUseCase {
   constructor(
     private pollRepository: PollRepository,
+    private participantRepository: ParticipantRepository,
+    private voteRepository: VoteRepository,
     private boardRepository: BoardRepository,
     private organizationRepository: OrganizationRepository
   ) {}
@@ -23,7 +27,7 @@ export class RemoveParticipantUseCase {
 
     // 1. Get participant
     const participantResult =
-      await this.pollRepository.getParticipantById(participantId);
+      await this.participantRepository.getParticipantById(participantId);
     if (!participantResult.success) {
       return failure(participantResult.error);
     }
@@ -62,7 +66,7 @@ export class RemoveParticipantUseCase {
     }
 
     // 4. Check if poll has votes (cannot remove participants if votes exist)
-    const hasVotesResult = await this.pollRepository.pollHasVotes(
+    const hasVotesResult = await this.voteRepository.pollHasVotes(
       participant.pollId
     );
     if (!hasVotesResult.success) {
@@ -75,7 +79,7 @@ export class RemoveParticipantUseCase {
 
     // 5. Delete participant
     const deleteResult =
-      await this.pollRepository.deleteParticipant(participantId);
+      await this.participantRepository.deleteParticipant(participantId);
 
     return deleteResult;
   }

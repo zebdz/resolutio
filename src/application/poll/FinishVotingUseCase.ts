@@ -1,6 +1,9 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { Vote } from '../../domain/poll/Vote';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
+import { VoteRepository } from '../../domain/poll/VoteRepository';
+import { DraftRepository } from '../../domain/poll/DraftRepository';
 import { PollErrors } from './PollErrors';
 import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
 
@@ -10,7 +13,12 @@ export interface FinishVotingInput {
 }
 
 export class FinishVotingUseCase {
-  constructor(private pollRepository: PollRepository) {}
+  constructor(
+    private pollRepository: PollRepository,
+    private participantRepository: ParticipantRepository,
+    private voteRepository: VoteRepository,
+    private draftRepository: DraftRepository
+  ) {}
 
   async execute(input: FinishVotingInput): Promise<Result<void, string>> {
     const { pollId, userId } = input;
@@ -37,7 +45,7 @@ export class FinishVotingUseCase {
 
     // 3. Check if user is a participant
     const participantResult =
-      await this.pollRepository.getParticipantByUserAndPoll(pollId, userId);
+      await this.participantRepository.getParticipantByUserAndPoll(pollId, userId);
     if (!participantResult.success) {
       return failure(participantResult.error);
     }
@@ -48,7 +56,7 @@ export class FinishVotingUseCase {
     }
 
     // 4. Check if user has already finished voting
-    const hasFinishedResult = await this.pollRepository.hasUserFinishedVoting(
+    const hasFinishedResult = await this.voteRepository.hasUserFinishedVoting(
       pollId,
       userId
     );
@@ -61,7 +69,7 @@ export class FinishVotingUseCase {
     }
 
     // 5. Get user's drafts
-    const draftsResult = await this.pollRepository.getUserDrafts(
+    const draftsResult = await this.draftRepository.getUserDrafts(
       pollId,
       userId
     );
@@ -115,13 +123,13 @@ export class FinishVotingUseCase {
     }
 
     // 8. Save all votes
-    const createVotesResult = await this.pollRepository.createVotes(votes);
+    const createVotesResult = await this.voteRepository.createVotes(votes);
     if (!createVotesResult.success) {
       return failure(createVotesResult.error);
     }
 
     // 9. Delete user's drafts
-    const deleteResult = await this.pollRepository.deleteUserDrafts(
+    const deleteResult = await this.draftRepository.deleteUserDrafts(
       pollId,
       userId
     );

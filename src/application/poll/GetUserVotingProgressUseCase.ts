@@ -2,6 +2,9 @@ import { Result, success, failure } from '../../domain/shared/Result';
 import { Poll } from '../../domain/poll/Poll';
 import { VoteDraft } from '../../domain/poll/VoteDraft';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
+import { VoteRepository } from '../../domain/poll/VoteRepository';
+import { DraftRepository } from '../../domain/poll/DraftRepository';
 import { PollErrors } from './PollErrors';
 import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
 
@@ -20,7 +23,12 @@ export interface GetUserVotingProgressResult {
 }
 
 export class GetUserVotingProgressUseCase {
-  constructor(private pollRepository: PollRepository) {}
+  constructor(
+    private pollRepository: PollRepository,
+    private participantRepository: ParticipantRepository,
+    private voteRepository: VoteRepository,
+    private draftRepository: DraftRepository
+  ) {}
 
   async execute(
     input: GetUserVotingProgressInput
@@ -40,7 +48,7 @@ export class GetUserVotingProgressUseCase {
 
     // 2. Check if user is a participant
     const participantResult =
-      await this.pollRepository.getParticipantByUserAndPoll(pollId, userId);
+      await this.participantRepository.getParticipantByUserAndPoll(pollId, userId);
     if (!participantResult.success) {
       return failure(participantResult.error);
     }
@@ -48,7 +56,7 @@ export class GetUserVotingProgressUseCase {
     const isParticipant = !!participantResult.value;
 
     // 3. Check if user has finished voting
-    const hasFinishedResult = await this.pollRepository.hasUserFinishedVoting(
+    const hasFinishedResult = await this.voteRepository.hasUserFinishedVoting(
       pollId,
       userId
     );
@@ -59,7 +67,7 @@ export class GetUserVotingProgressUseCase {
     const hasFinished = hasFinishedResult.value;
 
     // 4. Get user's drafts
-    const draftsResult = await this.pollRepository.getUserDrafts(
+    const draftsResult = await this.draftRepository.getUserDrafts(
       pollId,
       userId
     );

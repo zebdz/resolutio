@@ -1,5 +1,7 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { QuestionRepository } from '../../domain/poll/QuestionRepository';
+import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { PollErrors } from './PollErrors';
 
 export interface DeleteQuestionInput {
@@ -8,11 +10,15 @@ export interface DeleteQuestionInput {
 }
 
 export class DeleteQuestionUseCase {
-  constructor(private pollRepository: PollRepository) {}
+  constructor(
+    private pollRepository: PollRepository,
+    private questionRepository: QuestionRepository,
+    private voteRepository: VoteRepository
+  ) {}
 
   async execute(input: DeleteQuestionInput): Promise<Result<void, string>> {
     // Get the question
-    const questionResult = await this.pollRepository.getQuestionById(
+    const questionResult = await this.questionRepository.getQuestionById(
       input.questionId
     );
 
@@ -42,7 +48,7 @@ export class DeleteQuestionUseCase {
     }
 
     // Check if poll can be edited
-    const hasVotesResult = await this.pollRepository.pollHasVotes(poll.id);
+    const hasVotesResult = await this.voteRepository.pollHasVotes(poll.id);
     if (!hasVotesResult.success) {
       return failure(hasVotesResult.error);
     }
@@ -61,7 +67,7 @@ export class DeleteQuestionUseCase {
     }
 
     // Delete (archive) the question
-    const deleteResult = await this.pollRepository.deleteQuestion(
+    const deleteResult = await this.questionRepository.deleteQuestion(
       input.questionId
     );
 

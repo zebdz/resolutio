@@ -3,6 +3,8 @@ import { Poll } from '../../domain/poll/Poll';
 import { Vote } from '../../domain/poll/Vote';
 import { PollParticipant } from '../../domain/poll/PollParticipant';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
+import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { PollErrors } from './PollErrors';
@@ -46,6 +48,8 @@ export interface GetPollResultsResult {
 export class GetPollResultsUseCase {
   constructor(
     private pollRepository: PollRepository,
+    private participantRepository: ParticipantRepository,
+    private voteRepository: VoteRepository,
     private boardRepository: BoardRepository,
     private organizationRepository: OrganizationRepository,
     private userRepository: UserRepository
@@ -98,7 +102,7 @@ export class GetPollResultsUseCase {
     }
 
     // 4. Get all votes and participants
-    const votesResult = await this.pollRepository.getVotesByPoll(pollId);
+    const votesResult = await this.voteRepository.getVotesByPoll(pollId);
     if (!votesResult.success) {
       return failure(votesResult.error);
     }
@@ -106,7 +110,7 @@ export class GetPollResultsUseCase {
     const votes = votesResult.value;
 
     const participantsResult =
-      await this.pollRepository.getParticipants(pollId);
+      await this.participantRepository.getParticipants(pollId);
     if (!participantsResult.success) {
       return failure(participantsResult.error);
     }

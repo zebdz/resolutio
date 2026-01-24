@@ -3,6 +3,8 @@ import { RemoveParticipantUseCase } from '../RemoveParticipantUseCase';
 import { Poll } from '../../../domain/poll/Poll';
 import { PollParticipant } from '../../../domain/poll/PollParticipant';
 import { PollRepository } from '../../../domain/poll/PollRepository';
+import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
+import { VoteRepository } from '../../../domain/poll/VoteRepository';
 import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { Board } from '../../../domain/board/Board';
@@ -14,6 +16,8 @@ import { Decimal } from 'decimal.js';
 
 describe('RemoveParticipantUseCase', () => {
   let pollRepository: Partial<PollRepository>;
+  let participantRepository: Partial<ParticipantRepository>;
+  let voteRepository: Partial<VoteRepository>;
   let boardRepository: Partial<BoardRepository>;
   let organizationRepository: Partial<OrganizationRepository>;
   let useCase: RemoveParticipantUseCase;
@@ -61,10 +65,16 @@ describe('RemoveParticipantUseCase', () => {
 
     // Mock repositories
     pollRepository = {
-      getParticipantById: vi.fn().mockResolvedValue(success(participant)),
       getPollById: vi.fn().mockResolvedValue(success(poll)),
-      pollHasVotes: vi.fn().mockResolvedValue(success(false)),
+    };
+
+    participantRepository = {
+      getParticipantById: vi.fn().mockResolvedValue(success(participant)),
       deleteParticipant: vi.fn().mockResolvedValue(success(undefined)),
+    };
+
+    voteRepository = {
+      pollHasVotes: vi.fn().mockResolvedValue(success(false)),
     };
 
     boardRepository = {
@@ -77,6 +87,8 @@ describe('RemoveParticipantUseCase', () => {
 
     useCase = new RemoveParticipantUseCase(
       pollRepository as PollRepository,
+      participantRepository as ParticipantRepository,
+      voteRepository as VoteRepository,
       boardRepository as BoardRepository,
       organizationRepository as OrganizationRepository
     );
@@ -89,13 +101,13 @@ describe('RemoveParticipantUseCase', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(pollRepository.deleteParticipant).toHaveBeenCalledWith(
+    expect(participantRepository.deleteParticipant).toHaveBeenCalledWith(
       'participant-1'
     );
   });
 
   it('should reject when participant not found', async () => {
-    pollRepository.getParticipantById = vi
+    participantRepository.getParticipantById = vi
       .fn()
       .mockResolvedValue(success(null));
 
@@ -153,7 +165,7 @@ describe('RemoveParticipantUseCase', () => {
   });
 
   it('should reject when poll has votes', async () => {
-    pollRepository.pollHasVotes = vi.fn().mockResolvedValue(success(true));
+    voteRepository.pollHasVotes = vi.fn().mockResolvedValue(success(true));
 
     const result = await useCase.execute({
       participantId: 'participant-1',

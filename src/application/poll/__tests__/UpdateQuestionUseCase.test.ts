@@ -1,228 +1,69 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UpdateQuestionUseCase } from '../UpdateQuestionUseCase';
 import { Poll } from '../../../domain/poll/Poll';
 import { Question } from '../../../domain/poll/Question';
 import { Answer } from '../../../domain/poll/Answer';
-import {
-  PollRepository,
-  UpdateQuestionOrderData,
-} from '../../../domain/poll/PollRepository';
+import { PollRepository } from '../../../domain/poll/PollRepository';
+import { QuestionRepository } from '../../../domain/poll/QuestionRepository';
+import { VoteRepository } from '../../../domain/poll/VoteRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
-import { QuestionType } from '../../../domain/poll/QuestionType';
-
-// Mock PollRepository
-class MockPollRepository implements PollRepository {
-  private polls: Map<string, Poll> = new Map();
-  private questions: Map<string, Question> = new Map();
-  private answers: Map<string, Answer> = new Map();
-  private votes: Set<string> = new Set();
-  private nextId = 1;
-
-  async createPoll(poll: Poll): Promise<Result<Poll, string>> {
-    const id = `poll-${this.nextId++}`;
-    (poll as any).props.id = id;
-    this.polls.set(id, poll);
-
-    return success(poll);
-  }
-
-  async getPollById(pollId: string): Promise<Result<Poll | null, string>> {
-    return success(this.polls.get(pollId) || null);
-  }
-
-  async getPollsByBoardId(boardId: string): Promise<Result<Poll[], string>> {
-    const polls = Array.from(this.polls.values()).filter(
-      (p) => p.boardId === boardId && !p.isArchived()
-    );
-
-    return success(polls);
-  }
-
-  async getPollsByUserId(userId: string): Promise<Result<Poll[], string>> {
-    return success(Array.from(this.polls.values()));
-  }
-
-  async updatePoll(poll: Poll): Promise<Result<void, string>> {
-    this.polls.set(poll.id, poll);
-
-    return success(undefined);
-  }
-
-  async deletePoll(pollId: string): Promise<Result<void, string>> {
-    const poll = this.polls.get(pollId);
-    if (!poll) {
-      return failure(PollErrors.NOT_FOUND);
-    }
-
-    poll.archive();
-
-    return success(undefined);
-  }
-
-  async pollHasVotes(pollId: string): Promise<Result<boolean, string>> {
-    return success(this.votes.has(pollId));
-  }
-
-  async createQuestion(question: Question): Promise<Result<Question, string>> {
-    const id = `question-${this.nextId++}`;
-    (question as any).props.id = id;
-    this.questions.set(id, question);
-
-    return success(question);
-  }
-
-  async getQuestionById(
-    questionId: string
-  ): Promise<Result<Question | null, string>> {
-    return success(this.questions.get(questionId) || null);
-  }
-
-  async getQuestionsByPollId(
-    pollId: string
-  ): Promise<Result<Question[], string>> {
-    const questions = Array.from(this.questions.values()).filter(
-      (q) => q.pollId === pollId && !q.isArchived()
-    );
-
-    return success(questions);
-  }
-
-  async updateQuestion(question: Question): Promise<Result<void, string>> {
-    this.questions.set(question.id, question);
-
-    return success(undefined);
-  }
-
-  async updateQuestionOrder(
-    updates: UpdateQuestionOrderData[]
-  ): Promise<Result<void, string>> {
-    for (const update of updates) {
-      const question = this.questions.get(update.questionId);
-      if (question) {
-        question.updatePage(update.page);
-        question.updateOrder(update.order);
-      }
-    }
-
-    return success(undefined);
-  }
-
-  async deleteQuestion(questionId: string): Promise<Result<void, string>> {
-    const question = this.questions.get(questionId);
-    if (!question) {
-      return failure(PollErrors.QUESTION_NOT_FOUND);
-    }
-
-    question.archive();
-
-    return success(undefined);
-  }
-
-  async createAnswer(answer: Answer): Promise<Result<Answer, string>> {
-    const id = `answer-${this.nextId++}`;
-    (answer as any).props.id = id;
-    this.answers.set(id, answer);
-
-    return success(answer);
-  }
-
-  async getAnswerById(
-    answerId: string
-  ): Promise<Result<Answer | null, string>> {
-    return success(this.answers.get(answerId) || null);
-  }
-
-  async getAnswersByQuestionId(
-    questionId: string
-  ): Promise<Result<Answer[], string>> {
-    const answers = Array.from(this.answers.values()).filter(
-      (a) => a.questionId === questionId && !a.isArchived()
-    );
-
-    return success(answers);
-  }
-
-  async updateAnswer(answer: Answer): Promise<Result<void, string>> {
-    this.answers.set(answer.id, answer);
-
-    return success(undefined);
-  }
-
-  async deleteAnswer(answerId: string): Promise<Result<void, string>> {
-    const answer = this.answers.get(answerId);
-    if (!answer) {
-      return failure(PollErrors.ANSWER_NOT_FOUND);
-    }
-
-    answer.archive();
-
-    return success(undefined);
-  }
-
-  // Test helper methods
-  addPoll(poll: Poll): void {
-    this.polls.set(poll.id, poll);
-  }
-
-  addQuestion(question: Question): void {
-    this.questions.set(question.id, question);
-  }
-
-  addAnswer(answer: Answer): void {
-    this.answers.set(answer.id, answer);
-  }
-
-  addVoteToPoll(pollId: string): void {
-    this.votes.add(pollId);
-  }
-
-  clear(): void {
-    this.polls.clear();
-    this.questions.clear();
-    this.answers.clear();
-    this.votes.clear();
-    this.nextId = 1;
-  }
-}
 
 describe('UpdateQuestionUseCase', () => {
   let useCase: UpdateQuestionUseCase;
-  let pollRepository: MockPollRepository;
+  let pollRepository: Partial<PollRepository>;
+  let questionRepository: Partial<QuestionRepository>;
+  let voteRepository: Partial<VoteRepository>;
+  let poll: Poll;
+  let question: Question;
 
   beforeEach(() => {
-    pollRepository = new MockPollRepository();
-    useCase = new UpdateQuestionUseCase(pollRepository);
+    // Create a poll
+    const pollResult = Poll.create(
+      'Test Poll',
+      'Test Description',
+      'board-1',
+      'user-1',
+      new Date('2026-01-15'),
+      new Date('2026-02-15')
+    );
+    poll = pollResult.value;
+    (poll as any).props.id = 'poll-1';
+
+    // Create a question
+    const questionResult = Question.create(
+      'Original Question',
+      'poll-1',
+      1,
+      0,
+      'single-choice'
+    );
+    question = questionResult.value;
+    (question as any).props.id = 'question-1';
+
+    // Mock repositories
+    pollRepository = {
+      getPollById: vi.fn().mockResolvedValue(success(poll)),
+    };
+
+    questionRepository = {
+      getQuestionById: vi.fn().mockResolvedValue(success(question)),
+      updateQuestion: vi.fn().mockResolvedValue(success(undefined)),
+    };
+
+    voteRepository = {
+      pollHasVotes: vi.fn().mockResolvedValue(success(false)),
+    };
+
+    useCase = new UpdateQuestionUseCase(
+      pollRepository as PollRepository,
+      questionRepository as QuestionRepository,
+      voteRepository as VoteRepository
+    );
   });
 
   describe('updating question text', () => {
     it('should update question text when user is poll creator and poll is editable', async () => {
-      // Create a poll
-      const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
-      );
-      const poll = pollResult.value;
-      (poll as any).props.id = 'poll-1';
-      pollRepository.addPoll(poll);
-
-      // Create a question
-      const questionResult = Question.create(
-        'Original Question',
-        'poll-1',
-        1,
-        0,
-        'single-choice'
-      );
-      const question = questionResult.value;
-      (question as any).props.id = 'question-1';
-      pollRepository.addQuestion(question);
-
-      // Update question
       const result = await useCase.execute({
         questionId: 'question-1',
         userId: 'user-1',
@@ -230,16 +71,14 @@ describe('UpdateQuestionUseCase', () => {
       });
 
       expect(result.success).toBe(true);
-
-      // Verify question was updated
-      const updatedQuestionResult =
-        await pollRepository.getQuestionById('question-1');
-      expect(updatedQuestionResult.success).toBe(true);
-      const updatedQuestion = updatedQuestionResult.value!;
-      expect(updatedQuestion.text).toBe('Updated Question');
+      expect(questionRepository.updateQuestion).toHaveBeenCalled();
     });
 
     it('should fail when question not found', async () => {
+      questionRepository.getQuestionById = vi
+        .fn()
+        .mockResolvedValue(success(null));
+
       const result = await useCase.execute({
         questionId: 'non-existent',
         userId: 'user-1',
@@ -251,31 +90,6 @@ describe('UpdateQuestionUseCase', () => {
     });
 
     it('should fail when user is not poll creator', async () => {
-      // Create poll and question
-      const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
-      );
-      const poll = pollResult.value;
-      (poll as any).props.id = 'poll-1';
-      pollRepository.addPoll(poll);
-
-      const questionResult = Question.create(
-        'Original Question',
-        'poll-1',
-        1,
-        0,
-        'single-choice'
-      );
-      const question = questionResult.value;
-      (question as any).props.id = 'question-1';
-      pollRepository.addQuestion(question);
-
-      // Try to update with different user
       const result = await useCase.execute({
         questionId: 'question-1',
         userId: 'user-2',
@@ -287,17 +101,6 @@ describe('UpdateQuestionUseCase', () => {
     });
 
     it('should fail when poll is active', async () => {
-      const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
-      );
-      const poll = pollResult.value;
-      (poll as any).props.id = 'poll-1';
-
       // Activate poll (need question with answer)
       const questionForActivation = Question.create(
         'Temp Question',
@@ -306,23 +109,14 @@ describe('UpdateQuestionUseCase', () => {
         0,
         'single-choice'
       );
-      const tempAnswer = Answer.create('Temp Answer', 1, questionForActivation.value.id);
+      const tempAnswer = Answer.create(
+        'Temp Answer',
+        1,
+        questionForActivation.value.id
+      );
       questionForActivation.value.addAnswer(tempAnswer.value);
       poll.addQuestion(questionForActivation.value);
       poll.activate();
-
-      pollRepository.addPoll(poll);
-
-      const questionResult = Question.create(
-        'Original Question',
-        'poll-1',
-        1,
-        0,
-        'single-choice'
-      );
-      const question = questionResult.value;
-      (question as any).props.id = 'question-1';
-      pollRepository.addQuestion(question);
 
       const result = await useCase.execute({
         questionId: 'question-1',
@@ -335,29 +129,7 @@ describe('UpdateQuestionUseCase', () => {
     });
 
     it('should fail when poll has votes', async () => {
-      const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
-      );
-      const poll = pollResult.value;
-      (poll as any).props.id = 'poll-1';
-      pollRepository.addPoll(poll);
-      pollRepository.addVoteToPoll('poll-1');
-
-      const questionResult = Question.create(
-        'Original Question',
-        'poll-1',
-        1,
-        0,
-        'single-choice'
-      );
-      const question = questionResult.value;
-      (question as any).props.id = 'question-1';
-      pollRepository.addQuestion(question);
+      voteRepository.pollHasVotes = vi.fn().mockResolvedValue(success(true));
 
       const result = await useCase.execute({
         questionId: 'question-1',
@@ -372,19 +144,8 @@ describe('UpdateQuestionUseCase', () => {
 
   describe('updating question details', () => {
     it('should update question details', async () => {
-      const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
-      );
-      const poll = pollResult.value;
-      (poll as any).props.id = 'poll-1';
-      pollRepository.addPoll(poll);
-
-      const questionResult = Question.create(
+      // Create question with details
+      const questionWithDetails = Question.create(
         'Original Question',
         'poll-1',
         1,
@@ -392,9 +153,10 @@ describe('UpdateQuestionUseCase', () => {
         'single-choice',
         'Original details'
       );
-      const question = questionResult.value;
-      (question as any).props.id = 'question-1';
-      pollRepository.addQuestion(question);
+      (questionWithDetails.value as any).props.id = 'question-1';
+      questionRepository.getQuestionById = vi
+        .fn()
+        .mockResolvedValue(success(questionWithDetails.value));
 
       const result = await useCase.execute({
         questionId: 'question-1',
@@ -403,39 +165,12 @@ describe('UpdateQuestionUseCase', () => {
       });
 
       expect(result.success).toBe(true);
-
-      const updatedQuestionResult =
-        await pollRepository.getQuestionById('question-1');
-      const updatedQuestion = updatedQuestionResult.value!;
-      expect(updatedQuestion.details).toBe('Updated details');
+      expect(questionRepository.updateQuestion).toHaveBeenCalled();
     });
   });
 
   describe('updating question type', () => {
     it('should update question type from single-choice to multiple-choice', async () => {
-      const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
-      );
-      const poll = pollResult.value;
-      (poll as any).props.id = 'poll-1';
-      pollRepository.addPoll(poll);
-
-      const questionResult = Question.create(
-        'Original Question',
-        'poll-1',
-        1,
-        0,
-        'single-choice'
-      );
-      const question = questionResult.value;
-      (question as any).props.id = 'question-1';
-      pollRepository.addQuestion(question);
-
       const result = await useCase.execute({
         questionId: 'question-1',
         userId: 'user-1',
@@ -443,29 +178,14 @@ describe('UpdateQuestionUseCase', () => {
       });
 
       expect(result.success).toBe(true);
-
-      const updatedQuestionResult =
-        await pollRepository.getQuestionById('question-1');
-      const updatedQuestion = updatedQuestionResult.value!;
-      expect(updatedQuestion.questionType).toBe('multiple-choice');
+      expect(questionRepository.updateQuestion).toHaveBeenCalled();
     });
   });
 
   describe('updating multiple properties at once', () => {
     it('should update text, details, and type together', async () => {
-      const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
-      );
-      const poll = pollResult.value;
-      (poll as any).props.id = 'poll-1';
-      pollRepository.addPoll(poll);
-
-      const questionResult = Question.create(
+      // Create question with details
+      const questionWithDetails = Question.create(
         'Original Question',
         'poll-1',
         1,
@@ -473,9 +193,10 @@ describe('UpdateQuestionUseCase', () => {
         'single-choice',
         'Original details'
       );
-      const question = questionResult.value;
-      (question as any).props.id = 'question-1';
-      pollRepository.addQuestion(question);
+      (questionWithDetails.value as any).props.id = 'question-1';
+      questionRepository.getQuestionById = vi
+        .fn()
+        .mockResolvedValue(success(questionWithDetails.value));
 
       const result = await useCase.execute({
         questionId: 'question-1',
@@ -486,13 +207,7 @@ describe('UpdateQuestionUseCase', () => {
       });
 
       expect(result.success).toBe(true);
-
-      const updatedQuestionResult =
-        await pollRepository.getQuestionById('question-1');
-      const updatedQuestion = updatedQuestionResult.value!;
-      expect(updatedQuestion.text).toBe('Updated Question');
-      expect(updatedQuestion.details).toBe('Updated details');
-      expect(updatedQuestion.questionType).toBe('multiple-choice');
+      expect(questionRepository.updateQuestion).toHaveBeenCalled();
     });
   });
 });

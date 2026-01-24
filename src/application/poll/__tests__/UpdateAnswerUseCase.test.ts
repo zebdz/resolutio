@@ -3,160 +3,23 @@ import { UpdateAnswerUseCase } from '../UpdateAnswerUseCase';
 import { Poll } from '../../../domain/poll/Poll';
 import { Question } from '../../../domain/poll/Question';
 import { Answer } from '../../../domain/poll/Answer';
-import {
-  PollRepository,
-  UpdateQuestionOrderData,
-} from '../../../domain/poll/PollRepository';
+import { PollRepository } from '../../../domain/poll/PollRepository';
+import { QuestionRepository } from '../../../domain/poll/QuestionRepository';
+import { AnswerRepository } from '../../../domain/poll/AnswerRepository';
+import { VoteRepository } from '../../../domain/poll/VoteRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 
-// Mock PollRepository
-class MockPollRepository implements PollRepository {
+// Mock PollRepository - only poll operations needed
+class MockPollRepository implements Partial<PollRepository> {
   private polls: Map<string, Poll> = new Map();
-  private questions: Map<string, Question> = new Map();
-  private answers: Map<string, Answer> = new Map();
-  private votes: Set<string> = new Set();
-  private nextId = 1;
-
-  async createPoll(poll: Poll): Promise<Result<Poll, string>> {
-    const id = `poll-${this.nextId++}`;
-    (poll as any).props.id = id;
-    this.polls.set(id, poll);
-
-    return success(poll);
-  }
 
   async getPollById(pollId: string): Promise<Result<Poll | null, string>> {
     return success(this.polls.get(pollId) || null);
   }
 
-  async getPollsByBoardId(boardId: string): Promise<Result<Poll[], string>> {
-    const polls = Array.from(this.polls.values()).filter(
-      (p) => p.boardId === boardId && !p.isArchived()
-    );
-
-    return success(polls);
-  }
-
-  async getPollsByUserId(userId: string): Promise<Result<Poll[], string>> {
-    return success(Array.from(this.polls.values()));
-  }
-
-  async updatePoll(poll: Poll): Promise<Result<void, string>> {
-    this.polls.set(poll.id, poll);
-
-    return success(undefined);
-  }
-
-  async deletePoll(pollId: string): Promise<Result<void, string>> {
-    const poll = this.polls.get(pollId);
-    if (!poll) {
-      return failure(PollErrors.NOT_FOUND);
-    }
-
-    poll.archive();
-
-    return success(undefined);
-  }
-
-  async pollHasVotes(pollId: string): Promise<Result<boolean, string>> {
-    return success(this.votes.has(pollId));
-  }
-
-  async createQuestion(question: Question): Promise<Result<Question, string>> {
-    const id = `question-${this.nextId++}`;
-    (question as any).props.id = id;
-    this.questions.set(id, question);
-
-    return success(question);
-  }
-
-  async getQuestionById(
-    questionId: string
-  ): Promise<Result<Question | null, string>> {
-    return success(this.questions.get(questionId) || null);
-  }
-
-  async getQuestionsByPollId(
-    pollId: string
-  ): Promise<Result<Question[], string>> {
-    const questions = Array.from(this.questions.values()).filter(
-      (q) => q.pollId === pollId && !q.isArchived()
-    );
-
-    return success(questions);
-  }
-
-  async updateQuestion(question: Question): Promise<Result<void, string>> {
-    this.questions.set(question.id, question);
-
-    return success(undefined);
-  }
-
-  async updateQuestionOrder(
-    updates: UpdateQuestionOrderData[]
-  ): Promise<Result<void, string>> {
-    for (const update of updates) {
-      const question = this.questions.get(update.questionId);
-      if (question) {
-        question.updatePage(update.page);
-        question.updateOrder(update.order);
-      }
-    }
-
-    return success(undefined);
-  }
-
-  async deleteQuestion(questionId: string): Promise<Result<void, string>> {
-    const question = this.questions.get(questionId);
-    if (!question) {
-      return failure(PollErrors.QUESTION_NOT_FOUND);
-    }
-
-    question.archive();
-
-    return success(undefined);
-  }
-
-  async createAnswer(answer: Answer): Promise<Result<Answer, string>> {
-    const id = `answer-${this.nextId++}`;
-    (answer as any).props.id = id;
-    this.answers.set(id, answer);
-
-    return success(answer);
-  }
-
-  async getAnswerById(
-    answerId: string
-  ): Promise<Result<Answer | null, string>> {
-    return success(this.answers.get(answerId) || null);
-  }
-
-  async getAnswersByQuestionId(
-    questionId: string
-  ): Promise<Result<Answer[], string>> {
-    const answers = Array.from(this.answers.values()).filter(
-      (a) => a.questionId === questionId && !a.isArchived()
-    );
-
-    return success(answers);
-  }
-
-  async updateAnswer(answer: Answer): Promise<Result<void, string>> {
-    this.answers.set(answer.id, answer);
-
-    return success(undefined);
-  }
-
-  async deleteAnswer(answerId: string): Promise<Result<void, string>> {
-    const answer = this.answers.get(answerId);
-    if (!answer) {
-      return failure(PollErrors.ANSWER_NOT_FOUND);
-    }
-
-    answer.archive();
-
-    return success(undefined);
+  async pollHasVotes(_pollId: string): Promise<Result<boolean, string>> {
+    return success(false);
   }
 
   // Test helper methods
@@ -164,34 +27,90 @@ class MockPollRepository implements PollRepository {
     this.polls.set(poll.id, poll);
   }
 
+  clear(): void {
+    this.polls.clear();
+  }
+}
+
+// Mock QuestionRepository
+class MockQuestionRepository implements Partial<QuestionRepository> {
+  private questions: Map<string, Question> = new Map();
+
+  async getQuestionById(
+    questionId: string
+  ): Promise<Result<Question | null, string>> {
+    return success(this.questions.get(questionId) || null);
+  }
+
+  // Test helper methods
   addQuestion(question: Question): void {
     this.questions.set(question.id, question);
   }
 
+  clear(): void {
+    this.questions.clear();
+  }
+}
+
+// Mock AnswerRepository
+class MockAnswerRepository implements Partial<AnswerRepository> {
+  private answers: Map<string, Answer> = new Map();
+
+  async getAnswerById(answerId: string): Promise<Result<Answer | null, string>> {
+    return success(this.answers.get(answerId) || null);
+  }
+
+  async updateAnswer(answer: Answer): Promise<Result<void, string>> {
+    this.answers.set(answer.id, answer);
+    return success(undefined);
+  }
+
+  // Test helper methods
   addAnswer(answer: Answer): void {
     this.answers.set(answer.id, answer);
   }
 
+  clear(): void {
+    this.answers.clear();
+  }
+}
+
+// Mock VoteRepository
+class MockVoteRepository implements Partial<VoteRepository> {
+  private votes: Set<string> = new Set();
+
+  async pollHasVotes(pollId: string): Promise<Result<boolean, string>> {
+    return success(this.votes.has(pollId));
+  }
+
+  // Test helper methods
   addVoteToPoll(pollId: string): void {
     this.votes.add(pollId);
   }
 
   clear(): void {
-    this.polls.clear();
-    this.questions.clear();
-    this.answers.clear();
     this.votes.clear();
-    this.nextId = 1;
   }
 }
 
 describe('UpdateAnswerUseCase', () => {
   let useCase: UpdateAnswerUseCase;
   let pollRepository: MockPollRepository;
+  let questionRepository: MockQuestionRepository;
+  let answerRepository: MockAnswerRepository;
+  let voteRepository: MockVoteRepository;
 
   beforeEach(() => {
     pollRepository = new MockPollRepository();
-    useCase = new UpdateAnswerUseCase(pollRepository);
+    questionRepository = new MockQuestionRepository();
+    answerRepository = new MockAnswerRepository();
+    voteRepository = new MockVoteRepository();
+    useCase = new UpdateAnswerUseCase(
+      pollRepository as unknown as PollRepository,
+      questionRepository as unknown as QuestionRepository,
+      answerRepository as unknown as AnswerRepository,
+      voteRepository as unknown as VoteRepository
+    );
   });
 
   describe('updating answer text', () => {
@@ -219,13 +138,13 @@ describe('UpdateAnswerUseCase', () => {
       );
       const question = questionResult.value;
       (question as any).props.id = 'question-1';
-      pollRepository.addQuestion(question);
+      questionRepository.addQuestion(question);
 
       // Create an answer
       const answerResult = Answer.create('Original Answer', 0, 'question-1');
       const answer = answerResult.value;
       (answer as any).props.id = 'answer-1';
-      pollRepository.addAnswer(answer);
+      answerRepository.addAnswer(answer);
 
       // Update answer
       const result = await useCase.execute({
@@ -238,7 +157,7 @@ describe('UpdateAnswerUseCase', () => {
 
       // Verify answer was updated
       const updatedAnswerResult =
-        await pollRepository.getAnswerById('answer-1');
+        await answerRepository.getAnswerById('answer-1');
       expect(updatedAnswerResult.success).toBe(true);
       const updatedAnswer = updatedAnswerResult.value!;
       expect(updatedAnswer.text).toBe('Updated Answer');
@@ -278,12 +197,12 @@ describe('UpdateAnswerUseCase', () => {
       );
       const question = questionResult.value;
       (question as any).props.id = 'question-1';
-      pollRepository.addQuestion(question);
+      questionRepository.addQuestion(question);
 
       const answerResult = Answer.create('Original Answer', 0, 'question-1');
       const answer = answerResult.value;
       (answer as any).props.id = 'answer-1';
-      pollRepository.addAnswer(answer);
+      answerRepository.addAnswer(answer);
 
       // Try to update with different user
       const result = await useCase.execute({
@@ -316,7 +235,11 @@ describe('UpdateAnswerUseCase', () => {
         0,
         'single-choice'
       );
-      const tempAnswer = Answer.create('Temp Answer', 1, questionForActivation.value.id);
+      const tempAnswer = Answer.create(
+        'Temp Answer',
+        1,
+        questionForActivation.value.id
+      );
       questionForActivation.value.addAnswer(tempAnswer.value);
       poll.addQuestion(questionForActivation.value);
       poll.activate();
@@ -332,12 +255,12 @@ describe('UpdateAnswerUseCase', () => {
       );
       const question = questionResult.value;
       (question as any).props.id = 'question-1';
-      pollRepository.addQuestion(question);
+      questionRepository.addQuestion(question);
 
       const answerResult = Answer.create('Original Answer', 0, 'question-1');
       const answer = answerResult.value;
       (answer as any).props.id = 'answer-1';
-      pollRepository.addAnswer(answer);
+      answerRepository.addAnswer(answer);
 
       const result = await useCase.execute({
         answerId: 'answer-1',
@@ -361,7 +284,7 @@ describe('UpdateAnswerUseCase', () => {
       const poll = pollResult.value;
       (poll as any).props.id = 'poll-1';
       pollRepository.addPoll(poll);
-      pollRepository.addVoteToPoll('poll-1');
+      voteRepository.addVoteToPoll('poll-1');
 
       const questionResult = Question.create(
         'Test Question',
@@ -372,12 +295,12 @@ describe('UpdateAnswerUseCase', () => {
       );
       const question = questionResult.value;
       (question as any).props.id = 'question-1';
-      pollRepository.addQuestion(question);
+      questionRepository.addQuestion(question);
 
       const answerResult = Answer.create('Original Answer', 0, 'question-1');
       const answer = answerResult.value;
       (answer as any).props.id = 'answer-1';
-      pollRepository.addAnswer(answer);
+      answerRepository.addAnswer(answer);
 
       const result = await useCase.execute({
         answerId: 'answer-1',
@@ -413,12 +336,12 @@ describe('UpdateAnswerUseCase', () => {
       );
       const question = questionResult.value;
       (question as any).props.id = 'question-1';
-      pollRepository.addQuestion(question);
+      questionRepository.addQuestion(question);
 
       const answerResult = Answer.create('Original Answer', 0, 'question-1');
       const answer = answerResult.value;
       (answer as any).props.id = 'answer-1';
-      pollRepository.addAnswer(answer);
+      answerRepository.addAnswer(answer);
 
       const result = await useCase.execute({
         answerId: 'answer-1',
@@ -429,7 +352,7 @@ describe('UpdateAnswerUseCase', () => {
       expect(result.success).toBe(true);
 
       const updatedAnswerResult =
-        await pollRepository.getAnswerById('answer-1');
+        await answerRepository.getAnswerById('answer-1');
       const updatedAnswer = updatedAnswerResult.value!;
       expect(updatedAnswer.order).toBe(5);
     });
@@ -458,12 +381,12 @@ describe('UpdateAnswerUseCase', () => {
       );
       const question = questionResult.value;
       (question as any).props.id = 'question-1';
-      pollRepository.addQuestion(question);
+      questionRepository.addQuestion(question);
 
       const answerResult = Answer.create('Original Answer', 0, 'question-1');
       const answer = answerResult.value;
       (answer as any).props.id = 'answer-1';
-      pollRepository.addAnswer(answer);
+      answerRepository.addAnswer(answer);
 
       const result = await useCase.execute({
         answerId: 'answer-1',
@@ -475,7 +398,7 @@ describe('UpdateAnswerUseCase', () => {
       expect(result.success).toBe(true);
 
       const updatedAnswerResult =
-        await pollRepository.getAnswerById('answer-1');
+        await answerRepository.getAnswerById('answer-1');
       const updatedAnswer = updatedAnswerResult.value!;
       expect(updatedAnswer.text).toBe('Updated Answer');
       expect(updatedAnswer.order).toBe(3);

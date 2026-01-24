@@ -4,6 +4,7 @@ import { Poll } from '../../../domain/poll/Poll';
 import { PollParticipant } from '../../../domain/poll/PollParticipant';
 import { ParticipantWeightHistory } from '../../../domain/poll/ParticipantWeightHistory';
 import { PollRepository } from '../../../domain/poll/PollRepository';
+import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
 import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { Board } from '../../../domain/board/Board';
@@ -14,6 +15,7 @@ import { Decimal } from 'decimal.js';
 
 describe('GetWeightHistoryUseCase', () => {
   let pollRepository: Partial<PollRepository>;
+  let participantRepository: Partial<ParticipantRepository>;
   let boardRepository: Partial<BoardRepository>;
   let organizationRepository: Partial<OrganizationRepository>;
   let prisma: any;
@@ -78,8 +80,11 @@ describe('GetWeightHistoryUseCase', () => {
 
     // Mock repositories
     pollRepository = {
-      getParticipantById: vi.fn().mockResolvedValue(success(participant)),
       getPollById: vi.fn().mockResolvedValue(success(poll)),
+    };
+
+    participantRepository = {
+      getParticipantById: vi.fn().mockResolvedValue(success(participant)),
       getWeightHistory: vi.fn().mockResolvedValue(success([historyEntry])),
     };
 
@@ -119,6 +124,7 @@ describe('GetWeightHistoryUseCase', () => {
 
     useCase = new GetWeightHistoryUseCase(
       pollRepository as PollRepository,
+      participantRepository as ParticipantRepository,
       boardRepository as BoardRepository,
       organizationRepository as OrganizationRepository,
       prisma
@@ -183,7 +189,9 @@ describe('GetWeightHistoryUseCase', () => {
   });
 
   it('should return empty array when no history exists', async () => {
-    pollRepository.getWeightHistory = vi.fn().mockResolvedValue(success([]));
+    participantRepository.getWeightHistory = vi
+      .fn()
+      .mockResolvedValue(success([]));
 
     const result = await useCase.execute({
       pollId: 'poll-1',
@@ -210,7 +218,7 @@ describe('GetWeightHistoryUseCase', () => {
     if (history2Result.success) {
       const history2 = history2Result.value;
       (history2 as any).props.id = 'history-2';
-      pollRepository.getWeightHistory = vi
+      participantRepository.getWeightHistory = vi
         .fn()
         .mockResolvedValue(success([historyEntry, history2]));
     }

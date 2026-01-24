@@ -2,6 +2,8 @@ import { Result, success, failure } from '../../domain/shared/Result';
 import { Question } from '../../domain/poll/Question';
 import { Answer } from '../../domain/poll/Answer';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { QuestionRepository } from '../../domain/poll/QuestionRepository';
+import { AnswerRepository } from '../../domain/poll/AnswerRepository';
 import { QuestionType } from '../../domain/poll/QuestionType';
 import { PollErrors } from './PollErrors';
 
@@ -16,7 +18,11 @@ export interface AddQuestionInput {
 }
 
 export class AddQuestionUseCase {
-  constructor(private pollRepository: PollRepository) {}
+  constructor(
+    private pollRepository: PollRepository,
+    private questionRepository: QuestionRepository,
+    private answerRepository: AnswerRepository
+  ) {}
 
   async execute(input: AddQuestionInput): Promise<Result<Question, string>> {
     // 1. Check if poll exists
@@ -52,7 +58,7 @@ export class AddQuestionUseCase {
     }
 
     // 5. Persist the validated question
-    const createdQuestionResult = await this.pollRepository.createQuestion(
+    const createdQuestionResult = await this.questionRepository.createQuestion(
       questionResult.value
     );
     if (!createdQuestionResult.success) {
@@ -69,7 +75,7 @@ export class AddQuestionUseCase {
         return failure(answerResult.error);
       }
 
-      const createdAnswerResult = await this.pollRepository.createAnswer(
+      const createdAnswerResult = await this.answerRepository.createAnswer(
         answerResult.value
       );
       if (!createdAnswerResult.success) {
@@ -78,9 +84,8 @@ export class AddQuestionUseCase {
     }
 
     // 7. Get the question with all its answers
-    const questionWithAnswersResult = await this.pollRepository.getQuestionById(
-      question.id
-    );
+    const questionWithAnswersResult =
+      await this.questionRepository.getQuestionById(question.id);
     if (
       !questionWithAnswersResult.success ||
       !questionWithAnswersResult.value

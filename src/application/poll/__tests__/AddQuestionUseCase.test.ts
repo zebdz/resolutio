@@ -3,26 +3,24 @@ import { AddQuestionUseCase } from '../AddQuestionUseCase';
 import { Poll } from '../../../domain/poll/Poll';
 import { Question } from '../../../domain/poll/Question';
 import { Answer } from '../../../domain/poll/Answer';
+import { PollRepository } from '../../../domain/poll/PollRepository';
 import {
-  PollRepository,
+  QuestionRepository,
   UpdateQuestionOrderData,
-} from '../../../domain/poll/PollRepository';
+} from '../../../domain/poll/QuestionRepository';
+import { AnswerRepository } from '../../../domain/poll/AnswerRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
 
-// Mock PollRepository (same as before)
+// Mock PollRepository
 class MockPollRepository implements PollRepository {
   private polls: Map<string, Poll> = new Map();
-  private questions: Map<string, Question> = new Map();
-  private answers: Map<string, Answer> = new Map();
-  private nextId = 1;
 
   async createPoll(poll: Poll): Promise<Result<Poll, string>> {
-    const id = `poll-${this.nextId++}`;
+    const id = `poll-${Math.random()}`;
     (poll as any).props.id = id;
     this.polls.set(id, poll);
-
     return success(poll);
   }
 
@@ -31,11 +29,9 @@ class MockPollRepository implements PollRepository {
   }
 
   async getPollsByBoardId(boardId: string): Promise<Result<Poll[], string>> {
-    const polls = Array.from(this.polls.values()).filter(
-      (p) => p.boardId === boardId && !p.isArchived()
+    return success(
+      Array.from(this.polls.values()).filter((p) => p.boardId === boardId)
     );
-
-    return success(polls);
   }
 
   async getPollsByUserId(userId: string): Promise<Result<Poll[], string>> {
@@ -44,32 +40,38 @@ class MockPollRepository implements PollRepository {
 
   async updatePoll(poll: Poll): Promise<Result<void, string>> {
     this.polls.set(poll.id, poll);
-
     return success(undefined);
   }
 
   async deletePoll(pollId: string): Promise<Result<void, string>> {
     const poll = this.polls.get(pollId);
-    if (!poll) {
-      return failure(PollErrors.NOT_FOUND);
-    }
-
-    poll.archive();
-
+    if (poll) poll.archive();
     return success(undefined);
   }
+
+  async pollHasVotes(pollId: string): Promise<Result<boolean, string>> {
+    return success(false);
+  }
+
+  addPoll(poll: Poll): void {
+    this.polls.set(poll.id, poll);
+  }
+
+  clear(): void {
+    this.polls.clear();
+  }
+}
+
+// Mock QuestionRepository
+class MockQuestionRepository implements QuestionRepository {
+  private questions: Map<string, Question> = new Map();
+  private answers: Map<string, Answer[]> = new Map();
+  private nextId = 1;
 
   async createQuestion(question: Question): Promise<Result<Question, string>> {
     const id = `question-${this.nextId++}`;
     (question as any).props.id = id;
     this.questions.set(id, question);
-
-    // Add question to poll
-    const poll = this.polls.get(question.pollId);
-    if (poll) {
-      poll.addQuestion(question);
-    }
-
     return success(question);
   }
 
@@ -77,45 +79,37 @@ class MockPollRepository implements PollRepository {
     questionId: string
   ): Promise<Result<Question | null, string>> {
     const question = this.questions.get(questionId);
-    if (!question) {
-      return success(null);
-    }
+    if (!question) return success(null);
 
-    // Get all answers for this question and add them
-    const answers = Array.from(this.answers.values()).filter(
-      (a) => a.questionId === questionId && !a.isArchived()
+    const answers = this.answers.get(questionId) || [];
+    return success(
+      Question.reconstitute({
+        id: question.id,
+        text: question.text,
+        details: question.details,
+        pollId: question.pollId,
+        page: question.page,
+        order: question.order,
+        questionType: question.questionType,
+        createdAt: question.createdAt,
+        archivedAt: question.archivedAt,
+        answers: answers.filter((a) => !a.isArchived()),
+      })
     );
-
-    // Create a new question instance with answers
-    const questionWithAnswers = Question.reconstitute({
-      id: question.id,
-      text: question.text,
-      details: question.details,
-      pollId: question.pollId,
-      page: question.page,
-      order: question.order,
-      questionType: question.questionType,
-      createdAt: question.createdAt,
-      archivedAt: question.archivedAt,
-      answers: answers.sort((a, b) => a.order - b.order),
-    });
-
-    return success(questionWithAnswers);
   }
 
   async getQuestionsByPollId(
     pollId: string
   ): Promise<Result<Question[], string>> {
-    const questions = Array.from(this.questions.values()).filter(
-      (q) => q.pollId === pollId && !q.isArchived()
+    return success(
+      Array.from(this.questions.values()).filter(
+        (q) => q.pollId === pollId && !q.isArchived()
+      )
     );
-
-    return success(questions);
   }
 
   async updateQuestion(question: Question): Promise<Result<void, string>> {
     this.questions.set(question.id, question);
-
     return success(undefined);
   }
 
@@ -129,26 +123,43 @@ class MockPollRepository implements PollRepository {
         question.updateOrder(update.order);
       }
     }
-
     return success(undefined);
   }
 
   async deleteQuestion(questionId: string): Promise<Result<void, string>> {
     const question = this.questions.get(questionId);
-    if (!question) {
-      return failure(PollErrors.QUESTION_NOT_FOUND);
-    }
-
-    question.archive();
-
+    if (question) question.archive();
     return success(undefined);
+  }
+
+  addAnswerToQuestion(questionId: string, answer: Answer): void {
+    const existing = this.answers.get(questionId) || [];
+    existing.push(answer);
+    this.answers.set(questionId, existing);
+  }
+
+  clear(): void {
+    this.questions.clear();
+    this.answers.clear();
+    this.nextId = 1;
+  }
+}
+
+// Mock AnswerRepository
+class MockAnswerRepository implements AnswerRepository {
+  private answers: Map<string, Answer> = new Map();
+  private questionRepository: MockQuestionRepository;
+  private nextId = 1;
+
+  constructor(questionRepository: MockQuestionRepository) {
+    this.questionRepository = questionRepository;
   }
 
   async createAnswer(answer: Answer): Promise<Result<Answer, string>> {
     const id = `answer-${this.nextId++}`;
     (answer as any).props.id = id;
     this.answers.set(id, answer);
-
+    this.questionRepository.addAnswerToQuestion(answer.questionId, answer);
     return success(answer);
   }
 
@@ -161,37 +172,25 @@ class MockPollRepository implements PollRepository {
   async getAnswersByQuestionId(
     questionId: string
   ): Promise<Result<Answer[], string>> {
-    const answers = Array.from(this.answers.values()).filter(
-      (a) => a.questionId === questionId && !a.isArchived()
+    return success(
+      Array.from(this.answers.values()).filter(
+        (a) => a.questionId === questionId && !a.isArchived()
+      )
     );
-
-    return success(answers);
   }
 
   async updateAnswer(answer: Answer): Promise<Result<void, string>> {
     this.answers.set(answer.id, answer);
-
     return success(undefined);
   }
 
   async deleteAnswer(answerId: string): Promise<Result<void, string>> {
     const answer = this.answers.get(answerId);
-    if (!answer) {
-      return failure(PollErrors.ANSWER_NOT_FOUND);
-    }
-
-    answer.archive();
-
+    if (answer) answer.archive();
     return success(undefined);
   }
 
-  addPoll(poll: Poll): void {
-    this.polls.set(poll.id, poll);
-  }
-
   clear(): void {
-    this.polls.clear();
-    this.questions.clear();
     this.answers.clear();
     this.nextId = 1;
   }
@@ -200,14 +199,21 @@ class MockPollRepository implements PollRepository {
 describe('AddQuestionUseCase', () => {
   let useCase: AddQuestionUseCase;
   let pollRepository: MockPollRepository;
+  let questionRepository: MockQuestionRepository;
+  let answerRepository: MockAnswerRepository;
 
   beforeEach(() => {
     pollRepository = new MockPollRepository();
-    useCase = new AddQuestionUseCase(pollRepository);
+    questionRepository = new MockQuestionRepository();
+    answerRepository = new MockAnswerRepository(questionRepository);
+    useCase = new AddQuestionUseCase(
+      pollRepository,
+      questionRepository,
+      answerRepository
+    );
   });
 
   it('should add a question with answers to a poll', async () => {
-    // Arrange
     const pollResult = Poll.create(
       'Test Poll',
       'Description',
@@ -221,7 +227,6 @@ describe('AddQuestionUseCase', () => {
     (poll as any).props.id = 'poll-1';
     pollRepository.addPoll(poll);
 
-    // Act
     const result = await useCase.execute({
       pollId: 'poll-1',
       text: 'What is your favorite color?',
@@ -232,7 +237,6 @@ describe('AddQuestionUseCase', () => {
       answers: ['Red', 'Green', 'Blue'],
     });
 
-    // Assert
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.value.text).toBe('What is your favorite color?');
@@ -248,7 +252,6 @@ describe('AddQuestionUseCase', () => {
   });
 
   it('should add a multiple-choice question', async () => {
-    // Arrange
     const pollResult = Poll.create(
       'Test Poll',
       'Description',
@@ -262,7 +265,6 @@ describe('AddQuestionUseCase', () => {
     (poll as any).props.id = 'poll-1';
     pollRepository.addPoll(poll);
 
-    // Act
     const result = await useCase.execute({
       pollId: 'poll-1',
       text: 'What features do you want?',
@@ -272,7 +274,6 @@ describe('AddQuestionUseCase', () => {
       answers: ['Feature A', 'Feature B', 'Feature C', 'Feature D'],
     });
 
-    // Assert
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.value.questionType).toBe('multiple-choice');
@@ -281,7 +282,6 @@ describe('AddQuestionUseCase', () => {
   });
 
   it('should fail when poll does not exist', async () => {
-    // Act
     const result = await useCase.execute({
       pollId: 'non-existent-poll',
       text: 'What is your favorite color?',
@@ -291,7 +291,6 @@ describe('AddQuestionUseCase', () => {
       answers: ['Red', 'Green', 'Blue'],
     });
 
-    // Assert
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toBe(PollErrors.NOT_FOUND);
@@ -299,7 +298,6 @@ describe('AddQuestionUseCase', () => {
   });
 
   it('should fail when question text is empty', async () => {
-    // Arrange
     const pollResult = Poll.create(
       'Test Poll',
       'Description',
@@ -313,7 +311,6 @@ describe('AddQuestionUseCase', () => {
     (poll as any).props.id = 'poll-1';
     pollRepository.addPoll(poll);
 
-    // Act
     const result = await useCase.execute({
       pollId: 'poll-1',
       text: '',
@@ -323,7 +320,6 @@ describe('AddQuestionUseCase', () => {
       answers: ['Red', 'Green', 'Blue'],
     });
 
-    // Assert
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toBe(PollDomainCodes.QUESTION_TEXT_EMPTY);
@@ -331,7 +327,6 @@ describe('AddQuestionUseCase', () => {
   });
 
   it('should fail when no answers are provided', async () => {
-    // Arrange
     const pollResult = Poll.create(
       'Test Poll',
       'Description',
@@ -345,7 +340,6 @@ describe('AddQuestionUseCase', () => {
     (poll as any).props.id = 'poll-1';
     pollRepository.addPoll(poll);
 
-    // Act
     const result = await useCase.execute({
       pollId: 'poll-1',
       text: 'What is your favorite color?',
@@ -355,7 +349,6 @@ describe('AddQuestionUseCase', () => {
       answers: [],
     });
 
-    // Assert
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toBe(PollErrors.NO_ANSWERS);
@@ -363,7 +356,6 @@ describe('AddQuestionUseCase', () => {
   });
 
   it('should fail when poll is finished', async () => {
-    // Arrange
     const pollResult = Poll.create(
       'Test Poll',
       'Description',
@@ -378,7 +370,6 @@ describe('AddQuestionUseCase', () => {
     poll.finish();
     pollRepository.addPoll(poll);
 
-    // Act
     const result = await useCase.execute({
       pollId: 'poll-1',
       text: 'What is your favorite color?',
@@ -388,7 +379,6 @@ describe('AddQuestionUseCase', () => {
       answers: ['Red', 'Green', 'Blue'],
     });
 
-    // Assert
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error).toBe(PollErrors.CANNOT_MODIFY_FINISHED);
@@ -396,7 +386,6 @@ describe('AddQuestionUseCase', () => {
   });
 
   it('should handle questions on different pages', async () => {
-    // Arrange
     const pollResult = Poll.create(
       'Test Poll',
       'Description',
@@ -410,7 +399,6 @@ describe('AddQuestionUseCase', () => {
     (poll as any).props.id = 'poll-1';
     pollRepository.addPoll(poll);
 
-    // Act - Add question on page 2
     const result = await useCase.execute({
       pollId: 'poll-1',
       text: 'Second page question',
@@ -420,7 +408,6 @@ describe('AddQuestionUseCase', () => {
       answers: ['Option 1', 'Option 2'],
     });
 
-    // Assert
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.value.page).toBe(2);

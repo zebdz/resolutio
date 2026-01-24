@@ -1,5 +1,6 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { DraftRepository } from '../../domain/poll/DraftRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
@@ -13,6 +14,7 @@ interface FinishPollCommand {
 export class FinishPollUseCase {
   constructor(
     private pollRepository: PollRepository,
+    private draftRepository: DraftRepository,
     private boardRepository: BoardRepository,
     private organizationRepository: OrganizationRepository,
     private userRepository: UserRepository
@@ -60,7 +62,7 @@ export class FinishPollUseCase {
     }
 
     // Clean up all remaining drafts for this poll
-    const deleteDraftsResult = await this.pollRepository.deleteAllPollDrafts(
+    const deleteDraftsResult = await this.draftRepository.deleteAllPollDrafts(
       command.pollId
     );
 

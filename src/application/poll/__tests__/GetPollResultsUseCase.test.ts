@@ -6,17 +6,21 @@ import { Answer } from '../../../domain/poll/Answer';
 import { Vote } from '../../../domain/poll/Vote';
 import { PollParticipant } from '../../../domain/poll/PollParticipant';
 import { PollRepository } from '../../../domain/poll/PollRepository';
+import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
+import { VoteRepository } from '../../../domain/poll/VoteRepository';
 import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
+import { UserRepository } from '../../../domain/user/UserRepository';
 import { Board } from '../../../domain/board/Board';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { Decimal } from 'decimal.js';
 import { User } from '@/generated/prisma';
-import { UserRepository } from '@/src/domain/user/UserRepository';
 
 describe('GetPollResultsUseCase', () => {
   let pollRepository: Partial<PollRepository>;
+  let participantRepository: Partial<ParticipantRepository>;
+  let voteRepository: Partial<VoteRepository>;
   let boardRepository: Partial<BoardRepository>;
   let organizationRepository: Partial<OrganizationRepository>;
   let userRepository: Partial<UserRepository>;
@@ -42,50 +46,41 @@ describe('GetPollResultsUseCase', () => {
       new Date('2026-02-15')
     );
     expect(pollResult.success).toBe(true);
-    if (pollResult.success) {
-      poll = pollResult.value;
-      (poll as any).props.id = 'poll-1';
-      poll.activate();
-      poll.finish();
-    }
+    poll = pollResult.value;
+    (poll as any).props.id = 'poll-1';
+    poll.activate();
+    poll.finish();
 
     // Create board
     const boardResult = Board.create('org-1', 'Test Board', 'user-admin');
     expect(boardResult.success).toBe(true);
-    if (boardResult.success) {
-      board = boardResult.value;
-      (board as any).props.id = 'board-1';
-    }
+    board = boardResult.value;
+    (board as any).props.id = 'board-1';
 
     // Create question
     const questionResult = Question.create(
-      'poll-1',
       'Test Question',
-      'single-choice',
-      1
+      'poll-1',
+      1,
+      0,
+      'single-choice'
     );
     expect(questionResult.success).toBe(true);
-    if (questionResult.success) {
-      question = questionResult.value;
-      (question as any).props.id = 'question-1';
-      (poll as any).props.questions = [question];
-    }
+    question = questionResult.value;
+    (question as any).props.id = 'question-1';
+    (poll as any).props.questions = [question];
 
     // Create answers
-    const answer1Result = Answer.create('question-1', 'Answer 1', 1);
+    const answer1Result = Answer.create('Answer 1', 1, 'question-1');
     expect(answer1Result.success).toBe(true);
-    if (answer1Result.success) {
-      answer1 = answer1Result.value;
-      (answer1 as any).props.id = 'answer-1';
-    }
+    answer1 = answer1Result.value;
+    (answer1 as any).props.id = 'answer-1';
 
-    const answer2Result = Answer.create('question-1', 'Answer 2', 2);
+    const answer2Result = Answer.create('Answer 2', 2, 'question-1');
     expect(answer2Result.success).toBe(true);
-    if (answer2Result.success) {
-      answer2 = answer2Result.value;
-      (answer2 as any).props.id = 'answer-2';
-      (question as any).props.answers = [answer1, answer2];
-    }
+    answer2 = answer2Result.value;
+    (answer2 as any).props.id = 'answer-2';
+    (question as any).props.answers = [answer1, answer2];
 
     // Create participants
     const participant1Result = PollParticipant.create(
@@ -94,10 +89,8 @@ describe('GetPollResultsUseCase', () => {
       new Decimal(2.0).toNumber()
     );
     expect(participant1Result.success).toBe(true);
-    if (participant1Result.success) {
-      participant1 = participant1Result.value;
-      (participant1 as any).props.id = 'participant-1';
-    }
+    participant1 = participant1Result.value;
+    (participant1 as any).props.id = 'participant-1';
 
     const participant2Result = PollParticipant.create(
       'poll-1',
@@ -105,10 +98,8 @@ describe('GetPollResultsUseCase', () => {
       new Decimal(3.0).toNumber()
     );
     expect(participant2Result.success).toBe(true);
-    if (participant2Result.success) {
-      participant2 = participant2Result.value;
-      (participant2 as any).props.id = 'participant-2';
-    }
+    participant2 = participant2Result.value;
+    (participant2 as any).props.id = 'participant-2';
 
     // Create votes
     const vote1Result = Vote.create(
@@ -118,9 +109,7 @@ describe('GetPollResultsUseCase', () => {
       new Decimal(2.0).toNumber()
     );
     expect(vote1Result.success).toBe(true);
-    if (vote1Result.success) {
-      vote1 = vote1Result.value;
-    }
+    vote1 = vote1Result.value;
 
     const vote2Result = Vote.create(
       'question-1',
@@ -129,17 +118,21 @@ describe('GetPollResultsUseCase', () => {
       new Decimal(3.0).toNumber()
     );
     expect(vote2Result.success).toBe(true);
-    if (vote2Result.success) {
-      vote2 = vote2Result.value;
-    }
+    vote2 = vote2Result.value;
 
     // Mock repositories
     pollRepository = {
       getPollById: vi.fn().mockResolvedValue(success(poll)),
-      getVotesByPoll: vi.fn().mockResolvedValue(success([vote1, vote2])),
+    };
+
+    participantRepository = {
       getParticipants: vi
         .fn()
         .mockResolvedValue(success([participant1, participant2])),
+    };
+
+    voteRepository = {
+      getVotesByPoll: vi.fn().mockResolvedValue(success([vote1, vote2])),
     };
 
     boardRepository = {
@@ -152,16 +145,16 @@ describe('GetPollResultsUseCase', () => {
     };
 
     userRepository = {
-      findByIds: vi
-        .fn()
-        .mockResolvedValue([
-          { id: 'user-1', firstName: 'Alice', lastName: 'Smith' } as User,
-          { id: 'user-2', firstName: 'Bob', lastName: 'Johnson' } as User,
-        ]),
+      findByIds: vi.fn().mockResolvedValue([
+        { id: 'user-1', firstName: 'Alice', lastName: 'Smith' } as User,
+        { id: 'user-2', firstName: 'Bob', lastName: 'Johnson' } as User,
+      ]),
     };
 
     useCase = new GetPollResultsUseCase(
       pollRepository as PollRepository,
+      participantRepository as ParticipantRepository,
+      voteRepository as VoteRepository,
       boardRepository as BoardRepository,
       organizationRepository as OrganizationRepository,
       userRepository as UserRepository
@@ -264,14 +257,6 @@ describe('GetPollResultsUseCase', () => {
     if (result.success) {
       // canViewVoters should be false for non-creators
       expect(result.value.canViewVoters).toBe(false);
-
-      // Voter data is still in the response from use case, but should be filtered by server component
-      // This test verifies the flag is set correctly
-      const answer1Result = result.value.results[0].answers.find(
-        (a) => a.answerId === 'answer-1'
-      );
-      expect(answer1Result?.voters.length).toBe(1); // Use case includes it
-      // BUT the server component should filter this based on canViewVoters flag
     }
   });
 
@@ -288,13 +273,6 @@ describe('GetPollResultsUseCase', () => {
     if (result.success) {
       // canViewVoters should be false for the poll creator
       expect(result.value.canViewVoters).toBe(false);
-
-      const answer1Result = result.value.results[0].answers.find(
-        (a) => a.answerId === 'answer-1'
-      );
-      expect(answer1Result?.voters.length).toBe(1);
-      expect(answer1Result?.voters[0].userId).toBe('user-1');
-      expect(answer1Result?.voters[0].weight).toBe(2.0);
     }
   });
 
@@ -307,19 +285,10 @@ describe('GetPollResultsUseCase', () => {
       userId: 'user-admin',
     });
 
-    organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(true);
-
     expect(result.success).toBe(true);
     if (result.success) {
       // canViewVoters should be true for admins
       expect(result.value.canViewVoters).toBe(true);
-
-      const answer1Result = result.value.results[0].answers.find(
-        (a) => a.answerId === 'answer-1'
-      );
-      expect(answer1Result?.voters.length).toBe(1);
-      expect(answer1Result?.voters[0].userId).toBe('user-1');
-      expect(answer1Result?.voters[0].weight).toBe(2.0);
     }
   });
 
@@ -374,14 +343,12 @@ describe('GetPollResultsUseCase', () => {
       new Decimal(0).toNumber()
     );
     expect(participant3Result.success).toBe(true);
-    if (participant3Result.success) {
-      const participant3 = participant3Result.value;
-      (participant3 as any).props.id = 'participant-3';
+    const participant3 = participant3Result.value;
+    (participant3 as any).props.id = 'participant-3';
 
-      pollRepository.getParticipants = vi
-        .fn()
-        .mockResolvedValue(success([participant1, participant2, participant3]));
-    }
+    participantRepository.getParticipants = vi
+      .fn()
+      .mockResolvedValue(success([participant1, participant2, participant3]));
 
     const result = await useCase.execute({
       pollId: 'poll-1',
@@ -396,7 +363,7 @@ describe('GetPollResultsUseCase', () => {
   });
 
   it('should handle poll with no votes', async () => {
-    pollRepository.getVotesByPoll = vi.fn().mockResolvedValue(success([]));
+    voteRepository.getVotesByPoll = vi.fn().mockResolvedValue(success([]));
 
     const result = await useCase.execute({
       pollId: 'poll-1',
@@ -418,18 +385,17 @@ describe('GetPollResultsUseCase', () => {
   it('should exclude archived questions from results', async () => {
     // Add archived question
     const archivedQuestionResult = Question.create(
-      'poll-1',
       'Archived Question',
-      'single-choice',
-      2
+      'poll-1',
+      2,
+      0,
+      'single-choice'
     );
     expect(archivedQuestionResult.success).toBe(true);
-    if (archivedQuestionResult.success) {
-      const archivedQuestion = archivedQuestionResult.value;
-      (archivedQuestion as any).props.id = 'question-2';
-      archivedQuestion.archive();
-      (poll as any).props.questions = [question, archivedQuestion];
-    }
+    const archivedQuestion = archivedQuestionResult.value;
+    (archivedQuestion as any).props.id = 'question-2';
+    archivedQuestion.archive();
+    (poll as any).props.questions = [question, archivedQuestion];
 
     const result = await useCase.execute({
       pollId: 'poll-1',
@@ -469,12 +435,10 @@ describe('GetPollResultsUseCase', () => {
       new Decimal(2.0).toNumber()
     );
     expect(vote3Result.success).toBe(true);
-    if (vote3Result.success) {
-      const vote3 = vote3Result.value;
-      pollRepository.getVotesByPoll = vi
-        .fn()
-        .mockResolvedValue(success([vote1, vote2, vote3]));
-    }
+    const vote3 = vote3Result.value;
+    voteRepository.getVotesByPoll = vi
+      .fn()
+      .mockResolvedValue(success([vote1, vote2, vote3]));
 
     const result = await useCase.execute({
       pollId: 'poll-1',

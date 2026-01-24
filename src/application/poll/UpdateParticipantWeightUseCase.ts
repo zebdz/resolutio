@@ -1,6 +1,8 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { ParticipantWeightHistory } from '../../domain/poll/ParticipantWeightHistory';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
+import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { PollErrors } from './PollErrors';
@@ -17,6 +19,8 @@ export interface UpdateParticipantWeightInput {
 export class UpdateParticipantWeightUseCase {
   constructor(
     private pollRepository: PollRepository,
+    private participantRepository: ParticipantRepository,
+    private voteRepository: VoteRepository,
     private boardRepository: BoardRepository,
     private organizationRepository: OrganizationRepository
   ) {}
@@ -28,7 +32,7 @@ export class UpdateParticipantWeightUseCase {
 
     // 1. Get participant
     const participantResult =
-      await this.pollRepository.getParticipantById(participantId);
+      await this.participantRepository.getParticipantById(participantId);
     if (!participantResult.success) {
       return failure(participantResult.error);
     }
@@ -67,7 +71,7 @@ export class UpdateParticipantWeightUseCase {
     }
 
     // 4. Check if poll has votes (cannot modify weights if votes exist)
-    const hasVotesResult = await this.pollRepository.pollHasVotes(
+    const hasVotesResult = await this.voteRepository.pollHasVotes(
       participant.pollId
     );
     if (!hasVotesResult.success) {
@@ -87,7 +91,7 @@ export class UpdateParticipantWeightUseCase {
 
     // 6. Save updated participant
     const saveResult =
-      await this.pollRepository.updateParticipantWeight(participant);
+      await this.participantRepository.updateParticipantWeight(participant);
     if (!saveResult.success) {
       return failure(saveResult.error);
     }
@@ -107,7 +111,7 @@ export class UpdateParticipantWeightUseCase {
       return failure(historyResult.error);
     }
 
-    const createHistoryResult = await this.pollRepository.createWeightHistory(
+    const createHistoryResult = await this.participantRepository.createWeightHistory(
       historyResult.value
     );
     if (!createHistoryResult.success) {

@@ -1,6 +1,8 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollParticipant } from '../../domain/poll/PollParticipant';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
+import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { PollErrors } from './PollErrors';
@@ -29,6 +31,8 @@ export interface GetParticipantsResult {
 export class GetParticipantsUseCase {
   constructor(
     private pollRepository: PollRepository,
+    private participantRepository: ParticipantRepository,
+    private voteRepository: VoteRepository,
     private boardRepository: BoardRepository,
     private organizationRepository: OrganizationRepository,
     private prisma: any
@@ -67,7 +71,7 @@ export class GetParticipantsUseCase {
 
     // 3. Get participants
     const participantsResult =
-      await this.pollRepository.getParticipants(pollId);
+      await this.participantRepository.getParticipants(pollId);
     if (!participantsResult.success) {
       return failure(participantsResult.error);
     }
@@ -97,7 +101,7 @@ export class GetParticipantsUseCase {
     }
 
     // 5. Check if participants can be modified (no votes exist)
-    const hasVotesResult = await this.pollRepository.pollHasVotes(pollId);
+    const hasVotesResult = await this.voteRepository.pollHasVotes(pollId);
     if (!hasVotesResult.success) {
       return failure(hasVotesResult.error);
     }

@@ -1,8 +1,9 @@
 import { Result, success, failure } from '../../domain/shared/Result';
+import { PollRepository } from '../../domain/poll/PollRepository';
 import {
-  PollRepository,
+  QuestionRepository,
   UpdateQuestionOrderData,
-} from '../../domain/poll/PollRepository';
+} from '../../domain/poll/QuestionRepository';
 import { PollErrors } from './PollErrors';
 
 export interface UpdateQuestionOrderInput {
@@ -11,7 +12,10 @@ export interface UpdateQuestionOrderInput {
 }
 
 export class UpdateQuestionOrderUseCase {
-  constructor(private pollRepository: PollRepository) {}
+  constructor(
+    private pollRepository: PollRepository,
+    private questionRepository: QuestionRepository
+  ) {}
 
   async execute(
     input: UpdateQuestionOrderInput
@@ -35,7 +39,9 @@ export class UpdateQuestionOrderUseCase {
     }
 
     // 4. Update question orders
-    const result = await this.pollRepository.updateQuestionOrder(input.updates);
+    const result = await this.questionRepository.updateQuestionOrder(
+      input.updates
+    );
     if (!result.success) {
       return failure(PollErrors.QUESTION_NOT_FOUND); // Repository operation error
     }

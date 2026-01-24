@@ -1,5 +1,8 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { QuestionRepository } from '../../domain/poll/QuestionRepository';
+import { AnswerRepository } from '../../domain/poll/AnswerRepository';
+import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { Answer } from '../../domain/poll/Answer';
 import { PollErrors } from './PollErrors';
 
@@ -11,11 +14,16 @@ export interface CreateAnswerInput {
 }
 
 export class CreateAnswerUseCase {
-  constructor(private pollRepository: PollRepository) {}
+  constructor(
+    private pollRepository: PollRepository,
+    private questionRepository: QuestionRepository,
+    private answerRepository: AnswerRepository,
+    private voteRepository: VoteRepository
+  ) {}
 
   async execute(input: CreateAnswerInput): Promise<Result<Answer, string>> {
     // Get the question to find its poll
-    const questionResult = await this.pollRepository.getQuestionById(
+    const questionResult = await this.questionRepository.getQuestionById(
       input.questionId
     );
 
@@ -45,7 +53,7 @@ export class CreateAnswerUseCase {
     }
 
     // Check if poll has votes
-    const hasVotesResult = await this.pollRepository.pollHasVotes(poll.id);
+    const hasVotesResult = await this.voteRepository.pollHasVotes(poll.id);
     if (!hasVotesResult.success) {
       return failure(hasVotesResult.error);
     }
@@ -68,7 +76,7 @@ export class CreateAnswerUseCase {
     const answer = addAnswerResult.value;
 
     // Save the answer to database
-    const createResult = await this.pollRepository.createAnswer(answer);
+    const createResult = await this.answerRepository.createAnswer(answer);
     if (!createResult.success) {
       return failure(createResult.error);
     }

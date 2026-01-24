@@ -1,5 +1,6 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
@@ -15,6 +16,7 @@ interface ActivatePollCommand {
 export class ActivatePollUseCase {
   constructor(
     private pollRepository: PollRepository,
+    private participantRepository: ParticipantRepository,
     private boardRepository: BoardRepository,
     private organizationRepository: OrganizationRepository,
     private userRepository: UserRepository
@@ -103,7 +105,7 @@ export class ActivatePollUseCase {
       poll.takeParticipantsSnapshot();
 
       // Execute activation in a single transaction
-      const activationResult = await this.pollRepository.executeActivation(
+      const activationResult = await this.participantRepository.executeActivation(
         poll,
         participants,
         historyRecords

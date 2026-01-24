@@ -1,5 +1,8 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { QuestionRepository } from '../../domain/poll/QuestionRepository';
+import { AnswerRepository } from '../../domain/poll/AnswerRepository';
+import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { PollErrors } from './PollErrors';
 
 export interface DeleteAnswerInput {
@@ -8,11 +11,16 @@ export interface DeleteAnswerInput {
 }
 
 export class DeleteAnswerUseCase {
-  constructor(private pollRepository: PollRepository) {}
+  constructor(
+    private pollRepository: PollRepository,
+    private questionRepository: QuestionRepository,
+    private answerRepository: AnswerRepository,
+    private voteRepository: VoteRepository
+  ) {}
 
   async execute(input: DeleteAnswerInput): Promise<Result<void, string>> {
     // Get the answer
-    const answerResult = await this.pollRepository.getAnswerById(
+    const answerResult = await this.answerRepository.getAnswerById(
       input.answerId
     );
 
@@ -26,7 +34,7 @@ export class DeleteAnswerUseCase {
     }
 
     // Get the question
-    const questionResult = await this.pollRepository.getQuestionById(
+    const questionResult = await this.questionRepository.getQuestionById(
       answer.questionId
     );
 
@@ -56,7 +64,7 @@ export class DeleteAnswerUseCase {
     }
 
     // Check if poll can be edited
-    const hasVotesResult = await this.pollRepository.pollHasVotes(poll.id);
+    const hasVotesResult = await this.voteRepository.pollHasVotes(poll.id);
     if (!hasVotesResult.success) {
       return failure(hasVotesResult.error);
     }
@@ -75,7 +83,7 @@ export class DeleteAnswerUseCase {
     }
 
     // Delete (archive) the answer
-    const deleteResult = await this.pollRepository.deleteAnswer(input.answerId);
+    const deleteResult = await this.answerRepository.deleteAnswer(input.answerId);
     if (!deleteResult.success) {
       return failure(deleteResult.error);
     }

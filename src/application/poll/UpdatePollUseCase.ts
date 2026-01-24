@@ -1,5 +1,6 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { PollErrors } from './PollErrors';
 
 export interface UpdatePollInput {
@@ -12,7 +13,10 @@ export interface UpdatePollInput {
 }
 
 export class UpdatePollUseCase {
-  constructor(private pollRepository: PollRepository) {}
+  constructor(
+    private pollRepository: PollRepository,
+    private voteRepository: VoteRepository
+  ) {}
 
   async execute(input: UpdatePollInput): Promise<Result<void, string>> {
     // 1. Check if poll exists
@@ -32,7 +36,7 @@ export class UpdatePollUseCase {
     }
 
     // 3. Check if poll can be edited
-    const hasVotesResult = await this.pollRepository.pollHasVotes(input.pollId);
+    const hasVotesResult = await this.voteRepository.pollHasVotes(input.pollId);
     if (!hasVotesResult.success) {
       return failure(hasVotesResult.error);
     }

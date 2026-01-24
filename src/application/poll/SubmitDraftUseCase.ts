@@ -1,6 +1,9 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { VoteDraft } from '../../domain/poll/VoteDraft';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
+import { VoteRepository } from '../../domain/poll/VoteRepository';
+import { DraftRepository } from '../../domain/poll/DraftRepository';
 import { PollErrors } from './PollErrors';
 import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
 
@@ -14,7 +17,12 @@ export interface SubmitDraftInput {
 }
 
 export class SubmitDraftUseCase {
-  constructor(private pollRepository: PollRepository) {}
+  constructor(
+    private pollRepository: PollRepository,
+    private participantRepository: ParticipantRepository,
+    private voteRepository: VoteRepository,
+    private draftRepository: DraftRepository
+  ) {}
 
   async execute(input: SubmitDraftInput): Promise<Result<VoteDraft, string>> {
     const {
@@ -48,7 +56,7 @@ export class SubmitDraftUseCase {
 
     // 3. Check if user is a participant
     const participantResult =
-      await this.pollRepository.getParticipantByUserAndPoll(pollId, userId);
+      await this.participantRepository.getParticipantByUserAndPoll(pollId, userId);
     if (!participantResult.success) {
       return failure(participantResult.error);
     }
@@ -58,7 +66,7 @@ export class SubmitDraftUseCase {
     }
 
     // 4. Check if user has already finished voting
-    const hasFinishedResult = await this.pollRepository.hasUserFinishedVoting(
+    const hasFinishedResult = await this.voteRepository.hasUserFinishedVoting(
       pollId,
       userId
     );
@@ -72,7 +80,7 @@ export class SubmitDraftUseCase {
 
     // 5. If shouldRemove is true, delete the specific draft and return
     if (shouldRemove) {
-      const deleteResult = await this.pollRepository.deleteDraftByAnswer(
+      const deleteResult = await this.draftRepository.deleteDraftByAnswer(
         pollId,
         questionId,
         answerId,
@@ -90,7 +98,7 @@ export class SubmitDraftUseCase {
 
     // 6. If single choice, delete existing drafts for this question
     if (isSingleChoice) {
-      const deleteResult = await this.pollRepository.deleteDraftsByQuestion(
+      const deleteResult = await this.draftRepository.deleteDraftsByQuestion(
         pollId,
         questionId,
         userId
@@ -106,7 +114,7 @@ export class SubmitDraftUseCase {
       return failure(draftResult.error);
     }
 
-    const saveResult = await this.pollRepository.saveDraft(draftResult.value);
+    const saveResult = await this.draftRepository.saveDraft(draftResult.value);
 
     return saveResult;
   }

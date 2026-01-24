@@ -4,35 +4,23 @@ import { Poll } from '../../../domain/poll/Poll';
 import { Question } from '../../../domain/poll/Question';
 import { PollParticipant } from '../../../domain/poll/PollParticipant';
 import { VoteDraft } from '../../../domain/poll/VoteDraft';
-import {
-  PollRepository,
-  UpdateQuestionOrderData,
-} from '../../../domain/poll/PollRepository';
+import { PollRepository } from '../../../domain/poll/PollRepository';
+import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
+import { VoteRepository } from '../../../domain/poll/VoteRepository';
+import { DraftRepository } from '../../../domain/poll/DraftRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
 import { Answer } from '../../../domain/poll/Answer';
 import { Vote } from '../../../domain/poll/Vote';
-import { ParticipantWeightHistory } from '../../../domain/poll/ParticipantWeightHistory';
 import { Decimal } from 'decimal.js';
 
-// Mock PollRepository (same as SubmitDraftUseCase)
-class MockPollRepository implements PollRepository {
+// Mock PollRepository - only implements methods used by FinishVotingUseCase
+class MockPollRepository implements Pick<PollRepository, 'getPollById'> {
   private polls: Map<string, Poll> = new Map();
   private questions: Map<string, Question> = new Map();
   private answers: Map<string, Answer> = new Map();
-  private participants: Map<string, PollParticipant> = new Map();
-  private drafts: Map<string, VoteDraft> = new Map();
-  private votes: Map<string, Vote> = new Map();
   private nextId = 1;
-
-  async createPoll(poll: Poll): Promise<Result<Poll, string>> {
-    const id = `poll-${this.nextId++}`;
-    (poll as any).props.id = id;
-    this.polls.set(id, poll);
-
-    return success(poll);
-  }
 
   async getPollById(pollId: string): Promise<Result<Poll | null, string>> {
     const poll = this.polls.get(pollId);
@@ -47,33 +35,13 @@ class MockPollRepository implements PollRepository {
     return success(poll || null);
   }
 
-  async getPollsByBoardId(boardId: string): Promise<Result<Poll[], string>> {
-    const polls = Array.from(this.polls.values()).filter(
-      (p) => p.boardId === boardId && !p.isArchived()
-    );
+  // Helper methods for test setup
+  async createPoll(poll: Poll): Promise<Result<Poll, string>> {
+    const id = `poll-${this.nextId++}`;
+    (poll as any).props.id = id;
+    this.polls.set(id, poll);
 
-    return success(polls);
-  }
-
-  async getPollsByUserId(userId: string): Promise<Result<Poll[], string>> {
-    return success(Array.from(this.polls.values()));
-  }
-
-  async updatePoll(poll: Poll): Promise<Result<void, string>> {
-    this.polls.set(poll.id, poll);
-
-    return success(undefined);
-  }
-
-  async archivePoll(pollId: string): Promise<Result<void, string>> {
-    const poll = this.polls.get(pollId);
-    if (!poll) {
-      return failure('Poll not found');
-    }
-
-    poll.archive();
-
-    return success(undefined);
+    return success(poll);
   }
 
   async createQuestion(question: Question): Promise<Result<Question, string>> {
@@ -84,40 +52,6 @@ class MockPollRepository implements PollRepository {
     return success(question);
   }
 
-  async getQuestionById(
-    questionId: string
-  ): Promise<Result<Question | null, string>> {
-    return success(this.questions.get(questionId) || null);
-  }
-
-  async getQuestionsByPollId(
-    pollId: string
-  ): Promise<Result<Question[], string>> {
-    const questions = Array.from(this.questions.values()).filter(
-      (q) => q.pollId === pollId
-    );
-
-    return success(questions);
-  }
-
-  async updateQuestion(question: Question): Promise<Result<void, string>> {
-    this.questions.set(question.id, question);
-
-    return success(undefined);
-  }
-
-  async deleteQuestion(questionId: string): Promise<Result<void, string>> {
-    this.questions.delete(questionId);
-
-    return success(undefined);
-  }
-
-  async updateQuestionsOrder(
-    data: UpdateQuestionOrderData[]
-  ): Promise<Result<void, string>> {
-    return success(undefined);
-  }
-
   async createAnswer(answer: Answer): Promise<Result<Answer, string>> {
     const id = `answer-${this.nextId++}`;
     (answer as any).props.id = id;
@@ -126,64 +60,59 @@ class MockPollRepository implements PollRepository {
     return success(answer);
   }
 
-  async getAnswerById(
-    answerId: string
-  ): Promise<Result<Answer | null, string>> {
-    return success(this.answers.get(answerId) || null);
+  async updatePoll(poll: Poll): Promise<Result<void, string>> {
+    this.polls.set(poll.id, poll);
+
+    return success(undefined);
   }
 
-  async getAnswersByQuestionId(
-    questionId: string
-  ): Promise<Result<Answer[], string>> {
-    const answers = Array.from(this.answers.values()).filter(
-      (a) => a.questionId === questionId
+  getQuestions(): Map<string, Question> {
+    return this.questions;
+  }
+}
+
+// Mock ParticipantRepository - only implements methods used by FinishVotingUseCase
+class MockParticipantRepository
+  implements Pick<ParticipantRepository, 'getParticipantByUserAndPoll'>
+{
+  private participants: Map<string, PollParticipant> = new Map();
+  private nextId = 1;
+
+  async getParticipantByUserAndPoll(
+    pollId: string,
+    userId: string
+  ): Promise<Result<PollParticipant | null, string>> {
+    const participant = Array.from(this.participants.values()).find(
+      (p) => p.userId === userId && p.pollId === pollId
     );
 
-    return success(answers);
+    return success(participant || null);
   }
 
-  async updateAnswer(answer: Answer): Promise<Result<void, string>> {
-    this.answers.set(answer.id, answer);
-
-    return success(undefined);
-  }
-
-  async deleteAnswer(answerId: string): Promise<Result<void, string>> {
-    this.answers.delete(answerId);
-
-    return success(undefined);
-  }
-
-  // Voting methods
-  async createVote(vote: Vote): Promise<Result<Vote, string>> {
-    this.votes.set(`${vote.userId}-${vote.answerId}`, vote);
-
-    return success(vote);
-  }
-
-  async createVotes(votes: Vote[]): Promise<Result<void, string>> {
-    for (const vote of votes) {
-      this.votes.set(`${vote.userId}-${vote.answerId}`, vote);
+  // Helper method for test setup
+  async createParticipants(
+    participants: PollParticipant[]
+  ): Promise<Result<void, string>> {
+    for (const p of participants) {
+      const id = `participant-${this.nextId++}`;
+      (p as any).props.id = id;
+      this.participants.set(id, p);
     }
 
     return success(undefined);
   }
+}
 
-  async getUserVotes(
-    pollId: string,
-    userId: string
-  ): Promise<Result<Vote[], string>> {
-    // Get all questions for this poll
-    const pollQuestions = Array.from(this.questions.values()).filter(
-      (q) => q.pollId === pollId
-    );
-    const questionIds = new Set(pollQuestions.map((q) => q.id));
+// Mock VoteRepository - only implements methods used by FinishVotingUseCase
+class MockVoteRepository
+  implements
+    Pick<VoteRepository, 'hasUserFinishedVoting' | 'createVotes' | 'pollHasVotes'>
+{
+  private votes: Map<string, Vote> = new Map();
+  private questions: Map<string, Question>;
 
-    return success(
-      Array.from(this.votes.values()).filter(
-        (v) => v.userId === userId && questionIds.has(v.questionId)
-      )
-    );
+  constructor(questions: Map<string, Question>) {
+    this.questions = questions;
   }
 
   async hasUserFinishedVoting(
@@ -204,18 +133,12 @@ class MockPollRepository implements PollRepository {
     return success(votes.length > 0);
   }
 
-  async getVotesByPoll(pollId: string): Promise<Result<Vote[], string>> {
-    // Get all questions for this poll
-    const pollQuestions = Array.from(this.questions.values()).filter(
-      (q) => q.pollId === pollId
-    );
-    const questionIds = new Set(pollQuestions.map((q) => q.id));
+  async createVotes(votes: Vote[]): Promise<Result<void, string>> {
+    for (const vote of votes) {
+      this.votes.set(`${vote.userId}-${vote.answerId}`, vote);
+    }
 
-    return success(
-      Array.from(this.votes.values()).filter((v) =>
-        questionIds.has(v.questionId)
-      )
-    );
+    return success(undefined);
   }
 
   async pollHasVotes(pollId: string): Promise<Result<boolean, string>> {
@@ -232,78 +155,36 @@ class MockPollRepository implements PollRepository {
     return success(votes.length > 0);
   }
 
-  // Participant methods
-  async createParticipants(
-    participants: PollParticipant[]
-  ): Promise<Result<void, string>> {
-    for (const p of participants) {
-      const id = `participant-${this.nextId++}`;
-      (p as any).props.id = id;
-      this.participants.set(id, p);
-    }
+  // Helper methods for test setup and verification
+  async createVote(vote: Vote): Promise<Result<Vote, string>> {
+    this.votes.set(`${vote.userId}-${vote.answerId}`, vote);
 
-    return success(undefined);
+    return success(vote);
   }
 
-  async getParticipants(
-    pollId: string
-  ): Promise<Result<PollParticipant[], string>> {
-    return success(
-      Array.from(this.participants.values()).filter((p) => p.pollId === pollId)
-    );
-  }
-
-  async getParticipantById(
-    participantId: string
-  ): Promise<Result<PollParticipant | null, string>> {
-    return success(this.participants.get(participantId) || null);
-  }
-
-  async getParticipantByUserAndPoll(
+  async getUserVotes(
     pollId: string,
     userId: string
-  ): Promise<Result<PollParticipant | null, string>> {
-    const participant = Array.from(this.participants.values()).find(
-      (p) => p.userId === userId && p.pollId === pollId
+  ): Promise<Result<Vote[], string>> {
+    // Get all questions for this poll
+    const pollQuestions = Array.from(this.questions.values()).filter(
+      (q) => q.pollId === pollId
     );
+    const questionIds = new Set(pollQuestions.map((q) => q.id));
 
-    return success(participant || null);
+    return success(
+      Array.from(this.votes.values()).filter(
+        (v) => v.userId === userId && questionIds.has(v.questionId)
+      )
+    );
   }
+}
 
-  async updateParticipantWeight(
-    participant: PollParticipant
-  ): Promise<Result<void, string>> {
-    this.participants.set(participant.id, participant);
-
-    return success(undefined);
-  }
-
-  async deleteParticipant(
-    participantId: string
-  ): Promise<Result<void, string>> {
-    this.participants.delete(participantId);
-
-    return success(undefined);
-  }
-
-  async createWeightHistory(
-    history: ParticipantWeightHistory
-  ): Promise<Result<void, string>> {
-    return success(undefined);
-  }
-
-  async getWeightHistory(
-    participantId: string
-  ): Promise<Result<ParticipantWeightHistory[], string>> {
-    return success([]);
-  }
-
-  // Draft methods
-  async saveDraft(draft: VoteDraft): Promise<Result<void, string>> {
-    this.drafts.set(`${draft.userId}-${draft.answerId}`, draft);
-
-    return success(undefined);
-  }
+// Mock DraftRepository - only implements methods used by FinishVotingUseCase
+class MockDraftRepository
+  implements Pick<DraftRepository, 'getUserDrafts' | 'deleteUserDrafts'>
+{
+  private drafts: Map<string, VoteDraft> = new Map();
 
   async getUserDrafts(
     pollId: string,
@@ -331,29 +212,9 @@ class MockPollRepository implements PollRepository {
     return success(undefined);
   }
 
-  async deleteAllPollDrafts(pollId: string): Promise<Result<void, string>> {
-    const toDelete: string[] = [];
-    this.drafts.forEach((draft, key) => {
-      if (draft.pollId === pollId) {
-        toDelete.push(key);
-      }
-    });
-    toDelete.forEach((key) => this.drafts.delete(key));
-
-    return success(undefined);
-  }
-
-  async deleteDraftsByQuestion(
-    userId: string,
-    questionId: string
-  ): Promise<Result<void, string>> {
-    const toDelete: string[] = [];
-    this.drafts.forEach((draft, key) => {
-      if (draft.userId === userId && draft.questionId === questionId) {
-        toDelete.push(key);
-      }
-    });
-    toDelete.forEach((key) => this.drafts.delete(key));
+  // Helper method for test setup
+  async saveDraft(draft: VoteDraft): Promise<Result<void, string>> {
+    this.drafts.set(`${draft.userId}-${draft.answerId}`, draft);
 
     return success(undefined);
   }
@@ -361,6 +222,9 @@ class MockPollRepository implements PollRepository {
 
 describe('FinishVotingUseCase', () => {
   let pollRepository: MockPollRepository;
+  let participantRepository: MockParticipantRepository;
+  let voteRepository: MockVoteRepository;
+  let draftRepository: MockDraftRepository;
   let useCase: FinishVotingUseCase;
   let poll: Poll;
   let question1: Question;
@@ -371,7 +235,8 @@ describe('FinishVotingUseCase', () => {
 
   beforeEach(async () => {
     pollRepository = new MockPollRepository();
-    useCase = new FinishVotingUseCase(pollRepository);
+    participantRepository = new MockParticipantRepository();
+    draftRepository = new MockDraftRepository();
 
     // Create a poll
     const pollResult = Poll.create(
@@ -433,7 +298,7 @@ describe('FinishVotingUseCase', () => {
     }
 
     // Add questions to poll and activate
-    const questions = Array.from(pollRepository['questions'].values()).filter(
+    const questions = Array.from(pollRepository.getQuestions().values()).filter(
       (q: any) => q.pollId === poll.id
     );
     (poll as any).props.questions = questions;
@@ -449,12 +314,23 @@ describe('FinishVotingUseCase', () => {
     expect(participantResult.success).toBe(true);
     if (participantResult.success) {
       participant = participantResult.value;
-      await pollRepository.createParticipants([participant]);
+      await participantRepository.createParticipants([participant]);
     }
 
     // Take snapshot
     poll.takeParticipantsSnapshot();
     await pollRepository.updatePoll(poll);
+
+    // Create voteRepository after questions are set up
+    voteRepository = new MockVoteRepository(pollRepository.getQuestions());
+
+    // Create use case with all repositories
+    useCase = new FinishVotingUseCase(
+      pollRepository as unknown as PollRepository,
+      participantRepository as unknown as ParticipantRepository,
+      voteRepository as unknown as VoteRepository,
+      draftRepository as unknown as DraftRepository
+    );
   });
 
   it('should successfully finish voting', async () => {
@@ -467,7 +343,7 @@ describe('FinishVotingUseCase', () => {
     );
     expect(draft1Result.success).toBe(true);
     if (draft1Result.success) {
-      await pollRepository.saveDraft(draft1Result.value);
+      await draftRepository.saveDraft(draft1Result.value);
     }
 
     const draft2Result = VoteDraft.create(
@@ -478,7 +354,7 @@ describe('FinishVotingUseCase', () => {
     );
     expect(draft2Result.success).toBe(true);
     if (draft2Result.success) {
-      await pollRepository.saveDraft(draft2Result.value);
+      await draftRepository.saveDraft(draft2Result.value);
     }
 
     const result = await useCase.execute({
@@ -493,7 +369,7 @@ describe('FinishVotingUseCase', () => {
     expect(result.success).toBe(true);
 
     // Verify votes were created
-    const votesResult = await pollRepository.getUserVotes(poll.id, 'user-1');
+    const votesResult = await voteRepository.getUserVotes(poll.id, 'user-1');
     expect(votesResult.success).toBe(true);
     if (votesResult.success) {
       expect(votesResult.value.length).toBe(2);
@@ -505,7 +381,7 @@ describe('FinishVotingUseCase', () => {
     }
 
     // Verify drafts were deleted
-    const draftsResult = await pollRepository.getUserDrafts(poll.id, 'user-1');
+    const draftsResult = await draftRepository.getUserDrafts(poll.id, 'user-1');
     expect(draftsResult.success).toBe(true);
     if (draftsResult.success) {
       expect(draftsResult.value.length).toBe(0);
@@ -583,7 +459,7 @@ describe('FinishVotingUseCase', () => {
     const voteResult = Vote.create(question1.id, answer1.id, 'user-1', 2.5);
     expect(voteResult.success).toBe(true);
     if (voteResult.success) {
-      await pollRepository.createVote(voteResult.value);
+      await voteRepository.createVote(voteResult.value);
 
       const result = await useCase.execute({
         userId: 'user-1',
@@ -601,13 +477,13 @@ describe('FinishVotingUseCase', () => {
     // Create draft only for first question
     const draft1Result = VoteDraft.create(
       poll.id,
-      'user-1',
       question1.id,
-      answer1.id
+      answer1.id,
+      'user-1'
     );
     expect(draft1Result.success).toBe(true);
     if (draft1Result.success) {
-      await pollRepository.saveDraft(draft1Result.value);
+      await draftRepository.saveDraft(draft1Result.value);
     }
 
     const result = await useCase.execute({
@@ -637,8 +513,8 @@ describe('FinishVotingUseCase', () => {
     );
     expect(draft1Result.success && draft2Result.success).toBe(true);
     if (draft1Result.success && draft2Result.success) {
-      await pollRepository.saveDraft(draft1Result.value);
-      await pollRepository.saveDraft(draft2Result.value);
+      await draftRepository.saveDraft(draft1Result.value);
+      await draftRepository.saveDraft(draft2Result.value);
     }
 
     const result = await useCase.execute({
@@ -649,7 +525,7 @@ describe('FinishVotingUseCase', () => {
     expect(result.success).toBe(true);
 
     // Verify votes have correct weight
-    const votesResult = await pollRepository.getUserVotes(poll.id, 'user-1');
+    const votesResult = await voteRepository.getUserVotes(poll.id, 'user-1');
     expect(votesResult.success).toBe(true);
     if (votesResult.success) {
       votesResult.value.forEach((vote) => {
@@ -686,11 +562,17 @@ describe('FinishVotingUseCase', () => {
       'user-1'
     );
 
-    expect(draft1aResult.success && draft1bResult.success && draft2Result.success).toBe(true);
-    if (draft1aResult.success && draft1bResult.success && draft2Result.success) {
-      await pollRepository.saveDraft(draft1aResult.value);
-      await pollRepository.saveDraft(draft1bResult.value);
-      await pollRepository.saveDraft(draft2Result.value);
+    expect(
+      draft1aResult.success && draft1bResult.success && draft2Result.success
+    ).toBe(true);
+    if (
+      draft1aResult.success &&
+      draft1bResult.success &&
+      draft2Result.success
+    ) {
+      await draftRepository.saveDraft(draft1aResult.value);
+      await draftRepository.saveDraft(draft1bResult.value);
+      await draftRepository.saveDraft(draft2Result.value);
     }
 
     const result = await useCase.execute({

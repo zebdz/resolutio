@@ -1,5 +1,8 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
+import { QuestionRepository } from '../../domain/poll/QuestionRepository';
+import { AnswerRepository } from '../../domain/poll/AnswerRepository';
+import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { PollErrors } from './PollErrors';
 
 export interface UpdateAnswerInput {
@@ -10,11 +13,16 @@ export interface UpdateAnswerInput {
 }
 
 export class UpdateAnswerUseCase {
-  constructor(private pollRepository: PollRepository) {}
+  constructor(
+    private pollRepository: PollRepository,
+    private questionRepository: QuestionRepository,
+    private answerRepository: AnswerRepository,
+    private voteRepository: VoteRepository
+  ) {}
 
   async execute(input: UpdateAnswerInput): Promise<Result<void, string>> {
     // Get the answer
-    const answerResult = await this.pollRepository.getAnswerById(
+    const answerResult = await this.answerRepository.getAnswerById(
       input.answerId
     );
 
@@ -28,7 +36,7 @@ export class UpdateAnswerUseCase {
     }
 
     // Get the question
-    const questionResult = await this.pollRepository.getQuestionById(
+    const questionResult = await this.questionRepository.getQuestionById(
       answer.questionId
     );
     if (!questionResult.success) {
@@ -57,7 +65,7 @@ export class UpdateAnswerUseCase {
     }
 
     // Check if poll can be edited
-    const hasVotesResult = await this.pollRepository.pollHasVotes(poll.id);
+    const hasVotesResult = await this.voteRepository.pollHasVotes(poll.id);
     if (!hasVotesResult.success) {
       return failure(hasVotesResult.error);
     }
@@ -91,7 +99,7 @@ export class UpdateAnswerUseCase {
     }
 
     // Save updated answer
-    const updateResult = await this.pollRepository.updateAnswer(answer);
+    const updateResult = await this.answerRepository.updateAnswer(answer);
     if (!updateResult.success) {
       return failure(updateResult.error);
     }

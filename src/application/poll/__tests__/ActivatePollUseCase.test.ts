@@ -9,6 +9,7 @@ import {
   PollRepository,
   UpdateQuestionOrderData,
 } from '../../../domain/poll/PollRepository';
+import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
 import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../../domain/user/UserRepository';
@@ -24,8 +25,6 @@ import { ParticipantWeightHistory } from '../../../domain/poll/ParticipantWeight
 
 class MockPollRepository implements PollRepository {
   private polls: Map<string, Poll> = new Map();
-  public participants: PollParticipant[] = [];
-  public historyRecords: ParticipantWeightHistory[] = [];
 
   async createPoll(poll: Poll): Promise<Result<Poll, string>> {
     this.polls.set(poll.id, poll);
@@ -139,10 +138,58 @@ class MockPollRepository implements PollRepository {
     return success([]);
   }
 
+  async saveDraft(draft: VoteDraft): Promise<Result<VoteDraft, string>> {
+    return success(draft);
+  }
+
+  async getUserDrafts(
+    pollId: string,
+    userId: string
+  ): Promise<Result<VoteDraft[], string>> {
+    return success([]);
+  }
+
+  async deleteUserDrafts(
+    pollId: string,
+    userId: string
+  ): Promise<Result<void, string>> {
+    return success(undefined);
+  }
+
+  async deleteAllPollDrafts(pollId: string): Promise<Result<void, string>> {
+    return success(undefined);
+  }
+
+  async deleteDraftsByQuestion(
+    pollId: string,
+    questionId: string,
+    userId: string
+  ): Promise<Result<void, string>> {
+    return success(undefined);
+  }
+
+  async deleteDraftByAnswer(
+    pollId: string,
+    questionId: string,
+    answerId: string,
+    userId: string
+  ): Promise<Result<void, string>> {
+    return success(undefined);
+  }
+}
+
+class MockParticipantRepository implements ParticipantRepository {
+  public participants: PollParticipant[] = [];
+  public historyRecords: ParticipantWeightHistory[] = [];
+  private polls: Map<string, Poll> = new Map();
+
+  setPollStore(polls: Map<string, Poll>): void {
+    this.polls = polls;
+  }
+
   async createParticipants(
     participants: PollParticipant[]
   ): Promise<Result<void, string>> {
-    // Assign IDs and store
     participants.forEach((p, index) => {
       (p as any).props.id = `participant-${index + 1}`;
     });
@@ -200,45 +247,6 @@ class MockPollRepository implements PollRepository {
     participantId: string
   ): Promise<Result<ParticipantWeightHistory[], string>> {
     return success([]);
-  }
-
-  async saveDraft(draft: VoteDraft): Promise<Result<VoteDraft, string>> {
-    return success(draft);
-  }
-
-  async getUserDrafts(
-    pollId: string,
-    userId: string
-  ): Promise<Result<VoteDraft[], string>> {
-    return success([]);
-  }
-
-  async deleteUserDrafts(
-    pollId: string,
-    userId: string
-  ): Promise<Result<void, string>> {
-    return success(undefined);
-  }
-
-  async deleteAllPollDrafts(pollId: string): Promise<Result<void, string>> {
-    return success(undefined);
-  }
-
-  async deleteDraftsByQuestion(
-    pollId: string,
-    questionId: string,
-    userId: string
-  ): Promise<Result<void, string>> {
-    return success(undefined);
-  }
-
-  async deleteDraftByAnswer(
-    pollId: string,
-    questionId: string,
-    answerId: string,
-    userId: string
-  ): Promise<Result<void, string>> {
-    return success(undefined);
   }
 
   async executeActivation(
@@ -436,6 +444,7 @@ class MockUserRepository implements UserRepository {
 
 describe('ActivatePollUseCase', () => {
   let pollRepository: MockPollRepository;
+  let participantRepository: MockParticipantRepository;
   let boardRepository: MockBoardRepository;
   let organizationRepository: MockOrganizationRepository;
   let userRepository: MockUserRepository;
@@ -445,12 +454,14 @@ describe('ActivatePollUseCase', () => {
 
   beforeEach(() => {
     pollRepository = new MockPollRepository();
+    participantRepository = new MockParticipantRepository();
     boardRepository = new MockBoardRepository();
     organizationRepository = new MockOrganizationRepository();
     userRepository = new MockUserRepository();
 
     useCase = new ActivatePollUseCase(
       pollRepository,
+      participantRepository,
       boardRepository,
       organizationRepository,
       userRepository
@@ -524,18 +535,18 @@ describe('ActivatePollUseCase', () => {
     expect(updatedPoll.participantsSnapshotTaken).toBe(true);
 
     // Verify participants were created
-    expect(pollRepository.participants.length).toBe(3);
-    expect(pollRepository.participants[0].userId).toBe('user-1');
-    expect(pollRepository.participants[1].userId).toBe('user-2');
-    expect(pollRepository.participants[2].userId).toBe('user-3');
+    expect(participantRepository.participants.length).toBe(3);
+    expect(participantRepository.participants[0].userId).toBe('user-1');
+    expect(participantRepository.participants[1].userId).toBe('user-2');
+    expect(participantRepository.participants[2].userId).toBe('user-3');
 
     // All should have weight 1.0
-    expect(pollRepository.participants[0].userWeight).toBe(1.0);
-    expect(pollRepository.participants[1].userWeight).toBe(1.0);
-    expect(pollRepository.participants[2].userWeight).toBe(1.0);
+    expect(participantRepository.participants[0].userWeight).toBe(1.0);
+    expect(participantRepository.participants[1].userWeight).toBe(1.0);
+    expect(participantRepository.participants[2].userWeight).toBe(1.0);
 
     // Verify weight history was created
-    expect(pollRepository.historyRecords.length).toBe(3);
+    expect(participantRepository.historyRecords.length).toBe(3);
   });
 
   it('should not recreate participants on second activation', async () => {
@@ -545,7 +556,7 @@ describe('ActivatePollUseCase', () => {
       userId: 'admin-1',
     });
 
-    const firstParticipantCount = pollRepository.participants.length;
+    const firstParticipantCount = participantRepository.participants.length;
 
     // Deactivate
     const updatedPollResult = await pollRepository.getPollById(poll.id);
@@ -560,7 +571,7 @@ describe('ActivatePollUseCase', () => {
     });
 
     // Should not create new participants
-    expect(pollRepository.participants.length).toBe(firstParticipantCount);
+    expect(participantRepository.participants.length).toBe(firstParticipantCount);
   });
 
   it('should fail if poll not found', async () => {
@@ -689,9 +700,9 @@ describe('ActivatePollUseCase', () => {
     });
 
     // Check weight history
-    expect(pollRepository.historyRecords.length).toBe(3);
+    expect(participantRepository.historyRecords.length).toBe(3);
 
-    const history = pollRepository.historyRecords[0];
+    const history = participantRepository.historyRecords[0];
     expect(history.oldWeight).toBe(0);
     expect(history.newWeight).toBe(1.0);
     expect(history.changedBy).toBe(adminId);
@@ -702,7 +713,7 @@ describe('ActivatePollUseCase', () => {
   describe('transaction', () => {
     it('should return error and not persist participants if executeActivation fails', async () => {
       // Override executeActivation to fail
-      pollRepository.executeActivation = async () => {
+      participantRepository.executeActivation = async () => {
         return failure('Database error');
       };
 
@@ -715,16 +726,16 @@ describe('ActivatePollUseCase', () => {
       expect(result.error).toBe('Database error');
 
       // Participants should not be persisted (transaction rolled back)
-      expect(pollRepository.participants.length).toBe(0);
+      expect(participantRepository.participants.length).toBe(0);
       // Note: In-memory poll object is mutated but in real DB it would rollback
     });
 
     it('should use executeActivation for first activation', async () => {
       let executeActivationCalled = false;
       const originalExecuteActivation =
-        pollRepository.executeActivation.bind(pollRepository);
+        participantRepository.executeActivation.bind(participantRepository);
 
-      pollRepository.executeActivation = async (poll, participants, history) => {
+      participantRepository.executeActivation = async (poll, participants, history) => {
         executeActivationCalled = true;
         return originalExecuteActivation(poll, participants, history);
       };
@@ -742,7 +753,7 @@ describe('ActivatePollUseCase', () => {
       let receivedParticipants: PollParticipant[] = [];
       let receivedHistory: ParticipantWeightHistory[] = [];
 
-      pollRepository.executeActivation = async (poll, participants, history) => {
+      participantRepository.executeActivation = async (poll, participants, history) => {
         receivedPoll = poll;
         receivedParticipants = participants;
         receivedHistory = history;
