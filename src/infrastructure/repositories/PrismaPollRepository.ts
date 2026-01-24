@@ -472,17 +472,31 @@ export class PrismaPollRepository implements PollRepository {
     userId: string
   ): Promise<Result<boolean, string>> {
     try {
-      // Check if user has votes for this poll
-      const voteCount = await this.prisma.vote.count({
+      // Get count of non-archived questions in poll
+      const totalQuestions = await this.prisma.question.count({
+        where: {
+          pollId,
+          archivedAt: null,
+        },
+      });
+
+      if (totalQuestions === 0) {
+        return success(false);
+      }
+
+      // Get count of distinct questions user has voted on
+      const votedQuestions = await this.prisma.vote.groupBy({
+        by: ['questionId'],
         where: {
           userId,
           question: {
             pollId,
+            archivedAt: null,
           },
         },
       });
 
-      return success(voteCount > 0);
+      return success(votedQuestions.length === totalQuestions);
     } catch (error) {
       return failure(`Failed to check if user finished voting: ${error}`);
     }

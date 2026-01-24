@@ -21,6 +21,7 @@ export interface AnswerResult {
   percentage: number;
   voters: Array<{
     userId: string;
+    userName: { firstName: string; lastName: string };
     weight: number;
   }>;
 }

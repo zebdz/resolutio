@@ -415,18 +415,20 @@ describe('FinishVotingUseCase', () => {
       await pollRepository.createQuestion(question2);
     }
 
-    // Create answers
-    const answer1Result = Answer.create(question1.id, 'Answer 1', 1);
+    // Create answers and add to questions
+    const answer1Result = Answer.create('Answer 1', 1, question1.id);
     expect(answer1Result.success).toBe(true);
     if (answer1Result.success) {
       answer1 = answer1Result.value;
+      question1.addAnswer(answer1);
       await pollRepository.createAnswer(answer1);
     }
 
-    const answer2Result = Answer.create(question2.id, 'Answer 2', 1);
+    const answer2Result = Answer.create('Answer 2', 1, question2.id);
     expect(answer2Result.success).toBe(true);
     if (answer2Result.success) {
       answer2 = answer2Result.value;
+      question2.addAnswer(answer2);
       await pollRepository.createAnswer(answer2);
     }
 

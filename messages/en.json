@@ -361,6 +361,7 @@
       "notPollCreator": "Only the poll creator can edit it",
       "notBoardMember": "You must be a board member to create polls",
       "boardNotFound": "Board not found",
+      "notAuthorized": "You are not authorized to perform this action",
       "noUpdates": "No updates provided",
       "titleRequired": "Poll title is required",
       "descriptionRequired": "Poll description is required",

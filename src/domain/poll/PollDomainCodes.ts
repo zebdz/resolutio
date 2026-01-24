@@ -15,6 +15,7 @@ export const PollDomainCodes = {
   POLL_ALREADY_FINISHED: 'domain.poll.alreadyFinished',
   POLL_ALREADY_ARCHIVED: 'domain.poll.alreadyArchived',
   POLL_NO_QUESTIONS: 'domain.poll.noQuestions',
+  POLL_QUESTION_NO_ANSWERS: 'domain.poll.questionNoAnswers',
   POLL_CANNOT_ACTIVATE_FINISHED: 'domain.poll.cannotActivateFinished',
   POLL_CANNOT_DEACTIVATE_FINISHED: 'domain.poll.cannotDeactivateFinished',
   POLL_CANNOT_UPDATE_FINISHED: 'domain.poll.cannotUpdateFinished',

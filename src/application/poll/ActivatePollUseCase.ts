@@ -1,6 +1,8 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
+import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { UserRepository } from '../../domain/user/UserRepository';
 import { PollParticipant } from '../../domain/poll/PollParticipant';
 import { ParticipantWeightHistory } from '../../domain/poll/ParticipantWeightHistory';
 import { PollErrors } from './PollErrors';
@@ -13,7 +15,9 @@ interface ActivatePollCommand {
 export class ActivatePollUseCase {
   constructor(
     private pollRepository: PollRepository,
-    private boardRepository: BoardRepository
+    private boardRepository: BoardRepository,
+    private organizationRepository: OrganizationRepository,
+    private userRepository: UserRepository
   ) {}
 
   async execute(command: ActivatePollCommand): Promise<Result<void, string>> {
@@ -26,6 +30,23 @@ export class ActivatePollUseCase {
     const poll = pollResult.value;
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
+    }
+
+    // Check authorization: superadmin or org admin
+    const isSuperAdmin = await this.userRepository.isSuperAdmin(command.userId);
+    if (!isSuperAdmin) {
+      const board = await this.boardRepository.findById(poll.boardId);
+      if (!board) {
+        return failure(PollErrors.BOARD_NOT_FOUND);
+      }
+
+      const isAdmin = await this.organizationRepository.isUserAdmin(
+        command.userId,
+        board.organizationId
+      );
+      if (!isAdmin) {
+        return failure(PollErrors.NOT_AUTHORIZED);
+      }
     }
 
     // Activate the poll

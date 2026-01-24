@@ -1,7 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { Poll } from '../Poll';
 import { Question } from '../Question';
+import { Answer } from '../Answer';
 import { PollDomainCodes } from '../PollDomainCodes';
+
+// Helper: create a question with an answer (required for poll activation)
+function createQuestionWithAnswer(pollId: string): Question {
+  const questionResult = Question.create('Test Question', pollId, 1, 0, 'single-choice');
+  const question = questionResult.value;
+  const answerResult = Answer.create('Test Answer', 1, question.id);
+  question.addAnswer(answerResult.value);
+
+  return question;
+}
 
 describe('Poll Domain', () => {
   describe('canEdit', () => {
@@ -36,16 +47,8 @@ describe('Poll Domain', () => {
       expect(pollResult.success).toBe(true);
       const poll = pollResult.value;
 
-      // Add a question so we can activate the poll
-      const questionResult = Question.create(
-        'Test Question',
-        'poll-1',
-        1,
-        0,
-        'single-choice'
-      );
-      expect(questionResult.success).toBe(true);
-      poll.addQuestion(questionResult.value);
+      // Add a question with answer so we can activate the poll
+      poll.addQuestion(createQuestionWithAnswer(poll.id));
 
       // Activate poll
       const activateResult = poll.activate();
@@ -108,16 +111,8 @@ describe('Poll Domain', () => {
       expect(pollResult.success).toBe(true);
       const poll = pollResult.value;
 
-      // Add a question so we can activate the poll
-      const questionResult = Question.create(
-        'Test Question',
-        'poll-1',
-        1,
-        0,
-        'single-choice'
-      );
-      expect(questionResult.success).toBe(true);
-      poll.addQuestion(questionResult.value);
+      // Add a question with answer so we can activate the poll
+      poll.addQuestion(createQuestionWithAnswer(poll.id));
 
       const activateResult = poll.activate();
       expect(activateResult.success).toBe(true);
@@ -141,16 +136,8 @@ describe('Poll Domain', () => {
 
       const poll = pollResult.value;
 
-      // Add a question so we can activate the poll
-      const questionResult = Question.create(
-        'Test Question',
-        'poll-1',
-        1,
-        0,
-        'single-choice'
-      );
-      expect(questionResult.success).toBe(true);
-      poll.addQuestion(questionResult.value);
+      // Add a question with answer so we can activate the poll
+      poll.addQuestion(createQuestionWithAnswer(poll.id));
 
       const activateResult = poll.activate();
       expect(activateResult.success).toBe(true);
@@ -174,16 +161,8 @@ describe('Poll Domain', () => {
 
       const poll = pollResult.value;
 
-      // Add a question so we can activate the poll
-      const questionResult = Question.create(
-        'Test Question',
-        'poll-1',
-        1,
-        0,
-        'single-choice'
-      );
-      expect(questionResult.success).toBe(true);
-      poll.addQuestion(questionResult.value);
+      // Add a question with answer so we can activate the poll
+      poll.addQuestion(createQuestionWithAnswer(poll.id));
 
       const activateResult = poll.activate();
       expect(activateResult.success).toBe(true);
@@ -207,16 +186,8 @@ describe('Poll Domain', () => {
 
       const poll = pollResult.value;
 
-      // Add a question so we can activate the poll
-      const questionResult = Question.create(
-        'Test Question',
-        'poll-1',
-        1,
-        0,
-        'single-choice'
-      );
-      expect(questionResult.success).toBe(true);
-      poll.addQuestion(questionResult.value);
+      // Add a question with answer so we can activate the poll
+      poll.addQuestion(createQuestionWithAnswer(poll.id));
 
       const activateResult = poll.activate();
       expect(activateResult.success).toBe(true);

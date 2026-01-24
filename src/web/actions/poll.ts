@@ -23,6 +23,8 @@ import {
   prisma,
   PrismaPollRepository,
   PrismaBoardRepository,
+  PrismaOrganizationRepository,
+  PrismaUserRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
 import { QuestionType } from '@/domain/poll/QuestionType';
@@ -35,6 +37,8 @@ export type ActionResult<T = void> =
 // Initialize dependencies
 const pollRepository = new PrismaPollRepository(prisma);
 const boardRepository = new PrismaBoardRepository(prisma);
+const organizationRepository = new PrismaOrganizationRepository(prisma);
+const userRepository = new PrismaUserRepository(prisma);
 
 // Use cases
 const createPollUseCase = new CreatePollUseCase(
@@ -53,10 +57,22 @@ const updateQuestionOrderUseCase = new UpdateQuestionOrderUseCase(
 );
 const activatePollUseCase = new ActivatePollUseCase(
   pollRepository,
-  boardRepository
+  boardRepository,
+  organizationRepository,
+  userRepository
 );
-const deactivatePollUseCase = new DeactivatePollUseCase(pollRepository);
-const finishPollUseCase = new FinishPollUseCase(pollRepository);
+const deactivatePollUseCase = new DeactivatePollUseCase(
+  pollRepository,
+  boardRepository,
+  organizationRepository,
+  userRepository
+);
+const finishPollUseCase = new FinishPollUseCase(
+  pollRepository,
+  boardRepository,
+  organizationRepository,
+  userRepository
+);
 
 export async function createPollAction(
   formData: FormData

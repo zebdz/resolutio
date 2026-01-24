@@ -405,11 +405,12 @@ describe('SubmitDraftUseCase', () => {
       await pollRepository.createQuestion(question);
     }
 
-    // Create an answer
-    const answerResult = Answer.create(question.id, 'Test Answer', 1);
+    // Create an answer and add to question
+    const answerResult = Answer.create('Test Answer', 1, question.id);
     expect(answerResult.success).toBe(true);
     if (answerResult.success) {
       answer = answerResult.value;
+      question.addAnswer(answer);
       await pollRepository.createAnswer(answer);
     }
 

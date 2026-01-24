@@ -229,8 +229,18 @@ export class Poll {
       return failure(PollDomainCodes.POLL_ALREADY_ACTIVE);
     }
 
-    if (this.props.questions.length === 0) {
+    // Check poll has at least one non-archived question
+    const activeQuestions = this.props.questions.filter((q) => !q.isArchived());
+    if (activeQuestions.length === 0) {
       return failure(PollDomainCodes.POLL_NO_QUESTIONS);
+    }
+
+    // Check each active question has at least one non-archived answer
+    for (const question of activeQuestions) {
+      const activeAnswers = question.answers.filter((a) => !a.isArchived());
+      if (activeAnswers.length === 0) {
+        return failure(PollDomainCodes.POLL_QUESTION_NO_ANSWERS);
+      }
     }
 
     this.props.active = true;

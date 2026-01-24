@@ -9,6 +9,7 @@ export const PollErrors = {
   NOT_POLL_CREATOR: 'poll.errors.notPollCreator',
   NOT_BOARD_MEMBER: 'poll.errors.notBoardMember',
   BOARD_NOT_FOUND: 'poll.errors.boardNotFound',
+  NOT_AUTHORIZED: 'poll.errors.notAuthorized',
 
   // Question
   QUESTION_NOT_FOUND: 'poll.errors.questionNotFound',

@@ -308,7 +308,7 @@ describe('UpdateAnswerUseCase', () => {
       const poll = pollResult.value;
       (poll as any).props.id = 'poll-1';
 
-      // Activate poll
+      // Activate poll (need question with answer)
       const questionForActivation = Question.create(
         'Temp Question',
         'poll-1',
@@ -316,6 +316,8 @@ describe('UpdateAnswerUseCase', () => {
         0,
         'single-choice'
       );
+      const tempAnswer = Answer.create('Temp Answer', 1, questionForActivation.value.id);
+      questionForActivation.value.addAnswer(tempAnswer.value);
       poll.addQuestion(questionForActivation.value);
       poll.activate();
 

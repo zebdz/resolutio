@@ -139,6 +139,14 @@ export class PrismaUserRepository implements UserRepository {
     return users.map((user) => this.toDomain(user));
   }
 
+  async isSuperAdmin(userId: string): Promise<boolean> {
+    const superAdmin = await this.prisma.superAdmin.findUnique({
+      where: { userId },
+    });
+
+    return superAdmin !== null;
+  }
+
   private toDomain(user: {
     id: string;
     firstName: string;
