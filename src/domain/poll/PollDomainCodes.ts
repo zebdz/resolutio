@@ -50,6 +50,7 @@ export const PollDomainCodes = {
   // Vote validation
   INVALID_WEIGHT: 'domain.poll.invalidWeight',
   ALREADY_VOTED: 'domain.poll.alreadyVoted',
+  SINGLE_CHOICE_MULTIPLE_ANSWERS: 'domain.poll.singleChoiceMultipleAnswers',
   NOT_PARTICIPANT: 'domain.poll.notParticipant',
   POLL_NOT_ACTIVE: 'domain.poll.pollNotActive',
   MUST_ANSWER_ALL_QUESTIONS: 'domain.poll.mustAnswerAllQuestions',

@@ -499,7 +499,8 @@
       "pollCannotAddQuestionArchived": "Нельзя добавлять вопрос к архивному опросу",
       "pollCannotRemoveQuestionFinished": "Нельзя удалять вопрос из завершённого опроса",
       "pollCannotRemoveQuestionArchived": "Нельзя удалять вопрос из архивного опроса",
-      "questionNotFound": "Вопрос не найден"
+      "questionNotFound": "Вопрос не найден",
+      "singleChoiceMultipleAnswers": "Вопрос с одним вариантом ответа может иметь только один ответ"
     }
   }
 }

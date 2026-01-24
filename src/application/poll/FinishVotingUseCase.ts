@@ -79,6 +79,24 @@ export class FinishVotingUseCase {
       return failure(PollDomainCodes.MUST_ANSWER_ALL_QUESTIONS);
     }
 
+    // 6b. Validate single-choice questions have exactly 1 draft
+    const draftsByQuestion = new Map<string, number>();
+    for (const draft of drafts) {
+      draftsByQuestion.set(
+        draft.questionId,
+        (draftsByQuestion.get(draft.questionId) || 0) + 1
+      );
+    }
+
+    for (const question of questions) {
+      if (question.questionType === 'single-choice') {
+        const draftCount = draftsByQuestion.get(question.id) || 0;
+        if (draftCount > 1) {
+          return failure(PollDomainCodes.SINGLE_CHOICE_MULTIPLE_ANSWERS);
+        }
+      }
+    }
+
     // 7. Create votes from drafts with participant weight
     const votes: Vote[] = [];
     for (const draft of drafts) {

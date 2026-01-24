@@ -657,4 +657,50 @@ describe('FinishVotingUseCase', () => {
       });
     }
   });
+
+  it('should reject when single-choice question has multiple drafts', async () => {
+    // Create a second answer for question1 (single-choice)
+    const answer1bResult = Answer.create('Answer 1b', 2, question1.id);
+    expect(answer1bResult.success).toBe(true);
+    const answer1b = answer1bResult.value;
+    await pollRepository.createAnswer(answer1b);
+
+    // Create two drafts for single-choice question1
+    const draft1aResult = VoteDraft.create(
+      poll.id,
+      question1.id,
+      answer1.id,
+      'user-1'
+    );
+    const draft1bResult = VoteDraft.create(
+      poll.id,
+      question1.id,
+      answer1b.id,
+      'user-1'
+    );
+    // Draft for question2
+    const draft2Result = VoteDraft.create(
+      poll.id,
+      question2.id,
+      answer2.id,
+      'user-1'
+    );
+
+    expect(draft1aResult.success && draft1bResult.success && draft2Result.success).toBe(true);
+    if (draft1aResult.success && draft1bResult.success && draft2Result.success) {
+      await pollRepository.saveDraft(draft1aResult.value);
+      await pollRepository.saveDraft(draft1bResult.value);
+      await pollRepository.saveDraft(draft2Result.value);
+    }
+
+    const result = await useCase.execute({
+      userId: 'user-1',
+      pollId: poll.id,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe(PollDomainCodes.SINGLE_CHOICE_MULTIPLE_ANSWERS);
+    }
+  });
 });
