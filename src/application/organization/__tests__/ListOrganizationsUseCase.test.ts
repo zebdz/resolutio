@@ -16,7 +16,7 @@ class MockOrganizationRepository implements OrganizationRepository {
   private userMemberships: Map<string, Set<string>> = new Map(); // userId -> Set<orgId>
 
   async save(organization: Organization): Promise<Organization> {
-    organization.setId(`org-${Date.now()}`);
+    (organization as any).props.id = `org-${Date.now()}`;
     this.organizations.set(organization.id, organization);
 
     return organization;
@@ -183,8 +183,8 @@ describe('ListOrganizationsUseCase', () => {
       const org1 = org1Result.value;
       const org2 = org2Result.value;
 
-      org1.setId('org-1');
-      org2.setId('org-2');
+      (org1 as any).props.id = 'org-1';
+      (org2 as any).props.id = 'org-2';
 
       organizationRepository.addOrganization(org1);
       organizationRepository.addOrganization(org2);
@@ -214,7 +214,7 @@ describe('ListOrganizationsUseCase', () => {
 
     if (orgResult.success) {
       const org = orgResult.value;
-      org.setId('org-123');
+      (org as any).props.id = 'org-123';
 
       organizationRepository.addOrganization(org);
       organizationRepository.setStats('org-123', {
@@ -242,7 +242,7 @@ describe('ListOrganizationsUseCase', () => {
 
     if (orgResult.success) {
       const org = orgResult.value;
-      org.setId('org-123');
+      (org as any).props.id = 'org-123';
 
       organizationRepository.addOrganization(org);
       organizationRepository.setStats('org-123', {
@@ -278,7 +278,7 @@ describe('ListOrganizationsUseCase', () => {
 
     if (orgResult.success) {
       const org = orgResult.value;
-      org.setId('org-123');
+      (org as any).props.id = 'org-123';
 
       organizationRepository.addOrganization(org);
       organizationRepository.setStats('org-123', {
@@ -311,9 +311,9 @@ describe('ListOrganizationsUseCase', () => {
       const org2 = org2Result.value;
       const org3 = org3Result.value;
 
-      org1.setId('org-1');
-      org2.setId('org-2');
-      org3.setId('org-3');
+      (org1 as any).props.id = 'org-1';
+      (org2 as any).props.id = 'org-2';
+      (org3 as any).props.id = 'org-3';
 
       organizationRepository.addOrganization(org1);
       organizationRepository.addOrganization(org2);
@@ -376,9 +376,9 @@ describe('ListOrganizationsUseCase', () => {
       const org2 = org2Result.value;
       const org3 = org3Result.value;
 
-      org1.setId('org-1');
-      org2.setId('org-2');
-      org3.setId('org-3');
+      (org1 as any).props.id = 'org-1';
+      (org2 as any).props.id = 'org-2';
+      (org3 as any).props.id = 'org-3';
 
       organizationRepository.addOrganization(org1);
       organizationRepository.addOrganization(org2);
@@ -410,8 +410,8 @@ describe('ListOrganizationsUseCase', () => {
       const org1 = org1Result.value;
       const org2 = org2Result.value;
 
-      org1.setId('org-1');
-      org2.setId('org-2');
+      (org1 as any).props.id = 'org-1';
+      (org2 as any).props.id = 'org-2';
 
       organizationRepository.addOrganization(org1);
       organizationRepository.addOrganization(org2);

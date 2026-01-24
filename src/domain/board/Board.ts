@@ -82,10 +82,6 @@ export class Board {
     return success(undefined);
   }
 
-  public setId(id: string): void {
-    this.props.id = id;
-  }
-
   public toJSON(): BoardProps {
     return {
       ...this.props,

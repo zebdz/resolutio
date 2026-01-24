@@ -68,11 +68,6 @@ export class PollParticipant {
     return this.props.createdAt;
   }
 
-  // Setters
-  public setId(id: string): void {
-    this.props.id = id;
-  }
-
   // Business logic
   public updateWeight(newWeight: number): Result<WeightChangeEvent, string> {
     if (newWeight < 0) {

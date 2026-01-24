@@ -12,7 +12,7 @@ class MockBoardRepository implements BoardRepository {
 
   async save(board: Board): Promise<Board> {
     const id = `board-${this.nextId++}`;
-    board.setId(id);
+    (board as any).props.id = id;
     this.boards.set(id, board);
 
     return board;
@@ -201,7 +201,7 @@ describe('CreateBoardUseCase', () => {
       );
       if (orgResult.success) {
         const org = orgResult.value;
-        org.setId('org-1');
+        (org as any).props.id = 'org-1';
         organizationRepository.addOrganization(org);
       }
     });
@@ -229,7 +229,7 @@ describe('CreateBoardUseCase', () => {
       );
       if (orgResult.success) {
         const org = orgResult.value;
-        org.setId('org-1');
+        (org as any).props.id = 'org-1';
         organizationRepository.addOrganization(org);
         organizationRepository.addAdmin('org-1', 'admin-1');
       }

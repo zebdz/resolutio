@@ -221,14 +221,14 @@ describe('AddBoardMemberUseCase', () => {
       );
       if (orgResult.success) {
         const org = orgResult.value;
-        org.setId('org-1');
+        (org as any).props.id = 'org-1';
         organizationRepository.addOrganization(org);
       }
 
       const boardResult = Board.create('Test Board', 'org-1');
       if (boardResult.success) {
         const board = boardResult.value;
-        board.setId('board-1');
+        (board as any).props.id = 'board-1';
         boardRepository.addBoard(board);
       }
     });
@@ -256,7 +256,7 @@ describe('AddBoardMemberUseCase', () => {
       );
       if (orgResult.success) {
         const org = orgResult.value;
-        org.setId('org-1');
+        (org as any).props.id = 'org-1';
         organizationRepository.addOrganization(org);
         organizationRepository.addAdmin('org-1', 'admin-1');
       }
@@ -264,14 +264,14 @@ describe('AddBoardMemberUseCase', () => {
       const boardResult = Board.create('Test Board', 'org-1');
       if (boardResult.success) {
         const board = boardResult.value;
-        board.setId('board-1');
+        (board as any).props.id = 'board-1';
         boardRepository.addBoard(board);
       }
 
       const generalBoardResult = Board.create('Test Board', 'org-1', true);
       if (generalBoardResult.success) {
         const generalBoard = generalBoardResult.value;
-        generalBoard.setId('general-board');
+        (generalBoard as any).props.id = 'general-board';
         boardRepository.addBoard(generalBoard);
       }
     });

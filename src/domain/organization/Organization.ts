@@ -98,10 +98,6 @@ export class Organization {
     return success(undefined);
   }
 
-  public setId(id: string): void {
-    this.props.id = id;
-  }
-
   public toJSON(): OrganizationProps {
     return {
       ...this.props,

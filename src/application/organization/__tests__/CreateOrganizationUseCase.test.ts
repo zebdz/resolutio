@@ -12,7 +12,7 @@ class MockOrganizationRepository implements OrganizationRepository {
   private organizations: Organization[] = [];
 
   async save(organization: Organization): Promise<Organization> {
-    organization.setId(`org-${Date.now()}`);
+    (organization as any).props.id = `org-${Date.now()}`;
     this.organizations.push(organization);
 
     return organization;
@@ -108,7 +108,7 @@ class MockBoardRepository implements BoardRepository {
   private boards: Board[] = [];
 
   async save(board: Board): Promise<Board> {
-    board.setId(`board-${Date.now()}`);
+    (board as any).props.id = `board-${Date.now()}`;
     this.boards.push(board);
 
     return board;

@@ -257,7 +257,7 @@ describe('GetOrganizationDetailsUseCase', () => {
       expect(orgResult.success).toBe(true);
       if (orgResult.success) {
         const organization = orgResult.value;
-        organization.setId('org-1');
+        (organization as any).props.id = 'org-1';
         organization.archive();
         await organizationRepository.save(organization);
 
@@ -288,7 +288,7 @@ describe('GetOrganizationDetailsUseCase', () => {
       expect(orgResult.success).toBe(true);
       if (orgResult.success) {
         organization = orgResult.value;
-        organization.setId('org-1');
+        (organization as any).props.id = 'org-1';
         await organizationRepository.save(organization);
       }
 
@@ -296,7 +296,7 @@ describe('GetOrganizationDetailsUseCase', () => {
       expect(board1Result.success).toBe(true);
       if (board1Result.success) {
         board1 = board1Result.value;
-        board1.setId('board-1');
+        (board1 as any).props.id = 'board-1';
         await boardRepository.save(board1);
       }
 
@@ -304,7 +304,7 @@ describe('GetOrganizationDetailsUseCase', () => {
       expect(board2Result.success).toBe(true);
       if (board2Result.success) {
         board2 = board2Result.value;
-        board2.setId('board-2');
+        (board2 as any).props.id = 'board-2';
         await boardRepository.save(board2);
       }
     });

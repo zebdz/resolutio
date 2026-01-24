@@ -193,14 +193,14 @@ describe('ArchiveBoardUseCase', () => {
       );
       if (orgResult.success) {
         const org = orgResult.value;
-        org.setId('org-1');
+        (org as any).props.id = 'org-1';
         organizationRepository.addOrganization(org);
       }
 
       const boardResult = Board.create('Test Board', 'org-1');
       if (boardResult.success) {
         const board = boardResult.value;
-        board.setId('board-1');
+        (board as any).props.id = 'board-1';
         boardRepository.addBoard(board);
       }
     });
@@ -227,7 +227,7 @@ describe('ArchiveBoardUseCase', () => {
       );
       if (orgResult.success) {
         const org = orgResult.value;
-        org.setId('org-1');
+        (org as any).props.id = 'org-1';
         organizationRepository.addOrganization(org);
         organizationRepository.addAdmin('org-1', 'admin-1');
       }
@@ -237,7 +237,7 @@ describe('ArchiveBoardUseCase', () => {
       const boardResult = Board.create('Test Board', 'org-1');
       if (boardResult.success) {
         const board = boardResult.value;
-        board.setId('board-1');
+        (board as any).props.id = 'board-1';
         boardRepository.addBoard(board);
       }
 
@@ -259,7 +259,7 @@ describe('ArchiveBoardUseCase', () => {
       const boardResult = Board.create('Test Board', 'org-1');
       if (boardResult.success) {
         const board = boardResult.value;
-        board.setId('board-1');
+        (board as any).props.id = 'board-1';
         board.archive(); // Archive it first
         boardRepository.addBoard(board);
       }
@@ -279,7 +279,7 @@ describe('ArchiveBoardUseCase', () => {
       const boardResult = Board.create('General Board', 'org-1', true);
       if (boardResult.success) {
         const board = boardResult.value;
-        board.setId('board-general');
+        (board as any).props.id = 'board-general';
         boardRepository.addBoard(board);
       }
 

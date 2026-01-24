@@ -81,9 +81,4 @@ export class ParticipantWeightHistory {
   public get changedAt(): Date {
     return this.props.changedAt;
   }
-
-  // Setters
-  public setId(id: string): void {
-    this.props.id = id;
-  }
 }

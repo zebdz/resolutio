@@ -63,9 +63,4 @@ export class Vote {
   public get createdAt(): Date {
     return this.props.createdAt;
   }
-
-  // Setters
-  public setId(id: string): void {
-    this.props.id = id;
-  }
 }

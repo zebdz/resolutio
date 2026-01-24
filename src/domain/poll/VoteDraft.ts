@@ -67,11 +67,6 @@ export class VoteDraft {
     return this.props.updatedAt;
   }
 
-  // Setters
-  public setId(id: string): void {
-    this.props.id = id;
-  }
-
   public touch(): void {
     this.props.updatedAt = new Date();
   }

@@ -28,7 +28,7 @@ class MockOrganizationRepository implements OrganizationRepository {
   private memberships: Map<string, Set<string>> = new Map(); // userId -> Set<orgId>
 
   async save(organization: Organization): Promise<Organization> {
-    organization.setId(`org-${Date.now()}`);
+    (organization as any).props.id = `org-${Date.now()}`;
     this.organizations.set(organization.id, organization);
 
     return organization;
@@ -173,7 +173,7 @@ describe('JoinOrganizationUseCase', () => {
 
     if (orgResult.success) {
       const org = orgResult.value;
-      org.setId('org-123');
+      (org as any).props.id = 'org-123';
       organizationRepository.addOrganization(org);
 
       // Join the organization
@@ -209,7 +209,7 @@ describe('JoinOrganizationUseCase', () => {
 
     if (orgResult.success) {
       const org = orgResult.value;
-      org.setId('org-archived');
+      (org as any).props.id = 'org-archived';
       org.archive();
       organizationRepository.addOrganization(org);
 
@@ -236,7 +236,7 @@ describe('JoinOrganizationUseCase', () => {
 
     if (orgResult.success) {
       const org = orgResult.value;
-      org.setId('org-123');
+      (org as any).props.id = 'org-123';
       organizationRepository.addOrganization(org);
 
       // Mock existing membership with accepted status
@@ -271,7 +271,7 @@ describe('JoinOrganizationUseCase', () => {
 
     if (orgResult.success) {
       const org = orgResult.value;
-      org.setId('org-123');
+      (org as any).props.id = 'org-123';
       organizationRepository.addOrganization(org);
 
       // Mock existing membership with pending status
@@ -306,7 +306,7 @@ describe('JoinOrganizationUseCase', () => {
 
     if (parentResult.success) {
       const parent = parentResult.value;
-      parent.setId('org-parent');
+      (parent as any).props.id = 'org-parent';
       organizationRepository.addOrganization(parent);
 
       // Create child organization
@@ -320,7 +320,7 @@ describe('JoinOrganizationUseCase', () => {
 
       if (childResult.success) {
         const child = childResult.value;
-        child.setId('org-child');
+        (child as any).props.id = 'org-child';
         organizationRepository.addOrganization(child);
 
         // User is member of parent
@@ -351,7 +351,7 @@ describe('JoinOrganizationUseCase', () => {
 
     if (parentResult.success) {
       const parent = parentResult.value;
-      parent.setId('org-parent');
+      (parent as any).props.id = 'org-parent';
       organizationRepository.addOrganization(parent);
 
       // Create child organization
@@ -365,7 +365,7 @@ describe('JoinOrganizationUseCase', () => {
 
       if (childResult.success) {
         const child = childResult.value;
-        child.setId('org-child');
+        (child as any).props.id = 'org-child';
         organizationRepository.addOrganization(child);
 
         // User is member of child

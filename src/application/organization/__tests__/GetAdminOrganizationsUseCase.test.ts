@@ -9,7 +9,7 @@ class MockOrganizationRepository implements OrganizationRepository {
   private adminRoles: Map<string, Set<string>> = new Map(); // userId -> Set<orgId>
 
   async save(organization: Organization): Promise<Organization> {
-    organization.setId(`org-${Date.now()}`);
+    (organization as any).props.id = `org-${Date.now()}`;
     this.organizations.set(organization.id, organization);
 
     return organization;
@@ -143,8 +143,8 @@ describe('GetAdminOrganizationsUseCase', () => {
       const org1 = org1Result.value;
       const org2 = org2Result.value;
 
-      org1.setId('org-1');
-      org2.setId('org-2');
+      (org1 as any).props.id = 'org-1';
+      (org2 as any).props.id = 'org-2';
 
       organizationRepository.addOrganization(org1);
       organizationRepository.addOrganization(org2);
@@ -180,9 +180,9 @@ describe('GetAdminOrganizationsUseCase', () => {
       const org2 = org2Result.value;
       const org3 = org3Result.value;
 
-      org1.setId('org-1');
-      org2.setId('org-2');
-      org3.setId('org-3');
+      (org1 as any).props.id = 'org-1';
+      (org2 as any).props.id = 'org-2';
+      (org3 as any).props.id = 'org-3';
 
       organizationRepository.addOrganization(org1);
       organizationRepository.addOrganization(org2);
