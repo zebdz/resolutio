@@ -14,7 +14,7 @@ export class CreateAnswerUseCase {
   constructor(private pollRepository: PollRepository) {}
 
   async execute(input: CreateAnswerInput): Promise<Result<Answer, string>> {
-    // Get the question
+    // Get the question to find its poll
     const questionResult = await this.pollRepository.getQuestionById(
       input.questionId
     );
@@ -28,7 +28,7 @@ export class CreateAnswerUseCase {
       return failure(PollErrors.QUESTION_NOT_FOUND);
     }
 
-    // Get the poll
+    // Get the poll (with questions loaded)
     const pollResult = await this.pollRepository.getPollById(question.pollId);
     if (!pollResult.success) {
       return failure(pollResult.error);
@@ -44,39 +44,30 @@ export class CreateAnswerUseCase {
       return failure(PollErrors.NOT_POLL_CREATOR);
     }
 
-    // Check if poll can be edited
+    // Check if poll has votes
     const hasVotesResult = await this.pollRepository.pollHasVotes(poll.id);
     if (!hasVotesResult.success) {
       return failure(hasVotesResult.error);
-    }
-
-    // Check poll state
-    if (poll.isActive()) {
-      return failure(PollErrors.CANNOT_MODIFY_ACTIVE);
-    }
-
-    if (poll.isFinished()) {
-      return failure(PollErrors.CANNOT_MODIFY_FINISHED);
     }
 
     if (hasVotesResult.value) {
       return failure(PollErrors.CANNOT_MODIFY_HAS_VOTES);
     }
 
-    // Create the answer
-    const answerResult = Answer.create(
+    // Add answer through aggregate root (validates poll state)
+    const addAnswerResult = poll.addAnswerToQuestion(
+      input.questionId,
       input.text,
-      input.order,
-      input.questionId
+      input.order
     );
 
-    if (!answerResult.success) {
-      return failure(answerResult.error);
+    if (!addAnswerResult.success) {
+      return failure(addAnswerResult.error);
     }
 
-    const answer = answerResult.value;
+    const answer = addAnswerResult.value;
 
-    // Save the answer
+    // Save the answer to database
     const createResult = await this.pollRepository.createAnswer(answer);
     if (!createResult.success) {
       return failure(createResult.error);

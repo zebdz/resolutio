@@ -25,6 +25,8 @@ export const PollDomainCodes = {
     'domain.poll.cannotRemoveQuestionFinished',
   POLL_CANNOT_REMOVE_QUESTION_ARCHIVED:
     'domain.poll.cannotRemoveQuestionArchived',
+  POLL_CANNOT_ADD_ANSWER_ACTIVE: 'domain.poll.cannotAddAnswerActive',
+  POLL_CANNOT_ADD_ANSWER_FINISHED: 'domain.poll.cannotAddAnswerFinished',
   QUESTION_NOT_FOUND: 'domain.poll.questionNotFound',
 
   // Question validation

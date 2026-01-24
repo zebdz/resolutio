@@ -499,6 +499,8 @@
       "pollCannotAddQuestionArchived": "Cannot add question to an archived poll",
       "pollCannotRemoveQuestionFinished": "Cannot remove question from a finished poll",
       "pollCannotRemoveQuestionArchived": "Cannot remove question from an archived poll",
+      "cannotAddAnswerActive": "Cannot add answer to an active poll",
+      "cannotAddAnswerFinished": "Cannot add answer to a finished poll",
       "questionNotFound": "Question not found",
       "singleChoiceMultipleAnswers": "Single-choice questions can only have one answer"
     }

@@ -1,5 +1,6 @@
 import { Result, success, failure } from '../shared/Result';
 import { Question, QuestionProps } from './Question';
+import { Answer } from './Answer';
 import { PollDomainCodes } from './PollDomainCodes';
 
 export interface PollProps {
@@ -318,6 +319,43 @@ export class Poll {
     this.props.archivedAt = new Date();
 
     return success(undefined);
+  }
+
+  /**
+   * Add an answer to a question through the aggregate root
+   * Validates poll state before delegating to the question
+   */
+  public addAnswerToQuestion(
+    questionId: string,
+    text: string,
+    order: number
+  ): Result<Answer, string> {
+    if (this.isActive()) {
+      return failure(PollDomainCodes.POLL_CANNOT_ADD_ANSWER_ACTIVE);
+    }
+
+    if (this.isFinished()) {
+      return failure(PollDomainCodes.POLL_CANNOT_ADD_ANSWER_FINISHED);
+    }
+
+    const question = this.props.questions.find((q) => q.id === questionId);
+    if (!question) {
+      return failure(PollDomainCodes.QUESTION_NOT_FOUND);
+    }
+
+    // Create the answer
+    const answerResult = Answer.create(text, order, questionId);
+    if (!answerResult.success) {
+      return failure(answerResult.error);
+    }
+
+    // Add to question (Question.addAnswer checks archived status)
+    const addResult = question.addAnswer(answerResult.value);
+    if (!addResult.success) {
+      return failure(addResult.error);
+    }
+
+    return success(answerResult.value);
   }
 
   public toJSON(): Omit<PollProps, 'questions'> & { questions: any[] } {

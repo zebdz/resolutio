@@ -347,4 +347,130 @@ describe('Poll Domain', () => {
       }
     });
   });
+
+  describe('addAnswerToQuestion', () => {
+    it('should add answer to existing question', () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+      const poll = pollResult.value;
+
+      // Add a question without answers
+      const questionResult = Question.create('Test Question', poll.id, 1, 0, 'single-choice');
+      const question = questionResult.value;
+      (question as any).props.id = 'question-1';
+      poll.addQuestion(question);
+
+      const result = poll.addAnswerToQuestion('question-1', 'New Answer', 1);
+      expect(result.success).toBe(true);
+
+      // Verify answer was added
+      const updatedQuestion = poll.questions.find((q) => q.id === 'question-1');
+      expect(updatedQuestion?.answers.length).toBe(1);
+      expect(updatedQuestion?.answers[0].text).toBe('New Answer');
+    });
+
+    it('should fail if poll is active', () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+      const poll = pollResult.value;
+
+      // Add question with answer and activate
+      poll.addQuestion(createQuestionWithAnswer(poll.id));
+      poll.activate();
+
+      const result = poll.addAnswerToQuestion('question-1', 'New Answer', 1);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollDomainCodes.POLL_CANNOT_ADD_ANSWER_ACTIVE);
+    });
+
+    it('should fail if poll is finished', () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+      const poll = pollResult.value;
+      poll.finish();
+
+      const result = poll.addAnswerToQuestion('question-1', 'New Answer', 1);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollDomainCodes.POLL_CANNOT_ADD_ANSWER_FINISHED);
+    });
+
+    it('should fail if question not found', () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+      const poll = pollResult.value;
+
+      const result = poll.addAnswerToQuestion('non-existent', 'New Answer', 1);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollDomainCodes.QUESTION_NOT_FOUND);
+    });
+
+    it('should fail if question is archived', () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+      const poll = pollResult.value;
+
+      const questionResult = Question.create('Test Question', poll.id, 1, 0, 'single-choice');
+      const question = questionResult.value;
+      (question as any).props.id = 'question-1';
+      poll.addQuestion(question);
+
+      // Archive the question
+      question.archive();
+
+      const result = poll.addAnswerToQuestion('question-1', 'New Answer', 1);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollDomainCodes.QUESTION_CANNOT_ADD_ANSWER_ARCHIVED);
+    });
+
+    it('should fail with invalid answer text', () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+      const poll = pollResult.value;
+
+      const questionResult = Question.create('Test Question', poll.id, 1, 0, 'single-choice');
+      const question = questionResult.value;
+      (question as any).props.id = 'question-1';
+      poll.addQuestion(question);
+
+      const result = poll.addAnswerToQuestion('question-1', '', 1);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollDomainCodes.ANSWER_TEXT_EMPTY);
+    });
+  });
 });
