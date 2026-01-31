@@ -457,6 +457,13 @@
       "weight": "Weight"
     }
   },
+  "navbar": {
+    "logo": "Resolutio",
+    "organizations": "Organizations",
+    "polls": "Polls",
+    "admin": "Admin",
+    "account": "Account"
+  },
   "domain": {
     "organization": {
       "organizationNameEmpty": "Organization name cannot be empty",

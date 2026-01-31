@@ -9,17 +9,16 @@ import { Link } from '@/src/i18n/routing';
 import { getOrganizationDetailsAction } from '@/web/actions/organization';
 import { JoinOrganizationButton } from './JoinOrganizationButton';
 import { UsersIcon } from '@heroicons/react/16/solid';
+import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 
 export default async function OrganizationDetailPage({
   params,
 }: {
   params: Promise<{ id: string; locale: string }>;
 }) {
-  const { id, locale } = await params;
+  const { id } = await params;
   const t = await getTranslations('organization.detail');
   const tCommon = await getTranslations('common');
-  const tAccount = await getTranslations('account');
-  const tBoards = await getTranslations('organization.boards');
 
   const user = await getCurrentUser();
 
@@ -28,14 +27,14 @@ export default async function OrganizationDetailPage({
 
   if (!result.success) {
     return (
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <AuthenticatedLayout>
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950">
           <Text className="text-red-800 dark:text-red-200">{result.error}</Text>
           <Link href="/organizations" className="mt-4 inline-block">
             <Button color="zinc">{tCommon('back')}</Button>
           </Link>
         </div>
-      </main>
+      </AuthenticatedLayout>
     );
   }
 
@@ -43,30 +42,16 @@ export default async function OrganizationDetailPage({
     result.data;
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <AuthenticatedLayout>
       <div className="space-y-8">
         {/* Header */}
-        <div className="flex items-start justify-between">
-          <div className="space-y-2 flex-1">
-            <Heading className="text-3xl font-bold">
-              {organization.name}
-            </Heading>
-            {firstAdmin && (
-              <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                {t('firstAdmin')}: {firstAdmin.firstName} {firstAdmin.lastName}
-              </Text>
-            )}
-          </div>
-          <div className="flex gap-2">
-            <Link href="/organizations">
-              <Button color="zinc">{tCommon('back')}</Button>
-            </Link>
-            {user && (
-              <Link href="/account">
-                <Button color="zinc">{tAccount('button')}</Button>
-              </Link>
-            )}
-          </div>
+        <div className="space-y-2">
+          <Heading className="text-3xl font-bold">{organization.name}</Heading>
+          {firstAdmin && (
+            <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+              {t('firstAdmin')}: {firstAdmin.firstName} {firstAdmin.lastName}
+            </Text>
+          )}
         </div>
 
         {/* Description */}
@@ -169,6 +154,6 @@ export default async function OrganizationDetailPage({
           </>
         )}
       </div>
-    </main>
+    </AuthenticatedLayout>
   );
 }

@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { Heading } from '@/app/components/catalyst/heading';
@@ -12,6 +11,7 @@ import {
 } from '@/app/components/catalyst/description-list';
 import { AccountForm } from '@/web/components/account/AccountForm';
 import { logoutAction } from '@/web/actions/auth';
+import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 
 export async function generateMetadata() {
   const t = await getTranslations('account');
@@ -25,12 +25,13 @@ export default async function AccountPage() {
   const t = await getTranslations('account');
   const user = await getCurrentUser();
 
+  // AuthenticatedLayout handles redirect if no user
   if (!user) {
-    redirect('/login');
+    return <AuthenticatedLayout>{null}</AuthenticatedLayout>;
   }
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+    <AuthenticatedLayout>
       <div className="space-y-8">
         {/* Header */}
         <div className="space-y-2">
@@ -104,6 +105,6 @@ export default async function AccountPage() {
           </form>
         </div>
       </div>
-    </main>
+    </AuthenticatedLayout>
   );
 }

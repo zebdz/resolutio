@@ -457,6 +457,13 @@
       "weight": "Вес"
     }
   },
+  "navbar": {
+    "logo": "Resolutio",
+    "organizations": "Организации",
+    "polls": "Опросы",
+    "admin": "Админ",
+    "account": "Аккаунт"
+  },
   "domain": {
     "organization": {
       "organizationNameEmpty": "Название организации не может быть пустым",

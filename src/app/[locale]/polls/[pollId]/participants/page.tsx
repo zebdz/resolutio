@@ -5,17 +5,15 @@ import { getPollByIdAction } from '@/web/actions/poll';
 import { getParticipantsAction } from '@/web/actions/participant';
 import ParticipantManagement from '@/web/components/participants/ParticipantManagement';
 import { Heading } from '@/app/components/catalyst/heading';
-import { Link } from '@/src/i18n/routing';
-import { Button } from '@/app/components/catalyst/button';
-import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 import { Toaster } from 'sonner';
 import { ParticipantWithUser } from '@/src/application/poll/GetParticipantsUseCase';
+import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 
 import {
   prisma,
   PrismaOrganizationRepository,
   PrismaUserRepository,
-  PrismaBoardRepository
+  PrismaBoardRepository,
 } from '@/infrastructure/index';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);
@@ -33,9 +31,8 @@ export default async function ParticipantsPage({
   params,
 }: ParticipantsPageProps) {
   const t = await getTranslations('poll.participants');
-  const commonT = await getTranslations('common');
   const user = await getCurrentUser();
-  const { pollId, locale } = await params;
+  const { pollId } = await params;
 
   if (!user) {
     redirect('/auth/login');
@@ -73,14 +70,8 @@ export default async function ParticipantsPage({
 
   if (!participantsResult.success) {
     return (
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <AuthenticatedLayout>
         <div className="mb-8">
-          <Link href={`/polls/${pollId}/edit`}>
-            <Button color="zinc" className="inline-flex items-center mb-4">
-              <ArrowLeftIcon className="w-4 h-4 mr-2" />
-              {commonT('back')}
-            </Button>
-          </Link>
           <Heading>{t('title')}</Heading>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">{poll.title}</p>
         </div>
@@ -90,7 +81,7 @@ export default async function ParticipantsPage({
             {participantsResult.error}
           </p>
         </div>
-      </main>
+      </AuthenticatedLayout>
     );
   }
 
@@ -109,15 +100,8 @@ export default async function ParticipantsPage({
   );
 
   return (
-    <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+    <AuthenticatedLayout>
       <div className="mb-8">
-        {/* <Link href={`/polls/${pollId}/edit`}> */}
-        <Link href={`/polls`}>
-          <Button color="zinc" className="inline-flex items-center mb-4">
-            <ArrowLeftIcon className="w-4 h-4 mr-2" />
-            {commonT('back')}
-          </Button>
-        </Link>
         <Heading>{t('title')}</Heading>
         <p className="mt-2 text-zinc-600 dark:text-zinc-400">{poll.title}</p>
       </div>
@@ -133,6 +117,6 @@ export default async function ParticipantsPage({
       />
 
       <Toaster />
-    </main>
+    </AuthenticatedLayout>
   );
 }

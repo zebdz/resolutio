@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { Heading, Subheading } from '@/app/components/catalyst/heading';
@@ -14,6 +13,7 @@ import {
   PrismaOrganizationRepository,
   PrismaUserRepository,
 } from '@/infrastructure/index';
+import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
@@ -23,7 +23,7 @@ export default async function PollsPage() {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect('/login');
+    return <AuthenticatedLayout>{null}</AuthenticatedLayout>;
   }
 
   // Check if user is a member of any boards
@@ -42,7 +42,7 @@ export default async function PollsPage() {
   const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <AuthenticatedLayout>
       <Toaster />
       <div className="space-y-8">
         {/* Header */}
@@ -98,6 +98,6 @@ export default async function PollsPage() {
           </div>
         )}
       </div>
-    </main>
+    </AuthenticatedLayout>
   );
 }

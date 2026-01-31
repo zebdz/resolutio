@@ -25,11 +25,9 @@ export function LocaleSwitcher() {
       href={pathname}
       locale={otherLocale}
       aria-label={`Switch to ${otherLocaleLabel}`}
-      className="group rounded-full bg-white/90 px-3 py-2 text-sm font-medium shadow-lg shadow-zinc-800/5 ring-1 ring-zinc-900/5 backdrop-blur transition dark:bg-zinc-800/90 dark:ring-white/10 dark:hover:ring-white/20"
+      className="flex items-center gap-2 rounded-lg p-2 text-sm font-medium text-zinc-950 hover:bg-zinc-950/5 dark:text-white dark:hover:bg-white/5"
     >
-      <span className="text-zinc-800 dark:text-zinc-200">
-        {otherLocale.toUpperCase()}
-      </span>
+      <span>{otherLocale.toUpperCase()}</span>
     </Link>
   );
 }

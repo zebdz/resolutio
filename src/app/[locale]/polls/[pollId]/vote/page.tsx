@@ -1,6 +1,4 @@
-import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { getCurrentUser } from '@/web/lib/session';
 import {
   getUserVotingProgressAction,
   canUserVoteAction,
@@ -11,6 +9,7 @@ import { Link } from '@/src/i18n/routing';
 import { Button } from '@/app/components/catalyst/button';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 import { Toaster } from 'sonner';
+import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 
 interface VotePageProps {
   params: Promise<{
@@ -20,21 +19,15 @@ interface VotePageProps {
 }
 
 export default async function VotePage({ params }: VotePageProps) {
-  const { pollId, locale } = await params;
-  const t = await getTranslations('poll.voting');
+  const { pollId } = await params;
   const commonT = await getTranslations('common');
-  const user = await getCurrentUser();
-
-  if (!user) {
-    redirect('/login');
-  }
 
   // Check if user can vote
   const canVoteResult = await canUserVoteAction(pollId);
 
   if (!canVoteResult.success) {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+      <AuthenticatedLayout>
         <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
           <p className="text-sm text-red-800 dark:text-red-200">
             {canVoteResult.error}
@@ -48,13 +41,13 @@ export default async function VotePage({ params }: VotePageProps) {
             </Button>
           </Link>
         </div>
-      </main>
+      </AuthenticatedLayout>
     );
   }
 
   if (!canVoteResult.data.canVote) {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+      <AuthenticatedLayout>
         <div className="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20">
           <p className="text-sm text-yellow-800 dark:text-yellow-200">
             {canVoteResult.data.reason}
@@ -68,7 +61,7 @@ export default async function VotePage({ params }: VotePageProps) {
             </Button>
           </Link>
         </div>
-      </main>
+      </AuthenticatedLayout>
     );
   }
 
@@ -77,7 +70,7 @@ export default async function VotePage({ params }: VotePageProps) {
 
   if (!progressResult.success) {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+      <AuthenticatedLayout>
         <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
           <p className="text-sm text-red-800 dark:text-red-200">
             {progressResult.error}
@@ -91,7 +84,7 @@ export default async function VotePage({ params }: VotePageProps) {
             </Button>
           </Link>
         </div>
-      </main>
+      </AuthenticatedLayout>
     );
   }
 
@@ -124,14 +117,8 @@ export default async function VotePage({ params }: VotePageProps) {
   }));
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+    <AuthenticatedLayout>
       <div className="mb-6">
-        <Link href="/polls">
-          <Button color="zinc" className="inline-flex items-center mb-4">
-            <ArrowLeftIcon className="w-4 h-4 mr-2" />
-            {commonT('back')}
-          </Button>
-        </Link>
         <Heading>{serializedPoll.title}</Heading>
         {serializedPoll.description && (
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">
@@ -147,6 +134,6 @@ export default async function VotePage({ params }: VotePageProps) {
       />
 
       <Toaster />
-    </main>
+    </AuthenticatedLayout>
   );
 }
