@@ -114,8 +114,13 @@ export default function PollResults({
         {/* Question results */}
         {results.questions.map((question) => {
           const winner = (() => {
-            if (question.questionType !== 'single-choice') return null;
-            if (question.answers.length === 0) return null;
+            if (question.questionType !== 'single-choice') {
+              return null;
+            }
+
+            if (question.answers.length === 0) {
+              return null;
+            }
 
             const maxVotes = Math.max(
               ...question.answers.map((a) => a.weightedVotes)

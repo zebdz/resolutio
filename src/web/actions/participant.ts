@@ -77,6 +77,7 @@ export async function getParticipantsAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -126,6 +127,7 @@ export async function updateParticipantWeightAction(data: {
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -140,6 +142,7 @@ export async function updateParticipantWeightAction(data: {
       const fieldErrors: Record<string, string[]> = {};
       validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
+
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
@@ -193,6 +196,7 @@ export async function removeParticipantAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -237,6 +241,7 @@ export async function getWeightHistoryAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,

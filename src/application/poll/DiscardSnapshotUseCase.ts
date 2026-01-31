@@ -1,27 +1,34 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
-import { DraftRepository } from '../../domain/poll/DraftRepository';
+import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
+import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { PollErrors } from './PollErrors';
 
-interface FinishPollCommand {
+interface DiscardSnapshotCommand {
   pollId: string;
-  userId: string; // Admin user finishing the poll
+  userId: string;
 }
 
-export class FinishPollUseCase {
+/**
+ * Discards a participant snapshot (READY → DRAFT).
+ * Only allowed if no votes have been cast.
+ */
+export class DiscardSnapshotUseCase {
   constructor(
     private pollRepository: PollRepository,
-    private draftRepository: DraftRepository,
+    private participantRepository: ParticipantRepository,
+    private voteRepository: VoteRepository,
     private boardRepository: BoardRepository,
     private organizationRepository: OrganizationRepository,
     private userRepository: UserRepository
   ) {}
 
-  async execute(command: FinishPollCommand): Promise<Result<void, string>> {
-    // Get the poll
+  async execute(
+    command: DiscardSnapshotCommand
+  ): Promise<Result<void, string>> {
     const pollResult = await this.pollRepository.getPollById(command.pollId);
 
     if (!pollResult.success) {
@@ -54,28 +61,39 @@ export class FinishPollUseCase {
       }
     }
 
-    // Mark poll as finished
-    const finishResult = poll.finish();
+    // Check if poll has votes
+    const hasVotesResult = await this.voteRepository.pollHasVotes(
+      command.pollId
+    );
 
-    if (!finishResult.success) {
-      return failure(finishResult.error);
+    if (!hasVotesResult.success) {
+      return failure(hasVotesResult.error);
     }
 
-    // Save the finished poll
+    const hasVotes = hasVotesResult.value;
+
+    // Discard snapshot (validates state and votes)
+    const discardResult = poll.discardSnapshot(hasVotes);
+
+    if (!discardResult.success) {
+      return failure(discardResult.error);
+    }
+
+    // Delete all participants for this poll
+    const deleteResult =
+      await this.participantRepository.deleteParticipantsByPollId(
+        command.pollId
+      );
+
+    if (!deleteResult.success) {
+      return failure(deleteResult.error);
+    }
+
+    // Update the poll
     const updateResult = await this.pollRepository.updatePoll(poll);
 
     if (!updateResult.success) {
       return failure(updateResult.error);
-    }
-
-    // Clean up all remaining drafts for this poll
-    const deleteDraftsResult = await this.draftRepository.deleteAllPollDrafts(
-      command.pollId
-    );
-
-    if (!deleteDraftsResult.success) {
-      // Log error but don't fail the operation
-      console.error('Failed to delete poll drafts:', deleteDraftsResult.error);
     }
 
     return success(undefined);

@@ -321,13 +321,13 @@ class MockOrganizationRepository implements OrganizationRepository {
     return [];
   }
 
-  async findAdminOrganizationsByUserId(userId: string): Promise<Organization[]> {
+  async findAdminOrganizationsByUserId(
+    userId: string
+  ): Promise<Organization[]> {
     return [];
   }
 
-  async findAllWithStats(
-    excludeUserMemberships?: string
-  ): Promise<
+  async findAllWithStats(excludeUserMemberships?: string): Promise<
     Array<{
       organization: Organization;
       memberCount: number;
@@ -424,6 +424,7 @@ describe('DeactivatePollUseCase', () => {
       new Date('2024-12-31')
     );
     expect(pollResult.success).toBe(true);
+
     if (pollResult.success) {
       poll = pollResult.value;
       (poll as any).props.id = 'poll-1';
@@ -437,6 +438,7 @@ describe('DeactivatePollUseCase', () => {
         'single-choice'
       );
       expect(questionResult.success).toBe(true);
+
       if (questionResult.success) {
         const question = questionResult.value;
         (question as any).props.id = 'question-1';
@@ -449,7 +451,8 @@ describe('DeactivatePollUseCase', () => {
         poll.addQuestion(question);
       }
 
-      // Activate the poll
+      // Take snapshot and activate the poll
+      poll.takeSnapshot();
       poll.activate();
 
       repository.createPoll(poll);
@@ -464,13 +467,14 @@ describe('DeactivatePollUseCase', () => {
 
     expect(result.success).toBe(true);
 
-    // Verify poll is deactivated
+    // Verify poll is deactivated (now in READY state)
     const updatedPollResult = await repository.getPollById(poll.id);
     expect(updatedPollResult.success).toBe(true);
+
     if (updatedPollResult.success) {
       const updatedPoll = updatedPollResult.value!;
-      expect(updatedPoll.active).toBe(false);
-      expect(updatedPoll.finished).toBe(false);
+      expect(updatedPoll.isActive()).toBe(false);
+      expect(updatedPoll.isReady()).toBe(true);
     }
   });
 
@@ -484,8 +488,8 @@ describe('DeactivatePollUseCase', () => {
     expect(result.error).toBe(PollErrors.NOT_FOUND);
   });
 
-  it('should fail if poll is already inactive', async () => {
-    // Deactivate the poll first
+  it('should fail if poll is in READY state (not active)', async () => {
+    // Deactivate the poll first (moves to READY)
     poll.deactivate();
     await repository.updatePoll(poll);
 
@@ -495,7 +499,7 @@ describe('DeactivatePollUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_ALREADY_INACTIVE);
+    expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
   });
 
   it('should fail if poll is finished', async () => {
@@ -509,7 +513,7 @@ describe('DeactivatePollUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_CANNOT_DEACTIVATE_FINISHED);
+    expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
   });
 
   // Authorization tests

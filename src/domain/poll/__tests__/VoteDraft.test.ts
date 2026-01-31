@@ -12,6 +12,7 @@ describe('VoteDraft Domain', () => {
       );
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.pollId).toBe('poll-1');
         expect(result.value.questionId).toBe('question-1');
@@ -31,6 +32,7 @@ describe('VoteDraft Domain', () => {
       );
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         const timeDiff = Math.abs(
           result.value.updatedAt.getTime() - result.value.createdAt.getTime()
@@ -50,6 +52,7 @@ describe('VoteDraft Domain', () => {
       );
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         const draft = result.value;
         const originalUpdatedAt = draft.updatedAt;

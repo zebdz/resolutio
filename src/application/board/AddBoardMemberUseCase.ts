@@ -45,6 +45,7 @@ export class AddBoardMemberUseCase {
     const isSuperAdmin = await this.userRepository.isSuperAdmin(
       input.adminUserId
     );
+
     if (!isSuperAdmin) {
       const isAdmin = await this.organizationRepository.isUserAdmin(
         input.adminUserId,

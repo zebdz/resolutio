@@ -71,11 +71,13 @@ export function AccountForm({ user }: Props) {
 
       if (!result.success) {
         setError(result.error);
+
         if (result.fieldErrors) {
           setFieldErrors(result.fieldErrors);
         }
       } else {
         setSuccess(t('updateSuccess'));
+
         // Redirect to the new language locale if changed
         if (formValues.language !== user.language) {
           // Use setTimeout to show success message briefly before redirect

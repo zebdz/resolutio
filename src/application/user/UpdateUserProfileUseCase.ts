@@ -15,6 +15,7 @@ export class UpdateUserProfileUseCase {
     try {
       // Find the user
       const user = await this.userRepository.findById(input.userId);
+
       if (!user) {
         return failure(new Error(`User with ID ${input.userId} not found`));
       }

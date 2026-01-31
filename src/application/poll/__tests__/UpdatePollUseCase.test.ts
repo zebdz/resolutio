@@ -105,6 +105,7 @@ describe('UpdatePollUseCase', () => {
       );
       questionResult.value.addAnswer(answerResult.value);
       poll.addQuestion(questionResult.value);
+      poll.takeSnapshot();
       poll.activate();
 
       const result = await useCase.execute({
@@ -121,6 +122,23 @@ describe('UpdatePollUseCase', () => {
     });
 
     it('should fail when poll is finished', async () => {
+      // Add a question with answer and transition to FINISHED
+      const questionResult = Question.create(
+        'Test Question',
+        'poll-1',
+        1,
+        0,
+        'single-choice'
+      );
+      const answerResult = Answer.create(
+        'Test Answer',
+        1,
+        questionResult.value.id
+      );
+      questionResult.value.addAnswer(answerResult.value);
+      poll.addQuestion(questionResult.value);
+      poll.takeSnapshot();
+      poll.activate();
       poll.finish();
 
       const result = await useCase.execute({

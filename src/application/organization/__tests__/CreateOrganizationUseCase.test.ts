@@ -36,6 +36,7 @@ class MockOrganizationRepository implements OrganizationRepository {
 
   async getAncestorIds(organizationId: string): Promise<string[]> {
     const org = await this.findById(organizationId);
+
     if (!org || !org.parentId) {
       return [];
     }
@@ -148,6 +149,7 @@ class MockBoardRepository implements BoardRepository {
 
   async update(board: Board): Promise<Board> {
     const index = this.boards.findIndex((b) => b.id === board.id);
+
     if (index !== -1) {
       this.boards[index] = board;
     }
@@ -184,6 +186,7 @@ describe('CreateOrganizationUseCase', () => {
     const result = await useCase.execute(input, 'user-123', 'General Meeting');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.organization.name).toBe('Test Organization');
       expect(result.value.organization.description).toBe('A test organization');
@@ -202,6 +205,7 @@ describe('CreateOrganizationUseCase', () => {
     const result = await useCase.execute(input, 'user-123', 'General Meeting');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.generalBoard.name).toBe('General Meeting');
       expect(result.value.generalBoard.isGeneral).toBe(true);
@@ -221,6 +225,7 @@ describe('CreateOrganizationUseCase', () => {
     const result = await useCase.execute(input, 'user-456', 'Общее собрание');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.generalBoard.name).toBe('Общее собрание');
       expect(result.value.generalBoard.isGeneral).toBe(true);
@@ -237,6 +242,7 @@ describe('CreateOrganizationUseCase', () => {
     const result = await useCase.execute(input, 'user-123', 'General Meeting');
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(
         OrganizationDomainCodes.ORGANIZATION_NAME_EMPTY
@@ -254,6 +260,7 @@ describe('CreateOrganizationUseCase', () => {
     const result = await useCase.execute(input, 'user-123', 'General Meeting');
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(
         OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_EMPTY
@@ -271,6 +278,7 @@ describe('CreateOrganizationUseCase', () => {
     const result = await useCase.execute(input, 'user-123', 'General Meeting');
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(OrganizationErrors.PARENT_NOT_FOUND);
     }
@@ -308,6 +316,7 @@ describe('CreateOrganizationUseCase', () => {
       );
 
       expect(childResult.success).toBe(true);
+
       if (childResult.success) {
         expect(childResult.value.organization.parentId).toBe(parentId);
       }

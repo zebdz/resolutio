@@ -78,8 +78,10 @@ export function CreatePollForm() {
     async function loadBoards() {
       try {
         const result = await getUserBoardsAction();
+
         if (result.success) {
           setBoards(result.data);
+
           // Auto-select first board if available
           if (result.data.length > 0 && !pollData.boardId) {
             setPollData((prev) => ({ ...prev, boardId: result.data[0].id }));
@@ -248,6 +250,7 @@ export function CreatePollForm() {
         }
 
         const validAnswers = question.answers.filter((a) => a.text.trim());
+
         if (validAnswers.length === 0) {
           setError(t('errors.atLeastOneAnswer'));
 
@@ -284,6 +287,7 @@ export function CreatePollForm() {
         const questionFormData = new FormData();
         questionFormData.append('pollId', pollId);
         questionFormData.append('text', question.text);
+
         if (question.details) {
           questionFormData.append('details', question.details);
         }

@@ -46,17 +46,20 @@ export class GetWeightHistoryUseCase {
 
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(pollId);
+
     if (!pollResult.success) {
       return failure(pollResult.error);
     }
 
     const poll = pollResult.value;
+
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
     }
 
     // 2. Get board and check admin permissions
     const board = await this.boardRepository.findById(poll.boardId);
+
     if (!board) {
       return failure(PollErrors.BOARD_NOT_FOUND);
     }
@@ -71,7 +74,9 @@ export class GetWeightHistoryUseCase {
     }
 
     // 3. Get weight history
-    const historyResult = await this.participantRepository.getWeightHistory(pollId);
+    const historyResult =
+      await this.participantRepository.getWeightHistory(pollId);
+
     if (!historyResult.success) {
       return failure(historyResult.error);
     }

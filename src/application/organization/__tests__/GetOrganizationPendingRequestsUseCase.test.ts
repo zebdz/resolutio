@@ -40,6 +40,7 @@ class MockPrisma {
           const order = Array.isArray(orderBy)
             ? orderBy[0].createdAt
             : orderBy.createdAt;
+
           if (order === 'asc') {
             return a.createdAt.getTime() - b.createdAt.getTime();
           }
@@ -114,6 +115,7 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe(OrganizationErrors.NOT_FOUND);
       }
@@ -132,6 +134,7 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe(OrganizationErrors.NOT_ADMIN);
       }
@@ -151,6 +154,7 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.requests).toEqual([]);
       }
@@ -187,6 +191,7 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.requests).toHaveLength(2);
         expect(result.value.requests[0].userId).toBe('user-1');
@@ -233,6 +238,7 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.requests).toHaveLength(1);
         expect(result.value.requests[0].userId).toBe('user-1');
@@ -269,6 +275,7 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.requests).toHaveLength(2);
         // Should be ordered by creation time (oldest first)

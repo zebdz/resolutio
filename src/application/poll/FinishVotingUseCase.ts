@@ -25,11 +25,13 @@ export class FinishVotingUseCase {
 
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(pollId);
+
     if (!pollResult.success) {
       return failure(pollResult.error);
     }
 
     const poll = pollResult.value;
+
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
     }
@@ -45,12 +47,17 @@ export class FinishVotingUseCase {
 
     // 3. Check if user is a participant
     const participantResult =
-      await this.participantRepository.getParticipantByUserAndPoll(pollId, userId);
+      await this.participantRepository.getParticipantByUserAndPoll(
+        pollId,
+        userId
+      );
+
     if (!participantResult.success) {
       return failure(participantResult.error);
     }
 
     const participant = participantResult.value;
+
     if (!participant) {
       return failure(PollDomainCodes.NOT_PARTICIPANT);
     }
@@ -60,6 +67,7 @@ export class FinishVotingUseCase {
       pollId,
       userId
     );
+
     if (!hasFinishedResult.success) {
       return failure(hasFinishedResult.error);
     }
@@ -73,6 +81,7 @@ export class FinishVotingUseCase {
       pollId,
       userId
     );
+
     if (!draftsResult.success) {
       return failure(draftsResult.error);
     }
@@ -89,6 +98,7 @@ export class FinishVotingUseCase {
 
     // 6b. Validate single-choice questions have exactly 1 draft
     const draftsByQuestion = new Map<string, number>();
+
     for (const draft of drafts) {
       draftsByQuestion.set(
         draft.questionId,
@@ -99,6 +109,7 @@ export class FinishVotingUseCase {
     for (const question of questions) {
       if (question.questionType === 'single-choice') {
         const draftCount = draftsByQuestion.get(question.id) || 0;
+
         if (draftCount > 1) {
           return failure(PollDomainCodes.SINGLE_CHOICE_MULTIPLE_ANSWERS);
         }
@@ -107,6 +118,7 @@ export class FinishVotingUseCase {
 
     // 7. Create votes from drafts with participant weight
     const votes: Vote[] = [];
+
     for (const draft of drafts) {
       const voteResult = Vote.create(
         draft.questionId,
@@ -124,6 +136,7 @@ export class FinishVotingUseCase {
 
     // 8. Save all votes
     const createVotesResult = await this.voteRepository.createVotes(votes);
+
     if (!createVotesResult.success) {
       return failure(createVotesResult.error);
     }
@@ -133,6 +146,7 @@ export class FinishVotingUseCase {
       pollId,
       userId
     );
+
     if (!deleteResult.success) {
       return failure(deleteResult.error);
     }

@@ -22,6 +22,7 @@ describe('GetUserOrganizationsUseCase', () => {
       const filtered = memberships.filter(
         (m) => m.userId === args.where.userId
       );
+
       // Sort by createdAt descending if orderBy is specified
       if (args.orderBy && args.orderBy.createdAt === 'desc') {
         return filtered.sort(
@@ -41,6 +42,7 @@ describe('GetUserOrganizationsUseCase', () => {
     const result = await useCase.execute('user-123');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.member).toEqual([]);
       expect(result.value.pending).toEqual([]);
@@ -97,6 +99,7 @@ describe('GetUserOrganizationsUseCase', () => {
     const result = await useCase.execute('user-123');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.member).toHaveLength(2);
       // Sorted by createdAt desc, so org-2 (Jan 3) comes before org-1 (Jan 1)
@@ -133,6 +136,7 @@ describe('GetUserOrganizationsUseCase', () => {
     const result = await useCase.execute('user-123');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.pending).toHaveLength(1);
       expect(result.value.pending[0].organization.name).toBe(
@@ -204,6 +208,7 @@ describe('GetUserOrganizationsUseCase', () => {
     const result = await useCase.execute('user-123');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.rejected).toHaveLength(2);
 
@@ -307,6 +312,7 @@ describe('GetUserOrganizationsUseCase', () => {
     const result = await useCase.execute('user-123');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.member).toHaveLength(1);
       expect(result.value.member[0].organization.name).toBe('Accepted Org');
@@ -390,6 +396,7 @@ describe('GetUserOrganizationsUseCase', () => {
     const result = await useCase.execute('user-123');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.member).toHaveLength(3);
       // Should be sorted by membership createdAt descending (newest request first)

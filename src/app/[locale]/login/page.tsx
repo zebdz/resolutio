@@ -15,6 +15,7 @@ export async function generateMetadata() {
 export default async function LoginPage() {
   // Redirect to home if already logged in
   const user = await getCurrentUser();
+
   if (user) {
     redirect('/home');
   }

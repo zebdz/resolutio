@@ -64,6 +64,7 @@ class MockBoardRepository implements BoardRepository {
     removedReason?: string
   ): Promise<void> {
     const members = this.members.get(boardId);
+
     if (members) {
       members.delete(userId);
     }
@@ -253,6 +254,7 @@ describe('AddBoardMemberUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe('board.errors.notFound');
       }
@@ -266,6 +268,7 @@ describe('AddBoardMemberUseCase', () => {
         'Test Desc',
         'creator-1'
       );
+
       if (orgResult.success) {
         const org = orgResult.value;
         (org as any).props.id = 'org-1';
@@ -273,6 +276,7 @@ describe('AddBoardMemberUseCase', () => {
       }
 
       const boardResult = Board.create('Test Board', 'org-1');
+
       if (boardResult.success) {
         const board = boardResult.value;
         (board as any).props.id = 'board-1';
@@ -288,6 +292,7 @@ describe('AddBoardMemberUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe('organization.errors.notAdmin');
       }
@@ -301,6 +306,7 @@ describe('AddBoardMemberUseCase', () => {
         'Test Desc',
         'creator-1'
       );
+
       if (orgResult.success) {
         const org = orgResult.value;
         (org as any).props.id = 'org-1';
@@ -309,6 +315,7 @@ describe('AddBoardMemberUseCase', () => {
       }
 
       const boardResult = Board.create('Test Board', 'org-1');
+
       if (boardResult.success) {
         const board = boardResult.value;
         (board as any).props.id = 'board-1';
@@ -316,6 +323,7 @@ describe('AddBoardMemberUseCase', () => {
       }
 
       const generalBoardResult = Board.create('Test Board', 'org-1', true);
+
       if (generalBoardResult.success) {
         const generalBoard = generalBoardResult.value;
         (generalBoard as any).props.id = 'general-board';
@@ -341,6 +349,7 @@ describe('AddBoardMemberUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe('board.errors.userNotOrgMember');
       }
@@ -357,6 +366,7 @@ describe('AddBoardMemberUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe('board.errors.alreadyMember');
       }
@@ -392,6 +402,7 @@ describe('AddBoardMemberUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe('board.errors.boardArchived');
       }
@@ -405,6 +416,7 @@ describe('AddBoardMemberUseCase', () => {
         'Test Desc',
         'creator-1'
       );
+
       if (orgResult.success) {
         const org = orgResult.value;
         (org as any).props.id = 'org-1';
@@ -412,6 +424,7 @@ describe('AddBoardMemberUseCase', () => {
       }
 
       const boardResult = Board.create('Test Board', 'org-1');
+
       if (boardResult.success) {
         const board = boardResult.value;
         (board as any).props.id = 'board-1';

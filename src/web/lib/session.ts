@@ -35,6 +35,7 @@ export async function deleteSessionCookie(): Promise<void> {
 export async function getCurrentUser(): Promise<User | null> {
   try {
     const sessionId = await getSessionCookie();
+
     if (!sessionId) {
       return null;
     }
@@ -44,6 +45,7 @@ export async function getCurrentUser(): Promise<User | null> {
 
     // Get session
     const session = await sessionRepository.findById(sessionId);
+
     if (!session) {
       return null;
     }

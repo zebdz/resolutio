@@ -51,6 +51,7 @@ describe('GetPendingRequestsUseCase', () => {
     const result = await useCase.execute('admin-123');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.requests).toEqual([]);
     }
@@ -74,6 +75,7 @@ describe('GetPendingRequestsUseCase', () => {
     const result = await useCase.execute('admin-123');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.requests).toEqual([]);
     }
@@ -115,6 +117,7 @@ describe('GetPendingRequestsUseCase', () => {
     const result = await useCase.execute('admin-123');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.requests).toHaveLength(1);
       expect(result.value.requests[0].organizationId).toBe('org-1');
@@ -218,6 +221,7 @@ describe('GetPendingRequestsUseCase', () => {
     const result = await useCase.execute('admin-123');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.requests).toHaveLength(3);
 
@@ -312,6 +316,7 @@ describe('GetPendingRequestsUseCase', () => {
     const result = await useCase.execute('admin-123');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.requests).toHaveLength(3);
       // Should be sorted by createdAt ascending
@@ -376,6 +381,7 @@ describe('GetPendingRequestsUseCase', () => {
     const result = await useCase.execute('admin-123');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       // Should only return request for org-1, not org-2
       expect(result.value.requests).toHaveLength(1);

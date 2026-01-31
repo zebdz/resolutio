@@ -77,13 +77,16 @@ class MockOrganizationRepository implements OrganizationRepository {
     userId: string
   ): Promise<Organization[]> {
     const adminOrgs = this.adminRoles.get(userId);
+
     if (!adminOrgs) {
       return [];
     }
 
     const result: Organization[] = [];
+
     for (const orgId of adminOrgs) {
       const org = this.organizations.get(orgId);
+
       if (org) {
         result.push(org);
       }
@@ -127,6 +130,7 @@ describe('GetAdminOrganizationsUseCase', () => {
     const result = await useCase.execute('user-123');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.organizations).toEqual([]);
     }
@@ -156,6 +160,7 @@ describe('GetAdminOrganizationsUseCase', () => {
       const result = await useCase.execute('user-123');
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.organizations).toHaveLength(2);
         expect(result.value.organizations.map((org) => org.id)).toEqual([
@@ -195,6 +200,7 @@ describe('GetAdminOrganizationsUseCase', () => {
       const result = await useCase.execute('user-123');
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.organizations).toHaveLength(2);
         expect(result.value.organizations.map((org) => org.id)).toEqual([

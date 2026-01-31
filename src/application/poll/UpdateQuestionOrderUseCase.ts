@@ -22,6 +22,7 @@ export class UpdateQuestionOrderUseCase {
   ): Promise<Result<void, string>> {
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(input.pollId);
+
     if (!pollResult.success || !pollResult.value) {
       return failure(PollErrors.NOT_FOUND);
     }
@@ -42,6 +43,7 @@ export class UpdateQuestionOrderUseCase {
     const result = await this.questionRepository.updateQuestionOrder(
       input.updates
     );
+
     if (!result.success) {
       return failure(PollErrors.QUESTION_NOT_FOUND); // Repository operation error
     }

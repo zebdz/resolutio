@@ -32,17 +32,20 @@ export class CreateAnswerUseCase {
     }
 
     const question = questionResult.value;
+
     if (!question) {
       return failure(PollErrors.QUESTION_NOT_FOUND);
     }
 
     // Get the poll (with questions loaded)
     const pollResult = await this.pollRepository.getPollById(question.pollId);
+
     if (!pollResult.success) {
       return failure(pollResult.error);
     }
 
     const poll = pollResult.value;
+
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
     }
@@ -54,6 +57,7 @@ export class CreateAnswerUseCase {
 
     // Check if poll has votes
     const hasVotesResult = await this.voteRepository.pollHasVotes(poll.id);
+
     if (!hasVotesResult.success) {
       return failure(hasVotesResult.error);
     }
@@ -77,6 +81,7 @@ export class CreateAnswerUseCase {
 
     // Save the answer to database
     const createResult = await this.answerRepository.createAnswer(answer);
+
     if (!createResult.success) {
       return failure(createResult.error);
     }

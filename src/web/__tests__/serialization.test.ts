@@ -53,6 +53,7 @@ function isJSONSerializable(
   if (Array.isArray(value)) {
     value.forEach((item, index) => {
       const result = isJSONSerializable(item, `${path}[${index}]`);
+
       if (!result.valid) {
         errors.push(...result.errors);
       }
@@ -76,6 +77,7 @@ function isJSONSerializable(
 
     // Check for methods (like toJSON, which React Server Components reject)
     const proto = Object.getPrototypeOf(value);
+
     if (proto && proto !== Object.prototype && proto !== Array.prototype) {
       // This object has a custom prototype, likely a class instance
       const methods = Object.getOwnPropertyNames(proto).filter(
@@ -95,6 +97,7 @@ function isJSONSerializable(
     // Recursively check all properties
     for (const [key, val] of Object.entries(value)) {
       const result = isJSONSerializable(val, `${path}.${key}`);
+
       if (!result.valid) {
         errors.push(...result.errors);
       }
@@ -109,6 +112,7 @@ function isJSONSerializable(
  */
 function expectSerializable(value: unknown, description: string) {
   const result = isJSONSerializable(value);
+
   if (!result.valid) {
     console.error(
       `\n❌ Serialization errors in ${description}:`,

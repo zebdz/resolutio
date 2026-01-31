@@ -114,6 +114,7 @@ describe('DeleteQuestionUseCase', () => {
     );
     questionForActivation.value.addAnswer(tempAnswer.value);
     poll.addQuestion(questionForActivation.value);
+    poll.takeSnapshot();
     poll.activate();
 
     const result = await useCase.execute({

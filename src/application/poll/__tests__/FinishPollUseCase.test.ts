@@ -67,7 +67,8 @@ describe('FinishPollUseCase', () => {
 
     poll.addQuestion(question);
 
-    // Activate the poll
+    // Take snapshot and activate the poll
+    poll.takeSnapshot();
     poll.activate();
 
     // Mock repositories
@@ -141,19 +142,19 @@ describe('FinishPollUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_ALREADY_FINISHED);
+    expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
   });
 
-  it('should finish inactive poll', async () => {
-    poll.deactivate();
+  it('should fail if poll is in READY state (not active)', async () => {
+    poll.deactivate(); // moves to READY
 
     const result = await useCase.execute({
       pollId: poll.id,
       userId: 'admin-1',
     });
 
-    expect(result.success).toBe(true);
-    expect(pollRepository.updatePoll).toHaveBeenCalled();
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
   });
 
   // Authorization tests

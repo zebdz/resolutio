@@ -43,6 +43,7 @@ describe('UpdateUserProfileUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.language).toBe('ru');
       }
@@ -59,6 +60,7 @@ describe('UpdateUserProfileUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error.message).toContain('not found');
       }
@@ -75,6 +77,7 @@ describe('UpdateUserProfileUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error.message).toContain('Language');
       }

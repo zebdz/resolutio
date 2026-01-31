@@ -2,6 +2,7 @@ import { Result, success, failure } from '../shared/Result';
 import { Question, QuestionProps } from './Question';
 import { Answer } from './Answer';
 import { PollDomainCodes } from './PollDomainCodes';
+import { PollState } from './PollState';
 
 export interface PollProps {
   id: string;
@@ -10,9 +11,7 @@ export interface PollProps {
   boardId: string;
   startDate: Date;
   endDate: Date;
-  active: boolean;
-  finished: boolean;
-  participantsSnapshotTaken: boolean;
+  state: PollState;
   weightCriteria: string | null;
   createdBy: string;
   createdAt: Date;
@@ -61,9 +60,7 @@ export class Poll {
       boardId,
       startDate,
       endDate,
-      active: false,
-      finished: false,
-      participantsSnapshotTaken: false,
+      state: PollState.DRAFT,
       weightCriteria: null,
       createdBy,
       createdAt: new Date(),
@@ -103,16 +100,8 @@ export class Poll {
     return this.props.endDate;
   }
 
-  public get active(): boolean {
-    return this.props.active;
-  }
-
-  public get finished(): boolean {
-    return this.props.finished;
-  }
-
-  public get participantsSnapshotTaken(): boolean {
-    return this.props.participantsSnapshotTaken;
+  public get state(): PollState {
+    return this.props.state;
   }
 
   public get weightCriteria(): string | null {
@@ -139,12 +128,20 @@ export class Poll {
     return this.props.archivedAt !== null;
   }
 
-  public isFinished(): boolean {
-    return this.props.finished;
+  public isDraft(): boolean {
+    return this.props.state === PollState.DRAFT;
+  }
+
+  public isReady(): boolean {
+    return this.props.state === PollState.READY;
   }
 
   public isActive(): boolean {
-    return this.props.active;
+    return this.props.state === PollState.ACTIVE;
+  }
+
+  public isFinished(): boolean {
+    return this.props.state === PollState.FINISHED;
   }
 
   /**
@@ -221,17 +218,18 @@ export class Poll {
     return success(undefined);
   }
 
-  public activate(): Result<void, string> {
-    if (this.isFinished()) {
-      return failure(PollDomainCodes.POLL_CANNOT_ACTIVATE_FINISHED);
-    }
-
-    if (this.isActive()) {
-      return failure(PollDomainCodes.POLL_ALREADY_ACTIVE);
+  /**
+   * Take snapshot: DRAFT → READY
+   * Validates poll has questions with answers before transitioning
+   */
+  public takeSnapshot(): Result<void, string> {
+    if (!this.isDraft()) {
+      return failure(PollDomainCodes.POLL_MUST_BE_DRAFT);
     }
 
     // Check poll has at least one non-archived question
     const activeQuestions = this.props.questions.filter((q) => !q.isArchived());
+
     if (activeQuestions.length === 0) {
       return failure(PollDomainCodes.POLL_NO_QUESTIONS);
     }
@@ -239,37 +237,70 @@ export class Poll {
     // Check each active question has at least one non-archived answer
     for (const question of activeQuestions) {
       const activeAnswers = question.answers.filter((a) => !a.isArchived());
+
       if (activeAnswers.length === 0) {
         return failure(PollDomainCodes.POLL_QUESTION_NO_ANSWERS);
       }
     }
 
-    this.props.active = true;
+    this.props.state = PollState.READY;
 
     return success(undefined);
   }
 
+  /**
+   * Discard snapshot: READY → DRAFT
+   * Only allowed if no votes have been cast
+   */
+  public discardSnapshot(hasVotes: boolean): Result<void, string> {
+    if (!this.isReady()) {
+      return failure(PollDomainCodes.POLL_MUST_BE_READY);
+    }
+
+    if (hasVotes) {
+      return failure(PollDomainCodes.POLL_CANNOT_DISCARD_SNAPSHOT_HAS_VOTES);
+    }
+
+    this.props.state = PollState.DRAFT;
+
+    return success(undefined);
+  }
+
+  /**
+   * Activate: READY → ACTIVE
+   */
+  public activate(): Result<void, string> {
+    if (!this.isReady()) {
+      return failure(PollDomainCodes.POLL_MUST_BE_READY);
+    }
+
+    this.props.state = PollState.ACTIVE;
+
+    return success(undefined);
+  }
+
+  /**
+   * Deactivate: ACTIVE → READY
+   */
   public deactivate(): Result<void, string> {
-    if (this.isFinished()) {
-      return failure(PollDomainCodes.POLL_CANNOT_DEACTIVATE_FINISHED);
-    }
-
     if (!this.isActive()) {
-      return failure(PollDomainCodes.POLL_ALREADY_INACTIVE);
+      return failure(PollDomainCodes.POLL_MUST_BE_ACTIVE);
     }
 
-    this.props.active = false;
+    this.props.state = PollState.READY;
 
     return success(undefined);
   }
 
+  /**
+   * Finish: ACTIVE → FINISHED
+   */
   public finish(): Result<void, string> {
-    if (this.isFinished()) {
-      return failure(PollDomainCodes.POLL_ALREADY_FINISHED);
+    if (!this.isActive()) {
+      return failure(PollDomainCodes.POLL_MUST_BE_ACTIVE);
     }
 
-    this.props.finished = true;
-    this.props.active = false;
+    this.props.state = PollState.FINISHED;
 
     return success(undefined);
   }
@@ -298,12 +329,14 @@ export class Poll {
     }
 
     const question = this.props.questions.find((q) => q.id === questionId);
+
     if (!question) {
       return failure(PollDomainCodes.QUESTION_NOT_FOUND);
     }
 
     // Archive the question instead of removing it
     const archiveResult = question.archive();
+
     if (!archiveResult.success) {
       return failure(archiveResult.error);
     }
@@ -339,18 +372,21 @@ export class Poll {
     }
 
     const question = this.props.questions.find((q) => q.id === questionId);
+
     if (!question) {
       return failure(PollDomainCodes.QUESTION_NOT_FOUND);
     }
 
     // Create the answer
     const answerResult = Answer.create(text, order, questionId);
+
     if (!answerResult.success) {
       return failure(answerResult.error);
     }
 
     // Add to question (Question.addAnswer checks archived status)
     const addResult = question.addAnswer(answerResult.value);
+
     if (!addResult.success) {
       return failure(addResult.error);
     }
@@ -366,19 +402,11 @@ export class Poll {
   }
 
   /**
-   * Mark that participants snapshot has been taken
-   * This should only be called once when the poll is first activated
-   */
-  public takeParticipantsSnapshot(): void {
-    this.props.participantsSnapshotTaken = true;
-  }
-
-  /**
    * Check if participants can be modified
-   * Participants can be modified if snapshot has been taken but no votes exist
+   * Participants can only be modified in READY state with no votes
    */
   public canModifyParticipants(hasVotes: boolean): boolean {
-    return this.props.participantsSnapshotTaken && !hasVotes;
+    return this.isReady() && !hasVotes;
   }
 
   /**

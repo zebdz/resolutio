@@ -56,12 +56,15 @@ class MockQuestionRepository implements Partial<QuestionRepository> {
 class MockAnswerRepository implements Partial<AnswerRepository> {
   private answers: Map<string, Answer> = new Map();
 
-  async getAnswerById(answerId: string): Promise<Result<Answer | null, string>> {
+  async getAnswerById(
+    answerId: string
+  ): Promise<Result<Answer | null, string>> {
     return success(this.answers.get(answerId) || null);
   }
 
   async updateAnswer(answer: Answer): Promise<Result<void, string>> {
     this.answers.set(answer.id, answer);
+
     return success(undefined);
   }
 
@@ -242,6 +245,7 @@ describe('UpdateAnswerUseCase', () => {
       );
       questionForActivation.value.addAnswer(tempAnswer.value);
       poll.addQuestion(questionForActivation.value);
+      poll.takeSnapshot();
       poll.activate();
 
       pollRepository.addPoll(poll);

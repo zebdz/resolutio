@@ -60,6 +60,7 @@ class MockBoardRepository implements BoardRepository {
 
   async removeUserFromBoard(userId: string, boardId: string): Promise<void> {
     const members = this.boardMembers.get(boardId);
+
     if (members) {
       members.delete(userId);
     }
@@ -109,6 +110,7 @@ describe('HandleJoinRequestUseCase', () => {
     prisma.organizationUser.update = async (args: any) => {
       const key = `${args.where.organizationId_userId.organizationId}-${args.where.organizationId_userId.userId}`;
       const existing = requests.get(key);
+
       if (!existing) {
         throw new Error('Request not found');
       }
@@ -173,6 +175,7 @@ describe('HandleJoinRequestUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const updated = requests.get(key);
       expect(updated.status).toBe('accepted');
@@ -220,6 +223,7 @@ describe('HandleJoinRequestUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const updated = requests.get(key);
       expect(updated.status).toBe('rejected');
@@ -266,6 +270,7 @@ describe('HandleJoinRequestUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const updated = requests.get(key);
       expect(updated.status).toBe('rejected');
@@ -303,6 +308,7 @@ describe('HandleJoinRequestUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(OrganizationErrors.NOT_ADMIN);
     }
@@ -328,6 +334,7 @@ describe('HandleJoinRequestUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(OrganizationErrors.REQUEST_NOT_FOUND);
     }
@@ -368,6 +375,7 @@ describe('HandleJoinRequestUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(OrganizationErrors.NOT_PENDING);
     }
@@ -412,6 +420,7 @@ describe('HandleJoinRequestUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       // Verify user was added to general board
       const members = boardRepository.getBoardMembers(generalBoardId);

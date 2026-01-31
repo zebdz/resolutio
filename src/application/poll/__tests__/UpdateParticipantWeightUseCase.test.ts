@@ -36,16 +36,18 @@ describe('UpdateParticipantWeightUseCase', () => {
       new Date('2026-02-15')
     );
     expect(pollResult.success).toBe(true);
+
     if (pollResult.success) {
       poll = pollResult.value;
       (poll as any).props.id = 'poll-1';
+      poll.takeSnapshot();
       poll.activate();
-      poll.takeParticipantsSnapshot();
     }
 
     // Create board
     const boardResult = Board.create('org-1', 'Test Board', 'user-admin');
     expect(boardResult.success).toBe(true);
+
     if (boardResult.success) {
       board = boardResult.value;
       (board as any).props.id = 'board-1';
@@ -58,6 +60,7 @@ describe('UpdateParticipantWeightUseCase', () => {
       new Decimal(1.0).toNumber()
     );
     expect(participantResult.success).toBe(true);
+
     if (participantResult.success) {
       participant = participantResult.value;
       (participant as any).props.id = 'participant-1';
@@ -116,6 +119,7 @@ describe('UpdateParticipantWeightUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollDomainCodes.INVALID_WEIGHT);
     }
@@ -133,6 +137,7 @@ describe('UpdateParticipantWeightUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe('poll.errors.participantNotFound');
     }
@@ -148,6 +153,7 @@ describe('UpdateParticipantWeightUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.NOT_FOUND);
     }
@@ -163,6 +169,7 @@ describe('UpdateParticipantWeightUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.BOARD_NOT_FOUND);
     }
@@ -178,6 +185,7 @@ describe('UpdateParticipantWeightUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(OrganizationErrors.NOT_ADMIN);
     }
@@ -193,6 +201,7 @@ describe('UpdateParticipantWeightUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(
         PollDomainCodes.CANNOT_MODIFY_PARTICIPANTS_HAS_VOTES

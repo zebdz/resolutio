@@ -67,6 +67,7 @@ export function RegisterForm({ locale }: Props) {
 
       if (!result.success) {
         setError(result.error);
+
         if (result.fieldErrors) {
           setFieldErrors(result.fieldErrors);
         }

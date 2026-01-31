@@ -62,17 +62,20 @@ export class GetPollResultsUseCase {
 
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(pollId);
+
     if (!pollResult.success) {
       return failure(pollResult.error);
     }
 
     const poll = pollResult.value;
+
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
     }
 
     // 2. Get board and organization to check permissions
     const board = await this.boardRepository.findById(poll.boardId);
+
     if (!board) {
       return failure(PollErrors.BOARD_NOT_FOUND);
     }
@@ -81,9 +84,7 @@ export class GetPollResultsUseCase {
     // If poll is active (not finished), only admins can view results
     // If poll is finished, any organization member can view
 
-    const isSuperAdmin = await this.userRepository.isSuperAdmin(
-      userId
-    );
+    const isSuperAdmin = await this.userRepository.isSuperAdmin(userId);
 
     const isOrganizationAdmin = await this.organizationRepository.isUserAdmin(
       userId,
@@ -110,6 +111,7 @@ export class GetPollResultsUseCase {
 
     // 4. Get all votes and participants
     const votesResult = await this.voteRepository.getVotesByPoll(pollId);
+
     if (!votesResult.success) {
       return failure(votesResult.error);
     }
@@ -118,6 +120,7 @@ export class GetPollResultsUseCase {
 
     const participantsResult =
       await this.participantRepository.getParticipants(pollId);
+
     if (!participantsResult.success) {
       return failure(participantsResult.error);
     }
@@ -132,6 +135,7 @@ export class GetPollResultsUseCase {
 
     // 6. Group votes by question
     const votesByQuestion = new Map<string, Vote[]>();
+
     for (const vote of votes) {
       if (!votesByQuestion.has(vote.questionId)) {
         votesByQuestion.set(vote.questionId, []);
@@ -151,6 +155,7 @@ export class GetPollResultsUseCase {
     const users = await this.userRepository.findByIds(
       participants.map((p) => p.userId)
     );
+
     if (users) {
       for (const user of users) {
         usersInfo.set(user.id, {
@@ -169,6 +174,7 @@ export class GetPollResultsUseCase {
 
       // Group votes by answer
       const votesByAnswer = new Map<string, Vote[]>();
+
       for (const vote of questionVotes) {
         if (!votesByAnswer.has(vote.answerId)) {
           votesByAnswer.set(vote.answerId, []);

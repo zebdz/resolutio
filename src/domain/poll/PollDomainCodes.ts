@@ -18,6 +18,13 @@ export const PollDomainCodes = {
   POLL_QUESTION_NO_ANSWERS: 'domain.poll.questionNoAnswers',
   POLL_CANNOT_ACTIVATE_FINISHED: 'domain.poll.cannotActivateFinished',
   POLL_CANNOT_DEACTIVATE_FINISHED: 'domain.poll.cannotDeactivateFinished',
+
+  // State machine transitions
+  POLL_MUST_BE_DRAFT: 'domain.poll.mustBeDraft',
+  POLL_MUST_BE_READY: 'domain.poll.mustBeReady',
+  POLL_MUST_BE_ACTIVE: 'domain.poll.mustBeActive',
+  POLL_CANNOT_DISCARD_SNAPSHOT_HAS_VOTES:
+    'domain.poll.cannotDiscardSnapshotHasVotes',
   POLL_CANNOT_UPDATE_FINISHED: 'domain.poll.cannotUpdateFinished',
   POLL_CANNOT_ADD_QUESTION_FINISHED: 'domain.poll.cannotAddQuestionFinished',
   POLL_CANNOT_ADD_QUESTION_ARCHIVED: 'domain.poll.cannotAddQuestionArchived',

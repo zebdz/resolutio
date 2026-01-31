@@ -7,11 +7,12 @@ import { Button } from '@/app/components/catalyst/button';
 import {
   Dialog,
   DialogActions,
-  DialogBody,
   DialogDescription,
   DialogTitle,
 } from '@/app/components/catalyst/dialog';
 import {
+  takeSnapshotAction,
+  discardSnapshotAction,
   activatePollAction,
   deactivatePollAction,
   finishPollAction,
@@ -19,33 +20,73 @@ import {
 import { toast } from 'sonner';
 import { Link } from '@/src/i18n/routing';
 
+type PollState = 'DRAFT' | 'READY' | 'ACTIVE' | 'FINISHED';
+
 interface PollControlsProps {
   pollId: string;
-  isActive: boolean;
-  isFinished: boolean;
+  state: PollState;
   hasQuestions: boolean;
 }
 
 export default function PollControls({
   pollId,
-  isActive,
-  isFinished,
+  state,
   hasQuestions,
 }: PollControlsProps) {
   const t = useTranslations('poll');
   const router = useRouter();
+  const [isTakingSnapshot, setIsTakingSnapshot] = useState(false);
+  const [isDiscardingSnapshot, setIsDiscardingSnapshot] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
   const [showFinishDialog, setShowFinishDialog] = useState(false);
 
-  const handleActivate = async () => {
+  const handleTakeSnapshot = async () => {
     if (!hasQuestions) {
       toast.error(t('errors.atLeastOneQuestionRequired'));
 
       return;
     }
 
+    setIsTakingSnapshot(true);
+
+    try {
+      const result = await takeSnapshotAction(pollId);
+
+      if (result.success) {
+        toast.success(t('snapshotTaken'));
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch {
+      toast.error(t('errors.generic'));
+    } finally {
+      setIsTakingSnapshot(false);
+    }
+  };
+
+  const handleDiscardSnapshot = async () => {
+    setIsDiscardingSnapshot(true);
+
+    try {
+      const result = await discardSnapshotAction(pollId);
+
+      if (result.success) {
+        toast.success(t('snapshotDiscarded'));
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch {
+      toast.error(t('errors.generic'));
+    } finally {
+      setIsDiscardingSnapshot(false);
+    }
+  };
+
+  const handleActivate = async () => {
     setIsActivating(true);
 
     try {
@@ -57,7 +98,7 @@ export default function PollControls({
       } else {
         toast.error(result.error);
       }
-    } catch (error) {
+    } catch {
       toast.error(t('errors.generic'));
     } finally {
       setIsActivating(false);
@@ -76,7 +117,7 @@ export default function PollControls({
       } else {
         toast.error(result.error);
       }
-    } catch (error) {
+    } catch {
       toast.error(t('errors.generic'));
     } finally {
       setIsDeactivating(false);
@@ -96,14 +137,29 @@ export default function PollControls({
       } else {
         toast.error(result.error);
       }
-    } catch (error) {
+    } catch {
       toast.error(t('errors.generic'));
     } finally {
       setIsFinishing(false);
     }
   };
 
-  if (isFinished) {
+  const getStatusLabel = () => {
+    switch (state) {
+      case 'DRAFT':
+        return t('upcoming');
+      case 'READY':
+        return t('upcoming');
+      case 'ACTIVE':
+        return t('active');
+      case 'FINISHED':
+        return t('finished');
+      default:
+        return '';
+    }
+  };
+
+  if (state === 'FINISHED') {
     return (
       <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 bg-white dark:bg-zinc-900">
         <div className="flex items-center justify-between">
@@ -132,20 +188,43 @@ export default function PollControls({
               {t('pollControls')}
             </h3>
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              {isActive ? t('active') : t('upcoming')}
+              {getStatusLabel()}
             </p>
           </div>
 
-          <div className="flex gap-2">
-            {!isActive ? (
+          <div className="flex flex-wrap gap-2">
+            {state === 'DRAFT' && (
               <Button
-                color="green"
-                onClick={handleActivate}
-                disabled={isActivating || !hasQuestions}
+                color="blue"
+                onClick={handleTakeSnapshot}
+                disabled={isTakingSnapshot || !hasQuestions}
               >
-                {isActivating ? t('activating') : t('activatePoll')}
+                {isTakingSnapshot ? t('takingSnapshot') : t('takeSnapshot')}
               </Button>
-            ) : (
+            )}
+
+            {state === 'READY' && (
+              <>
+                <Button
+                  color="green"
+                  onClick={handleActivate}
+                  disabled={isActivating}
+                >
+                  {isActivating ? t('activating') : t('activatePoll')}
+                </Button>
+                <Button
+                  color="zinc"
+                  onClick={handleDiscardSnapshot}
+                  disabled={isDiscardingSnapshot}
+                >
+                  {isDiscardingSnapshot
+                    ? t('discardingSnapshot')
+                    : t('discardSnapshot')}
+                </Button>
+              </>
+            )}
+
+            {state === 'ACTIVE' && (
               <>
                 <Button
                   color="yellow"
@@ -168,7 +247,7 @@ export default function PollControls({
               <Button color="zinc">{t('manageParticipants')}</Button>
             </Link>
 
-            {isActive && (
+            {state === 'ACTIVE' && (
               <Link href={`/polls/${pollId}/results`}>
                 <Button color="zinc">{t('viewResults')}</Button>
               </Link>

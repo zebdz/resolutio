@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UpdateQuestionOrderUseCase } from '../UpdateQuestionOrderUseCase';
 import { Poll } from '../../../domain/poll/Poll';
 import { Question } from '../../../domain/poll/Question';
+import { Answer } from '../../../domain/poll/Answer';
 import { PollRepository } from '../../../domain/poll/PollRepository';
 import { QuestionRepository } from '../../../domain/poll/QuestionRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
@@ -82,12 +83,30 @@ describe('UpdateQuestionOrderUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.NOT_FOUND);
     }
   });
 
   it('should fail when poll is finished', async () => {
+    // Add question with answer and transition to FINISHED
+    const questionResult = Question.create(
+      'Test Question',
+      'poll-1',
+      1,
+      0,
+      'single-choice'
+    );
+    const answerResult = Answer.create(
+      'Test Answer',
+      1,
+      questionResult.value.id
+    );
+    questionResult.value.addAnswer(answerResult.value);
+    poll.addQuestion(questionResult.value);
+    poll.takeSnapshot();
+    poll.activate();
     poll.finish();
 
     const result = await useCase.execute({
@@ -96,6 +115,7 @@ describe('UpdateQuestionOrderUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.CANNOT_MODIFY_FINISHED);
     }

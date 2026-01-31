@@ -4,12 +4,10 @@ import { Poll } from '../../../domain/poll/Poll';
 import { Question } from '../../../domain/poll/Question';
 import { Answer } from '../../../domain/poll/Answer';
 import { Board } from '../../../domain/board/Board';
-import { Organization } from '../../../domain/organization/Organization';
 import {
   PollRepository,
   UpdateQuestionOrderData,
 } from '../../../domain/poll/PollRepository';
-import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
 import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../../domain/user/UserRepository';
@@ -18,10 +16,9 @@ import { PhoneNumber } from '../../../domain/user/PhoneNumber';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
-import { PollParticipant } from '../../../domain/poll/PollParticipant';
 import { Vote } from '../../../domain/poll/Vote';
 import { VoteDraft } from '../../../domain/poll/VoteDraft';
-import { ParticipantWeightHistory } from '../../../domain/poll/ParticipantWeightHistory';
+import { PollState } from '../../../domain/poll/PollState';
 
 class MockPollRepository implements PollRepository {
   private polls: Map<string, Poll> = new Map();
@@ -178,107 +175,8 @@ class MockPollRepository implements PollRepository {
   }
 }
 
-class MockParticipantRepository implements ParticipantRepository {
-  public participants: PollParticipant[] = [];
-  public historyRecords: ParticipantWeightHistory[] = [];
-  private polls: Map<string, Poll> = new Map();
-
-  setPollStore(polls: Map<string, Poll>): void {
-    this.polls = polls;
-  }
-
-  async createParticipants(
-    participants: PollParticipant[]
-  ): Promise<Result<void, string>> {
-    participants.forEach((p, index) => {
-      (p as any).props.id = `participant-${index + 1}`;
-    });
-    this.participants.push(...participants);
-
-    return success(undefined);
-  }
-
-  async getParticipants(
-    pollId: string
-  ): Promise<Result<PollParticipant[], string>> {
-    return success(this.participants);
-  }
-
-  async getParticipantById(
-    participantId: string
-  ): Promise<Result<PollParticipant | null, string>> {
-    return success(null);
-  }
-
-  async getParticipantByUserAndPoll(
-    pollId: string,
-    userId: string
-  ): Promise<Result<PollParticipant | null, string>> {
-    return success(null);
-  }
-
-  async updateParticipantWeight(
-    participant: PollParticipant
-  ): Promise<Result<void, string>> {
-    return success(undefined);
-  }
-
-  async deleteParticipant(
-    participantId: string
-  ): Promise<Result<void, string>> {
-    return success(undefined);
-  }
-
-  async createWeightHistory(
-    history: ParticipantWeightHistory
-  ): Promise<Result<ParticipantWeightHistory, string>> {
-    this.historyRecords.push(history);
-
-    return success(history);
-  }
-
-  async getWeightHistory(
-    pollId: string
-  ): Promise<Result<ParticipantWeightHistory[], string>> {
-    return success([]);
-  }
-
-  async getParticipantWeightHistory(
-    participantId: string
-  ): Promise<Result<ParticipantWeightHistory[], string>> {
-    return success([]);
-  }
-
-  async executeActivation(
-    poll: Poll,
-    participants: PollParticipant[],
-    historyRecords: ParticipantWeightHistory[]
-  ): Promise<Result<PollParticipant[], string>> {
-    // Simulate transactional behavior - all or nothing
-    // Assign IDs to participants
-    participants.forEach((p, index) => {
-      (p as any).props.id = `participant-${index + 1}`;
-    });
-
-    // Store participants
-    this.participants.push(...participants);
-
-    // Store history records with participant IDs
-    historyRecords.forEach((h, index) => {
-      (h as any).props.participantId = participants[index]?.id || h.participantId;
-      this.historyRecords.push(h);
-    });
-
-    // Update poll in our store
-    this.polls.set(poll.id, poll);
-
-    return success(participants);
-  }
-}
-
 class MockBoardRepository implements BoardRepository {
   private boards: Map<string, Board> = new Map();
-  private boardMembers: Map<string, { userId: string }[]> = new Map();
 
   async save(board: Board): Promise<Board> {
     this.boards.set(board.id, board);
@@ -301,7 +199,7 @@ class MockBoardRepository implements BoardRepository {
   }
 
   async findBoardMembers(boardId: string): Promise<{ userId: string }[]> {
-    return this.boardMembers.get(boardId) || [];
+    return [];
   }
 
   async isUserMember(userId: string, boardId: string): Promise<boolean> {
@@ -312,17 +210,7 @@ class MockBoardRepository implements BoardRepository {
     userId: string,
     boardId: string,
     addedBy?: string
-  ): Promise<void> {
-    const current = this.boardMembers.get(boardId);
-    if (current?.some((bm) => bm.userId === userId)) {
-      return;
-    }
-
-    const updated = current?.slice() || [];
-
-    updated.push({ userId });
-    this.boardMembers.set(boardId, updated);
-  }
+  ): Promise<void> {}
 
   async removeUserFromBoard(
     userId: string,
@@ -345,23 +233,23 @@ class MockOrganizationRepository implements OrganizationRepository {
     this.admins.add(`${organizationId}:${userId}`);
   }
 
-  async save(organization: Organization): Promise<Organization> {
+  async save(organization: any): Promise<any> {
     return organization;
   }
 
-  async findById(id: string): Promise<Organization | null> {
+  async findById(id: string): Promise<any> {
     return null;
   }
 
-  async findByName(name: string): Promise<Organization | null> {
+  async findByName(name: string): Promise<any> {
     return null;
   }
 
-  async findByCreatorId(creatorId: string): Promise<Organization[]> {
+  async findByCreatorId(creatorId: string): Promise<any[]> {
     return [];
   }
 
-  async findByParentId(parentId: string): Promise<Organization[]> {
+  async findByParentId(parentId: string): Promise<any[]> {
     return [];
   }
 
@@ -381,27 +269,19 @@ class MockOrganizationRepository implements OrganizationRepository {
     return this.admins.has(`${organizationId}:${userId}`);
   }
 
-  async findMembershipsByUserId(userId: string): Promise<Organization[]> {
+  async findMembershipsByUserId(userId: string): Promise<any[]> {
     return [];
   }
 
-  async findAdminOrganizationsByUserId(userId: string): Promise<Organization[]> {
+  async findAdminOrganizationsByUserId(userId: string): Promise<any[]> {
     return [];
   }
 
-  async findAllWithStats(
-    excludeUserMemberships?: string
-  ): Promise<
-    Array<{
-      organization: Organization;
-      memberCount: number;
-      firstAdmin: { id: string; firstName: string; lastName: string } | null;
-    }>
-  > {
+  async findAllWithStats(excludeUserMemberships?: string): Promise<any[]> {
     return [];
   }
 
-  async update(organization: Organization): Promise<Organization> {
+  async update(organization: any): Promise<any> {
     return organization;
   }
 }
@@ -442,33 +322,62 @@ class MockUserRepository implements UserRepository {
   }
 }
 
+// Helper to create a poll in READY state
+function createReadyPoll(id: string, boardId: string, createdBy: string): Poll {
+  const pollResult = Poll.create(
+    'Test Poll',
+    'Test Description',
+    boardId,
+    createdBy,
+    new Date('2024-01-01'),
+    new Date('2024-12-31')
+  );
+  const poll = pollResult.value;
+  (poll as any).props.id = id;
+
+  // Add question with answer
+  const questionResult = Question.create(
+    'Question 1',
+    id,
+    1,
+    1,
+    'single-choice'
+  );
+  const question = questionResult.value;
+  (question as any).props.id = 'question-1';
+  const answerResult = Answer.create('Answer 1', 1, question.id);
+  question.addAnswer(answerResult.value);
+  poll.addQuestion(question);
+
+  // Take snapshot to move to READY state
+  poll.takeSnapshot();
+
+  return poll;
+}
+
 describe('ActivatePollUseCase', () => {
   let pollRepository: MockPollRepository;
-  let participantRepository: MockParticipantRepository;
   let boardRepository: MockBoardRepository;
   let organizationRepository: MockOrganizationRepository;
   let userRepository: MockUserRepository;
   let useCase: ActivatePollUseCase;
-  let poll: Poll;
   let board: Board;
 
   beforeEach(() => {
     pollRepository = new MockPollRepository();
-    participantRepository = new MockParticipantRepository();
     boardRepository = new MockBoardRepository();
     organizationRepository = new MockOrganizationRepository();
     userRepository = new MockUserRepository();
 
     useCase = new ActivatePollUseCase(
       pollRepository,
-      participantRepository,
       boardRepository,
       organizationRepository,
       userRepository
     );
 
     // Create a test board
-    const boardResult = Board.reconstitute({
+    board = Board.reconstitute({
       id: 'board-1',
       name: 'Test Board',
       organizationId: 'org-1',
@@ -476,102 +385,25 @@ describe('ActivatePollUseCase', () => {
       createdAt: new Date(),
       archivedAt: null,
     });
-    board = boardResult;
     boardRepository.save(board);
-
-    boardRepository.addUserToBoard('user-1', 'board-1');
-    boardRepository.addUserToBoard('user-2', 'board-1');
-    boardRepository.addUserToBoard('user-3', 'board-1');
 
     // Set admin-1 as admin of org-1
     organizationRepository.setAdmin('admin-1', 'org-1');
-
-    // Create a test poll
-    const pollResult = Poll.create(
-      'Test Poll',
-      'Test Description',
-      board.id,
-      'admin-1',
-      new Date('2024-01-01'),
-      new Date('2024-12-31')
-    );
-    poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
-
-    // Add a question with an answer
-    const questionResult = Question.create(
-      'Question 1',
-      poll.id,
-      1,
-      1,
-      'single-choice'
-    );
-    const question = questionResult.value;
-    (question as any).props.id = 'question-1';
-
-    // Add an answer to the question
-    const answerResult = Answer.create('Answer 1', 1, question.id);
-    const answer = answerResult.value;
-    (answer as any).props.id = 'answer-1';
-    question.addAnswer(answer);
-
-    poll.addQuestion(question);
-
-    pollRepository.createPoll(poll);
   });
 
-  it('should activate poll and create participant snapshot on first activation', async () => {
+  it('should activate poll in READY state', async () => {
+    const poll = createReadyPoll('poll-1', board.id, 'admin-1');
+    await pollRepository.createPoll(poll);
+
     const result = await useCase.execute({
-      pollId: poll.id,
+      pollId: 'poll-1',
       userId: 'admin-1',
     });
 
     expect(result.success).toBe(true);
 
-    // Verify poll is active
-    const updatedPollResult = await pollRepository.getPollById(poll.id);
-    const updatedPoll = updatedPollResult.value;
-    expect(updatedPoll.active).toBe(true);
-    expect(updatedPoll.participantsSnapshotTaken).toBe(true);
-
-    // Verify participants were created
-    expect(participantRepository.participants.length).toBe(3);
-    expect(participantRepository.participants[0].userId).toBe('user-1');
-    expect(participantRepository.participants[1].userId).toBe('user-2');
-    expect(participantRepository.participants[2].userId).toBe('user-3');
-
-    // All should have weight 1.0
-    expect(participantRepository.participants[0].userWeight).toBe(1.0);
-    expect(participantRepository.participants[1].userWeight).toBe(1.0);
-    expect(participantRepository.participants[2].userWeight).toBe(1.0);
-
-    // Verify weight history was created
-    expect(participantRepository.historyRecords.length).toBe(3);
-  });
-
-  it('should not recreate participants on second activation', async () => {
-    // First activation
-    await useCase.execute({
-      pollId: poll.id,
-      userId: 'admin-1',
-    });
-
-    const firstParticipantCount = participantRepository.participants.length;
-
-    // Deactivate
-    const updatedPollResult = await pollRepository.getPollById(poll.id);
-    const updatedPoll = updatedPollResult.value;
-    updatedPoll.deactivate();
-    await pollRepository.updatePoll(updatedPoll);
-
-    // Second activation
-    await useCase.execute({
-      pollId: poll.id,
-      userId: 'admin-1',
-    });
-
-    // Should not create new participants
-    expect(participantRepository.participants.length).toBe(firstParticipantCount);
+    const updatedPollResult = await pollRepository.getPollById('poll-1');
+    expect(updatedPollResult.value?.state).toBe(PollState.ACTIVE);
   });
 
   it('should fail if poll not found', async () => {
@@ -584,201 +416,65 @@ describe('ActivatePollUseCase', () => {
     expect(result.error).toBe(PollErrors.NOT_FOUND);
   });
 
-  it('should fail if board not found', async () => {
-    // Create poll with non-existent board
+  it('should fail if poll is in DRAFT state', async () => {
+    // Create poll in DRAFT state (no snapshot)
     const pollResult = Poll.create(
       'Test Poll',
       'Test Description',
-      'non-existent-board',
-      'admin-1',
-      new Date('2024-01-01'),
-      new Date('2024-12-31')
-    );
-    const badPoll = pollResult.value;
-    (badPoll as any).props.id = 'poll-2';
-
-    const questionResult = Question.create(
-      'Question 1',
-      badPoll.id,
-      1,
-      1,
-      'single-choice'
-    );
-    badPoll.addQuestion(questionResult.value);
-
-    await pollRepository.createPoll(badPoll);
-
-    const result = await useCase.execute({
-      pollId: badPoll.id,
-      userId: 'admin-1',
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.BOARD_NOT_FOUND);
-  });
-
-  it('should fail if poll already active', async () => {
-    // Activate first
-    await useCase.execute({
-      pollId: poll.id,
-      userId: 'admin-1',
-    });
-
-    // Try to activate again
-    const result = await useCase.execute({
-      pollId: poll.id,
-      userId: 'admin-1',
-    });
-
-    expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_ALREADY_ACTIVE);
-  });
-
-  it('should fail if poll has no questions', async () => {
-    // Create poll without questions
-    const pollResult = Poll.create(
-      'Empty Poll',
-      'Test Description',
       board.id,
       'admin-1',
       new Date('2024-01-01'),
       new Date('2024-12-31')
     );
-    const emptyPoll = pollResult.value;
-    (emptyPoll as any).props.id = 'poll-2';
-    await pollRepository.createPoll(emptyPoll);
+    const poll = pollResult.value;
+    (poll as any).props.id = 'poll-1';
+    await pollRepository.createPoll(poll);
 
     const result = await useCase.execute({
-      pollId: emptyPoll.id,
+      pollId: 'poll-1',
       userId: 'admin-1',
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_NO_QUESTIONS);
+    expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_READY);
   });
 
-  it('should fail if question has no answers', async () => {
-    // Create poll with question but no answers
-    const pollResult = Poll.create(
-      'No Answers Poll',
-      'Test Description',
-      board.id,
-      'admin-1',
-      new Date('2024-01-01'),
-      new Date('2024-12-31')
-    );
-    const noAnswersPoll = pollResult.value;
-    (noAnswersPoll as any).props.id = 'poll-3';
-
-    const questionResult = Question.create(
-      'Question without answers',
-      noAnswersPoll.id,
-      1,
-      1,
-      'single-choice'
-    );
-    // No answers added to question
-    noAnswersPoll.addQuestion(questionResult.value);
-
-    await pollRepository.createPoll(noAnswersPoll);
+  it('should fail if poll is already ACTIVE', async () => {
+    const poll = createReadyPoll('poll-1', board.id, 'admin-1');
+    poll.activate();
+    await pollRepository.createPoll(poll);
 
     const result = await useCase.execute({
-      pollId: noAnswersPoll.id,
+      pollId: 'poll-1',
       userId: 'admin-1',
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_QUESTION_NO_ANSWERS);
+    expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_READY);
   });
 
-  it('should create weight history with correct metadata', async () => {
-    const adminId = 'admin-1';
+  it('should fail if poll is FINISHED', async () => {
+    const poll = createReadyPoll('poll-1', board.id, 'admin-1');
+    poll.activate();
+    poll.finish();
+    await pollRepository.createPoll(poll);
 
-    await useCase.execute({
-      pollId: poll.id,
-      userId: adminId,
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      userId: 'admin-1',
     });
 
-    // Check weight history
-    expect(participantRepository.historyRecords.length).toBe(3);
-
-    const history = participantRepository.historyRecords[0];
-    expect(history.oldWeight).toBe(0);
-    expect(history.newWeight).toBe(1.0);
-    expect(history.changedBy).toBe(adminId);
-    expect(history.reason).toContain('Initial snapshot');
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_READY);
   });
 
-  // Transaction tests
-  describe('transaction', () => {
-    it('should return error and not persist participants if executeActivation fails', async () => {
-      // Override executeActivation to fail
-      participantRepository.executeActivation = async () => {
-        return failure('Database error');
-      };
-
-      const result = await useCase.execute({
-        pollId: poll.id,
-        userId: 'admin-1',
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('Database error');
-
-      // Participants should not be persisted (transaction rolled back)
-      expect(participantRepository.participants.length).toBe(0);
-      // Note: In-memory poll object is mutated but in real DB it would rollback
-    });
-
-    it('should use executeActivation for first activation', async () => {
-      let executeActivationCalled = false;
-      const originalExecuteActivation =
-        participantRepository.executeActivation.bind(participantRepository);
-
-      participantRepository.executeActivation = async (poll, participants, history) => {
-        executeActivationCalled = true;
-        return originalExecuteActivation(poll, participants, history);
-      };
-
-      await useCase.execute({
-        pollId: poll.id,
-        userId: 'admin-1',
-      });
-
-      expect(executeActivationCalled).toBe(true);
-    });
-
-    it('should pass all data to executeActivation in single call', async () => {
-      let receivedPoll: Poll | null = null;
-      let receivedParticipants: PollParticipant[] = [];
-      let receivedHistory: ParticipantWeightHistory[] = [];
-
-      participantRepository.executeActivation = async (poll, participants, history) => {
-        receivedPoll = poll;
-        receivedParticipants = participants;
-        receivedHistory = history;
-        return success(participants);
-      };
-
-      await useCase.execute({
-        pollId: poll.id,
-        userId: 'admin-1',
-      });
-
-      // Verify all data passed together for atomic operation
-      expect(receivedPoll).not.toBeNull();
-      expect(receivedPoll!.active).toBe(true);
-      expect(receivedPoll!.participantsSnapshotTaken).toBe(true);
-      expect(receivedParticipants.length).toBe(3);
-      expect(receivedHistory.length).toBe(3);
-    });
-  });
-
-  // Authorization tests
   describe('authorization', () => {
     it('should reject non-admin user', async () => {
+      const poll = createReadyPoll('poll-1', board.id, 'admin-1');
+      await pollRepository.createPoll(poll);
+
       const result = await useCase.execute({
-        pollId: poll.id,
+        pollId: 'poll-1',
         userId: 'regular-user',
       });
 
@@ -787,8 +483,11 @@ describe('ActivatePollUseCase', () => {
     });
 
     it('should allow admin user', async () => {
+      const poll = createReadyPoll('poll-1', board.id, 'admin-1');
+      await pollRepository.createPoll(poll);
+
       const result = await useCase.execute({
-        pollId: poll.id,
+        pollId: 'poll-1',
         userId: 'admin-1',
       });
 
@@ -797,9 +496,11 @@ describe('ActivatePollUseCase', () => {
 
     it('should allow superadmin even if not org admin', async () => {
       userRepository.setSuperAdmin('super-user');
+      const poll = createReadyPoll('poll-1', board.id, 'admin-1');
+      await pollRepository.createPoll(poll);
 
       const result = await useCase.execute({
-        pollId: poll.id,
+        pollId: 'poll-1',
         userId: 'super-user',
       });
 

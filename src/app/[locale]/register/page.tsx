@@ -20,6 +20,7 @@ type Props = {
 export default async function RegisterPage({ params }: Props) {
   // Redirect to home if already logged in
   const user = await getCurrentUser();
+
   if (user) {
     redirect('/home');
   }

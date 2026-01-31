@@ -12,6 +12,14 @@ datasource db {
   provider = "postgresql"
 }
 
+// Enums
+enum PollState {
+  DRAFT
+  READY
+  ACTIVE
+  FINISHED
+}
+
 // Authentication Models
 model User {
   id          String   @id @default(cuid())
@@ -168,19 +176,17 @@ model BoardUser {
 
 // Poll Models
 model Poll {
-  id                        String    @id @default(cuid())
-  title                     String
-  description               String
-  boardId                   String    @map("board_id")
-  startDate                 DateTime  @map("start_date")
-  endDate                   DateTime  @map("end_date")
-  active                    Boolean   @default(true)
-  finished                  Boolean   @default(false)
-  participantsSnapshotTaken Boolean   @default(false) @map("participants_snapshot_taken")
-  weightCriteria            String?   @map("weight_criteria")
-  createdBy                 String    @map("created_by")
-  createdAt                 DateTime  @default(now()) @map("created_at")
-  archivedAt                DateTime? @map("archived_at")
+  id             String    @id @default(cuid())
+  title          String
+  description    String
+  boardId        String    @map("board_id")
+  startDate      DateTime  @map("start_date")
+  endDate        DateTime  @map("end_date")
+  state          PollState @default(DRAFT)
+  weightCriteria String?   @map("weight_criteria")
+  createdBy      String    @map("created_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  archivedAt     DateTime? @map("archived_at")
 
   board        Board                          @relation(fields: [boardId], references: [id], onDelete: Cascade)
   creator      User                           @relation(fields: [createdBy], references: [id])
@@ -189,7 +195,7 @@ model Poll {
   voteDrafts   VoteDraft[]
 
   @@index([boardId])
-  @@index([active])
+  @@index([state])
   @@index([createdBy])
   @@map("polls")
 }

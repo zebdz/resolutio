@@ -24,6 +24,7 @@ export async function updateProfileAction(
   try {
     // Get current user
     const currentUser = await getCurrentUser();
+
     if (!currentUser) {
       return {
         success: false,
@@ -41,10 +42,12 @@ export async function updateProfileAction(
 
     // Validate with Zod
     const validation = UpdateUserProfileSchema.safeParse(input);
+
     if (!validation.success) {
       const fieldErrors: Record<string, string[]> = {};
       validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
+
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }

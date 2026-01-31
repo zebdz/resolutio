@@ -8,6 +8,7 @@ describe('PollParticipant Domain', () => {
       const result = PollParticipant.create('poll-1', 'user-1');
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.pollId).toBe('poll-1');
         expect(result.value.userId).toBe('user-1');
@@ -20,6 +21,7 @@ describe('PollParticipant Domain', () => {
       const result = PollParticipant.create('poll-1', 'user-1', 2.5);
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.userWeight).toBe(2.5);
       }
@@ -29,6 +31,7 @@ describe('PollParticipant Domain', () => {
       const result = PollParticipant.create('poll-1', 'user-1', -1.0);
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe(PollDomainCodes.INVALID_WEIGHT);
       }
@@ -38,6 +41,7 @@ describe('PollParticipant Domain', () => {
       const result = PollParticipant.create('poll-1', 'user-1', 0);
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.userWeight).toBe(0);
       }
@@ -49,11 +53,13 @@ describe('PollParticipant Domain', () => {
       const result = PollParticipant.create('poll-1', 'user-1', 1.0);
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         const participant = result.value;
         const updateResult = participant.updateWeight(3.0);
 
         expect(updateResult.success).toBe(true);
+
         if (updateResult.success) {
           expect(updateResult.value.oldWeight).toBe(1.0);
           expect(updateResult.value.newWeight).toBe(3.0);
@@ -66,11 +72,13 @@ describe('PollParticipant Domain', () => {
       const result = PollParticipant.create('poll-1', 'user-1', 1.0);
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         const participant = result.value;
         const updateResult = participant.updateWeight(-1.0);
 
         expect(updateResult.success).toBe(false);
+
         if (!updateResult.success) {
           expect(updateResult.error).toBe(PollDomainCodes.INVALID_WEIGHT);
         }
@@ -84,11 +92,13 @@ describe('PollParticipant Domain', () => {
       const result = PollParticipant.create('poll-1', 'user-1', 1.0);
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         const participant = result.value;
         const updateResult = participant.updateWeight(0);
 
         expect(updateResult.success).toBe(true);
+
         if (updateResult.success) {
           expect(participant.userWeight).toBe(0);
         }

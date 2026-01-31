@@ -29,6 +29,7 @@ function isItemCurrent(itemHref: string, pathname: string): boolean {
   if (itemHref === '/home') {
     return pathWithoutLocale === '/home';
   }
+
   return pathWithoutLocale.startsWith(itemHref);
 }
 
@@ -57,10 +58,7 @@ export function AppNavbar({ isSuperAdmin }: AppNavbarProps) {
           <NavbarLabel>{t('polls')}</NavbarLabel>
         </NavbarItem>
         {isSuperAdmin && (
-          <NavbarItem
-            href="/admin"
-            current={isItemCurrent('/admin', pathname)}
-          >
+          <NavbarItem href="/admin" current={isItemCurrent('/admin', pathname)}>
             <ShieldCheckIcon data-slot="icon" />
             <NavbarLabel>{t('admin')}</NavbarLabel>
           </NavbarItem>

@@ -1,10 +1,14 @@
-import { PrismaClient } from '@/generated/prisma/client';
+import {
+  PrismaClient,
+  PollState as PrismaPollState,
+} from '@/generated/prisma/client';
 import { Poll } from '../../domain/poll/Poll';
 import { Question } from '../../domain/poll/Question';
 import { Answer } from '../../domain/poll/Answer';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { QuestionType } from '../../domain/poll/QuestionType';
+import { PollState } from '../../domain/poll/PollState';
 
 export class PrismaPollRepository implements PollRepository {
   constructor(private prisma: PrismaClient) {}
@@ -19,9 +23,7 @@ export class PrismaPollRepository implements PollRepository {
           createdBy: poll.createdBy,
           startDate: poll.startDate,
           endDate: poll.endDate,
-          active: false,
-          finished: false,
-          participantsSnapshotTaken: false,
+          state: this.toPrismaState(poll.state),
           weightCriteria: poll.weightCriteria,
         },
         include: {
@@ -142,9 +144,7 @@ export class PrismaPollRepository implements PollRepository {
           description: poll.description,
           startDate: poll.startDate,
           endDate: poll.endDate,
-          active: poll.active,
-          finished: poll.finished,
-          participantsSnapshotTaken: poll.participantsSnapshotTaken,
+          state: this.toPrismaState(poll.state),
           weightCriteria: poll.weightCriteria,
           archivedAt: poll.archivedAt,
         },
@@ -181,15 +181,39 @@ export class PrismaPollRepository implements PollRepository {
       boardId: prismaData.boardId,
       startDate: prismaData.startDate,
       endDate: prismaData.endDate,
-      active: prismaData.active,
-      finished: prismaData.finished,
-      participantsSnapshotTaken: prismaData.participantsSnapshotTaken || false,
+      state: this.toDomainState(prismaData.state),
       weightCriteria: prismaData.weightCriteria || null,
       createdBy: prismaData.createdBy,
       createdAt: prismaData.createdAt,
       archivedAt: prismaData.archivedAt,
       questions,
     });
+  }
+
+  private toDomainState(prismaState: PrismaPollState): PollState {
+    switch (prismaState) {
+      case 'DRAFT':
+        return PollState.DRAFT;
+      case 'READY':
+        return PollState.READY;
+      case 'ACTIVE':
+        return PollState.ACTIVE;
+      case 'FINISHED':
+        return PollState.FINISHED;
+    }
+  }
+
+  private toPrismaState(domainState: PollState): PrismaPollState {
+    switch (domainState) {
+      case PollState.DRAFT:
+        return 'DRAFT';
+      case PollState.READY:
+        return 'READY';
+      case PollState.ACTIVE:
+        return 'ACTIVE';
+      case PollState.FINISHED:
+        return 'FINISHED';
+    }
   }
 
   private toDomainQuestion(prismaData: any): Question {

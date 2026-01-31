@@ -24,6 +24,7 @@ class MockPollRepository implements Pick<PollRepository, 'getPollById'> {
 
   async getPollById(pollId: string): Promise<Result<Poll | null, string>> {
     const poll = this.polls.get(pollId);
+
     if (poll) {
       // Populate questions
       const questions = Array.from(this.questions.values()).filter(
@@ -72,9 +73,10 @@ class MockPollRepository implements Pick<PollRepository, 'getPollById'> {
 }
 
 // Mock ParticipantRepository - only implements methods used by FinishVotingUseCase
-class MockParticipantRepository
-  implements Pick<ParticipantRepository, 'getParticipantByUserAndPoll'>
-{
+class MockParticipantRepository implements Pick<
+  ParticipantRepository,
+  'getParticipantByUserAndPoll'
+> {
   private participants: Map<string, PollParticipant> = new Map();
   private nextId = 1;
 
@@ -104,10 +106,10 @@ class MockParticipantRepository
 }
 
 // Mock VoteRepository - only implements methods used by FinishVotingUseCase
-class MockVoteRepository
-  implements
-    Pick<VoteRepository, 'hasUserFinishedVoting' | 'createVotes' | 'pollHasVotes'>
-{
+class MockVoteRepository implements Pick<
+  VoteRepository,
+  'hasUserFinishedVoting' | 'createVotes' | 'pollHasVotes'
+> {
   private votes: Map<string, Vote> = new Map();
   private questions: Map<string, Question>;
 
@@ -181,9 +183,10 @@ class MockVoteRepository
 }
 
 // Mock DraftRepository - only implements methods used by FinishVotingUseCase
-class MockDraftRepository
-  implements Pick<DraftRepository, 'getUserDrafts' | 'deleteUserDrafts'>
-{
+class MockDraftRepository implements Pick<
+  DraftRepository,
+  'getUserDrafts' | 'deleteUserDrafts'
+> {
   private drafts: Map<string, VoteDraft> = new Map();
 
   async getUserDrafts(
@@ -248,6 +251,7 @@ describe('FinishVotingUseCase', () => {
       new Date('2026-02-15')
     );
     expect(pollResult.success).toBe(true);
+
     if (pollResult.success) {
       poll = pollResult.value;
       await pollRepository.createPoll(poll);
@@ -262,6 +266,7 @@ describe('FinishVotingUseCase', () => {
       'single-choice'
     );
     expect(question1Result.success).toBe(true);
+
     if (question1Result.success) {
       question1 = question1Result.value;
       await pollRepository.createQuestion(question1);
@@ -275,6 +280,7 @@ describe('FinishVotingUseCase', () => {
       'single-choice'
     );
     expect(question2Result.success).toBe(true);
+
     if (question2Result.success) {
       question2 = question2Result.value;
       await pollRepository.createQuestion(question2);
@@ -283,6 +289,7 @@ describe('FinishVotingUseCase', () => {
     // Create answers and add to questions
     const answer1Result = Answer.create('Answer 1', 1, question1.id);
     expect(answer1Result.success).toBe(true);
+
     if (answer1Result.success) {
       answer1 = answer1Result.value;
       question1.addAnswer(answer1);
@@ -291,6 +298,7 @@ describe('FinishVotingUseCase', () => {
 
     const answer2Result = Answer.create('Answer 2', 1, question2.id);
     expect(answer2Result.success).toBe(true);
+
     if (answer2Result.success) {
       answer2 = answer2Result.value;
       question2.addAnswer(answer2);
@@ -302,6 +310,7 @@ describe('FinishVotingUseCase', () => {
       (q: any) => q.pollId === poll.id
     );
     (poll as any).props.questions = questions;
+    poll.takeSnapshot();
     poll.activate();
     await pollRepository.updatePoll(poll);
 
@@ -312,13 +321,13 @@ describe('FinishVotingUseCase', () => {
       new Decimal(2.5).toNumber()
     );
     expect(participantResult.success).toBe(true);
+
     if (participantResult.success) {
       participant = participantResult.value;
       await participantRepository.createParticipants([participant]);
     }
 
     // Take snapshot
-    poll.takeParticipantsSnapshot();
     await pollRepository.updatePoll(poll);
 
     // Create voteRepository after questions are set up
@@ -342,6 +351,7 @@ describe('FinishVotingUseCase', () => {
       'user-1'
     );
     expect(draft1Result.success).toBe(true);
+
     if (draft1Result.success) {
       await draftRepository.saveDraft(draft1Result.value);
     }
@@ -353,6 +363,7 @@ describe('FinishVotingUseCase', () => {
       'user-1'
     );
     expect(draft2Result.success).toBe(true);
+
     if (draft2Result.success) {
       await draftRepository.saveDraft(draft2Result.value);
     }
@@ -371,6 +382,7 @@ describe('FinishVotingUseCase', () => {
     // Verify votes were created
     const votesResult = await voteRepository.getUserVotes(poll.id, 'user-1');
     expect(votesResult.success).toBe(true);
+
     if (votesResult.success) {
       expect(votesResult.value.length).toBe(2);
       expect(
@@ -383,6 +395,7 @@ describe('FinishVotingUseCase', () => {
     // Verify drafts were deleted
     const draftsResult = await draftRepository.getUserDrafts(poll.id, 'user-1');
     expect(draftsResult.success).toBe(true);
+
     if (draftsResult.success) {
       expect(draftsResult.value.length).toBe(0);
     }
@@ -395,6 +408,7 @@ describe('FinishVotingUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.NOT_FOUND);
     }
@@ -411,6 +425,7 @@ describe('FinishVotingUseCase', () => {
       new Date('2026-02-15')
     );
     expect(inactivePollResult.success).toBe(true);
+
     if (inactivePollResult.success) {
       const inactivePoll = inactivePollResult.value;
       await pollRepository.createPoll(inactivePoll);
@@ -421,6 +436,7 @@ describe('FinishVotingUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe(PollDomainCodes.POLL_NOT_ACTIVE);
       }
@@ -437,6 +453,7 @@ describe('FinishVotingUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollDomainCodes.POLL_FINISHED);
     }
@@ -449,6 +466,7 @@ describe('FinishVotingUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollDomainCodes.NOT_PARTICIPANT);
     }
@@ -458,6 +476,7 @@ describe('FinishVotingUseCase', () => {
     // Create a vote
     const voteResult = Vote.create(question1.id, answer1.id, 'user-1', 2.5);
     expect(voteResult.success).toBe(true);
+
     if (voteResult.success) {
       await voteRepository.createVote(voteResult.value);
 
@@ -467,6 +486,7 @@ describe('FinishVotingUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe(PollDomainCodes.ALREADY_VOTED);
       }
@@ -482,6 +502,7 @@ describe('FinishVotingUseCase', () => {
       'user-1'
     );
     expect(draft1Result.success).toBe(true);
+
     if (draft1Result.success) {
       await draftRepository.saveDraft(draft1Result.value);
     }
@@ -492,6 +513,7 @@ describe('FinishVotingUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollDomainCodes.MUST_ANSWER_ALL_QUESTIONS);
     }
@@ -512,6 +534,7 @@ describe('FinishVotingUseCase', () => {
       'user-1'
     );
     expect(draft1Result.success && draft2Result.success).toBe(true);
+
     if (draft1Result.success && draft2Result.success) {
       await draftRepository.saveDraft(draft1Result.value);
       await draftRepository.saveDraft(draft2Result.value);
@@ -527,6 +550,7 @@ describe('FinishVotingUseCase', () => {
     // Verify votes have correct weight
     const votesResult = await voteRepository.getUserVotes(poll.id, 'user-1');
     expect(votesResult.success).toBe(true);
+
     if (votesResult.success) {
       votesResult.value.forEach((vote) => {
         expect(vote.userWeight === new Decimal(2.5).toNumber()).toBe(true);
@@ -565,6 +589,7 @@ describe('FinishVotingUseCase', () => {
     expect(
       draft1aResult.success && draft1bResult.success && draft2Result.success
     ).toBe(true);
+
     if (
       draft1aResult.success &&
       draft1bResult.success &&
@@ -581,6 +606,7 @@ describe('FinishVotingUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollDomainCodes.SINGLE_CHOICE_MULTIPLE_ANSWERS);
     }

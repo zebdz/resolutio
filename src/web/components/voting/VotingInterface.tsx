@@ -75,6 +75,7 @@ export default function VotingInterface({
   const [drafts, setDrafts] = useState<Record<string, string[]>>(() => {
     // Initialize drafts from server data
     const draftMap: Record<string, string[]> = {};
+
     if (initialDrafts && Array.isArray(initialDrafts)) {
       initialDrafts.forEach((draft) => {
         if (!draftMap[draft.questionId]) {
@@ -153,6 +154,7 @@ export default function VotingInterface({
 
   const handlePrevious = () => {
     const currentIndex = pages.indexOf(currentPage);
+
     if (currentIndex > 0) {
       setCurrentPage(pages[currentIndex - 1]);
     }
@@ -160,6 +162,7 @@ export default function VotingInterface({
 
   const handleNext = () => {
     const currentIndex = pages.indexOf(currentPage);
+
     if (currentIndex < pages.length - 1) {
       setCurrentPage(pages[currentIndex + 1]);
     }

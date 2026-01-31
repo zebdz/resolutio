@@ -8,6 +8,7 @@ describe('Vote Domain', () => {
       const result = Vote.create('question-1', 'answer-1', 'user-1', 1.5);
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.questionId).toBe('question-1');
         expect(result.value.answerId).toBe('answer-1');
@@ -20,6 +21,7 @@ describe('Vote Domain', () => {
       const result = Vote.create('question-1', 'answer-1', 'user-1', 1.0);
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.userWeight).toBe(1.0);
       }
@@ -29,6 +31,7 @@ describe('Vote Domain', () => {
       const result = Vote.create('question-1', 'answer-1', 'user-1', -1.0);
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe(PollDomainCodes.INVALID_WEIGHT);
       }
@@ -38,6 +41,7 @@ describe('Vote Domain', () => {
       const result = Vote.create('question-1', 'answer-1', 'user-1', 0);
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.userWeight).toBe(0);
       }

@@ -53,6 +53,7 @@ class MockPollRepository implements PollRepository {
 
   async deletePoll(pollId: string): Promise<Result<void, string>> {
     const poll = this.polls.get(pollId);
+
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
     }
@@ -97,6 +98,7 @@ class MockPollRepository implements PollRepository {
   ): Promise<Result<void, string>> {
     for (const update of updates) {
       const question = this.questions.get(update.questionId);
+
       if (question) {
         question.updatePage(update.page);
         question.updateOrder(update.order);
@@ -108,6 +110,7 @@ class MockPollRepository implements PollRepository {
 
   async deleteQuestion(questionId: string): Promise<Result<void, string>> {
     const question = this.questions.get(questionId);
+
     if (!question) {
       return failure(PollErrors.QUESTION_NOT_FOUND);
     }
@@ -149,6 +152,7 @@ class MockPollRepository implements PollRepository {
 
   async deleteAnswer(answerId: string): Promise<Result<void, string>> {
     const answer = this.answers.get(answerId);
+
     if (!answer) {
       return failure(PollErrors.ANSWER_NOT_FOUND);
     }
@@ -273,6 +277,7 @@ describe('CreatePollUseCase', () => {
 
     // Assert
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.title).toBe('Test Poll');
       expect(result.value.description).toBe('This is a test poll');
@@ -280,8 +285,7 @@ describe('CreatePollUseCase', () => {
       expect(result.value.createdBy).toBe('user-1');
       expect(result.value.startDate).toEqual(startDate);
       expect(result.value.endDate).toEqual(endDate);
-      expect(result.value.active).toBe(false);
-      expect(result.value.finished).toBe(false);
+      expect(result.value.isDraft()).toBe(true);
     }
   });
 
@@ -309,6 +313,7 @@ describe('CreatePollUseCase', () => {
 
     // Assert
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.NOT_BOARD_MEMBER);
     }
@@ -331,6 +336,7 @@ describe('CreatePollUseCase', () => {
 
     // Assert
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.BOARD_NOT_FOUND);
     }
@@ -360,6 +366,7 @@ describe('CreatePollUseCase', () => {
 
     // Assert
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toContain('title');
     }
@@ -389,6 +396,7 @@ describe('CreatePollUseCase', () => {
 
     // Assert
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toContain('description');
     }
@@ -418,6 +426,7 @@ describe('CreatePollUseCase', () => {
 
     // Assert
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollDomainCodes.POLL_INVALID_DATES);
     }

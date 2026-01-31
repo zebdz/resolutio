@@ -54,6 +54,7 @@ export default function MembersList({ boardId, members }: MembersListProps) {
     const formData = new FormData();
     formData.append('boardId', boardId);
     formData.append('userId', selectedMember.id);
+
     if (reason) {
       formData.append('reason', reason);
     }

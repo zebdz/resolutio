@@ -22,6 +22,7 @@ export class CreatePollUseCase {
   async execute(input: CreatePollInput): Promise<Result<Poll, string>> {
     // 1. Check if board exists
     const board = await this.boardRepository.findById(input.boardId);
+
     if (!board) {
       return failure(PollErrors.BOARD_NOT_FOUND);
     }

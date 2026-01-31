@@ -18,6 +18,7 @@ function isItemCurrent(itemHref: string, pathname: string): boolean {
   if (itemHref === '/home') {
     return pathname === '/home';
   }
+
   return pathname.startsWith(itemHref);
 }
 

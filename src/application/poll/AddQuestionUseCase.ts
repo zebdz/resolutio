@@ -27,6 +27,7 @@ export class AddQuestionUseCase {
   async execute(input: AddQuestionInput): Promise<Result<Question, string>> {
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(input.pollId);
+
     if (!pollResult.success || !pollResult.value) {
       return failure(PollErrors.NOT_FOUND);
     }
@@ -61,6 +62,7 @@ export class AddQuestionUseCase {
     const createdQuestionResult = await this.questionRepository.createQuestion(
       questionResult.value
     );
+
     if (!createdQuestionResult.success) {
       return failure(PollErrors.QUESTION_NOT_FOUND); // Repository persistence error
     }
@@ -78,6 +80,7 @@ export class AddQuestionUseCase {
       const createdAnswerResult = await this.answerRepository.createAnswer(
         answerResult.value
       );
+
       if (!createdAnswerResult.success) {
         return failure(PollErrors.ANSWER_NOT_FOUND); // Repository persistence error
       }
@@ -86,6 +89,7 @@ export class AddQuestionUseCase {
     // 7. Get the question with all its answers
     const questionWithAnswersResult =
       await this.questionRepository.getQuestionById(question.id);
+
     if (
       !questionWithAnswersResult.success ||
       !questionWithAnswersResult.value

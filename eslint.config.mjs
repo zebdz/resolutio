@@ -17,10 +17,11 @@ const eslintConfig = defineConfig([
     rules: {
       // Enforce curly braces for all control statements
       curly: ['error', 'all'],
-      // Enforce blank line before return statements and after block-like statements
+      // Enforce blank lines around block-like statements and before return
       'padding-line-between-statements': [
         'error',
         { blankLine: 'always', prev: '*', next: 'return' },
+        { blankLine: 'always', prev: '*', next: 'block-like' },
         { blankLine: 'always', prev: 'block-like', next: '*' },
       ],
       '@typescript-eslint/no-explicit-any': 'off', // temporarily disable TODO: enable later

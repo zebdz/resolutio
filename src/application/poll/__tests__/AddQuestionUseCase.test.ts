@@ -21,6 +21,7 @@ class MockPollRepository implements PollRepository {
     const id = `poll-${Math.random()}`;
     (poll as any).props.id = id;
     this.polls.set(id, poll);
+
     return success(poll);
   }
 
@@ -40,12 +41,17 @@ class MockPollRepository implements PollRepository {
 
   async updatePoll(poll: Poll): Promise<Result<void, string>> {
     this.polls.set(poll.id, poll);
+
     return success(undefined);
   }
 
   async deletePoll(pollId: string): Promise<Result<void, string>> {
     const poll = this.polls.get(pollId);
-    if (poll) poll.archive();
+
+    if (poll) {
+      poll.archive();
+    }
+
     return success(undefined);
   }
 
@@ -72,6 +78,7 @@ class MockQuestionRepository implements QuestionRepository {
     const id = `question-${this.nextId++}`;
     (question as any).props.id = id;
     this.questions.set(id, question);
+
     return success(question);
   }
 
@@ -79,9 +86,13 @@ class MockQuestionRepository implements QuestionRepository {
     questionId: string
   ): Promise<Result<Question | null, string>> {
     const question = this.questions.get(questionId);
-    if (!question) return success(null);
+
+    if (!question) {
+      return success(null);
+    }
 
     const answers = this.answers.get(questionId) || [];
+
     return success(
       Question.reconstitute({
         id: question.id,
@@ -110,6 +121,7 @@ class MockQuestionRepository implements QuestionRepository {
 
   async updateQuestion(question: Question): Promise<Result<void, string>> {
     this.questions.set(question.id, question);
+
     return success(undefined);
   }
 
@@ -118,17 +130,23 @@ class MockQuestionRepository implements QuestionRepository {
   ): Promise<Result<void, string>> {
     for (const update of updates) {
       const question = this.questions.get(update.questionId);
+
       if (question) {
         question.updatePage(update.page);
         question.updateOrder(update.order);
       }
     }
+
     return success(undefined);
   }
 
   async deleteQuestion(questionId: string): Promise<Result<void, string>> {
     const question = this.questions.get(questionId);
-    if (question) question.archive();
+
+    if (question) {
+      question.archive();
+    }
+
     return success(undefined);
   }
 
@@ -160,6 +178,7 @@ class MockAnswerRepository implements AnswerRepository {
     (answer as any).props.id = id;
     this.answers.set(id, answer);
     this.questionRepository.addAnswerToQuestion(answer.questionId, answer);
+
     return success(answer);
   }
 
@@ -181,12 +200,17 @@ class MockAnswerRepository implements AnswerRepository {
 
   async updateAnswer(answer: Answer): Promise<Result<void, string>> {
     this.answers.set(answer.id, answer);
+
     return success(undefined);
   }
 
   async deleteAnswer(answerId: string): Promise<Result<void, string>> {
     const answer = this.answers.get(answerId);
-    if (answer) answer.archive();
+
+    if (answer) {
+      answer.archive();
+    }
+
     return success(undefined);
   }
 
@@ -238,6 +262,7 @@ describe('AddQuestionUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.text).toBe('What is your favorite color?');
       expect(result.value.details).toBe('Please select one option');
@@ -275,6 +300,7 @@ describe('AddQuestionUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.questionType).toBe('multiple-choice');
       expect(result.value.answers).toHaveLength(4);
@@ -292,6 +318,7 @@ describe('AddQuestionUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.NOT_FOUND);
     }
@@ -321,6 +348,7 @@ describe('AddQuestionUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollDomainCodes.QUESTION_TEXT_EMPTY);
     }
@@ -350,6 +378,7 @@ describe('AddQuestionUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.NO_ANSWERS);
     }
@@ -367,7 +396,25 @@ describe('AddQuestionUseCase', () => {
     expect(pollResult.success).toBe(true);
     const poll = pollResult.value;
     (poll as any).props.id = 'poll-1';
+
+    // Add question with answer so we can transition through states
+    const questionResult = Question.create(
+      'Q1',
+      poll.id,
+      1,
+      1,
+      'single-choice'
+    );
+    const question = questionResult.value;
+    const answerResult = Answer.create('A1', 1, question.id);
+    question.addAnswer(answerResult.value);
+    poll.addQuestion(question);
+
+    // Transition to FINISHED state
+    poll.takeSnapshot();
+    poll.activate();
     poll.finish();
+
     pollRepository.addPoll(poll);
 
     const result = await useCase.execute({
@@ -380,6 +427,7 @@ describe('AddQuestionUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.CANNOT_MODIFY_FINISHED);
     }
@@ -409,6 +457,7 @@ describe('AddQuestionUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.page).toBe(2);
     }

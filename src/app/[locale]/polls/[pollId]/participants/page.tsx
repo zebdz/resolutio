@@ -48,6 +48,7 @@ export default async function ParticipantsPage({
   const poll = pollResult.data;
 
   const board = await boardRepository.findById(poll.boardId);
+
   if (!board) {
     redirect('/polls');
   }

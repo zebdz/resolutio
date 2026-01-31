@@ -25,6 +25,7 @@ export class CreateOrganizationUseCase {
 
     // Check if organization with this name already exists
     const existingOrg = await this.deps.organizationRepository.findByName(name);
+
     if (existingOrg) {
       return failure(OrganizationErrors.NAME_EXISTS);
     }
@@ -33,6 +34,7 @@ export class CreateOrganizationUseCase {
     if (parentId) {
       const parentOrg =
         await this.deps.organizationRepository.findById(parentId);
+
       if (!parentOrg) {
         return failure(OrganizationErrors.PARENT_NOT_FOUND);
       }

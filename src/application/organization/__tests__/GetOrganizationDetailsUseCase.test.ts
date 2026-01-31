@@ -62,6 +62,7 @@ class MockOrganizationRepository implements OrganizationRepository {
     this.members.forEach((members, orgId) => {
       if (members.has(userId)) {
         const org = this.organizations.get(orgId);
+
         if (org) {
           memberOrgs.push(org);
         }
@@ -78,6 +79,7 @@ class MockOrganizationRepository implements OrganizationRepository {
     this.admins.forEach((admins, orgId) => {
       if (admins.has(userId)) {
         const org = this.organizations.get(orgId);
+
         if (org) {
           adminOrgs.push(org);
         }
@@ -240,6 +242,7 @@ describe('GetOrganizationDetailsUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe(OrganizationErrors.NOT_FOUND);
       }
@@ -255,6 +258,7 @@ describe('GetOrganizationDetailsUseCase', () => {
       );
 
       expect(orgResult.success).toBe(true);
+
       if (orgResult.success) {
         const organization = orgResult.value;
         (organization as any).props.id = 'org-1';
@@ -266,6 +270,7 @@ describe('GetOrganizationDetailsUseCase', () => {
         });
 
         expect(result.success).toBe(false);
+
         if (!result.success) {
           expect(result.error).toBe(OrganizationErrors.ARCHIVED);
         }
@@ -286,6 +291,7 @@ describe('GetOrganizationDetailsUseCase', () => {
       );
 
       expect(orgResult.success).toBe(true);
+
       if (orgResult.success) {
         organization = orgResult.value;
         (organization as any).props.id = 'org-1';
@@ -294,6 +300,7 @@ describe('GetOrganizationDetailsUseCase', () => {
 
       const board1Result = Board.create('General Board', 'org-1', true);
       expect(board1Result.success).toBe(true);
+
       if (board1Result.success) {
         board1 = board1Result.value;
         (board1 as any).props.id = 'board-1';
@@ -302,6 +309,7 @@ describe('GetOrganizationDetailsUseCase', () => {
 
       const board2Result = Board.create('Special Board', 'org-1', false);
       expect(board2Result.success).toBe(true);
+
       if (board2Result.success) {
         board2 = board2Result.value;
         (board2 as any).props.id = 'board-2';
@@ -315,6 +323,7 @@ describe('GetOrganizationDetailsUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.organization.id).toBe('org-1');
         expect(result.value.organization.name).toBe('Test Organization');
@@ -330,6 +339,7 @@ describe('GetOrganizationDetailsUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.boards[0].memberCount).toBe(5);
         expect(result.value.boards[1].memberCount).toBe(5);
@@ -342,6 +352,7 @@ describe('GetOrganizationDetailsUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.firstAdmin).not.toBeNull();
         expect(result.value.firstAdmin?.firstName).toBe('Admin');
@@ -358,6 +369,7 @@ describe('GetOrganizationDetailsUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.isUserMember).toBe(true);
         expect(result.value.isUserAdmin).toBe(false);
@@ -374,6 +386,7 @@ describe('GetOrganizationDetailsUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.isUserMember).toBe(true);
         expect(result.value.isUserAdmin).toBe(true);
@@ -390,6 +403,7 @@ describe('GetOrganizationDetailsUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         const board1Details = result.value.boards.find(
           (b) => b.board.id === 'board-1'
@@ -412,6 +426,7 @@ describe('GetOrganizationDetailsUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.boards).toHaveLength(1);
         expect(result.value.boards[0].board.id).toBe('board-1');

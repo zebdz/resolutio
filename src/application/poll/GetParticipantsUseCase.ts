@@ -45,17 +45,20 @@ export class GetParticipantsUseCase {
 
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(pollId);
+
     if (!pollResult.success) {
       return failure(pollResult.error);
     }
 
     const poll = pollResult.value;
+
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
     }
 
     // 2. Get board and check admin permissions
     const board = await this.boardRepository.findById(poll.boardId);
+
     if (!board) {
       return failure(PollErrors.BOARD_NOT_FOUND);
     }
@@ -72,6 +75,7 @@ export class GetParticipantsUseCase {
     // 3. Get participants
     const participantsResult =
       await this.participantRepository.getParticipants(pollId);
+
     if (!participantsResult.success) {
       return failure(participantsResult.error);
     }
@@ -102,6 +106,7 @@ export class GetParticipantsUseCase {
 
     // 5. Check if participants can be modified (no votes exist)
     const hasVotesResult = await this.voteRepository.pollHasVotes(pollId);
+
     if (!hasVotesResult.success) {
       return failure(hasVotesResult.error);
     }

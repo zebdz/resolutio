@@ -36,15 +36,18 @@ describe('GetWeightHistoryUseCase', () => {
       new Date('2026-02-15')
     );
     expect(pollResult.success).toBe(true);
+
     if (pollResult.success) {
       poll = pollResult.value;
       (poll as any).props.id = 'poll-1';
+      poll.takeSnapshot();
       poll.activate();
     }
 
     // Create board
     const boardResult = Board.create('org-1', 'Test Board', 'user-admin');
     expect(boardResult.success).toBe(true);
+
     if (boardResult.success) {
       board = boardResult.value;
       (board as any).props.id = 'board-1';
@@ -57,6 +60,7 @@ describe('GetWeightHistoryUseCase', () => {
       new Decimal(1.0).toNumber()
     );
     expect(participantResult.success).toBe(true);
+
     if (participantResult.success) {
       participant = participantResult.value;
       (participant as any).props.id = 'participant-1';
@@ -73,6 +77,7 @@ describe('GetWeightHistoryUseCase', () => {
       'Weight adjustment'
     );
     expect(historyResult.success).toBe(true);
+
     if (historyResult.success) {
       historyEntry = historyResult.value;
       (historyEntry as any).props.id = 'history-1';
@@ -138,6 +143,7 @@ describe('GetWeightHistoryUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.history.length).toBe(1);
       expect(result.value.history[0].history.id).toBe('history-1');
@@ -155,6 +161,7 @@ describe('GetWeightHistoryUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.NOT_FOUND);
     }
@@ -169,6 +176,7 @@ describe('GetWeightHistoryUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.BOARD_NOT_FOUND);
     }
@@ -183,6 +191,7 @@ describe('GetWeightHistoryUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(OrganizationErrors.NOT_ADMIN);
     }
@@ -199,6 +208,7 @@ describe('GetWeightHistoryUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.history.length).toBe(0);
     }
@@ -215,6 +225,7 @@ describe('GetWeightHistoryUseCase', () => {
       'Another adjustment'
     );
     expect(history2Result.success).toBe(true);
+
     if (history2Result.success) {
       const history2 = history2Result.value;
       (history2 as any).props.id = 'history-2';
@@ -229,6 +240,7 @@ describe('GetWeightHistoryUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.history.length).toBe(2);
     }

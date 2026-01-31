@@ -186,12 +186,14 @@ export class Question {
     }
 
     const index = this.props.answers.findIndex((a) => a.id === answerId);
+
     if (index === -1) {
       return failure(PollDomainCodes.QUESTION_ANSWER_NOT_FOUND);
     }
 
     // Archive the answer instead of removing it
     const archiveResult = this.props.answers[index].archive();
+
     if (!archiveResult.success) {
       return failure(archiveResult.error);
     }

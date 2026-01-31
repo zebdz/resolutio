@@ -20,6 +20,7 @@ export interface ParticipantRepository {
     participant: PollParticipant
   ): Promise<Result<void, string>>;
   deleteParticipant(participantId: string): Promise<Result<void, string>>;
+  deleteParticipantsByPollId(pollId: string): Promise<Result<void, string>>;
 
   // Weight history operations
   createWeightHistory(

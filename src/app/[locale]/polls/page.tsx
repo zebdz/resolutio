@@ -36,8 +36,9 @@ export default async function PollsPage() {
   const polls = pollsResult.success ? pollsResult.data : [];
 
   // Fetch user's admin organizations and superadmin status for authorization
-  const adminOrgs =
-    await organizationRepository.findAdminOrganizationsByUserId(user.id);
+  const adminOrgs = await organizationRepository.findAdminOrganizationsByUserId(
+    user.id
+  );
   const adminOrgIds = new Set(adminOrgs.map((o) => o.id));
   const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
 
@@ -90,9 +91,7 @@ export default async function PollsPage() {
                 key={poll.id}
                 poll={poll}
                 userId={user.id}
-                canManage={
-                  isSuperAdmin || adminOrgIds.has(poll.organizationId)
-                }
+                canManage={isSuperAdmin || adminOrgIds.has(poll.organizationId)}
               />
             ))}
           </div>

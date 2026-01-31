@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GetPollResultsUseCase } from '../GetPollResultsUseCase';
 import { Poll } from '../../../domain/poll/Poll';
+import { PollState } from '../../../domain/poll/PollState';
 import { Question } from '../../../domain/poll/Question';
 import { Answer } from '../../../domain/poll/Answer';
 import { Vote } from '../../../domain/poll/Vote';
@@ -48,8 +49,8 @@ describe('GetPollResultsUseCase', () => {
     expect(pollResult.success).toBe(true);
     poll = pollResult.value;
     (poll as any).props.id = 'poll-1';
-    poll.activate();
-    poll.finish();
+    // Set state directly to FINISHED (questions added to props below)
+    (poll as any).props.state = PollState.FINISHED;
 
     // Create board
     const boardResult = Board.create('org-1', 'Test Board', 'user-admin');
@@ -145,11 +146,15 @@ describe('GetPollResultsUseCase', () => {
     };
 
     userRepository = {
-      findByIds: vi.fn().mockResolvedValue([
-        { id: 'user-1', firstName: 'Alice', lastName: 'Smith' } as User,
-        { id: 'user-2', firstName: 'Bob', lastName: 'Johnson' } as User,
-      ]),
-      isSuperAdmin: vi.fn(userId => Promise.resolve(userId === 'user-superadmin')),
+      findByIds: vi
+        .fn()
+        .mockResolvedValue([
+          { id: 'user-1', firstName: 'Alice', lastName: 'Smith' } as User,
+          { id: 'user-2', firstName: 'Bob', lastName: 'Johnson' } as User,
+        ]),
+      isSuperAdmin: vi.fn((userId) =>
+        Promise.resolve(userId === 'user-superadmin')
+      ),
     };
 
     useCase = new GetPollResultsUseCase(
@@ -169,6 +174,7 @@ describe('GetPollResultsUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const questionResult = result.value.results[0];
       const answer1Result = questionResult.answers.find(
@@ -192,6 +198,7 @@ describe('GetPollResultsUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.canViewVoters).toBe(true);
       const answer1Result = result.value.results[0].answers.find(
@@ -205,7 +212,7 @@ describe('GetPollResultsUseCase', () => {
 
   it('should allow admin to view results of active poll', async () => {
     // Make poll active but not finished
-    (poll as any).props.finished = false;
+    (poll as any).props.state = PollState.ACTIVE;
 
     const result = await useCase.execute({
       pollId: 'poll-1',
@@ -217,8 +224,7 @@ describe('GetPollResultsUseCase', () => {
 
   it('should reject non-admin viewing results of active poll', async () => {
     // Make poll active but not finished
-    (poll as any).props.active = true;
-    (poll as any).props.finished = false;
+    (poll as any).props.state = PollState.ACTIVE;
     organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
 
     const result = await useCase.execute({
@@ -227,15 +233,15 @@ describe('GetPollResultsUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe('poll.errors.resultsAdminOnly');
     }
   });
 
-  it('should allow superadmin to view results of active poll', async() => {
+  it('should allow superadmin to view results of active poll', async () => {
     // Make poll active but not finished
-    (poll as any).props.active = true;
-    (poll as any).props.finished = false;
+    (poll as any).props.state = PollState.ACTIVE;
     organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
     organizationRepository.isUserMember = vi.fn().mockResolvedValue(false);
 
@@ -270,6 +276,7 @@ describe('GetPollResultsUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       // canViewVoters should be false for non-creators
       expect(result.value.canViewVoters).toBe(false);
@@ -286,6 +293,7 @@ describe('GetPollResultsUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       // canViewVoters should be false for the poll creator
       expect(result.value.canViewVoters).toBe(false);
@@ -302,6 +310,7 @@ describe('GetPollResultsUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       // canViewVoters should be true for admins
       expect(result.value.canViewVoters).toBe(true);
@@ -318,6 +327,7 @@ describe('GetPollResultsUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe('poll.errors.notOrganizationMember');
     }
@@ -332,6 +342,7 @@ describe('GetPollResultsUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.NOT_FOUND);
     }
@@ -346,6 +357,7 @@ describe('GetPollResultsUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.BOARD_NOT_FOUND);
     }
@@ -372,6 +384,7 @@ describe('GetPollResultsUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.totalParticipants).toBe(3);
       expect(result.value.totalParticipantWeight).toBe(5.0);
@@ -387,6 +400,7 @@ describe('GetPollResultsUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const questionResult = result.value.results[0];
       expect(questionResult.totalVotes).toBe(0);
@@ -419,6 +433,7 @@ describe('GetPollResultsUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.results.length).toBe(1);
       expect(result.value.results[0].questionId).toBe('question-1');
@@ -435,6 +450,7 @@ describe('GetPollResultsUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const questionResult = result.value.results[0];
       expect(questionResult.answers.length).toBe(1);
@@ -462,6 +478,7 @@ describe('GetPollResultsUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const questionResult = result.value.results[0];
       expect(questionResult.totalVotes).toBe(3);

@@ -30,6 +30,7 @@ function isItemCurrent(itemHref: string, pathname: string): boolean {
   if (itemHref === '/home') {
     return pathWithoutLocale === '/home';
   }
+
   return pathWithoutLocale.startsWith(itemHref);
 }
 

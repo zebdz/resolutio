@@ -17,6 +17,7 @@ function parseAnswersFromFormData(
   // Find all answer indices
   for (const key of formData.keys()) {
     const match = key.match(/^answers\[(\d+)\]\[text\]$/);
+
     if (match) {
       answerIndices.add(parseInt(match[1]));
     }

@@ -225,6 +225,7 @@ describe('ArchiveBoardUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe('board.errors.notFound');
       }
@@ -238,6 +239,7 @@ describe('ArchiveBoardUseCase', () => {
         'Test Desc',
         'creator-1'
       );
+
       if (orgResult.success) {
         const org = orgResult.value;
         (org as any).props.id = 'org-1';
@@ -245,6 +247,7 @@ describe('ArchiveBoardUseCase', () => {
       }
 
       const boardResult = Board.create('Test Board', 'org-1');
+
       if (boardResult.success) {
         const board = boardResult.value;
         (board as any).props.id = 'board-1';
@@ -259,6 +262,7 @@ describe('ArchiveBoardUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe('organization.errors.notAdmin');
       }
@@ -272,6 +276,7 @@ describe('ArchiveBoardUseCase', () => {
         'Test Desc',
         'creator-1'
       );
+
       if (orgResult.success) {
         const org = orgResult.value;
         (org as any).props.id = 'org-1';
@@ -282,6 +287,7 @@ describe('ArchiveBoardUseCase', () => {
 
     it('should archive a board successfully', async () => {
       const boardResult = Board.create('Test Board', 'org-1');
+
       if (boardResult.success) {
         const board = boardResult.value;
         (board as any).props.id = 'board-1';
@@ -304,6 +310,7 @@ describe('ArchiveBoardUseCase', () => {
 
     it('should fail when trying to archive an already archived board', async () => {
       const boardResult = Board.create('Test Board', 'org-1');
+
       if (boardResult.success) {
         const board = boardResult.value;
         (board as any).props.id = 'board-1';
@@ -317,6 +324,7 @@ describe('ArchiveBoardUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe('domain.board.boardAlreadyArchived');
       }
@@ -324,6 +332,7 @@ describe('ArchiveBoardUseCase', () => {
 
     it('should fail when trying to archive the general board', async () => {
       const boardResult = Board.create('General Board', 'org-1', true);
+
       if (boardResult.success) {
         const board = boardResult.value;
         (board as any).props.id = 'board-general';
@@ -336,6 +345,7 @@ describe('ArchiveBoardUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe('board.errors.cannotArchiveGeneral');
       }
@@ -349,17 +359,20 @@ describe('ArchiveBoardUseCase', () => {
         'Test Desc',
         'creator-1'
       );
+
       if (orgResult.success) {
         const org = orgResult.value;
         (org as any).props.id = 'org-1';
         organizationRepository.addOrganization(org);
       }
+
       // NOT adding as admin - superadmin should bypass
       userRepository.addSuperAdmin('superadmin-1');
     });
 
     it('should archive board without being org admin', async () => {
       const boardResult = Board.create('Test Board', 'org-1');
+
       if (boardResult.success) {
         const board = boardResult.value;
         (board as any).props.id = 'board-1';

@@ -36,11 +36,13 @@ export class SubmitDraftUseCase {
 
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(pollId);
+
     if (!pollResult.success) {
       return failure(pollResult.error);
     }
 
     const poll = pollResult.value;
+
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
     }
@@ -56,7 +58,11 @@ export class SubmitDraftUseCase {
 
     // 3. Check if user is a participant
     const participantResult =
-      await this.participantRepository.getParticipantByUserAndPoll(pollId, userId);
+      await this.participantRepository.getParticipantByUserAndPoll(
+        pollId,
+        userId
+      );
+
     if (!participantResult.success) {
       return failure(participantResult.error);
     }
@@ -70,6 +76,7 @@ export class SubmitDraftUseCase {
       pollId,
       userId
     );
+
     if (!hasFinishedResult.success) {
       return failure(hasFinishedResult.error);
     }
@@ -86,6 +93,7 @@ export class SubmitDraftUseCase {
         answerId,
         userId
       );
+
       if (!deleteResult.success) {
         return failure(deleteResult.error);
       }
@@ -103,6 +111,7 @@ export class SubmitDraftUseCase {
         questionId,
         userId
       );
+
       if (!deleteResult.success) {
         return failure(deleteResult.error);
       }
@@ -110,6 +119,7 @@ export class SubmitDraftUseCase {
 
     // 7. Create and save draft
     const draftResult = VoteDraft.create(pollId, questionId, answerId, userId);
+
     if (!draftResult.success) {
       return failure(draftResult.error);
     }

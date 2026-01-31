@@ -1,5 +1,10 @@
-import { Prisma, PrismaClient } from '@/generated/prisma/client';
+import {
+  Prisma,
+  PrismaClient,
+  PollState as PrismaPollState,
+} from '@/generated/prisma/client';
 import { Poll } from '../../domain/poll/Poll';
+import { PollState } from '../../domain/poll/PollState';
 import { PollParticipant } from '../../domain/poll/PollParticipant';
 import { ParticipantWeightHistory } from '../../domain/poll/ParticipantWeightHistory';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
@@ -115,6 +120,20 @@ export class PrismaParticipantRepository implements ParticipantRepository {
     }
   }
 
+  async deleteParticipantsByPollId(
+    pollId: string
+  ): Promise<Result<void, string>> {
+    try {
+      await this.prisma.pollParticipant.deleteMany({
+        where: { pollId },
+      });
+
+      return success(undefined);
+    } catch (error) {
+      return failure(`Failed to delete participants: ${error}`);
+    }
+  }
+
   async createWeightHistory(
     history: ParticipantWeightHistory
   ): Promise<Result<ParticipantWeightHistory, string>> {
@@ -217,9 +236,7 @@ export class PrismaParticipantRepository implements ParticipantRepository {
             description: poll.description,
             startDate: poll.startDate,
             endDate: poll.endDate,
-            active: poll.active,
-            finished: poll.finished,
-            participantsSnapshotTaken: poll.participantsSnapshotTaken,
+            state: this.toPrismaState(poll.state),
             weightCriteria: poll.weightCriteria,
             archivedAt: poll.archivedAt,
           },
@@ -228,9 +245,7 @@ export class PrismaParticipantRepository implements ParticipantRepository {
         return createdParticipants;
       });
 
-      return success(
-        savedParticipants.map((p) => this.toDomainParticipant(p))
-      );
+      return success(savedParticipants.map((p) => this.toDomainParticipant(p)));
     } catch (error) {
       return failure(`Failed to execute activation: ${error}`);
     }
@@ -259,5 +274,16 @@ export class PrismaParticipantRepository implements ParticipantRepository {
       reason: prismaData.reason,
       changedAt: prismaData.changedAt,
     });
+  }
+
+  private toPrismaState(domainState: PollState): PrismaPollState {
+    const stateMap: Record<PollState, PrismaPollState> = {
+      [PollState.DRAFT]: PrismaPollState.DRAFT,
+      [PollState.READY]: PrismaPollState.READY,
+      [PollState.ACTIVE]: PrismaPollState.ACTIVE,
+      [PollState.FINISHED]: PrismaPollState.FINISHED,
+    };
+
+    return stateMap[domainState];
   }
 }

@@ -30,6 +30,7 @@ function isDatabaseConnectionError(error: unknown): boolean {
 
   // Check error message
   const errorMessage = error instanceof Error ? error.message : String(error);
+
   if (
     errorMessage.includes('Connection terminated') ||
     errorMessage.includes("Can't reach database") ||
@@ -97,10 +98,12 @@ export async function registerAction(
 
     // Validate with Zod
     const validation = RegisterUserSchema.safeParse(input);
+
     if (!validation.success) {
       const fieldErrors: Record<string, string[]> = {};
       validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
+
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
@@ -120,6 +123,7 @@ export async function registerAction(
     const { confirmPassword, ...registerInput } = validation.data;
 
     let result;
+
     try {
       result = await registerUserUseCase.execute(registerInput);
     } catch (useCaseError) {
@@ -185,10 +189,12 @@ export async function loginAction(
 
     // Validate with Zod
     const validation = LoginUserSchema.safeParse(input);
+
     if (!validation.success) {
       const fieldErrors: Record<string, string[]> = {};
       validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
+
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
@@ -205,6 +211,7 @@ export async function loginAction(
 
     // Execute use case
     let result;
+
     try {
       result = await loginUserUseCase.execute(validation.data);
     } catch (useCaseError) {

@@ -92,6 +92,7 @@ function QuestionItem({
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
+
     if (onDelete) {
       onDelete(question.id);
     }
@@ -168,6 +169,7 @@ function PageGroup({
   const handlePageDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     const confirmMessage = t('deletePageConfirm', { page: pageNumber });
+
     if (onPageDelete && confirm(confirmMessage)) {
       onPageDelete(pageNumber);
     }
@@ -175,6 +177,7 @@ function PageGroup({
 
   const handleAddQuestion = (e: React.MouseEvent) => {
     e.stopPropagation();
+
     if (onAddQuestionToPage) {
       onAddQuestionToPage(pageNumber);
     }

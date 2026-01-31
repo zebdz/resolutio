@@ -10,7 +10,13 @@ import {
   CalendarIcon,
   PencilIcon,
 } from '@heroicons/react/24/outline';
-import { activatePollAction, deactivatePollAction, finishPollAction } from '@/web/actions/poll';
+import {
+  takeSnapshotAction,
+  discardSnapshotAction,
+  activatePollAction,
+  deactivatePollAction,
+  finishPollAction,
+} from '@/web/actions/poll';
 import { toast } from 'sonner';
 
 interface PollCardProps {
@@ -22,6 +28,8 @@ interface PollCardProps {
 export function PollCard({ poll, userId, canManage }: PollCardProps) {
   const t = useTranslations('poll');
   const router = useRouter();
+  const [isTakingSnapshot, setIsTakingSnapshot] = useState(false);
+  const [isDiscardingSnapshot, setIsDiscardingSnapshot] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
@@ -29,15 +37,63 @@ export function PollCard({ poll, userId, canManage }: PollCardProps) {
   const now = new Date();
   const startDate = new Date(poll.startDate);
   const endDate = new Date(poll.endDate);
-  const isActive = poll.active;
-  const isUpcoming = now < startDate;
-  const isFinished = poll.finished;
+  const isActive = poll.state === 'ACTIVE';
+  const isDraft = poll.state === 'DRAFT';
+  const isReady = poll.state === 'READY';
+  const isUpcoming = isDraft || isReady;
+  const isFinished = poll.state === 'FINISHED';
   const isCreator = poll.createdBy === userId;
 
   const canEditPoll = isCreator;
   const canManageParticipants = canManage;
   const canActivateAndDeactivatePoll = canManage;
   const canViewResultsBeforePollEnds = canManage;
+
+  const handleTakeSnapshot = async () => {
+    if (!confirm(t('confirmTakeSnapshot'))) {
+      return;
+    }
+
+    setIsTakingSnapshot(true);
+
+    try {
+      const result = await takeSnapshotAction(poll.id);
+
+      if (result.success) {
+        toast.success(t('snapshotTaken'));
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch {
+      toast.error(t('errors.generic'));
+    } finally {
+      setIsTakingSnapshot(false);
+    }
+  };
+
+  const handleDiscardSnapshot = async () => {
+    if (!confirm(t('confirmDiscardSnapshot'))) {
+      return;
+    }
+
+    setIsDiscardingSnapshot(true);
+
+    try {
+      const result = await discardSnapshotAction(poll.id);
+
+      if (result.success) {
+        toast.success(t('snapshotDiscarded'));
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch {
+      toast.error(t('errors.generic'));
+    } finally {
+      setIsDiscardingSnapshot(false);
+    }
+  };
 
   const handleDeactivate = async () => {
     if (!confirm(t('confirmDeactivatePoll'))) {
@@ -55,7 +111,7 @@ export function PollCard({ poll, userId, canManage }: PollCardProps) {
       } else {
         toast.error(result.error);
       }
-    } catch (error) {
+    } catch {
       toast.error(t('errors.generic'));
     } finally {
       setIsDeactivating(false);
@@ -78,7 +134,7 @@ export function PollCard({ poll, userId, canManage }: PollCardProps) {
       } else {
         toast.error(result.error);
       }
-    } catch (error) {
+    } catch {
       toast.error(t('errors.generic'));
     } finally {
       setIsActivating(false);
@@ -97,7 +153,7 @@ export function PollCard({ poll, userId, canManage }: PollCardProps) {
       } else {
         toast.error(result.error);
       }
-    } catch (error) {
+    } catch {
       toast.error(t('errors.generic'));
     } finally {
       setIsFinishing(false);
@@ -191,40 +247,62 @@ export function PollCard({ poll, userId, canManage }: PollCardProps) {
             )}
           </div>
 
-          {/* Activate button on inactive polls */}
-          {canActivateAndDeactivatePoll && !isActive && !isFinished && (
+          {/* Take Snapshot button for DRAFT polls */}
+          {canActivateAndDeactivatePoll && isDraft && (
             <Button
-              color="green"
-              onClick={handleActivate}
-              disabled={isActivating}
+              color="blue"
+              onClick={handleTakeSnapshot}
+              disabled={isTakingSnapshot}
               className="w-full"
             >
-              {isActivating ? t('activating') : t('activatePoll')}
+              {isTakingSnapshot ? t('takingSnapshot') : t('takeSnapshot')}
             </Button>
           )}
 
-          {/* Deactivate button on active polls */}
-          {canActivateAndDeactivatePoll && isActive && !isFinished && (
-            <Button
-              color="yellow"
-              onClick={handleDeactivate}
-              disabled={isDeactivating}
-              className="w-full"
-            >
-              {isDeactivating ? t('deactivating') : t('deactivatePoll')}
-            </Button>
+          {/* Activate and Discard Snapshot buttons for READY polls */}
+          {canActivateAndDeactivatePoll && isReady && (
+            <>
+              <Button
+                color="green"
+                onClick={handleActivate}
+                disabled={isActivating}
+                className="w-full"
+              >
+                {isActivating ? t('activating') : t('activatePoll')}
+              </Button>
+              <Button
+                color="zinc"
+                onClick={handleDiscardSnapshot}
+                disabled={isDiscardingSnapshot}
+                className="w-full"
+              >
+                {isDiscardingSnapshot
+                  ? t('discardingSnapshot')
+                  : t('discardSnapshot')}
+              </Button>
+            </>
           )}
 
-          {/* Finish button on polls */}
-          {canActivateAndDeactivatePoll && !isActive && !isFinished && (
-            <Button
-              color="red"
-              onClick={handleFinish}
-              disabled={isFinishing}
-              className="w-full"
-            >
-              {isFinishing ? t('finishing') : t('finishPoll')}
-            </Button>
+          {/* Deactivate and Finish buttons for ACTIVE polls */}
+          {canActivateAndDeactivatePoll && isActive && (
+            <>
+              <Button
+                color="yellow"
+                onClick={handleDeactivate}
+                disabled={isDeactivating}
+                className="w-full"
+              >
+                {isDeactivating ? t('deactivating') : t('deactivatePoll')}
+              </Button>
+              <Button
+                color="red"
+                onClick={handleFinish}
+                disabled={isFinishing}
+                className="w-full"
+              >
+                {isFinishing ? t('finishing') : t('finishPoll')}
+              </Button>
+            </>
           )}
         </div>
       </div>

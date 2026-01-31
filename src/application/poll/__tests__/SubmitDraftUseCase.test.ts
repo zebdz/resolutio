@@ -61,8 +61,8 @@ describe('SubmitDraftUseCase', () => {
 
     // Add questions to poll and activate
     (poll as any).props.questions = [question];
+    poll.takeSnapshot();
     poll.activate();
-    poll.takeParticipantsSnapshot();
 
     // Create a participant
     const participantResult = PollParticipant.create(
@@ -128,6 +128,7 @@ describe('SubmitDraftUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.NOT_FOUND);
     }
@@ -160,6 +161,7 @@ describe('SubmitDraftUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollDomainCodes.POLL_NOT_ACTIVE);
     }
@@ -177,6 +179,7 @@ describe('SubmitDraftUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollDomainCodes.POLL_FINISHED);
     }
@@ -196,6 +199,7 @@ describe('SubmitDraftUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollDomainCodes.NOT_PARTICIPANT);
     }
@@ -215,6 +219,7 @@ describe('SubmitDraftUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollDomainCodes.ALREADY_VOTED);
     }

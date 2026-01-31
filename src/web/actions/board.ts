@@ -61,6 +61,7 @@ export async function createBoardAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -77,10 +78,12 @@ export async function createBoardAction(
 
     // Validate with Zod
     const validation = CreateBoardSchema.safeParse(input);
+
     if (!validation.success) {
       const fieldErrors: Record<string, string[]> = {};
       validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
+
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
@@ -134,6 +137,7 @@ export async function archiveBoardAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -143,6 +147,7 @@ export async function archiveBoardAction(
 
     // Validate with Zod
     const validation = ArchiveBoardSchema.safeParse({ boardId });
+
     if (!validation.success) {
       return {
         success: false,
@@ -187,6 +192,7 @@ export async function addBoardMemberAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -202,6 +208,7 @@ export async function addBoardMemberAction(
 
     // Validate with Zod
     const validation = AddBoardMemberSchema.safeParse(input);
+
     if (!validation.success) {
       return {
         success: false,
@@ -246,6 +253,7 @@ export async function removeBoardMemberAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -262,6 +270,7 @@ export async function removeBoardMemberAction(
 
     // Validate with Zod
     const validation = RemoveBoardMemberSchema.safeParse(input);
+
     if (!validation.success) {
       return {
         success: false,
@@ -324,6 +333,7 @@ export async function getBoardDetailsAction(boardId: string): Promise<
 
   try {
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -333,6 +343,7 @@ export async function getBoardDetailsAction(boardId: string): Promise<
 
     // Get board
     const board = await boardRepository.findById(boardId);
+
     if (!board) {
       return {
         success: false,
@@ -437,6 +448,7 @@ export async function getUserBoardsAction(): Promise<
 
   try {
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -508,6 +520,7 @@ export async function searchUsersForBoardAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,

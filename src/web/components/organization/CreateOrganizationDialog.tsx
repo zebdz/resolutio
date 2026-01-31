@@ -49,6 +49,7 @@ export function CreateOrganizationDialog({
     const loadAdminOrganizations = async () => {
       setIsLoadingOrgs(true);
       const result = await getAdminOrganizationsAction();
+
       if (result.success) {
         setAdminOrganizations(result.data.organizations);
       }
@@ -65,6 +66,7 @@ export function CreateOrganizationDialog({
     setIsSubmitting(false);
     setError(null);
     setFieldErrors({});
+
     // Reset form fields
     if (formRef.current) {
       formRef.current.reset();
@@ -89,6 +91,7 @@ export function CreateOrganizationDialog({
       // router.push(`/${locale}/organizations/${result.data.organizationId}`);
     } else {
       setError(result.error);
+
       if (result.fieldErrors) {
         setFieldErrors(result.fieldErrors);
       }

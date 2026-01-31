@@ -57,6 +57,7 @@ export function LoginForm() {
 
       if (!result.success) {
         setError(result.error);
+
         if (result.fieldErrors) {
           setFieldErrors(result.fieldErrors);
         }

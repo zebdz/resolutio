@@ -33,11 +33,13 @@ export class UpdateParticipantWeightUseCase {
     // 1. Get participant
     const participantResult =
       await this.participantRepository.getParticipantById(participantId);
+
     if (!participantResult.success) {
       return failure(participantResult.error);
     }
 
     const participant = participantResult.value;
+
     if (!participant) {
       return failure('poll.errors.participantNotFound');
     }
@@ -46,17 +48,20 @@ export class UpdateParticipantWeightUseCase {
     const pollResult = await this.pollRepository.getPollById(
       participant.pollId
     );
+
     if (!pollResult.success) {
       return failure(pollResult.error);
     }
 
     const poll = pollResult.value;
+
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
     }
 
     // 3. Get board and check admin permissions
     const board = await this.boardRepository.findById(poll.boardId);
+
     if (!board) {
       return failure(PollErrors.BOARD_NOT_FOUND);
     }
@@ -74,6 +79,7 @@ export class UpdateParticipantWeightUseCase {
     const hasVotesResult = await this.voteRepository.pollHasVotes(
       participant.pollId
     );
+
     if (!hasVotesResult.success) {
       return failure(hasVotesResult.error);
     }
@@ -85,6 +91,7 @@ export class UpdateParticipantWeightUseCase {
     // 5. Update participant weight
     const oldWeight = participant.userWeight;
     const updateResult = participant.updateWeight(newWeight);
+
     if (!updateResult.success) {
       return failure(updateResult.error);
     }
@@ -92,6 +99,7 @@ export class UpdateParticipantWeightUseCase {
     // 6. Save updated participant
     const saveResult =
       await this.participantRepository.updateParticipantWeight(participant);
+
     if (!saveResult.success) {
       return failure(saveResult.error);
     }
@@ -111,9 +119,9 @@ export class UpdateParticipantWeightUseCase {
       return failure(historyResult.error);
     }
 
-    const createHistoryResult = await this.participantRepository.createWeightHistory(
-      historyResult.value
-    );
+    const createHistoryResult =
+      await this.participantRepository.createWeightHistory(historyResult.value);
+
     if (!createHistoryResult.success) {
       return failure(createHistoryResult.error);
     }

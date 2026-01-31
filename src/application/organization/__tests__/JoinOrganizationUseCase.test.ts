@@ -62,6 +62,7 @@ class MockOrganizationRepository implements OrganizationRepository {
 
   async getAncestorIds(organizationId: string): Promise<string[]> {
     const org = await this.findById(organizationId);
+
     if (!org || !org.parentId) {
       return [];
     }
@@ -100,6 +101,7 @@ class MockOrganizationRepository implements OrganizationRepository {
 
     for (const orgId of userOrgIds) {
       const org = await this.findById(orgId);
+
       if (org) {
         orgs.push(org);
       }
@@ -193,6 +195,7 @@ describe('JoinOrganizationUseCase', () => {
     );
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(OrganizationErrors.NOT_FOUND);
     }
@@ -219,6 +222,7 @@ describe('JoinOrganizationUseCase', () => {
       );
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe(OrganizationErrors.ARCHIVED);
       }
@@ -254,6 +258,7 @@ describe('JoinOrganizationUseCase', () => {
       );
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe(OrganizationErrors.ALREADY_MEMBER);
       }
@@ -289,6 +294,7 @@ describe('JoinOrganizationUseCase', () => {
       );
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe(OrganizationErrors.PENDING_REQUEST);
       }
@@ -333,6 +339,7 @@ describe('JoinOrganizationUseCase', () => {
         );
 
         expect(result.success).toBe(false);
+
         if (!result.success) {
           expect(result.error).toBe(OrganizationErrors.HIERARCHY_CONFLICT);
         }
@@ -378,6 +385,7 @@ describe('JoinOrganizationUseCase', () => {
         );
 
         expect(result.success).toBe(false);
+
         if (!result.success) {
           expect(result.error).toBe(OrganizationErrors.HIERARCHY_CONFLICT);
         }

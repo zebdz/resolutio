@@ -15,6 +15,7 @@ describe('ParticipantWeightHistory Domain', () => {
       );
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.participantId).toBe('participant-1');
         expect(result.value.pollId).toBe('poll-1');
@@ -38,6 +39,7 @@ describe('ParticipantWeightHistory Domain', () => {
       );
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.reason).toBeNull();
       }
@@ -55,6 +57,7 @@ describe('ParticipantWeightHistory Domain', () => {
       );
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.reason).toBeNull();
       }

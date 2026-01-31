@@ -28,11 +28,13 @@ export class RemoveParticipantUseCase {
     // 1. Get participant
     const participantResult =
       await this.participantRepository.getParticipantById(participantId);
+
     if (!participantResult.success) {
       return failure(participantResult.error);
     }
 
     const participant = participantResult.value;
+
     if (!participant) {
       return failure('poll.errors.participantNotFound');
     }
@@ -41,17 +43,20 @@ export class RemoveParticipantUseCase {
     const pollResult = await this.pollRepository.getPollById(
       participant.pollId
     );
+
     if (!pollResult.success) {
       return failure(pollResult.error);
     }
 
     const poll = pollResult.value;
+
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
     }
 
     // 3. Get board and check admin permissions
     const board = await this.boardRepository.findById(poll.boardId);
+
     if (!board) {
       return failure(PollErrors.BOARD_NOT_FOUND);
     }
@@ -69,6 +74,7 @@ export class RemoveParticipantUseCase {
     const hasVotesResult = await this.voteRepository.pollHasVotes(
       participant.pollId
     );
+
     if (!hasVotesResult.success) {
       return failure(hasVotesResult.error);
     }

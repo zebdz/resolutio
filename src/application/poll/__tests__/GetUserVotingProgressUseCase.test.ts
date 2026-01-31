@@ -12,6 +12,7 @@ import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { Answer } from '../../../domain/poll/Answer';
 import { Decimal } from 'decimal.js';
+import { PollState } from '../../../domain/poll/PollState';
 
 describe('GetUserVotingProgressUseCase', () => {
   let pollRepository: Partial<PollRepository>;
@@ -75,7 +76,7 @@ describe('GetUserVotingProgressUseCase', () => {
     answer2 = answer2Result.value;
     (answer2 as any).props.id = 'answer-2';
 
-    // Reconstitute poll with questions
+    // Reconstitute poll with questions (in ACTIVE state)
     poll = Poll.reconstitute({
       id: poll.id,
       title: poll.title,
@@ -83,9 +84,7 @@ describe('GetUserVotingProgressUseCase', () => {
       boardId: poll.boardId,
       startDate: poll.startDate,
       endDate: poll.endDate,
-      active: true,
-      finished: poll.finished,
-      participantsSnapshotTaken: poll.participantsSnapshotTaken,
+      state: PollState.ACTIVE,
       weightCriteria: poll.weightCriteria,
       createdBy: poll.createdBy,
       createdAt: poll.createdAt,
@@ -137,6 +136,7 @@ describe('GetUserVotingProgressUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const progress = result.value;
       expect(progress.poll.id).toBe(poll.id);
@@ -167,6 +167,7 @@ describe('GetUserVotingProgressUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const progress = result.value;
       expect(progress.drafts.length).toBe(1);
@@ -187,6 +188,7 @@ describe('GetUserVotingProgressUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const progress = result.value;
       expect(progress.hasFinished).toBe(true);
@@ -195,7 +197,7 @@ describe('GetUserVotingProgressUseCase', () => {
   });
 
   it('should indicate user cannot vote when poll is not active', async () => {
-    // Create inactive poll
+    // Create poll in READY state (not active)
     const inactivePoll = Poll.reconstitute({
       id: poll.id,
       title: poll.title,
@@ -203,9 +205,7 @@ describe('GetUserVotingProgressUseCase', () => {
       boardId: poll.boardId,
       startDate: poll.startDate,
       endDate: poll.endDate,
-      active: false,
-      finished: poll.finished,
-      participantsSnapshotTaken: poll.participantsSnapshotTaken,
+      state: PollState.READY,
       weightCriteria: poll.weightCriteria,
       createdBy: poll.createdBy,
       createdAt: poll.createdAt,
@@ -222,6 +222,7 @@ describe('GetUserVotingProgressUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const progress = result.value;
       expect(progress.canVote).toBe(false);
@@ -237,9 +238,7 @@ describe('GetUserVotingProgressUseCase', () => {
       boardId: poll.boardId,
       startDate: poll.startDate,
       endDate: poll.endDate,
-      active: false,
-      finished: true,
-      participantsSnapshotTaken: poll.participantsSnapshotTaken,
+      state: PollState.FINISHED,
       weightCriteria: poll.weightCriteria,
       createdBy: poll.createdBy,
       createdAt: poll.createdAt,
@@ -256,6 +255,7 @@ describe('GetUserVotingProgressUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const progress = result.value;
       expect(progress.canVote).toBe(false);
@@ -273,6 +273,7 @@ describe('GetUserVotingProgressUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const progress = result.value;
       expect(progress.canVote).toBe(false);
@@ -288,6 +289,7 @@ describe('GetUserVotingProgressUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.NOT_FOUND);
     }
@@ -303,6 +305,7 @@ describe('GetUserVotingProgressUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const progress = result.value;
       expect(progress.totalQuestions).toBe(1); // Only non-archived question
@@ -334,6 +337,7 @@ describe('GetUserVotingProgressUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       const progress = result.value;
       // Should count question only once even with multiple drafts

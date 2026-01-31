@@ -85,6 +85,7 @@ export async function submitDraftAction(data: {
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -102,6 +103,7 @@ export async function submitDraftAction(data: {
       const fieldErrors: Record<string, string[]> = {};
       validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
+
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
@@ -150,6 +152,7 @@ export async function getUserVotingProgressAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -197,6 +200,7 @@ export async function finishVotingAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -241,6 +245,7 @@ export async function getPollResultsAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -288,6 +293,7 @@ export async function canUserVoteAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -297,6 +303,7 @@ export async function canUserVoteAction(
 
     // Get the poll
     const pollResult = await pollRepository.getPollById(pollId);
+
     if (!pollResult.success) {
       return {
         success: false,
@@ -305,6 +312,7 @@ export async function canUserVoteAction(
     }
 
     const poll = pollResult.value;
+
     if (!poll) {
       return {
         success: false,
@@ -313,7 +321,7 @@ export async function canUserVoteAction(
     }
 
     // Check if poll is active and not finished
-    if (!poll.active) {
+    if (!poll.isActive()) {
       return {
         success: true,
         data: {
@@ -323,7 +331,7 @@ export async function canUserVoteAction(
       };
     }
 
-    if (poll.finished) {
+    if (poll.isFinished()) {
       return {
         success: true,
         data: {

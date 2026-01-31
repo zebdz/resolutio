@@ -10,8 +10,10 @@ import { CreateAnswerUseCase } from '@/application/poll/CreateAnswerUseCase';
 import { UpdateAnswerUseCase } from '@/application/poll/UpdateAnswerUseCase';
 import { DeleteAnswerUseCase } from '@/application/poll/DeleteAnswerUseCase';
 import { UpdateQuestionOrderUseCase } from '@/application/poll/UpdateQuestionOrderUseCase';
+import { TakeSnapshotUseCase } from '@/application/poll/TakeSnapshotUseCase';
 import { ActivatePollUseCase } from '@/application/poll/ActivatePollUseCase';
 import { DeactivatePollUseCase } from '@/application/poll/DeactivatePollUseCase';
+import { DiscardSnapshotUseCase } from '@/application/poll/DiscardSnapshotUseCase';
 import { FinishPollUseCase } from '@/application/poll/FinishPollUseCase';
 import {
   CreatePollSchema,
@@ -51,7 +53,10 @@ const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 
 // Use cases
-const createPollUseCase = new CreatePollUseCase(pollRepository, boardRepository);
+const createPollUseCase = new CreatePollUseCase(
+  pollRepository,
+  boardRepository
+);
 const updatePollUseCase = new UpdatePollUseCase(pollRepository, voteRepository);
 const addQuestionUseCase = new AddQuestionUseCase(
   pollRepository,
@@ -90,15 +95,29 @@ const updateQuestionOrderUseCase = new UpdateQuestionOrderUseCase(
   pollRepository,
   questionRepository
 );
-const activatePollUseCase = new ActivatePollUseCase(
+const takeSnapshotUseCase = new TakeSnapshotUseCase(
   pollRepository,
   participantRepository,
   boardRepository,
   organizationRepository,
   userRepository
 );
+const activatePollUseCase = new ActivatePollUseCase(
+  pollRepository,
+  boardRepository,
+  organizationRepository,
+  userRepository
+);
 const deactivatePollUseCase = new DeactivatePollUseCase(
   pollRepository,
+  boardRepository,
+  organizationRepository,
+  userRepository
+);
+const discardSnapshotUseCase = new DiscardSnapshotUseCase(
+  pollRepository,
+  participantRepository,
+  voteRepository,
   boardRepository,
   organizationRepository,
   userRepository
@@ -119,6 +138,7 @@ export async function createPollAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -137,10 +157,12 @@ export async function createPollAction(
 
     // Validate with Zod
     const validation = CreatePollSchema.safeParse(input);
+
     if (!validation.success) {
       const fieldErrors: Record<string, string[]> = {};
       validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
+
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
@@ -194,6 +216,7 @@ export async function addQuestionAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -206,6 +229,7 @@ export async function addQuestionAction(
     const answersJson = formData.get('answers') as string;
 
     let answerTexts: string[] = [];
+
     if (answersJson) {
       try {
         answerTexts = (JSON.parse(answersJson) as string[])
@@ -228,10 +252,12 @@ export async function addQuestionAction(
 
     // Validate with Zod
     const validation = AddQuestionSchema.safeParse(parsedInput);
+
     if (!validation.success) {
       const fieldErrors: Record<string, string[]> = {};
       validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
+
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
@@ -284,6 +310,7 @@ export async function updateQuestionOrderAction(input: {
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -293,10 +320,12 @@ export async function updateQuestionOrderAction(input: {
 
     // Validate with Zod
     const validation = UpdateQuestionOrderSchema.safeParse(input);
+
     if (!validation.success) {
       const fieldErrors: Record<string, string[]> = {};
       validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
+
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
@@ -343,6 +372,7 @@ export async function getUserPollsAction(): Promise<ActionResult<any[]>> {
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -424,6 +454,7 @@ export async function getPollsByBoardIdAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -433,6 +464,7 @@ export async function getPollsByBoardIdAction(
 
     // Check if user is a board member
     const isMember = await boardRepository.isUserMember(user.id, boardId);
+
     if (!isMember) {
       return {
         success: false,
@@ -473,6 +505,7 @@ export async function getPollByIdAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -506,6 +539,7 @@ export async function getPollByIdAction(
     // Check if user is a board member
     const poll = result.value;
     const isMember = await boardRepository.isUserMember(user.id, poll.boardId);
+
     if (!isMember) {
       return {
         success: false,
@@ -535,6 +569,7 @@ export async function updatePollAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -553,10 +588,12 @@ export async function updatePollAction(
 
     // Validate with Zod
     const validation = UpdatePollSchema.safeParse(input);
+
     if (!validation.success) {
       const fieldErrors: Record<string, string[]> = {};
       validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
+
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
@@ -608,6 +645,7 @@ export async function canEditPollAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -617,6 +655,7 @@ export async function canEditPollAction(
 
     // Get poll
     const pollResult = await pollRepository.getPollById(pollId);
+
     if (!pollResult.success) {
       return {
         success: false,
@@ -625,6 +664,7 @@ export async function canEditPollAction(
     }
 
     const poll = pollResult.value;
+
     if (!poll) {
       return {
         success: false,
@@ -645,6 +685,7 @@ export async function canEditPollAction(
 
     // Check if poll has votes
     const hasVotesResult = await voteRepository.pollHasVotes(pollId);
+
     if (!hasVotesResult.success) {
       return {
         success: false,
@@ -656,6 +697,7 @@ export async function canEditPollAction(
 
     // Check if poll can be edited
     const canEditResult = poll.canEdit(hasVotes);
+
     if (!canEditResult.success) {
       return {
         success: false,
@@ -665,6 +707,7 @@ export async function canEditPollAction(
 
     if (!canEditResult.value) {
       let reason = 'unknown';
+
       if (poll.isActive()) {
         reason = 'active';
       } else if (poll.isFinished()) {
@@ -708,6 +751,7 @@ export async function updateQuestionAction(data: {
 
   try {
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -748,6 +792,7 @@ export async function deleteQuestionAction(
 
   try {
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -787,6 +832,7 @@ export async function updateAnswerAction(data: {
 
   try {
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -828,6 +874,7 @@ export async function createAnswerAction(data: {
 
   try {
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -870,6 +917,7 @@ export async function deleteAnswerAction(
 
   try {
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -910,6 +958,7 @@ export async function activatePollAction(
 
   try {
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -952,6 +1001,7 @@ export async function deactivatePollAction(
 
   try {
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -994,6 +1044,7 @@ export async function finishPollAction(
 
   try {
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -1018,6 +1069,164 @@ export async function finishPollAction(
     return { success: true, data: undefined };
   } catch (error) {
     console.error('Error finishing poll:', error);
+
+    return {
+      success: false,
+      error: t('unexpected'),
+    };
+  }
+}
+
+/**
+ * Take a participant snapshot (DRAFT → READY)
+ */
+export async function takeSnapshotAction(
+  pollId: string
+): Promise<ActionResult<void>> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    const result = await takeSnapshotUseCase.execute({
+      pollId,
+      userId: user.id,
+    });
+
+    if (!result.success) {
+      const errorT = await getTranslations();
+
+      return {
+        success: false,
+        error: errorT(result.error as any),
+      };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error taking snapshot:', error);
+
+    return {
+      success: false,
+      error: t('unexpected'),
+    };
+  }
+}
+
+/**
+ * Discard a participant snapshot (READY → DRAFT)
+ * Only allowed if no votes have been cast
+ */
+export async function discardSnapshotAction(
+  pollId: string
+): Promise<ActionResult<void>> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    const result = await discardSnapshotUseCase.execute({
+      pollId,
+      userId: user.id,
+    });
+
+    if (!result.success) {
+      const errorT = await getTranslations();
+
+      return {
+        success: false,
+        error: errorT(result.error as any),
+      };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error discarding snapshot:', error);
+
+    return {
+      success: false,
+      error: t('unexpected'),
+    };
+  }
+}
+
+/**
+ * Check if current user can manage a poll (superadmin or org admin)
+ */
+export async function canManagePollAction(
+  pollId: string
+): Promise<ActionResult<boolean>> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    const pollResult = await pollRepository.getPollById(pollId);
+
+    if (!pollResult.success) {
+      return {
+        success: false,
+        error: t('unexpected'),
+      };
+    }
+
+    const poll = pollResult.value;
+
+    if (!poll) {
+      const tPoll = await getTranslations('poll.errors');
+
+      return {
+        success: false,
+        error: tPoll('pollNotFound'),
+      };
+    }
+
+    const board = await boardRepository.findById(poll.boardId);
+
+    if (!board) {
+      const tPoll = await getTranslations('poll.errors');
+
+      return {
+        success: false,
+        error: tPoll('boardNotFound'),
+      };
+    }
+
+    const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
+
+    if (isSuperAdmin) {
+      return { success: true, data: true };
+    }
+
+    const isOrgAdmin = await organizationRepository.isUserAdmin(
+      user.id,
+      board.organizationId
+    );
+
+    return { success: true, data: isOrgAdmin };
+  } catch (error) {
+    console.error('Error checking poll management permission:', error);
 
     return {
       success: false,

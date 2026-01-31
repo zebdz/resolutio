@@ -21,11 +21,13 @@ export class UpdatePollUseCase {
   async execute(input: UpdatePollInput): Promise<Result<void, string>> {
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(input.pollId);
+
     if (!pollResult.success) {
       return failure(pollResult.error);
     }
 
     const poll = pollResult.value;
+
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
     }
@@ -37,12 +39,14 @@ export class UpdatePollUseCase {
 
     // 3. Check if poll can be edited
     const hasVotesResult = await this.voteRepository.pollHasVotes(input.pollId);
+
     if (!hasVotesResult.success) {
       return failure(hasVotesResult.error);
     }
 
     const hasVotes = hasVotesResult.value;
     const canEditResult = poll.canEdit(hasVotes);
+
     if (!canEditResult.success) {
       return failure(canEditResult.error);
     }
@@ -64,22 +68,26 @@ export class UpdatePollUseCase {
 
     // 4. Update poll properties
     const titleResult = poll.updateTitle(input.title);
+
     if (!titleResult.success) {
       return failure(titleResult.error);
     }
 
     const descriptionResult = poll.updateDescription(input.description);
+
     if (!descriptionResult.success) {
       return failure(descriptionResult.error);
     }
 
     const datesResult = poll.updateDates(input.startDate, input.endDate);
+
     if (!datesResult.success) {
       return failure(datesResult.error);
     }
 
     // 5. Persist the updated poll
     const saveResult = await this.pollRepository.updatePoll(poll);
+
     if (!saveResult.success) {
       return failure(saveResult.error);
     }

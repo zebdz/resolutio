@@ -31,6 +31,7 @@ export class UpdateAnswerUseCase {
     }
 
     const answer = answerResult.value;
+
     if (!answer) {
       return failure(PollErrors.ANSWER_NOT_FOUND);
     }
@@ -39,22 +40,26 @@ export class UpdateAnswerUseCase {
     const questionResult = await this.questionRepository.getQuestionById(
       answer.questionId
     );
+
     if (!questionResult.success) {
       return failure(questionResult.error);
     }
 
     const question = questionResult.value;
+
     if (!question) {
       return failure(PollErrors.QUESTION_NOT_FOUND);
     }
 
     // Get the poll
     const pollResult = await this.pollRepository.getPollById(question.pollId);
+
     if (!pollResult.success) {
       return failure(pollResult.error);
     }
 
     const poll = pollResult.value;
+
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
     }
@@ -66,6 +71,7 @@ export class UpdateAnswerUseCase {
 
     // Check if poll can be edited
     const hasVotesResult = await this.voteRepository.pollHasVotes(poll.id);
+
     if (!hasVotesResult.success) {
       return failure(hasVotesResult.error);
     }
@@ -86,6 +92,7 @@ export class UpdateAnswerUseCase {
     // Update answer properties
     if (input.text !== undefined) {
       const textResult = answer.updateText(input.text);
+
       if (!textResult.success) {
         return failure(textResult.error);
       }
@@ -93,6 +100,7 @@ export class UpdateAnswerUseCase {
 
     if (input.order !== undefined) {
       const orderResult = answer.updateOrder(input.order);
+
       if (!orderResult.success) {
         return failure(orderResult.error);
       }
@@ -100,6 +108,7 @@ export class UpdateAnswerUseCase {
 
     // Save updated answer
     const updateResult = await this.answerRepository.updateAnswer(answer);
+
     if (!updateResult.success) {
       return failure(updateResult.error);
     }

@@ -234,6 +234,7 @@ describe('CreateBoardUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe('organization.errors.notFound');
       }
@@ -247,6 +248,7 @@ describe('CreateBoardUseCase', () => {
         'Test Desc',
         'creator-1'
       );
+
       if (orgResult.success) {
         const org = orgResult.value;
         (org as any).props.id = 'org-1';
@@ -262,6 +264,7 @@ describe('CreateBoardUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe('organization.errors.notAdmin');
       }
@@ -275,6 +278,7 @@ describe('CreateBoardUseCase', () => {
         'Test Desc',
         'creator-1'
       );
+
       if (orgResult.success) {
         const org = orgResult.value;
         (org as any).props.id = 'org-1';
@@ -291,6 +295,7 @@ describe('CreateBoardUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.board.name).toBe('Test Board');
         expect(result.value.board.organizationId).toBe('org-1');
@@ -308,6 +313,7 @@ describe('CreateBoardUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.board.isGeneral).toBe(true);
       }
@@ -321,6 +327,7 @@ describe('CreateBoardUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe('domain.board.boardNameEmpty');
       }
@@ -335,6 +342,7 @@ describe('CreateBoardUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe('domain.board.boardNameTooLong');
       }
@@ -369,11 +377,13 @@ describe('CreateBoardUseCase', () => {
         'Test Desc',
         'creator-1'
       );
+
       if (orgResult.success) {
         const org = orgResult.value;
         (org as any).props.id = 'org-1';
         organizationRepository.addOrganization(org);
       }
+
       // NOT adding as admin - superadmin should bypass
       userRepository.addSuperAdmin('superadmin-1');
     });
@@ -386,6 +396,7 @@ describe('CreateBoardUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.board.name).toBe('Test Board');
       }

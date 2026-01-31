@@ -94,6 +94,7 @@ export function PendingRequestsList({
     formData.append('organizationId', selectedRequest.organizationId);
     formData.append('requesterId', selectedRequest.requester.id);
     formData.append('action', 'reject');
+
     if (rejectionReason) {
       formData.append('rejectionReason', rejectionReason);
     }
@@ -138,6 +139,7 @@ export function PendingRequestsList({
   const requestsByOrg = requests.reduce(
     (acc, request) => {
       const orgId = request.organizationId;
+
       if (!acc[orgId]) {
         acc[orgId] = {
           organizationId: request.organizationId,

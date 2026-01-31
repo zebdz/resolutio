@@ -12,6 +12,7 @@ import {
   getPollByIdAction,
   updatePollAction,
   canEditPollAction,
+  canManagePollAction,
   addQuestionAction,
   updateQuestionAction,
   deleteQuestionAction,
@@ -45,13 +46,14 @@ interface Question {
   answers?: Answer[];
 }
 
+type PollState = 'DRAFT' | 'READY' | 'ACTIVE' | 'FINISHED';
+
 interface PollData {
   title: string;
   description: string;
   startDate: string;
   endDate: string;
-  isActive: boolean;
-  isFinished: boolean;
+  state: PollState;
 }
 
 export function EditPollForm() {
@@ -66,8 +68,7 @@ export function EditPollForm() {
     description: '',
     startDate: '',
     endDate: '',
-    isActive: false,
-    isFinished: false,
+    state: 'DRAFT',
   });
 
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -77,6 +78,7 @@ export function EditPollForm() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [canEdit, setCanEdit] = useState(false);
+  const [canManage, setCanManage] = useState(false);
 
   // Load poll data
   useEffect(() => {
@@ -87,6 +89,7 @@ export function EditPollForm() {
 
         // Check if poll can be edited
         const canEditResult = await canEditPollAction(pollId);
+
         if (!canEditResult.success) {
           setError(canEditResult.error);
           setIsLoading(false);
@@ -96,6 +99,7 @@ export function EditPollForm() {
 
         if (!canEditResult.data.canEdit) {
           let errorMessage = t('errors.cannotModifyFinished');
+
           if (canEditResult.data.reason === 'active') {
             errorMessage = t('errors.cannotModifyActive');
           } else if (canEditResult.data.reason === 'hasVotes') {
@@ -113,8 +117,16 @@ export function EditPollForm() {
 
         setCanEdit(true);
 
+        // Check if user can manage poll
+        const manageResult = await canManagePollAction(pollId);
+
+        if (manageResult.success) {
+          setCanManage(manageResult.data);
+        }
+
         // Load poll data
         const result = await getPollByIdAction(pollId);
+
         if (result.success) {
           const poll = result.data;
 
@@ -123,8 +135,7 @@ export function EditPollForm() {
             description: poll.description,
             startDate: new Date(poll.startDate).toISOString().split('T')[0],
             endDate: new Date(poll.endDate).toISOString().split('T')[0],
-            isActive: poll.isActive,
-            isFinished: poll.isFinished,
+            state: poll.state,
           });
 
           // Load questions
@@ -260,6 +271,7 @@ export function EditPollForm() {
 
   const handleSave = async () => {
     console.log('saving poll...');
+
     try {
       setIsSaving(true);
       setError(null);
@@ -298,6 +310,7 @@ export function EditPollForm() {
         }
 
         const validAnswers = question.answers.filter((a) => a.text.trim());
+
         if (validAnswers.length === 0) {
           setError(t('errors.atLeastOneAnswer'));
 
@@ -334,6 +347,7 @@ export function EditPollForm() {
       for (const questionId of deletedQuestionIds) {
         if (!questionId.startsWith('temp-')) {
           const deleteResult = await deleteQuestionAction(questionId);
+
           if (!deleteResult.success) {
             setError(deleteResult.error);
 
@@ -355,6 +369,7 @@ export function EditPollForm() {
           const formData = new FormData();
           formData.append('pollId', pollId);
           formData.append('text', question.text);
+
           if (question.details) {
             formData.append('details', question.details);
           }
@@ -374,6 +389,7 @@ export function EditPollForm() {
         } else {
           // Check if question was modified
           const original = originalQuestions.find((q) => q.id === question.id);
+
           if (!original) {
             continue;
           }
@@ -414,6 +430,7 @@ export function EditPollForm() {
           for (const answerId of deletedAnswerIds) {
             if (!answerId.startsWith('temp-')) {
               const deleteAnswerResult = await deleteAnswerAction(answerId);
+
               if (!deleteAnswerResult.success) {
                 setError(deleteAnswerResult.error);
 
@@ -426,6 +443,7 @@ export function EditPollForm() {
           if (question.answers) {
             for (let i = 0; i < question.answers.length; i++) {
               const answer = question.answers[i];
+
               if (!answer.text.trim()) {
                 continue;
               }
@@ -541,9 +559,7 @@ export function EditPollForm() {
   if (isLoading) {
     return (
       <div className="text-center py-12">
-        <p className="text-zinc-500 dark:text-zinc-400">
-          {tCommon('loading')}
-        </p>
+        <p className="text-zinc-500 dark:text-zinc-400">{tCommon('loading')}</p>
       </div>
     );
   }
@@ -591,11 +607,10 @@ export function EditPollForm() {
       )}
 
       {/* Poll Controls */}
-      {canEdit && (
+      {canManage && (
         <PollControls
           pollId={pollId}
-          isActive={pollData.isActive}
-          isFinished={pollData.isFinished}
+          state={pollData.state}
           hasQuestions={questions.length > 0}
         />
       )}

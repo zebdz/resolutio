@@ -93,6 +93,7 @@ class MockOrganizationRepository implements OrganizationRepository {
       // Skip organizations where user is already member or has pending request
       if (excludeUserMemberships) {
         const memberships = this.userMemberships.get(excludeUserMemberships);
+
         if (memberships && memberships.has(org.id)) {
           continue;
         }
@@ -158,6 +159,7 @@ describe('ListOrganizationsUseCase', () => {
     const result = await useCase.execute();
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.organizations).toEqual([]);
     }
@@ -192,6 +194,7 @@ describe('ListOrganizationsUseCase', () => {
       const result = await useCase.execute();
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.organizations).toHaveLength(2);
         expect(result.value.organizations[0].organization.name).toBe(
@@ -225,6 +228,7 @@ describe('ListOrganizationsUseCase', () => {
       const result = await useCase.execute();
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.organizations).toHaveLength(1);
         expect(result.value.organizations[0].memberCount).toBe(5);
@@ -257,6 +261,7 @@ describe('ListOrganizationsUseCase', () => {
       const result = await useCase.execute();
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.organizations).toHaveLength(1);
         expect(result.value.organizations[0].firstAdmin).toEqual({
@@ -289,6 +294,7 @@ describe('ListOrganizationsUseCase', () => {
       const result = await useCase.execute();
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.organizations).toHaveLength(1);
         expect(result.value.organizations[0].firstAdmin).toBeNull();
@@ -337,6 +343,7 @@ describe('ListOrganizationsUseCase', () => {
       const result = await useCase.execute();
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.organizations).toHaveLength(3);
 
@@ -391,6 +398,7 @@ describe('ListOrganizationsUseCase', () => {
       const result = await useCase.execute('user-123');
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         // Should only return org-3
         expect(result.value.organizations).toHaveLength(1);
@@ -423,6 +431,7 @@ describe('ListOrganizationsUseCase', () => {
       const result = await useCase.execute();
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.organizations).toHaveLength(2);
       }

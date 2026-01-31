@@ -27,17 +27,20 @@ export class DeleteQuestionUseCase {
     }
 
     const question = questionResult.value;
+
     if (!question) {
       return failure(PollErrors.QUESTION_NOT_FOUND);
     }
 
     // Get the poll
     const pollResult = await this.pollRepository.getPollById(question.pollId);
+
     if (!pollResult.success) {
       return failure(pollResult.error);
     }
 
     const poll = pollResult.value;
+
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
     }
@@ -49,6 +52,7 @@ export class DeleteQuestionUseCase {
 
     // Check if poll can be edited
     const hasVotesResult = await this.voteRepository.pollHasVotes(poll.id);
+
     if (!hasVotesResult.success) {
       return failure(hasVotesResult.error);
     }

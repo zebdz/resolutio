@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GetParticipantsUseCase } from '../GetParticipantsUseCase';
 import { Poll } from '../../../domain/poll/Poll';
 import { PollParticipant } from '../../../domain/poll/PollParticipant';
+import { Question } from '../../../domain/poll/Question';
+import { Answer } from '../../../domain/poll/Answer';
 import { PollRepository } from '../../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../../domain/poll/VoteRepository';
@@ -38,8 +40,20 @@ describe('GetParticipantsUseCase', () => {
     expect(pollResult.success).toBe(true);
     poll = pollResult.value;
     (poll as any).props.id = 'poll-1';
-    poll.activate();
-    poll.takeParticipantsSnapshot();
+
+    // Add question with answer so poll can transition to READY state
+    const questionResult = Question.create(
+      'Test Q',
+      'poll-1',
+      1,
+      0,
+      'single-choice'
+    );
+    const answerResult = Answer.create('Test A', 1, questionResult.value.id);
+    questionResult.value.addAnswer(answerResult.value);
+    poll.addQuestion(questionResult.value);
+    poll.takeSnapshot();
+    // Poll is now in READY state (canModify should be true if no votes)
 
     // Create board
     const boardResult = Board.create('org-1', 'Test Board', 'user-admin');
@@ -106,6 +120,7 @@ describe('GetParticipantsUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.participants.length).toBe(1);
       expect(result.value.participants[0].user.id).toBe('user-1');
@@ -123,6 +138,7 @@ describe('GetParticipantsUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.canModify).toBe(false);
     }
@@ -137,6 +153,7 @@ describe('GetParticipantsUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.NOT_FOUND);
     }
@@ -151,6 +168,7 @@ describe('GetParticipantsUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(PollErrors.BOARD_NOT_FOUND);
     }
@@ -165,6 +183,7 @@ describe('GetParticipantsUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+
     if (!result.success) {
       expect(result.error).toBe(OrganizationErrors.NOT_ADMIN);
     }
@@ -180,6 +199,7 @@ describe('GetParticipantsUseCase', () => {
       new Date('2026-01-15'),
       new Date('2026-02-15')
     );
+
     if (pollWithoutSnapshot.success) {
       (pollWithoutSnapshot.value as any).props.id = 'poll-2';
       pollWithoutSnapshot.value.activate();
@@ -194,6 +214,7 @@ describe('GetParticipantsUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.canModify).toBe(false);
     }

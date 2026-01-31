@@ -33,6 +33,7 @@ export class LoginUserUseCase {
 
       // Find user by phone number
       const user = await this.userRepository.findByPhoneNumber(phoneNumber);
+
       if (!user) {
         return failure(
           new UnauthorizedError('Invalid phone number or password')

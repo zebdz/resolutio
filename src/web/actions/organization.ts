@@ -82,6 +82,7 @@ export async function createOrganizationAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -98,10 +99,12 @@ export async function createOrganizationAction(
 
     // Validate with Zod
     const validation = CreateOrganizationSchema.safeParse(input);
+
     if (!validation.success) {
       const fieldErrors: Record<string, string[]> = {};
       validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
+
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
@@ -236,6 +239,7 @@ export async function joinOrganizationAction(
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -250,10 +254,12 @@ export async function joinOrganizationAction(
 
     // Validate with Zod
     const validation = JoinOrganizationSchema.safeParse(input);
+
     if (!validation.success) {
       const fieldErrors: Record<string, string[]> = {};
       validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
+
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
@@ -326,6 +332,7 @@ export async function getAdminOrganizationsAction(): Promise<
   try {
     // Get current user
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -393,6 +400,7 @@ export async function getUserOrganizationsAction(): Promise<
 
   try {
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -463,6 +471,7 @@ export async function getPendingRequestsAction(): Promise<
 
   try {
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -503,6 +512,7 @@ export async function handleJoinRequestAction(
 
   try {
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,
@@ -520,10 +530,12 @@ export async function handleJoinRequestAction(
     };
 
     const validation = HandleJoinRequestSchema.safeParse(input);
+
     if (!validation.success) {
       const fieldErrors: Record<string, string[]> = {};
       validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
+
         if (!fieldErrors[path]) {
           fieldErrors[path] = [];
         }
@@ -654,6 +666,7 @@ export async function getOrganizationPendingRequestsAction(
 
   try {
     const user = await getCurrentUser();
+
     if (!user) {
       return {
         success: false,

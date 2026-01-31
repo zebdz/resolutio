@@ -12,7 +12,7 @@
     "lint:fix": "eslint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "fl": "yarn run format && yarn run lint",
+    "fl": "yarn run format && yarn run lint:fix",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",

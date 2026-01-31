@@ -31,6 +31,7 @@ export class RegisterUserUseCase {
 
       // Check if user already exists
       const exists = await this.userRepository.exists(phoneNumber);
+
       if (exists) {
         return failure(new DuplicateError('User', 'phone number'));
       }

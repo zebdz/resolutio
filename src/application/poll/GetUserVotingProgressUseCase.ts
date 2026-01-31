@@ -37,18 +37,24 @@ export class GetUserVotingProgressUseCase {
 
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(pollId);
+
     if (!pollResult.success) {
       return failure(pollResult.error);
     }
 
     const poll = pollResult.value;
+
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
     }
 
     // 2. Check if user is a participant
     const participantResult =
-      await this.participantRepository.getParticipantByUserAndPoll(pollId, userId);
+      await this.participantRepository.getParticipantByUserAndPoll(
+        pollId,
+        userId
+      );
+
     if (!participantResult.success) {
       return failure(participantResult.error);
     }
@@ -60,6 +66,7 @@ export class GetUserVotingProgressUseCase {
       pollId,
       userId
     );
+
     if (!hasFinishedResult.success) {
       return failure(hasFinishedResult.error);
     }
@@ -71,6 +78,7 @@ export class GetUserVotingProgressUseCase {
       pollId,
       userId
     );
+
     if (!draftsResult.success) {
       return failure(draftsResult.error);
     }
