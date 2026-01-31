@@ -8,6 +8,7 @@ import { Button } from '@/app/components/catalyst/button';
 import { Heading, Subheading } from '@/app/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
 import { PendingRequestsList } from '@/app/[locale]/organizations/pending-requests/PendingRequestsList';
+import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 
 type PageProps = {
   params: Promise<{
@@ -50,24 +51,26 @@ export default async function OrganizationPendingRequestsPage({
   const { organization } = detailsResult.data;
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-8 flex items-center justify-between">
-        <Link
-          href={`/organizations/${organizationId}`}
-          className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
-        >
-          <Button color="zinc">{tCommon('back')}</Button>
-        </Link>
-      </div>
+    <AuthenticatedLayout>
+      <div className="mx-auto max-w-4xl px-4 py-8">
+        <div className="mb-8 flex items-center justify-between">
+          <Link
+            href={`/organizations/${organizationId}`}
+            className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+          >
+            <Button color="zinc">{tCommon('back')}</Button>
+          </Link>
+        </div>
 
-      <div className="mb-8">
-        <Heading>{t('title')}</Heading>
-        <Subheading className="mt-2">
-          {t('subtitle', { organization: organization.name })}
-        </Subheading>
-      </div>
+        <div className="mb-8">
+          <Heading>{t('title')}</Heading>
+          <Subheading className="mt-2">
+            {t('subtitle', { organization: organization.name })}
+          </Subheading>
+        </div>
 
-      <PendingRequestsList requests={filteredRequests} />
-    </div>
+        <PendingRequestsList requests={filteredRequests} />
+      </div>
+    </AuthenticatedLayout>
   );
 }
