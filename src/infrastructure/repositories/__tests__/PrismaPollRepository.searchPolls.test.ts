@@ -63,7 +63,9 @@ describe('PrismaPollRepository.searchPolls', () => {
       })
     );
 
-    if (!result.success) {return;}
+    if (!result.success) {
+      return;
+    }
 
     expect(result.value).toHaveLength(1);
     expect(result.value[0].id).toBe('poll-1');
@@ -292,7 +294,9 @@ describe('PrismaPollRepository.searchPolls', () => {
 
     expect(result.success).toBe(false);
 
-    if (result.success) {return;}
+    if (result.success) {
+      return;
+    }
 
     expect(result.error).toBe('common.errors.unexpected');
   });

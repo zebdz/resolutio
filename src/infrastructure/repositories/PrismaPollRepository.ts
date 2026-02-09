@@ -232,17 +232,25 @@ export class PrismaPollRepository implements PollRepository {
       if (filters.createdFrom || filters.createdTo) {
         where.createdAt = {};
 
-        if (filters.createdFrom) {where.createdAt.gte = filters.createdFrom;}
+        if (filters.createdFrom) {
+          where.createdAt.gte = filters.createdFrom;
+        }
 
-        if (filters.createdTo) {where.createdAt.lte = filters.createdTo;}
+        if (filters.createdTo) {
+          where.createdAt.lte = filters.createdTo;
+        }
       }
 
       if (filters.startFrom || filters.startTo) {
         where.startDate = {};
 
-        if (filters.startFrom) {where.startDate.gte = filters.startFrom;}
+        if (filters.startFrom) {
+          where.startDate.gte = filters.startFrom;
+        }
 
-        if (filters.startTo) {where.startDate.lte = filters.startTo;}
+        if (filters.startTo) {
+          where.startDate.lte = filters.startTo;
+        }
       }
 
       if (userId) {
