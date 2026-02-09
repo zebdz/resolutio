@@ -7,6 +7,7 @@ import { PollRepository } from '../../../domain/poll/PollRepository';
 import { QuestionRepository } from '../../../domain/poll/QuestionRepository';
 import { AnswerRepository } from '../../../domain/poll/AnswerRepository';
 import { VoteRepository } from '../../../domain/poll/VoteRepository';
+import { UserRepository } from '../../../domain/user/UserRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 
@@ -96,23 +97,39 @@ class MockVoteRepository implements Partial<VoteRepository> {
   }
 }
 
+// Mock UserRepository
+class MockUserRepository implements Partial<UserRepository> {
+  private superAdmins: Set<string> = new Set();
+
+  setSuperAdmin(userId: string): void {
+    this.superAdmins.add(userId);
+  }
+
+  async isSuperAdmin(userId: string): Promise<boolean> {
+    return this.superAdmins.has(userId);
+  }
+}
+
 describe('UpdateAnswerUseCase', () => {
   let useCase: UpdateAnswerUseCase;
   let pollRepository: MockPollRepository;
   let questionRepository: MockQuestionRepository;
   let answerRepository: MockAnswerRepository;
   let voteRepository: MockVoteRepository;
+  let userRepository: MockUserRepository;
 
   beforeEach(() => {
     pollRepository = new MockPollRepository();
     questionRepository = new MockQuestionRepository();
     answerRepository = new MockAnswerRepository();
     voteRepository = new MockVoteRepository();
+    userRepository = new MockUserRepository();
     useCase = new UpdateAnswerUseCase(
       pollRepository as unknown as PollRepository,
       questionRepository as unknown as QuestionRepository,
       answerRepository as unknown as AnswerRepository,
-      voteRepository as unknown as VoteRepository
+      voteRepository as unknown as VoteRepository,
+      userRepository as unknown as UserRepository
     );
   });
 
@@ -412,6 +429,89 @@ describe('UpdateAnswerUseCase', () => {
       const updatedAnswer = updatedAnswerResult.value!;
       expect(updatedAnswer.text).toBe('Updated Answer');
       expect(updatedAnswer.order).toBe(3);
+    });
+  });
+
+  describe('superadmin authorization', () => {
+    it('should allow superadmin (not creator) to update answer', async () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'org-1',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+      const poll = pollResult.value;
+      (poll as any).props.id = 'poll-1';
+      pollRepository.addPoll(poll);
+
+      const questionResult = Question.create(
+        'Test Question',
+        'poll-1',
+        1,
+        0,
+        'single-choice'
+      );
+      const question = questionResult.value;
+      (question as any).props.id = 'question-1';
+      questionRepository.addQuestion(question);
+
+      const answerResult = Answer.create('Original Answer', 0, 'question-1');
+      const answer = answerResult.value;
+      (answer as any).props.id = 'answer-1';
+      answerRepository.addAnswer(answer);
+
+      userRepository.setSuperAdmin('superadmin-1');
+
+      const result = await useCase.execute({
+        answerId: 'answer-1',
+        userId: 'superadmin-1',
+        text: 'Updated by superadmin',
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject non-creator non-superadmin', async () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'org-1',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      );
+      const poll = pollResult.value;
+      (poll as any).props.id = 'poll-1';
+      pollRepository.addPoll(poll);
+
+      const questionResult = Question.create(
+        'Test Question',
+        'poll-1',
+        1,
+        0,
+        'single-choice'
+      );
+      const question = questionResult.value;
+      (question as any).props.id = 'question-1';
+      questionRepository.addQuestion(question);
+
+      const answerResult = Answer.create('Original Answer', 0, 'question-1');
+      const answer = answerResult.value;
+      (answer as any).props.id = 'answer-1';
+      answerRepository.addAnswer(answer);
+
+      const result = await useCase.execute({
+        answerId: 'answer-1',
+        userId: 'user-2',
+        text: 'Updated by stranger',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollErrors.NOT_POLL_CREATOR);
     });
   });
 });

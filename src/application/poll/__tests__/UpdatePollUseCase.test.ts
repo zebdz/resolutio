@@ -5,6 +5,7 @@ import { Question } from '../../../domain/poll/Question';
 import { Answer } from '../../../domain/poll/Answer';
 import { PollRepository } from '../../../domain/poll/PollRepository';
 import { VoteRepository } from '../../../domain/poll/VoteRepository';
+import { UserRepository } from '../../../domain/user/UserRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 
@@ -12,6 +13,7 @@ describe('UpdatePollUseCase', () => {
   let useCase: UpdatePollUseCase;
   let pollRepository: Partial<PollRepository>;
   let voteRepository: Partial<VoteRepository>;
+  let userRepository: Partial<UserRepository>;
   let poll: Poll;
 
   beforeEach(() => {
@@ -39,9 +41,14 @@ describe('UpdatePollUseCase', () => {
       pollHasVotes: vi.fn().mockResolvedValue(success(false)),
     };
 
+    userRepository = {
+      isSuperAdmin: vi.fn().mockResolvedValue(false),
+    };
+
     useCase = new UpdatePollUseCase(
       pollRepository as PollRepository,
-      voteRepository as VoteRepository
+      voteRepository as VoteRepository,
+      userRepository as UserRepository
     );
   });
 
@@ -169,6 +176,51 @@ describe('UpdatePollUseCase', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe(PollErrors.CANNOT_MODIFY_HAS_VOTES);
+    });
+  });
+
+  describe('superadmin authorization', () => {
+    it('should allow superadmin (not creator) to update poll', async () => {
+      userRepository.isSuperAdmin = vi.fn().mockResolvedValue(true);
+
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        userId: 'superadmin-1',
+        title: 'Updated Title',
+        description: 'Updated Description',
+        startDate: new Date('2026-01-20'),
+        endDate: new Date('2026-02-20'),
+      });
+
+      expect(result.success).toBe(true);
+      expect(pollRepository.updatePoll).toHaveBeenCalled();
+    });
+
+    it('should reject non-creator non-superadmin', async () => {
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        userId: 'user-2',
+        title: 'Updated Title',
+        description: 'Updated Description',
+        startDate: new Date('2026-01-20'),
+        endDate: new Date('2026-02-20'),
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollErrors.NOT_POLL_CREATOR);
+    });
+
+    it('should still allow creator (not superadmin) to update poll', async () => {
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        userId: 'user-1',
+        title: 'Updated Title',
+        description: 'Updated Description',
+        startDate: new Date('2026-01-20'),
+        endDate: new Date('2026-02-20'),
+      });
+
+      expect(result.success).toBe(true);
     });
   });
 });

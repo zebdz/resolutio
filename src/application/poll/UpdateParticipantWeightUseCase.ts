@@ -4,6 +4,7 @@ import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { UserRepository } from '../../domain/user/UserRepository';
 import { PollErrors } from './PollErrors';
 import { OrganizationErrors } from '../organization/OrganizationErrors';
 import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
@@ -20,7 +21,8 @@ export class UpdateParticipantWeightUseCase {
     private pollRepository: PollRepository,
     private participantRepository: ParticipantRepository,
     private voteRepository: VoteRepository,
-    private organizationRepository: OrganizationRepository
+    private organizationRepository: OrganizationRepository,
+    private userRepository: UserRepository
   ) {}
 
   async execute(
@@ -57,14 +59,18 @@ export class UpdateParticipantWeightUseCase {
       return failure(PollErrors.NOT_FOUND);
     }
 
-    // 3. Check admin permissions
-    const isAdmin = await this.organizationRepository.isUserAdmin(
-      adminUserId,
-      poll.organizationId
-    );
+    // 3. Check admin permissions: superadmin or org admin
+    const isSuperAdmin = await this.userRepository.isSuperAdmin(adminUserId);
 
-    if (!isAdmin) {
-      return failure(OrganizationErrors.NOT_ADMIN);
+    if (!isSuperAdmin) {
+      const isAdmin = await this.organizationRepository.isUserAdmin(
+        adminUserId,
+        poll.organizationId
+      );
+
+      if (!isAdmin) {
+        return failure(OrganizationErrors.NOT_ADMIN);
+      }
     }
 
     // 4. Check if poll has votes (cannot modify weights if votes exist)

@@ -105,8 +105,7 @@ export default async function ParticipantsPage({
           participants: serializedParticipants,
           canModify: participantsData.canModify,
         }}
-        isActive={poll.isActive}
-        isFinished={poll.isFinished}
+        pollState={poll.state}
       />
 
       <Toaster />

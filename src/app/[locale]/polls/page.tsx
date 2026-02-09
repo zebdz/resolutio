@@ -4,9 +4,8 @@ import { Heading, Subheading } from '@/app/components/catalyst/heading';
 import { Button } from '@/app/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import { PlusIcon } from '@heroicons/react/20/solid';
-import { getUserPollsAction } from '@/web/actions/poll';
+import { searchPollsAction } from '@/web/actions/poll';
 import { getUserMemberOrganizationsAction } from '@/web/actions/organization';
-import { PollCard } from '@/web/components/PollCard';
 import { Toaster } from 'sonner';
 import {
   prisma,
@@ -14,6 +13,7 @@ import {
   PrismaUserRepository,
 } from '@/infrastructure/index';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { PollsList } from '@/web/components/PollsList';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
@@ -26,20 +26,49 @@ export default async function PollsPage() {
     return <AuthenticatedLayout>{null}</AuthenticatedLayout>;
   }
 
-  // Check if user is a member of any organization
-  const orgsResult = await getUserMemberOrganizationsAction();
-  const hasOrgMembership = orgsResult.success && orgsResult.data.length > 0;
+  const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
 
-  // Fetch user's polls
-  const pollsResult = await getUserPollsAction();
-  const polls = pollsResult.success ? pollsResult.data : [];
-
-  // Fetch user's admin organizations and superadmin status for authorization
+  // Admin org IDs for canManage
   const adminOrgs = await organizationRepository.findAdminOrganizationsByUserId(
     user.id
   );
-  const adminOrgIds = new Set(adminOrgs.map((o) => o.id));
-  const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
+  const adminOrgIds = adminOrgs.map((o) => o.id);
+
+  // Org list for dropdown: superadmin sees all, regular user sees member + admin orgs
+  let organizations: Array<{ id: string; name: string }> = [];
+
+  if (isSuperAdmin) {
+    const allOrgs = await organizationRepository.findAllWithStats();
+    organizations = allOrgs.map((o) => ({
+      id: o.organization.id,
+      name: o.organization.name,
+    }));
+  } else {
+    const orgsResult = await getUserMemberOrganizationsAction();
+    const memberOrgs = orgsResult.success ? orgsResult.data : [];
+
+    // Merge admin orgs that aren't already in member list
+    const orgMap = new Map(memberOrgs.map((o) => [o.id, o]));
+
+    for (const adminOrg of adminOrgs) {
+      if (!orgMap.has(adminOrg.id)) {
+        orgMap.set(adminOrg.id, { id: adminOrg.id, name: adminOrg.name });
+      }
+    }
+
+    organizations = [...orgMap.values()];
+  }
+
+  const hasOrgMembership = organizations.length > 0;
+
+  // Initial polls: last week
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+  const pollsResult = await searchPollsAction({
+    createdFrom: oneWeekAgo.toISOString().split('T')[0],
+  });
+  const polls = pollsResult.success ? pollsResult.data : [];
 
   return (
     <AuthenticatedLayout>
@@ -48,19 +77,21 @@ export default async function PollsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="space-y-2">
-            <Heading className="text-3xl font-bold">{t('title')}</Heading>
-            <Subheading>{t('myPolls')}</Subheading>
+            <Heading className="text-3xl font-bold">
+              {isSuperAdmin ? t('allPolls') : t('title')}
+            </Heading>
+            <Subheading>{isSuperAdmin ? t('title') : t('myPolls')}</Subheading>
           </div>
           <Link href="/polls/create">
             <Button color="blue" disabled={!hasOrgMembership}>
-              <PlusIcon className="w-5 h-5 mr-2" />
+              <PlusIcon className="h-5 w-5 mr-2" />
               {t('createPoll')}
             </Button>
           </Link>
         </div>
 
         {/* No org membership warning */}
-        {!hasOrgMembership && (
+        {!hasOrgMembership && !isSuperAdmin && (
           <div className="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20">
             <p className="text-sm text-yellow-800 dark:text-yellow-200">
               {t('noOrgMembership')}
@@ -68,33 +99,13 @@ export default async function PollsPage() {
           </div>
         )}
 
-        {/* Polls List */}
-        {polls.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-zinc-500 dark:text-zinc-400">
-              {t('noPollsYet')}
-            </p>
-            {hasOrgMembership && (
-              <Link href="/polls/create" className="mt-4 inline-block">
-                <Button color="blue">
-                  <PlusIcon className="w-5 h-5 mr-2" />
-                  {t('createPoll')}
-                </Button>
-              </Link>
-            )}
-          </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {polls.map((poll: any) => (
-              <PollCard
-                key={poll.id}
-                poll={poll}
-                userId={user.id}
-                canManage={isSuperAdmin || adminOrgIds.has(poll.organizationId)}
-              />
-            ))}
-          </div>
-        )}
+        <PollsList
+          initialPolls={polls}
+          organizations={organizations}
+          userId={user.id}
+          adminOrgIds={adminOrgIds}
+          isSuperAdmin={isSuperAdmin}
+        />
       </div>
     </AuthenticatedLayout>
   );

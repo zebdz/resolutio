@@ -1,6 +1,7 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
+import { UserRepository } from '../../domain/user/UserRepository';
 import { PollErrors } from './PollErrors';
 
 export interface UpdatePollInput {
@@ -15,7 +16,8 @@ export interface UpdatePollInput {
 export class UpdatePollUseCase {
   constructor(
     private pollRepository: PollRepository,
-    private voteRepository: VoteRepository
+    private voteRepository: VoteRepository,
+    private userRepository: UserRepository
   ) {}
 
   async execute(input: UpdatePollInput): Promise<Result<void, string>> {
@@ -32,8 +34,10 @@ export class UpdatePollUseCase {
       return failure(PollErrors.NOT_FOUND);
     }
 
-    // 2. Check if user is the poll creator
-    if (poll.createdBy !== input.userId) {
+    // 2. Check authorization: creator or superadmin
+    const isSuperAdmin = await this.userRepository.isSuperAdmin(input.userId);
+
+    if (!isSuperAdmin && poll.createdBy !== input.userId) {
       return failure(PollErrors.NOT_POLL_CREATOR);
     }
 

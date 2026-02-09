@@ -4,6 +4,7 @@ import { HandleJoinRequestUseCase } from '../HandleJoinRequestUseCase';
 import { OrganizationErrors } from '../OrganizationErrors';
 import { Organization } from '../../../domain/organization/Organization';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
+import { UserRepository } from '../../../domain/user/UserRepository';
 
 // Mock PrismaClient
 class MockPrismaClient {
@@ -143,16 +144,49 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
 }
 
+// Mock UserRepository
+class MockUserRepository {
+  private superAdmins: Set<string> = new Set();
+
+  async findById() {
+    return null;
+  }
+  async findByIds() {
+    return [];
+  }
+  async findByPhoneNumber() {
+    return null;
+  }
+  async save(user: any) {
+    return user;
+  }
+  async exists() {
+    return false;
+  }
+  async searchUsers() {
+    return [];
+  }
+  async isSuperAdmin(userId: string): Promise<boolean> {
+    return this.superAdmins.has(userId);
+  }
+
+  addSuperAdmin(userId: string) {
+    this.superAdmins.add(userId);
+  }
+}
+
 describe('HandleJoinRequestUseCase', () => {
   let useCase: HandleJoinRequestUseCase;
   let prisma: MockPrismaClient;
   let organizationRepository: MockOrganizationRepository;
+  let userRepository: MockUserRepository;
   let requests: Map<string, any>;
   let adminRoles: Map<string, Set<string>>;
 
   beforeEach(() => {
     prisma = new MockPrismaClient();
     organizationRepository = new MockOrganizationRepository();
+    userRepository = new MockUserRepository();
     requests = new Map();
     adminRoles = new Map();
 
@@ -193,6 +227,7 @@ describe('HandleJoinRequestUseCase', () => {
     useCase = new HandleJoinRequestUseCase({
       prisma: prisma as unknown as PrismaClient,
       organizationRepository,
+      userRepository: userRepository as unknown as UserRepository,
     });
   });
 
@@ -451,7 +486,9 @@ describe('HandleJoinRequestUseCase', () => {
     );
     expect(parentResult.success).toBe(true);
 
-    if (!parentResult.success) {return;}
+    if (!parentResult.success) {
+      return;
+    }
 
     const parentOrg = parentResult.value;
     (parentOrg as any).props.id = parentOrgId;
@@ -465,7 +502,9 @@ describe('HandleJoinRequestUseCase', () => {
     );
     expect(childResult.success).toBe(true);
 
-    if (!childResult.success) {return;}
+    if (!childResult.success) {
+      return;
+    }
 
     const childOrg = childResult.value;
     (childOrg as any).props.id = childOrgId;
@@ -520,7 +559,9 @@ describe('HandleJoinRequestUseCase', () => {
     );
     expect(parentResult.success).toBe(true);
 
-    if (!parentResult.success) {return;}
+    if (!parentResult.success) {
+      return;
+    }
 
     const parentOrg = parentResult.value;
     (parentOrg as any).props.id = parentOrgId;
@@ -534,7 +575,9 @@ describe('HandleJoinRequestUseCase', () => {
     );
     expect(childResult.success).toBe(true);
 
-    if (!childResult.success) {return;}
+    if (!childResult.success) {
+      return;
+    }
 
     const childOrg = childResult.value;
     (childOrg as any).props.id = childOrgId;
@@ -573,5 +616,68 @@ describe('HandleJoinRequestUseCase', () => {
     // Verify user was removed from child org
     const removed = organizationRepository.getRemovedMemberships();
     expect(removed).toContainEqual({ userId: requesterId, orgId: childOrgId });
+  });
+
+  it('should allow superadmin to accept request even if not org admin', async () => {
+    const organizationId = 'org-123';
+    const requesterId = 'user-456';
+    const superadminId = 'superadmin-1';
+
+    userRepository.addSuperAdmin(superadminId);
+
+    const key = `${organizationId}-${requesterId}`;
+    requests.set(key, {
+      id: 'request-1',
+      organizationId,
+      userId: requesterId,
+      status: 'pending',
+      createdAt: new Date(),
+      acceptedAt: null,
+      rejectedAt: null,
+      rejectionReason: null,
+      acceptedByUserId: null,
+      rejectedByUserId: null,
+    });
+
+    const result = await useCase.execute({
+      organizationId,
+      requesterId,
+      adminId: superadminId,
+      action: 'accept',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should allow superadmin to reject request even if not org admin', async () => {
+    const organizationId = 'org-123';
+    const requesterId = 'user-456';
+    const superadminId = 'superadmin-1';
+
+    userRepository.addSuperAdmin(superadminId);
+
+    const key = `${organizationId}-${requesterId}`;
+    requests.set(key, {
+      id: 'request-1',
+      organizationId,
+      userId: requesterId,
+      status: 'pending',
+      createdAt: new Date(),
+      acceptedAt: null,
+      rejectedAt: null,
+      rejectionReason: null,
+      acceptedByUserId: null,
+      rejectedByUserId: null,
+    });
+
+    const result = await useCase.execute({
+      organizationId,
+      requesterId,
+      adminId: superadminId,
+      action: 'reject',
+      rejectionReason: 'Superadmin decision',
+    });
+
+    expect(result.success).toBe(true);
   });
 });

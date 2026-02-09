@@ -89,13 +89,13 @@ export class GetPollResultsUseCase {
         return failure('poll.errors.resultsAdminOnly');
       }
     } else {
-      // Poll is finished, check if user is organization member
+      // Poll is finished, check if user is organization member or admin
       const isMember = await this.organizationRepository.isUserMember(
         userId,
         poll.organizationId
       );
 
-      if (!isMember) {
+      if (!isMember && !isAdmin) {
         return failure('poll.errors.notOrganizationMember');
       }
     }

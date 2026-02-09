@@ -4,6 +4,7 @@ import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { UserRepository } from '../../domain/user/UserRepository';
 import { PollErrors } from './PollErrors';
 import { OrganizationErrors } from '../organization/OrganizationErrors';
 
@@ -33,6 +34,7 @@ export class GetParticipantsUseCase {
     private participantRepository: ParticipantRepository,
     private voteRepository: VoteRepository,
     private organizationRepository: OrganizationRepository,
+    private userRepository: UserRepository,
     private prisma: any
   ) {}
 
@@ -54,14 +56,18 @@ export class GetParticipantsUseCase {
       return failure(PollErrors.NOT_FOUND);
     }
 
-    // 2. Check admin permissions
-    const isAdmin = await this.organizationRepository.isUserAdmin(
-      adminUserId,
-      poll.organizationId
-    );
+    // 2. Check admin permissions: superadmin or org admin
+    const isSuperAdmin = await this.userRepository.isSuperAdmin(adminUserId);
 
-    if (!isAdmin) {
-      return failure(OrganizationErrors.NOT_ADMIN);
+    if (!isSuperAdmin) {
+      const isAdmin = await this.organizationRepository.isUserAdmin(
+        adminUserId,
+        poll.organizationId
+      );
+
+      if (!isAdmin) {
+        return failure(OrganizationErrors.NOT_ADMIN);
+      }
     }
 
     // 3. Get participants

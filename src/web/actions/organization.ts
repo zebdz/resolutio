@@ -20,6 +20,7 @@ import {
   prisma,
   PrismaOrganizationRepository,
   PrismaBoardRepository,
+  PrismaUserRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
 
@@ -31,6 +32,7 @@ export type ActionResult<T = void> =
 // Initialize dependencies
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const boardRepository = new PrismaBoardRepository(prisma);
+const userRepository = new PrismaUserRepository(prisma);
 
 // Use cases
 const createOrganizationUseCase = new CreateOrganizationUseCase({
@@ -56,6 +58,7 @@ const getPendingRequestsUseCase = new GetPendingRequestsUseCase({
 const handleJoinRequestUseCase = new HandleJoinRequestUseCase({
   prisma,
   organizationRepository,
+  userRepository,
 });
 
 const joinOrganizationUseCase = new JoinOrganizationUseCase({
@@ -66,6 +69,7 @@ const joinOrganizationUseCase = new JoinOrganizationUseCase({
 const getOrganizationDetailsUseCase = new GetOrganizationDetailsUseCase({
   organizationRepository,
   boardRepository,
+  userRepository,
   prisma,
 });
 
@@ -77,6 +81,7 @@ const cancelJoinRequestUseCase = new CancelJoinRequestUseCase({
 const getOrganizationPendingRequestsUseCase =
   new GetOrganizationPendingRequestsUseCase({
     prisma,
+    userRepository,
   });
 
 export async function createOrganizationAction(

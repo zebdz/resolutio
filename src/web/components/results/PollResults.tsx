@@ -38,19 +38,19 @@ interface PollResultsData {
 
 interface PollResultsProps {
   results: PollResultsData;
-  isActive: boolean;
-  isFinished: boolean;
+  pollState: string;
   isPollCreator: boolean;
   canViewVoters: boolean;
 }
 
 export default function PollResults({
   results,
-  isActive,
-  isFinished,
+  pollState,
   isPollCreator,
   canViewVoters,
 }: PollResultsProps) {
+  const isActive = pollState === 'ACTIVE';
+  const isFinished = pollState === 'FINISHED';
   const t = useTranslations('poll.results');
   const [selectedAnswer, setSelectedAnswer] = useState<AnswerResult | null>(
     null

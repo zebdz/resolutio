@@ -1,5 +1,6 @@
 import { PrismaClient } from '@/generated/prisma/client';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { HandleJoinRequestInput } from './HandleJoinRequestSchema';
 import { OrganizationErrors } from './OrganizationErrors';
@@ -7,6 +8,7 @@ import { OrganizationErrors } from './OrganizationErrors';
 export interface HandleJoinRequestDependencies {
   prisma: PrismaClient;
   organizationRepository: OrganizationRepository;
+  userRepository: UserRepository;
 }
 
 export class HandleJoinRequestUseCase {
@@ -16,18 +18,24 @@ export class HandleJoinRequestUseCase {
     const { organizationId, requesterId, adminId, action, rejectionReason } =
       input;
 
-    // 1. Check if the admin is actually an admin of the organization
-    const adminRole = await this.deps.prisma.organizationAdminUser.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId,
-          userId: adminId,
-        },
-      },
-    });
+    // 1. Check admin permissions: superadmin or org admin
+    const isSuperAdmin = await this.deps.userRepository.isSuperAdmin(adminId);
 
-    if (!adminRole) {
-      return failure(OrganizationErrors.NOT_ADMIN);
+    if (!isSuperAdmin) {
+      const adminRole = await this.deps.prisma.organizationAdminUser.findUnique(
+        {
+          where: {
+            organizationId_userId: {
+              organizationId,
+              userId: adminId,
+            },
+          },
+        }
+      );
+
+      if (!adminRole) {
+        return failure(OrganizationErrors.NOT_ADMIN);
+      }
     }
 
     // 2. Find the join request

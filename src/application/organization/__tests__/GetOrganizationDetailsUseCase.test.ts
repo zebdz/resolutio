@@ -5,6 +5,7 @@ import { Board } from '../../../domain/board/Board';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { OrganizationErrors } from '../OrganizationErrors';
+import { UserRepository } from '../../../domain/user/UserRepository';
 
 // Mock OrganizationRepository
 class MockOrganizationRepository implements OrganizationRepository {
@@ -207,21 +208,55 @@ class MockPrisma {
   };
 }
 
+// Mock UserRepository
+class MockUserRepository {
+  private superAdmins: Set<string> = new Set();
+
+  async findById() {
+    return null;
+  }
+  async findByIds() {
+    return [];
+  }
+  async findByPhoneNumber() {
+    return null;
+  }
+  async save(user: any) {
+    return user;
+  }
+  async exists() {
+    return false;
+  }
+  async searchUsers() {
+    return [];
+  }
+  async isSuperAdmin(userId: string): Promise<boolean> {
+    return this.superAdmins.has(userId);
+  }
+
+  addSuperAdmin(userId: string) {
+    this.superAdmins.add(userId);
+  }
+}
+
 describe('GetOrganizationDetailsUseCase', () => {
   let useCase: GetOrganizationDetailsUseCase;
   let organizationRepository: MockOrganizationRepository;
   let boardRepository: MockBoardRepository;
   let prisma: MockPrisma;
+  let userRepository: MockUserRepository;
 
   beforeEach(() => {
     organizationRepository = new MockOrganizationRepository();
     boardRepository = new MockBoardRepository();
     prisma = new MockPrisma();
+    userRepository = new MockUserRepository();
 
     useCase = new GetOrganizationDetailsUseCase({
       organizationRepository,
       boardRepository,
       prisma: prisma as any,
+      userRepository: userRepository as unknown as UserRepository,
     });
   });
 
@@ -420,6 +455,21 @@ describe('GetOrganizationDetailsUseCase', () => {
       if (result.success) {
         expect(result.value.boards).toHaveLength(1);
         expect(result.value.boards[0].board.id).toBe('board-1');
+      }
+    });
+
+    it('should return isUserAdmin true for superadmin even if not org admin', async () => {
+      userRepository.addSuperAdmin('superadmin-1');
+
+      const result = await useCase.execute({
+        organizationId: 'org-1',
+        userId: 'superadmin-1',
+      });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.isUserAdmin).toBe(true);
       }
     });
   });

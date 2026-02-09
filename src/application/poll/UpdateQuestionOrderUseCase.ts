@@ -4,17 +4,20 @@ import {
   QuestionRepository,
   UpdateQuestionOrderData,
 } from '../../domain/poll/QuestionRepository';
+import { UserRepository } from '../../domain/user/UserRepository';
 import { PollErrors } from './PollErrors';
 
 export interface UpdateQuestionOrderInput {
   pollId: string;
+  userId: string;
   updates: UpdateQuestionOrderData[];
 }
 
 export class UpdateQuestionOrderUseCase {
   constructor(
     private pollRepository: PollRepository,
-    private questionRepository: QuestionRepository
+    private questionRepository: QuestionRepository,
+    private userRepository: UserRepository
   ) {}
 
   async execute(
@@ -29,12 +32,19 @@ export class UpdateQuestionOrderUseCase {
 
     const poll = pollResult.value;
 
-    // 2. Check if poll is finished
+    // 2. Check authorization: creator or superadmin
+    const isSuperAdmin = await this.userRepository.isSuperAdmin(input.userId);
+
+    if (!isSuperAdmin && poll.createdBy !== input.userId) {
+      return failure(PollErrors.NOT_POLL_CREATOR);
+    }
+
+    // 3. Check if poll is finished
     if (poll.isFinished()) {
       return failure(PollErrors.CANNOT_MODIFY_FINISHED);
     }
 
-    // 3. Validate updates
+    // 4. Validate updates
     if (!input.updates || input.updates.length === 0) {
       return failure(PollErrors.NO_UPDATES);
     }

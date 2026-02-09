@@ -108,7 +108,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       const poll = result.value!;
       expect(poll.id).toBe('poll-1');
@@ -179,7 +181,9 @@ describe('PrismaPollRepository', () => {
       const result = await repo.getPollById('poll-1');
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       const poll = result.value!;
       expect(poll.questions).toHaveLength(2);
@@ -195,7 +199,9 @@ describe('PrismaPollRepository', () => {
       const result = await repo.getPollById('poll-1');
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       expect(result.value!.questions).toHaveLength(0);
     });
@@ -209,7 +215,9 @@ describe('PrismaPollRepository', () => {
       const result = await repo.getPollById('poll-1');
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       expect(result.value!.questions[0].answers).toHaveLength(0);
     });
@@ -221,7 +229,9 @@ describe('PrismaPollRepository', () => {
       const result = await repo.getPollById('poll-1');
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       expect(result.value!.weightCriteria).toBe('shares');
     });
@@ -233,7 +243,9 @@ describe('PrismaPollRepository', () => {
       const result = await repo.getPollById('poll-1');
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       // '' is falsy, so weightCriteria || null => null
       expect(result.value!.weightCriteria).toBeNull();
@@ -260,7 +272,9 @@ describe('PrismaPollRepository', () => {
         const result = await repo.getPollById('poll-1');
         expect(result.success).toBe(true);
 
-        if (!result.success) {return;}
+        if (!result.success) {
+          return;
+        }
 
         expect(result.value!.state).toBe(expectedDomainState);
       }
@@ -342,7 +356,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       expect(result.value.id).toBe('poll-1');
       expect(result.value.title).toBe('Test Poll');
@@ -356,7 +372,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(false);
 
-      if (result.success) {return;}
+      if (result.success) {
+        return;
+      }
 
       expect(result.error).toBe('common.errors.unexpected');
     });
@@ -395,7 +413,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       expect(result.value).toBeNull();
     });
@@ -407,7 +427,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(false);
 
-      if (result.success) {return;}
+      if (result.success) {
+        return;
+      }
 
       expect(result.error).toBe('common.errors.unexpected');
     });
@@ -444,7 +466,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       expect(result.value).toHaveLength(1);
       expect(result.value[0].id).toBe('poll-1');
@@ -457,7 +481,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       expect(result.value).toHaveLength(0);
     });
@@ -472,7 +498,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       expect(result.value).toHaveLength(2);
       expect(result.value[0].id).toBe('poll-1');
@@ -487,7 +515,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(false);
 
-      if (result.success) {return;}
+      if (result.success) {
+        return;
+      }
 
       expect(result.error).toBe('common.errors.unexpected');
     });
@@ -524,7 +554,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       expect(result.value).toHaveLength(1);
     });
@@ -536,7 +568,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(false);
 
-      if (result.success) {return;}
+      if (result.success) {
+        return;
+      }
 
       expect(result.error).toBe('common.errors.unexpected');
     });
@@ -601,7 +635,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       expect(result.value).toHaveLength(1);
     });
@@ -613,7 +649,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(false);
 
-      if (result.success) {return;}
+      if (result.success) {
+        return;
+      }
 
       expect(result.error).toBe('common.errors.unexpected');
     });
@@ -683,7 +721,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(false);
 
-      if (result.success) {return;}
+      if (result.success) {
+        return;
+      }
 
       expect(result.error).toBe('common.errors.unexpected');
     });
@@ -713,7 +753,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(false);
 
-      if (result.success) {return;}
+      if (result.success) {
+        return;
+      }
 
       expect(result.error).toBe('common.errors.unexpected');
     });
@@ -732,7 +774,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       expect(result.value!.questions).toHaveLength(0);
     });
@@ -747,7 +791,9 @@ describe('PrismaPollRepository', () => {
 
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       expect(result.value!.questions[0].answers).toHaveLength(0);
     });
@@ -763,7 +809,9 @@ describe('PrismaPollRepository', () => {
       const result = await repo.getPollById('poll-1');
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       expect(result.value!.questions[0].details).toBe(
         'Some detailed explanation'
@@ -784,7 +832,9 @@ describe('PrismaPollRepository', () => {
       const result = await repo.getPollById('poll-1');
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       expect(result.value!.questions[0].answers[0].archivedAt).toEqual(
         archivedDate
@@ -800,7 +850,9 @@ describe('PrismaPollRepository', () => {
       const result = await repo.getPollById('poll-1');
       expect(result.success).toBe(true);
 
-      if (!result.success) {return;}
+      if (!result.success) {
+        return;
+      }
 
       expect(result.value!.questions[0].questionType).toBe('multiple-choice');
     });

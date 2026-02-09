@@ -6,6 +6,7 @@ import { PollRepository } from '../../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../../domain/poll/VoteRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
+import { UserRepository } from '../../../domain/user/UserRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { OrganizationErrors } from '../../organization/OrganizationErrors';
@@ -17,6 +18,7 @@ describe('UpdateParticipantWeightUseCase', () => {
   let participantRepository: Partial<ParticipantRepository>;
   let voteRepository: Partial<VoteRepository>;
   let organizationRepository: Partial<OrganizationRepository>;
+  let userRepository: Partial<UserRepository>;
   let useCase: UpdateParticipantWeightUseCase;
   let poll: Poll;
   let participant: PollParticipant;
@@ -73,11 +75,16 @@ describe('UpdateParticipantWeightUseCase', () => {
       isUserAdmin: vi.fn().mockResolvedValue(true),
     };
 
+    userRepository = {
+      isSuperAdmin: vi.fn().mockResolvedValue(false),
+    };
+
     useCase = new UpdateParticipantWeightUseCase(
       pollRepository as PollRepository,
       participantRepository as ParticipantRepository,
       voteRepository as VoteRepository,
-      organizationRepository as OrganizationRepository
+      organizationRepository as OrganizationRepository,
+      userRepository as UserRepository
     );
   });
 
@@ -188,5 +195,34 @@ describe('UpdateParticipantWeightUseCase', () => {
     const historyCall = (participantRepository.createWeightHistory as any).mock
       .calls[0][0];
     expect(historyCall.reason).toBe('Property size increased');
+  });
+
+  describe('superadmin authorization', () => {
+    it('should allow superadmin (not org admin) to update weight', async () => {
+      organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
+      userRepository.isSuperAdmin = vi.fn().mockResolvedValue(true);
+
+      const result = await useCase.execute({
+        participantId: 'participant-1',
+        newWeight: 2.5,
+        adminUserId: 'superadmin-1',
+      });
+
+      expect(result.success).toBe(true);
+      expect(participantRepository.updateParticipantWeight).toHaveBeenCalled();
+    });
+
+    it('should reject non-admin non-superadmin', async () => {
+      organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
+
+      const result = await useCase.execute({
+        participantId: 'participant-1',
+        newWeight: 2.5,
+        adminUserId: 'regular-user',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(OrganizationErrors.NOT_ADMIN);
+    });
   });
 });

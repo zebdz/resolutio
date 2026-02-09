@@ -8,6 +8,7 @@ import { PollRepository } from '../../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../../domain/poll/VoteRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
+import { UserRepository } from '../../../domain/user/UserRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { OrganizationErrors } from '../../organization/OrganizationErrors';
@@ -18,6 +19,7 @@ describe('GetParticipantsUseCase', () => {
   let participantRepository: Partial<ParticipantRepository>;
   let voteRepository: Partial<VoteRepository>;
   let organizationRepository: Partial<OrganizationRepository>;
+  let userRepository: Partial<UserRepository>;
   let prisma: any;
   let useCase: GetParticipantsUseCase;
   let poll: Poll;
@@ -79,6 +81,10 @@ describe('GetParticipantsUseCase', () => {
       isUserAdmin: vi.fn().mockResolvedValue(true),
     };
 
+    userRepository = {
+      isSuperAdmin: vi.fn().mockResolvedValue(false),
+    };
+
     prisma = {
       user: {
         findUnique: vi.fn().mockResolvedValue({
@@ -95,6 +101,7 @@ describe('GetParticipantsUseCase', () => {
       participantRepository as ParticipantRepository,
       voteRepository as VoteRepository,
       organizationRepository as OrganizationRepository,
+      userRepository as UserRepository,
       prisma
     );
   });
@@ -190,5 +197,35 @@ describe('GetParticipantsUseCase', () => {
     if (result.success) {
       expect(result.value.canModify).toBe(false);
     }
+  });
+
+  describe('superadmin authorization', () => {
+    it('should allow superadmin (not org admin) to get participants', async () => {
+      organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
+      userRepository.isSuperAdmin = vi.fn().mockResolvedValue(true);
+
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        adminUserId: 'superadmin-1',
+      });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.participants.length).toBe(1);
+      }
+    });
+
+    it('should reject non-admin non-superadmin', async () => {
+      organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
+
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        adminUserId: 'regular-user',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(OrganizationErrors.NOT_ADMIN);
+    });
   });
 });

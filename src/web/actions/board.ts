@@ -641,3 +641,43 @@ export async function searchUsersForBoardAction(
     };
   }
 }
+
+export async function getBoardsByOrganizationAction(
+  organizationId: string
+): Promise<ActionResult<Array<{ id: string; name: string }>>> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
+
+    if (!isSuperAdmin) {
+      const isMember = await organizationRepository.isUserMember(
+        user.id,
+        organizationId
+      );
+
+      if (!isMember) {
+        return { success: false, error: t('unauthorized') };
+      }
+    }
+
+    const boards = await boardRepository.findByOrganizationId(organizationId);
+
+    return {
+      success: true,
+      data: boards
+        .filter((b) => !b.archivedAt)
+        .map((b) => ({ id: b.id, name: b.name })),
+    };
+  } catch (error) {
+    console.error('Error getting boards by organization:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}

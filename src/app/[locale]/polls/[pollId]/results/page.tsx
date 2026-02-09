@@ -122,8 +122,7 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
 
       <PollResults
         results={serializedResults}
-        isActive={poll.isActive}
-        isFinished={poll.isFinished}
+        pollState={poll.state}
         isPollCreator={isPollCreator}
         canViewVoters={canViewVoters}
       />

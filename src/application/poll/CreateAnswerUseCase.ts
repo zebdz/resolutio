@@ -3,6 +3,7 @@ import { PollRepository } from '../../domain/poll/PollRepository';
 import { QuestionRepository } from '../../domain/poll/QuestionRepository';
 import { AnswerRepository } from '../../domain/poll/AnswerRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
+import { UserRepository } from '../../domain/user/UserRepository';
 import { Answer } from '../../domain/poll/Answer';
 import { PollErrors } from './PollErrors';
 
@@ -18,7 +19,8 @@ export class CreateAnswerUseCase {
     private pollRepository: PollRepository,
     private questionRepository: QuestionRepository,
     private answerRepository: AnswerRepository,
-    private voteRepository: VoteRepository
+    private voteRepository: VoteRepository,
+    private userRepository: UserRepository
   ) {}
 
   async execute(input: CreateAnswerInput): Promise<Result<Answer, string>> {
@@ -50,8 +52,10 @@ export class CreateAnswerUseCase {
       return failure(PollErrors.NOT_FOUND);
     }
 
-    // Check authorization: user must be poll creator
-    if (poll.createdBy !== input.userId) {
+    // Check authorization: creator or superadmin
+    const isSuperAdmin = await this.userRepository.isSuperAdmin(input.userId);
+
+    if (!isSuperAdmin && poll.createdBy !== input.userId) {
       return failure(PollErrors.NOT_POLL_CREATOR);
     }
 

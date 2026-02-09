@@ -4,11 +4,13 @@ import { Answer } from '../../domain/poll/Answer';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { QuestionRepository } from '../../domain/poll/QuestionRepository';
 import { AnswerRepository } from '../../domain/poll/AnswerRepository';
+import { UserRepository } from '../../domain/user/UserRepository';
 import { QuestionType } from '../../domain/poll/QuestionType';
 import { PollErrors } from './PollErrors';
 
 export interface AddQuestionInput {
   pollId: string;
+  userId: string;
   text: string;
   details?: string;
   page: number;
@@ -21,7 +23,8 @@ export class AddQuestionUseCase {
   constructor(
     private pollRepository: PollRepository,
     private questionRepository: QuestionRepository,
-    private answerRepository: AnswerRepository
+    private answerRepository: AnswerRepository,
+    private userRepository: UserRepository
   ) {}
 
   async execute(input: AddQuestionInput): Promise<Result<Question, string>> {
@@ -34,7 +37,14 @@ export class AddQuestionUseCase {
 
     const poll = pollResult.value;
 
-    // 2. Check if poll is finished
+    // 2. Check authorization: creator or superadmin
+    const isSuperAdmin = await this.userRepository.isSuperAdmin(input.userId);
+
+    if (!isSuperAdmin && poll.createdBy !== input.userId) {
+      return failure(PollErrors.NOT_POLL_CREATOR);
+    }
+
+    // 3. Check if poll is finished
     if (poll.isFinished()) {
       return failure(PollErrors.CANNOT_MODIFY_FINISHED);
     }

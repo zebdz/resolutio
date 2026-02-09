@@ -1,4 +1,5 @@
 import { Result, success, failure } from '../../domain/shared/Result';
+import { UserRepository } from '../../domain/user/UserRepository';
 import { OrganizationErrors } from './OrganizationErrors';
 
 export interface GetOrganizationPendingRequestsInput {
@@ -21,6 +22,7 @@ export interface GetOrganizationPendingRequestsResult {
 
 export interface GetOrganizationPendingRequestsDependencies {
   prisma: any; // PrismaClient
+  userRepository: UserRepository;
 }
 
 export class GetOrganizationPendingRequestsUseCase {
@@ -40,18 +42,23 @@ export class GetOrganizationPendingRequestsUseCase {
       return failure(OrganizationErrors.NOT_FOUND);
     }
 
-    // Check if user is admin of this organization
-    const isAdmin = await this.deps.prisma.organizationAdminUser.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId,
-          userId: adminUserId,
-        },
-      },
-    });
+    // Check admin permissions: superadmin or org admin
+    const isSuperAdmin =
+      await this.deps.userRepository.isSuperAdmin(adminUserId);
 
-    if (!isAdmin) {
-      return failure(OrganizationErrors.NOT_ADMIN);
+    if (!isSuperAdmin) {
+      const isAdmin = await this.deps.prisma.organizationAdminUser.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId,
+            userId: adminUserId,
+          },
+        },
+      });
+
+      if (!isAdmin) {
+        return failure(OrganizationErrors.NOT_ADMIN);
+      }
     }
 
     // Get pending requests for this organization

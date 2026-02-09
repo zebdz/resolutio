@@ -96,14 +96,30 @@ class MockPrisma {
   }
 }
 
+// Mock UserRepository
+class MockUserRepository {
+  private superAdmins: Set<string> = new Set();
+
+  async isSuperAdmin(userId: string): Promise<boolean> {
+    return this.superAdmins.has(userId);
+  }
+
+  addSuperAdmin(userId: string) {
+    this.superAdmins.add(userId);
+  }
+}
+
 describe('GetOrganizationPendingRequestsUseCase', () => {
   let useCase: GetOrganizationPendingRequestsUseCase;
   let prisma: MockPrisma;
+  let userRepository: MockUserRepository;
 
   beforeEach(() => {
     prisma = new MockPrisma();
+    userRepository = new MockUserRepository();
     useCase = new GetOrganizationPendingRequestsUseCase({
       prisma: prisma as any,
+      userRepository: userRepository as any,
     });
   });
 
@@ -281,6 +297,39 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
         // Should be ordered by creation time (oldest first)
         expect(result.value.requests[0].userId).toBe('user-1');
         expect(result.value.requests[1].userId).toBe('user-2');
+      }
+    });
+  });
+
+  describe('when user is a superadmin', () => {
+    beforeEach(() => {
+      prisma.addOrganization('org-1', 'Test Org');
+      userRepository.addSuperAdmin('superadmin-1');
+    });
+
+    it('should allow superadmin to get pending requests without being org admin', async () => {
+      const now = new Date();
+      prisma.addPendingRequest(
+        'org-1',
+        {
+          id: 'user-1',
+          firstName: 'John',
+          lastName: 'Doe',
+          phoneNumber: '+1234567890',
+        },
+        now
+      );
+
+      const result = await useCase.execute({
+        organizationId: 'org-1',
+        adminUserId: 'superadmin-1',
+      });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.requests).toHaveLength(1);
+        expect(result.value.requests[0].userId).toBe('user-1');
       }
     });
   });

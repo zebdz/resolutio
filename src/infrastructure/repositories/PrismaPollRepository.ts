@@ -5,7 +5,10 @@ import {
 import { Poll } from '../../domain/poll/Poll';
 import { Question } from '../../domain/poll/Question';
 import { Answer } from '../../domain/poll/Answer';
-import { PollRepository } from '../../domain/poll/PollRepository';
+import {
+  PollRepository,
+  PollSearchFilters,
+} from '../../domain/poll/PollRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { QuestionType } from '../../domain/poll/QuestionType';
 import { PollState } from '../../domain/poll/PollState';
@@ -192,6 +195,106 @@ export class PrismaPollRepository implements PollRepository {
       return success(polls.map((poll) => this.toDomainPoll(poll)));
     } catch (error) {
       console.error('Failed to get polls by user:', error);
+
+      return failure('common.errors.unexpected');
+    }
+  }
+
+  async searchPolls(
+    filters: PollSearchFilters,
+    userId?: string,
+    adminOrgIds?: string[]
+  ): Promise<Result<Poll[], string>> {
+    try {
+      const where: any = { archivedAt: null };
+
+      if (filters.titleSearch) {
+        where.title = {
+          contains: filters.titleSearch,
+          mode: 'insensitive',
+        };
+      }
+
+      if (filters.statuses && filters.statuses.length > 0) {
+        where.state = {
+          in: filters.statuses.map((s) => this.toPrismaState(s)),
+        };
+      }
+
+      if (filters.organizationId) {
+        where.organizationId = filters.organizationId;
+      }
+
+      if (filters.boardId) {
+        where.boardId = filters.boardId;
+      }
+
+      if (filters.createdFrom || filters.createdTo) {
+        where.createdAt = {};
+
+        if (filters.createdFrom) {where.createdAt.gte = filters.createdFrom;}
+
+        if (filters.createdTo) {where.createdAt.lte = filters.createdTo;}
+      }
+
+      if (filters.startFrom || filters.startTo) {
+        where.startDate = {};
+
+        if (filters.startFrom) {where.startDate.gte = filters.startFrom;}
+
+        if (filters.startTo) {where.startDate.lte = filters.startTo;}
+      }
+
+      if (userId) {
+        where.OR = [
+          {
+            organization: {
+              members: {
+                some: { userId, status: 'accepted' },
+              },
+            },
+          },
+          {
+            board: {
+              members: {
+                some: { userId, removedAt: null },
+              },
+            },
+          },
+          {
+            participants: {
+              some: { userId },
+            },
+          },
+        ];
+
+        if (adminOrgIds && adminOrgIds.length > 0) {
+          where.OR.push({
+            organizationId: { in: adminOrgIds },
+          });
+        }
+      }
+
+      const polls = await this.prisma.poll.findMany({
+        where,
+        include: {
+          questions: {
+            where: { archivedAt: null },
+            include: {
+              answers: {
+                where: { archivedAt: null },
+                orderBy: { order: 'asc' },
+              },
+            },
+            orderBy: [{ page: 'asc' }, { order: 'asc' }],
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return success(polls.map((poll) => this.toDomainPoll(poll)));
+    } catch (error) {
+      console.error('Failed to search polls:', error);
 
       return failure('common.errors.unexpected');
     }

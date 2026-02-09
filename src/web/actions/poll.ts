@@ -35,6 +35,8 @@ import {
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
 import { QuestionType } from '@/domain/poll/QuestionType';
+import { PollState } from '@/domain/poll/PollState';
+import { PollSearchFilters } from '@/domain/poll/PollRepository';
 
 // Action result type for client-side handling
 export type ActionResult<T = void> =
@@ -58,43 +60,54 @@ const createPollUseCase = new CreatePollUseCase(
   boardRepository,
   organizationRepository
 );
-const updatePollUseCase = new UpdatePollUseCase(pollRepository, voteRepository);
+const updatePollUseCase = new UpdatePollUseCase(
+  pollRepository,
+  voteRepository,
+  userRepository
+);
 const addQuestionUseCase = new AddQuestionUseCase(
   pollRepository,
   questionRepository,
-  answerRepository
+  answerRepository,
+  userRepository
 );
 const updateQuestionUseCase = new UpdateQuestionUseCase(
   pollRepository,
   questionRepository,
-  voteRepository
+  voteRepository,
+  userRepository
 );
 const deleteQuestionUseCase = new DeleteQuestionUseCase(
   pollRepository,
   questionRepository,
-  voteRepository
+  voteRepository,
+  userRepository
 );
 const createAnswerUseCase = new CreateAnswerUseCase(
   pollRepository,
   questionRepository,
   answerRepository,
-  voteRepository
+  voteRepository,
+  userRepository
 );
 const updateAnswerUseCase = new UpdateAnswerUseCase(
   pollRepository,
   questionRepository,
   answerRepository,
-  voteRepository
+  voteRepository,
+  userRepository
 );
 const deleteAnswerUseCase = new DeleteAnswerUseCase(
   pollRepository,
   questionRepository,
   answerRepository,
-  voteRepository
+  voteRepository,
+  userRepository
 );
 const updateQuestionOrderUseCase = new UpdateQuestionOrderUseCase(
   pollRepository,
-  questionRepository
+  questionRepository,
+  userRepository
 );
 const takeSnapshotUseCase = new TakeSnapshotUseCase(
   pollRepository,
@@ -273,7 +286,10 @@ export async function addQuestionAction(
     }
 
     // Execute use case
-    const result = await addQuestionUseCase.execute(validation.data);
+    const result = await addQuestionUseCase.execute({
+      ...validation.data,
+      userId: user.id,
+    });
 
     if (!result.success) {
       const parts = result.error.split('.');
@@ -341,7 +357,10 @@ export async function updateQuestionOrderAction(input: {
     }
 
     // Execute use case
-    const result = await updateQuestionOrderUseCase.execute(validation.data);
+    const result = await updateQuestionOrderUseCase.execute({
+      ...validation.data,
+      userId: user.id,
+    });
 
     if (!result.success) {
       const errorParts = result.error.split('.');
@@ -460,14 +479,18 @@ export async function getPollsByBoardIdAction(
       };
     }
 
-    // Check if user is a board member
-    const isMember = await boardRepository.isUserMember(user.id, boardId);
+    // Check if user is a board member (superadmin can access any board)
+    const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
 
-    if (!isMember) {
-      return {
-        success: false,
-        error: 'User is not a member of this board',
-      };
+    if (!isSuperAdmin) {
+      const isMember = await boardRepository.isUserMember(user.id, boardId);
+
+      if (!isMember) {
+        return {
+          success: false,
+          error: 'User is not a member of this board',
+        };
+      }
     }
 
     const result = await pollRepository.getPollsByBoardId(boardId);
@@ -528,24 +551,37 @@ export async function getPollByIdAction(
     }
 
     if (!result.value) {
+      const tPoll = await getTranslations('poll.errors');
+
       return {
         success: false,
-        error: t('poll.errors.pollNotFound'),
+        error: tPoll('pollNotFound'),
       };
     }
 
     // Check if user is an org member (covers both board-specific and org-wide polls)
+    // Superadmin can access any poll
     const poll = result.value;
-    const isMember = await organizationRepository.isUserMember(
-      user.id,
-      poll.organizationId
-    );
+    const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
 
-    if (!isMember) {
-      return {
-        success: false,
-        error: t('organization.errors.notMember'),
-      };
+    if (!isSuperAdmin) {
+      const isMember = await organizationRepository.isUserMember(
+        user.id,
+        poll.organizationId
+      );
+      const isAdmin = await organizationRepository.isUserAdmin(
+        user.id,
+        poll.organizationId
+      );
+
+      if (!isMember && !isAdmin) {
+        const tOrg = await getTranslations('organization.errors');
+
+        return {
+          success: false,
+          error: tOrg('notMember'),
+        };
+      }
     }
 
     return {
@@ -674,8 +710,10 @@ export async function canEditPollAction(
       };
     }
 
-    // Check if user is creator
-    if (poll.createdBy !== user.id) {
+    // Check if user is creator or superadmin
+    const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
+
+    if (!isSuperAdmin && poll.createdBy !== user.id) {
       return {
         success: true,
         data: {
@@ -1223,5 +1261,118 @@ export async function canManagePollAction(
       success: false,
       error: t('unexpected'),
     };
+  }
+}
+
+export interface SearchPollsInput {
+  titleSearch?: string;
+  statuses?: PollState[];
+  organizationId?: string;
+  boardId?: string;
+  createdFrom?: string;
+  createdTo?: string;
+  startFrom?: string;
+  startTo?: string;
+}
+
+export async function searchPollsAction(
+  input: SearchPollsInput
+): Promise<ActionResult<any[]>> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
+
+    const filters: PollSearchFilters = {
+      titleSearch: input.titleSearch || undefined,
+      statuses: input.statuses,
+      organizationId: input.organizationId || undefined,
+      boardId: input.boardId || undefined,
+      createdFrom: input.createdFrom ? new Date(input.createdFrom) : undefined,
+      createdTo: input.createdTo ? new Date(input.createdTo) : undefined,
+      startFrom: input.startFrom ? new Date(input.startFrom) : undefined,
+      startTo: input.startTo ? new Date(input.startTo) : undefined,
+    };
+
+    // Admin org IDs so admins see their orgs' polls even if not a member
+    let adminOrgIds: string[] | undefined;
+
+    if (!isSuperAdmin) {
+      const adminOrgs =
+        await organizationRepository.findAdminOrganizationsByUserId(user.id);
+      adminOrgIds = adminOrgs.map((o) => o.id);
+    }
+
+    const result = await pollRepository.searchPolls(
+      filters,
+      isSuperAdmin ? undefined : user.id,
+      adminOrgIds
+    );
+
+    if (!result.success) {
+      const errorParts = result.error.split('.');
+      const tError = await getTranslations(errorParts.shift());
+
+      return { success: false, error: tError(errorParts.join('.')) };
+    }
+
+    // Enrich with canVote + hasFinishedVoting + org/board names
+    const enriched = await Promise.all(
+      result.value.map(async (poll) => {
+        const pollJson: any = poll.toJSON();
+
+        // Org + board names
+        const org = await prisma.organization.findUnique({
+          where: { id: poll.organizationId },
+          select: { name: true },
+        });
+        pollJson.organizationName = org?.name ?? '';
+
+        if (poll.boardId) {
+          const board = await prisma.board.findUnique({
+            where: { id: poll.boardId },
+            select: { name: true },
+          });
+          pollJson.boardName = board?.name ?? '';
+        } else {
+          pollJson.boardName = '';
+        }
+
+        // canVote
+        const participant = await prisma.pollParticipant.findFirst({
+          where: { pollId: poll.id, userId: user.id },
+        });
+        pollJson.canVote = !!participant;
+
+        // hasFinishedVoting
+        if (participant) {
+          const votesCount = await prisma.vote.count({
+            where: {
+              userId: user.id,
+              question: { pollId: poll.id },
+            },
+          });
+          const totalQuestions = pollJson.questions?.length || 0;
+          pollJson.hasFinishedVoting =
+            votesCount >= totalQuestions && totalQuestions > 0;
+        } else {
+          pollJson.hasFinishedVoting = false;
+        }
+
+        return pollJson;
+      })
+    );
+
+    return { success: true, data: enriched };
+  } catch (error) {
+    console.error('Error searching polls:', error);
+
+    return { success: false, error: t('generic') };
   }
 }

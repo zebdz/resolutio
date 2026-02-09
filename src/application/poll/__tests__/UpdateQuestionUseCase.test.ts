@@ -6,6 +6,7 @@ import { Answer } from '../../../domain/poll/Answer';
 import { PollRepository } from '../../../domain/poll/PollRepository';
 import { QuestionRepository } from '../../../domain/poll/QuestionRepository';
 import { VoteRepository } from '../../../domain/poll/VoteRepository';
+import { UserRepository } from '../../../domain/user/UserRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 
@@ -14,6 +15,7 @@ describe('UpdateQuestionUseCase', () => {
   let pollRepository: Partial<PollRepository>;
   let questionRepository: Partial<QuestionRepository>;
   let voteRepository: Partial<VoteRepository>;
+  let userRepository: Partial<UserRepository>;
   let poll: Poll;
   let question: Question;
 
@@ -56,10 +58,15 @@ describe('UpdateQuestionUseCase', () => {
       pollHasVotes: vi.fn().mockResolvedValue(success(false)),
     };
 
+    userRepository = {
+      isSuperAdmin: vi.fn().mockResolvedValue(false),
+    };
+
     useCase = new UpdateQuestionUseCase(
       pollRepository as PollRepository,
       questionRepository as QuestionRepository,
-      voteRepository as VoteRepository
+      voteRepository as VoteRepository,
+      userRepository as UserRepository
     );
   });
 
@@ -210,6 +217,32 @@ describe('UpdateQuestionUseCase', () => {
 
       expect(result.success).toBe(true);
       expect(questionRepository.updateQuestion).toHaveBeenCalled();
+    });
+  });
+
+  describe('superadmin authorization', () => {
+    it('should allow superadmin (not creator) to update question', async () => {
+      userRepository.isSuperAdmin = vi.fn().mockResolvedValue(true);
+
+      const result = await useCase.execute({
+        questionId: 'question-1',
+        userId: 'superadmin-1',
+        text: 'Updated Question',
+      });
+
+      expect(result.success).toBe(true);
+      expect(questionRepository.updateQuestion).toHaveBeenCalled();
+    });
+
+    it('should reject non-creator non-superadmin', async () => {
+      const result = await useCase.execute({
+        questionId: 'question-1',
+        userId: 'user-2',
+        text: 'Updated Question',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollErrors.NOT_POLL_CREATOR);
     });
   });
 });

@@ -5,6 +5,7 @@ import { Question } from '../../../domain/poll/Question';
 import { Answer } from '../../../domain/poll/Answer';
 import { PollRepository } from '../../../domain/poll/PollRepository';
 import { QuestionRepository } from '../../../domain/poll/QuestionRepository';
+import { UserRepository } from '../../../domain/user/UserRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 
@@ -12,6 +13,7 @@ describe('UpdateQuestionOrderUseCase', () => {
   let useCase: UpdateQuestionOrderUseCase;
   let pollRepository: Partial<PollRepository>;
   let questionRepository: Partial<QuestionRepository>;
+  let userRepository: Partial<UserRepository>;
   let poll: Poll;
 
   beforeEach(() => {
@@ -38,15 +40,21 @@ describe('UpdateQuestionOrderUseCase', () => {
       updateQuestionOrder: vi.fn().mockResolvedValue(success(undefined)),
     };
 
+    userRepository = {
+      isSuperAdmin: vi.fn().mockResolvedValue(false),
+    };
+
     useCase = new UpdateQuestionOrderUseCase(
       pollRepository as PollRepository,
-      questionRepository as QuestionRepository
+      questionRepository as QuestionRepository,
+      userRepository as UserRepository
     );
   });
 
   it('should reorder questions within the same page', async () => {
     const result = await useCase.execute({
       pollId: 'poll-1',
+      userId: 'user-1',
       updates: [
         { questionId: 'q-3', page: 1, order: 0 },
         { questionId: 'q-1', page: 1, order: 1 },
@@ -65,6 +73,7 @@ describe('UpdateQuestionOrderUseCase', () => {
   it('should move question to a different page', async () => {
     const result = await useCase.execute({
       pollId: 'poll-1',
+      userId: 'user-1',
       updates: [
         { questionId: 'q-2', page: 2, order: 0 },
         { questionId: 'q-3', page: 2, order: 1 },
@@ -80,6 +89,7 @@ describe('UpdateQuestionOrderUseCase', () => {
 
     const result = await useCase.execute({
       pollId: 'non-existent-poll',
+      userId: 'user-1',
       updates: [{ questionId: 'q-1', page: 1, order: 0 }],
     });
 
@@ -112,6 +122,7 @@ describe('UpdateQuestionOrderUseCase', () => {
 
     const result = await useCase.execute({
       pollId: 'poll-1',
+      userId: 'user-1',
       updates: [{ questionId: 'q-1', page: 1, order: 1 }],
     });
 
@@ -125,6 +136,7 @@ describe('UpdateQuestionOrderUseCase', () => {
   it('should handle complex reordering across multiple pages', async () => {
     const result = await useCase.execute({
       pollId: 'poll-1',
+      userId: 'user-1',
       updates: [
         { questionId: 'q-1', page: 1, order: 0 },
         { questionId: 'q-4', page: 1, order: 1 }, // Moved from page 2
@@ -136,5 +148,30 @@ describe('UpdateQuestionOrderUseCase', () => {
 
     expect(result.success).toBe(true);
     expect(questionRepository.updateQuestionOrder).toHaveBeenCalled();
+  });
+
+  describe('superadmin authorization', () => {
+    it('should allow superadmin (not creator) to reorder questions', async () => {
+      userRepository.isSuperAdmin = vi.fn().mockResolvedValue(true);
+
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        userId: 'superadmin-1',
+        updates: [{ questionId: 'q-1', page: 1, order: 0 }],
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject non-creator non-superadmin', async () => {
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        userId: 'user-2',
+        updates: [{ questionId: 'q-1', page: 1, order: 0 }],
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollErrors.NOT_POLL_CREATOR);
+    });
   });
 });

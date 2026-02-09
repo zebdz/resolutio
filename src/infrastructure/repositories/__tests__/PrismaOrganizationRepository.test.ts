@@ -321,7 +321,9 @@ describe('PrismaOrganizationRepository', () => {
     it('creates org + admin relationship, returns reconstituted Organization', async () => {
       const input = Organization.create('New Org', 'Description', 'user-1');
 
-      if (!input.success) {throw new Error('create failed');}
+      if (!input.success) {
+        throw new Error('create failed');
+      }
 
       const org = input.value;
 

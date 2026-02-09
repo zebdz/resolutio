@@ -33,15 +33,13 @@ interface Participant {
 interface ParticipantManagementProps {
   pollId: string;
   participantsData: { participants: Participant[]; canModify: boolean };
-  isActive: boolean;
-  isFinished: boolean;
+  pollState: string;
 }
 
 export default function ParticipantManagement({
   pollId,
   participantsData,
-  isActive,
-  isFinished,
+  pollState,
 }: ParticipantManagementProps) {
   const t = useTranslations('poll.participants');
   const [participants, setParticipants] = useState(
@@ -116,7 +114,7 @@ export default function ParticipantManagement({
     setHistoryOpen(true);
   };
 
-  const canModify = participantsData.canModify && !isFinished;
+  const canModify = participantsData.canModify && pollState !== 'FINISHED';
 
   if (participants.length === 0) {
     return (

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AddQuestionUseCase } from '../AddQuestionUseCase';
 import { Poll } from '../../../domain/poll/Poll';
 import { Question } from '../../../domain/poll/Question';
@@ -9,6 +9,7 @@ import {
   UpdateQuestionOrderData,
 } from '../../../domain/poll/QuestionRepository';
 import { AnswerRepository } from '../../../domain/poll/AnswerRepository';
+import { UserRepository } from '../../../domain/user/UserRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
@@ -226,20 +227,36 @@ class MockAnswerRepository implements AnswerRepository {
   }
 }
 
+// Mock UserRepository
+class MockUserRepository implements Partial<UserRepository> {
+  private superAdmins: Set<string> = new Set();
+
+  setSuperAdmin(userId: string): void {
+    this.superAdmins.add(userId);
+  }
+
+  async isSuperAdmin(userId: string): Promise<boolean> {
+    return this.superAdmins.has(userId);
+  }
+}
+
 describe('AddQuestionUseCase', () => {
   let useCase: AddQuestionUseCase;
   let pollRepository: MockPollRepository;
   let questionRepository: MockQuestionRepository;
   let answerRepository: MockAnswerRepository;
+  let userRepository: MockUserRepository;
 
   beforeEach(() => {
     pollRepository = new MockPollRepository();
     questionRepository = new MockQuestionRepository();
     answerRepository = new MockAnswerRepository(questionRepository);
+    userRepository = new MockUserRepository();
     useCase = new AddQuestionUseCase(
       pollRepository,
       questionRepository,
-      answerRepository
+      answerRepository,
+      userRepository as unknown as UserRepository
     );
   });
 
@@ -260,6 +277,7 @@ describe('AddQuestionUseCase', () => {
 
     const result = await useCase.execute({
       pollId: 'poll-1',
+      userId: 'user-1',
       text: 'What is your favorite color?',
       details: 'Please select one option',
       page: 1,
@@ -300,6 +318,7 @@ describe('AddQuestionUseCase', () => {
 
     const result = await useCase.execute({
       pollId: 'poll-1',
+      userId: 'user-1',
       text: 'What features do you want?',
       page: 1,
       order: 0,
@@ -318,6 +337,7 @@ describe('AddQuestionUseCase', () => {
   it('should fail when poll does not exist', async () => {
     const result = await useCase.execute({
       pollId: 'non-existent-poll',
+      userId: 'user-1',
       text: 'What is your favorite color?',
       page: 1,
       order: 0,
@@ -349,6 +369,7 @@ describe('AddQuestionUseCase', () => {
 
     const result = await useCase.execute({
       pollId: 'poll-1',
+      userId: 'user-1',
       text: '',
       page: 1,
       order: 0,
@@ -380,6 +401,7 @@ describe('AddQuestionUseCase', () => {
 
     const result = await useCase.execute({
       pollId: 'poll-1',
+      userId: 'user-1',
       text: 'What is your favorite color?',
       page: 1,
       order: 0,
@@ -430,6 +452,7 @@ describe('AddQuestionUseCase', () => {
 
     const result = await useCase.execute({
       pollId: 'poll-1',
+      userId: 'user-1',
       text: 'What is your favorite color?',
       page: 1,
       order: 0,
@@ -461,6 +484,7 @@ describe('AddQuestionUseCase', () => {
 
     const result = await useCase.execute({
       pollId: 'poll-1',
+      userId: 'user-1',
       text: 'Second page question',
       page: 2,
       order: 0,
@@ -473,5 +497,63 @@ describe('AddQuestionUseCase', () => {
     if (result.success) {
       expect(result.value.page).toBe(2);
     }
+  });
+
+  describe('superadmin authorization', () => {
+    it('should allow superadmin (not creator) to add question', async () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Description',
+        'org-1',
+        'board-1',
+        'user-1',
+        new Date('2025-01-01'),
+        new Date('2025-12-31')
+      );
+      const poll = pollResult.value;
+      (poll as any).props.id = 'poll-1';
+      pollRepository.addPoll(poll);
+      userRepository.setSuperAdmin('superadmin-1');
+
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        userId: 'superadmin-1',
+        text: 'Question from superadmin',
+        page: 1,
+        order: 0,
+        questionType: 'single-choice',
+        answers: ['A', 'B'],
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject non-creator non-superadmin', async () => {
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Description',
+        'org-1',
+        'board-1',
+        'user-1',
+        new Date('2025-01-01'),
+        new Date('2025-12-31')
+      );
+      const poll = pollResult.value;
+      (poll as any).props.id = 'poll-1';
+      pollRepository.addPoll(poll);
+
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        userId: 'user-2',
+        text: 'Question from stranger',
+        page: 1,
+        order: 0,
+        questionType: 'single-choice',
+        answers: ['A', 'B'],
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollErrors.NOT_POLL_CREATOR);
+    });
   });
 });

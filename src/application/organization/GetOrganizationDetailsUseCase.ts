@@ -1,5 +1,6 @@
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
+import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { Organization } from '../../domain/organization/Organization';
 import { Board } from '../../domain/board/Board';
@@ -27,6 +28,7 @@ export interface OrganizationDetailsResult {
 export interface GetOrganizationDetailsDependencies {
   organizationRepository: OrganizationRepository;
   boardRepository: BoardRepository;
+  userRepository: UserRepository;
   prisma: any; // For custom queries
 }
 
@@ -88,10 +90,14 @@ export class GetOrganizationDetailsUseCase {
         userId,
         organizationId
       );
-      isUserAdmin = await this.deps.organizationRepository.isUserAdmin(
-        userId,
-        organizationId
-      );
+
+      const isSuperAdmin = await this.deps.userRepository.isSuperAdmin(userId);
+      isUserAdmin =
+        isSuperAdmin ||
+        (await this.deps.organizationRepository.isUserAdmin(
+          userId,
+          organizationId
+        ));
     }
 
     // Get first admin
