@@ -17,8 +17,9 @@ export default async function HomePage({
 
   // Check if user is admin of any organization
   const adminOrgsResult = await getAdminOrganizationsAction();
-  const isAdmin =
-    adminOrgsResult.success && adminOrgsResult.data.organizations.length > 0;
+  const adminOrganizations =
+    adminOrgsResult.success ? adminOrgsResult.data.organizations : [];
+  const isAdmin = adminOrganizations.length > 0;
 
   return (
     <AuthenticatedLayout>
@@ -39,7 +40,7 @@ export default async function HomePage({
         </div>
 
         {/* User Organizations List */}
-        <UserOrganizationsList />
+        <UserOrganizationsList adminOrganizations={adminOrganizations} />
       </div>
     </AuthenticatedLayout>
   );

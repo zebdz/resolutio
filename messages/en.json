@@ -52,6 +52,8 @@
     "rejectedRequests": "Rejected join requests",
     "createOrganization": "Create Organization",
     "noOrganizations": "You are not a member of any organizations yet.",
+    "myAdminOrganizations": "Organizations I'm an admin of",
+    "admin": "Admin",
     "member": "Member",
     "joinedAt": "Joined",
     "logout": "Logout",

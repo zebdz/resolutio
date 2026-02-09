@@ -52,6 +52,8 @@
     "rejectedRequests": "Отклонённые заявки на вступление",
     "createOrganization": "Создать организацию",
     "noOrganizations": "Вы пока не состоите ни в одной организации.",
+    "myAdminOrganizations": "Организации, которыми я управляю",
+    "admin": "Админ",
     "member": "Участник",
     "joinedAt": "Присоединился",
     "logout": "Выйти",

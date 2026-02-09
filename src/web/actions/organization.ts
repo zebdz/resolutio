@@ -331,6 +331,7 @@ export async function getAdminOrganizationsAction(): Promise<
     organizations: Array<{
       id: string;
       name: string;
+      description: string;
     }>;
   }>
 > {
@@ -362,6 +363,7 @@ export async function getAdminOrganizationsAction(): Promise<
         organizations: result.value.organizations.map((org) => ({
           id: org.id,
           name: org.name,
+          description: org.description,
         })),
       },
     };

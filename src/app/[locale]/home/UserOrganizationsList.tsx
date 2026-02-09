@@ -28,7 +28,19 @@ interface UserOrganization {
   };
 }
 
-export function UserOrganizationsList() {
+interface AdminOrganization {
+  id: string;
+  name: string;
+  description: string;
+}
+
+interface UserOrganizationsListProps {
+  adminOrganizations: AdminOrganization[];
+}
+
+export function UserOrganizationsList({
+  adminOrganizations,
+}: UserOrganizationsListProps) {
   const t = useTranslations('home');
   const [member, setMember] = useState<UserOrganization[]>([]);
   const [pending, setPending] = useState<UserOrganization[]>([]);
@@ -101,8 +113,17 @@ export function UserOrganizationsList() {
     );
   }
 
+  const memberIds = new Set(member.map((org) => org.id));
+  const adminOnlyOrgs = adminOrganizations.filter(
+    (org) => !memberIds.has(org.id)
+  );
+  const adminIdSet = new Set(adminOrganizations.map((org) => org.id));
+
   const hasOrganizations =
-    member.length > 0 || pending.length > 0 || rejected.length > 0;
+    member.length > 0 ||
+    pending.length > 0 ||
+    rejected.length > 0 ||
+    adminOnlyOrgs.length > 0;
 
   if (!hasOrganizations) {
     return (
@@ -133,7 +154,12 @@ export function UserOrganizationsList() {
                   <Heading level={3} className="text-lg font-semibold">
                     {org.name}
                   </Heading>
-                  <Badge color="green">{t('member')}</Badge>
+                  <div className="flex gap-1">
+                    {adminIdSet.has(org.id) && (
+                      <Badge color="purple">{t('admin')}</Badge>
+                    )}
+                    <Badge color="green">{t('member')}</Badge>
+                  </div>
                 </div>
                 <Text className="mt-2 line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">
                   {org.description}
@@ -149,10 +175,43 @@ export function UserOrganizationsList() {
         </div>
       )}
 
+      {/* Admin-only Organizations */}
+      {adminOnlyOrgs.length > 0 && (
+        <>
+          {member.length > 0 && <Divider className="my-8" />}
+          <div>
+            <Heading level={2} className="mb-4">
+              {t('myAdminOrganizations')}
+            </Heading>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {adminOnlyOrgs.map((org) => (
+                <Link
+                  key={org.id}
+                  href={`/organizations/${org.id}`}
+                  className="block rounded-lg border border-zinc-200 bg-white p-6 transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
+                >
+                  <div className="flex items-start justify-between">
+                    <Heading level={3} className="text-lg font-semibold">
+                      {org.name}
+                    </Heading>
+                    <Badge color="purple">{t('admin')}</Badge>
+                  </div>
+                  <Text className="mt-2 line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">
+                    {org.description}
+                  </Text>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Pending Requests */}
       {pending.length > 0 && (
         <>
-          {member.length > 0 && <Divider className="my-8" />}
+          {(member.length > 0 || adminOnlyOrgs.length > 0) && (
+            <Divider className="my-8" />
+          )}
           <div>
             <Heading level={2} className="mb-4">
               {t('pendingRequests')}
@@ -201,9 +260,9 @@ export function UserOrganizationsList() {
       {/* Rejected Requests */}
       {rejected.length > 0 && (
         <>
-          {(member.length > 0 || pending.length > 0) && (
-            <Divider className="my-8" />
-          )}
+          {(member.length > 0 ||
+            adminOnlyOrgs.length > 0 ||
+            pending.length > 0) && <Divider className="my-8" />}
           <div>
             <Heading level={2} className="mb-4">
               {t('rejectedRequests')}
