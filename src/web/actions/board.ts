@@ -73,7 +73,6 @@ export async function createBoardAction(
     const input = {
       name: formData.get('name') as string,
       organizationId: formData.get('organizationId') as string,
-      isGeneral: formData.get('isGeneral') === 'true',
     };
 
     // Validate with Zod
@@ -105,11 +104,12 @@ export async function createBoardAction(
     });
 
     if (!result.success) {
-      const tError = await getTranslations(result.error.split('.')[0]);
+      const errorParts = result.error.split('.');
+      const tError = await getTranslations(errorParts.shift());
 
       return {
         success: false,
-        error: tError(result.error),
+        error: tError(errorParts.join('.')),
       };
     }
 
@@ -162,11 +162,12 @@ export async function archiveBoardAction(
     });
 
     if (!result.success) {
-      const tError = await getTranslations(result.error.split('.')[0]);
+      const errorParts = result.error.split('.');
+      const tError = await getTranslations(errorParts.shift());
 
       return {
         success: false,
-        error: tError(result.error),
+        error: tError(errorParts.join('.')),
       };
     }
 
@@ -223,11 +224,12 @@ export async function addBoardMemberAction(
     });
 
     if (!result.success) {
-      const tError = await getTranslations(result.error.split('.')[0]);
+      const errorParts = result.error.split('.');
+      const tError = await getTranslations(errorParts.shift());
 
       return {
         success: false,
-        error: tError(result.error),
+        error: tError(errorParts.join('.')),
       };
     }
 
@@ -285,11 +287,12 @@ export async function removeBoardMemberAction(
     });
 
     if (!result.success) {
-      const tError = await getTranslations(result.error.split('.')[0]);
+      const errorParts = result.error.split('.');
+      const tError = await getTranslations(errorParts.shift());
 
       return {
         success: false,
-        error: tError(result.error),
+        error: tError(errorParts.join('.')),
       };
     }
 
@@ -313,7 +316,6 @@ export async function getBoardDetailsAction(boardId: string): Promise<
       id: string;
       name: string;
       organizationId: string;
-      isGeneral: boolean;
     };
     members: Array<{
       id: string;
@@ -382,10 +384,15 @@ export async function getBoardDetailsAction(boardId: string): Promise<
       },
     });
 
-    // Get organization members (for adding new members)
+    // Get organization members including descendants (for adding new members)
+    const descendantIds = await organizationRepository.getDescendantIds(
+      board.organizationId
+    );
+    const allOrgIds = [board.organizationId, ...descendantIds];
+
     const orgMembers = await prisma.organizationUser.findMany({
       where: {
-        organizationId: board.organizationId,
+        organizationId: { in: allOrgIds },
         status: 'accepted',
       },
       include: {
@@ -407,7 +414,6 @@ export async function getBoardDetailsAction(boardId: string): Promise<
           id: board.id,
           name: board.name,
           organizationId: board.organizationId,
-          isGeneral: board.isGeneral,
         },
         members: boardMembers.map((bm) => ({
           id: bm.user.id,
@@ -415,12 +421,19 @@ export async function getBoardDetailsAction(boardId: string): Promise<
           lastName: bm.user.lastName,
           phoneNumber: bm.user.phoneNumber,
         })),
-        organizationMembers: orgMembers.map((om) => ({
-          id: om.user.id,
-          firstName: om.user.firstName,
-          lastName: om.user.lastName,
-          phoneNumber: om.user.phoneNumber,
-        })),
+        organizationMembers: [
+          ...new Map(
+            orgMembers.map((om) => [
+              om.user.id,
+              {
+                id: om.user.id,
+                firstName: om.user.firstName,
+                lastName: om.user.lastName,
+                phoneNumber: om.user.phoneNumber,
+              },
+            ])
+          ).values(),
+        ],
       },
     };
   } catch (error) {
@@ -440,7 +453,6 @@ export async function getUserBoardsAction(): Promise<
       name: string;
       organizationId: string;
       organizationName: string;
-      isGeneral: boolean;
     }>
   >
 > {
@@ -484,7 +496,6 @@ export async function getUserBoardsAction(): Promise<
       name: bu.board.name,
       organizationId: bu.board.organizationId,
       organizationName: bu.board.organization.name,
-      isGeneral: bu.board.isGeneral,
     }));
 
     return {
@@ -542,7 +553,6 @@ export async function searchUsersForBoardAction(
       select: {
         id: true,
         organizationId: true,
-        isGeneral: true,
       },
     });
 
@@ -584,10 +594,15 @@ export async function searchUsersForBoardAction(
       boardMemberIds.map((bm: { userId: string }) => bm.userId)
     );
 
-    // Get organization member IDs
+    // Get organization member IDs (including descendants)
+    const searchDescendantIds = await organizationRepository.getDescendantIds(
+      board.organizationId
+    );
+    const searchAllOrgIds = [board.organizationId, ...searchDescendantIds];
+
     const orgMemberIds = await prisma.organizationUser.findMany({
       where: {
-        organizationId: board.organizationId,
+        organizationId: { in: searchAllOrgIds },
         status: 'accepted',
       },
       select: {

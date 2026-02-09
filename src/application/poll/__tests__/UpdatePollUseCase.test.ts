@@ -19,6 +19,7 @@ describe('UpdatePollUseCase', () => {
     const pollResult = Poll.create(
       'Original Title',
       'Original Description',
+      'org-1',
       'board-1',
       'user-1',
       new Date('2026-01-15'),

@@ -8,6 +8,7 @@ export const PollErrors = {
   CANNOT_MODIFY_HAS_VOTES: 'poll.errors.cannotModifyHasVotes',
   NOT_POLL_CREATOR: 'poll.errors.notPollCreator',
   NOT_BOARD_MEMBER: 'poll.errors.notBoardMember',
+  NOT_ORG_MEMBER: 'poll.errors.notOrgMember',
   BOARD_NOT_FOUND: 'poll.errors.boardNotFound',
   NOT_AUTHORIZED: 'poll.errors.notAuthorized',
 

@@ -11,6 +11,7 @@ export const OrganizationErrors = {
   PENDING_REQUEST: 'organization.errors.pendingRequest',
   REJECTED_REQUEST: 'organization.errors.rejectedRequest',
   HIERARCHY_CONFLICT: 'organization.errors.hierarchyConflict',
+  PENDING_HIERARCHY_REQUEST: 'organization.errors.pendingHierarchyRequest',
 
   // Create
   PARENT_NOT_FOUND: 'organization.errors.parentNotFound',

@@ -8,7 +8,8 @@ export interface PollProps {
   id: string;
   title: string;
   description: string;
-  boardId: string;
+  organizationId: string;
+  boardId: string | null;
   startDate: Date;
   endDate: Date;
   state: PollState;
@@ -25,7 +26,8 @@ export class Poll {
   public static create(
     title: string,
     description: string,
-    boardId: string,
+    organizationId: string,
+    boardId: string | null,
     createdBy: string,
     startDate: Date,
     endDate: Date
@@ -57,6 +59,7 @@ export class Poll {
       id: '',
       title: title.trim(),
       description: description.trim(),
+      organizationId,
       boardId,
       startDate,
       endDate,
@@ -88,7 +91,11 @@ export class Poll {
     return this.props.description;
   }
 
-  public get boardId(): string {
+  public get organizationId(): string {
+    return this.props.organizationId;
+  }
+
+  public get boardId(): string | null {
     return this.props.boardId;
   }
 

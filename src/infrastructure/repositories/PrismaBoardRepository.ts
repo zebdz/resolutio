@@ -12,7 +12,6 @@ export class PrismaBoardRepository implements BoardRepository {
       data: {
         name: data.name,
         organizationId: data.organizationId,
-        isGeneral: data.isGeneral,
         createdAt: data.createdAt,
         archivedAt: data.archivedAt,
       },
@@ -22,7 +21,6 @@ export class PrismaBoardRepository implements BoardRepository {
       id: created.id,
       name: created.name,
       organizationId: created.organizationId,
-      isGeneral: created.isGeneral,
       createdAt: created.createdAt,
       archivedAt: created.archivedAt,
     });
@@ -41,7 +39,6 @@ export class PrismaBoardRepository implements BoardRepository {
       id: board.id,
       name: board.name,
       organizationId: board.organizationId,
-      isGeneral: board.isGeneral,
       createdAt: board.createdAt,
       archivedAt: board.archivedAt,
     });
@@ -57,35 +54,10 @@ export class PrismaBoardRepository implements BoardRepository {
         id: board.id,
         name: board.name,
         organizationId: board.organizationId,
-        isGeneral: board.isGeneral,
         createdAt: board.createdAt,
         archivedAt: board.archivedAt,
       })
     );
-  }
-
-  async findGeneralBoardByOrganizationId(
-    organizationId: string
-  ): Promise<Board | null> {
-    const board = await this.prisma.board.findFirst({
-      where: {
-        organizationId,
-        isGeneral: true,
-      },
-    });
-
-    if (!board) {
-      return null;
-    }
-
-    return Board.reconstitute({
-      id: board.id,
-      name: board.name,
-      organizationId: board.organizationId,
-      isGeneral: board.isGeneral,
-      createdAt: board.createdAt,
-      archivedAt: board.archivedAt,
-    });
   }
 
   async findBoardMembers(boardId: string): Promise<{ userId: string }[]> {
@@ -198,7 +170,6 @@ export class PrismaBoardRepository implements BoardRepository {
       id: updated.id,
       name: updated.name,
       organizationId: updated.organizationId,
-      isGeneral: updated.isGeneral,
       createdAt: updated.createdAt,
       archivedAt: updated.archivedAt,
     });

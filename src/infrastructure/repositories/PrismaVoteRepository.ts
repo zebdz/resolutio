@@ -19,7 +19,9 @@ export class PrismaVoteRepository implements VoteRepository {
 
       return success(this.toDomainVote(created));
     } catch (error) {
-      return failure(`Failed to create vote: ${error}`);
+      console.error('Failed to create vote:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -36,7 +38,9 @@ export class PrismaVoteRepository implements VoteRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to create votes: ${error}`);
+      console.error('Failed to create votes:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -57,7 +61,9 @@ export class PrismaVoteRepository implements VoteRepository {
 
       return success(votes.map((v) => this.toDomainVote(v)));
     } catch (error) {
-      return failure(`Failed to get user votes: ${error}`);
+      console.error('Failed to get user votes:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -92,7 +98,9 @@ export class PrismaVoteRepository implements VoteRepository {
 
       return success(votedQuestions.length === totalQuestions);
     } catch (error) {
-      return failure(`Failed to check if user finished voting: ${error}`);
+      console.error('Failed to check if user finished voting:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -109,7 +117,9 @@ export class PrismaVoteRepository implements VoteRepository {
 
       return success(votes.map((v) => this.toDomainVote(v)));
     } catch (error) {
-      return failure(`Failed to get votes by poll: ${error}`);
+      console.error('Failed to get votes by poll:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -125,7 +135,9 @@ export class PrismaVoteRepository implements VoteRepository {
 
       return success(voteCount > 0);
     } catch (error) {
-      return failure(`Failed to check poll votes: ${error}`);
+      console.error('Failed to check poll votes:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 

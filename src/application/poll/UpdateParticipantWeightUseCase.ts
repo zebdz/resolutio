@@ -3,7 +3,6 @@ import { ParticipantWeightHistory } from '../../domain/poll/ParticipantWeightHis
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
-import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { PollErrors } from './PollErrors';
 import { OrganizationErrors } from '../organization/OrganizationErrors';
@@ -21,7 +20,6 @@ export class UpdateParticipantWeightUseCase {
     private pollRepository: PollRepository,
     private participantRepository: ParticipantRepository,
     private voteRepository: VoteRepository,
-    private boardRepository: BoardRepository,
     private organizationRepository: OrganizationRepository
   ) {}
 
@@ -59,16 +57,10 @@ export class UpdateParticipantWeightUseCase {
       return failure(PollErrors.NOT_FOUND);
     }
 
-    // 3. Get board and check admin permissions
-    const board = await this.boardRepository.findById(poll.boardId);
-
-    if (!board) {
-      return failure(PollErrors.BOARD_NOT_FOUND);
-    }
-
+    // 3. Check admin permissions
     const isAdmin = await this.organizationRepository.isUserAdmin(
       adminUserId,
-      board.organizationId
+      poll.organizationId
     );
 
     if (!isAdmin) {

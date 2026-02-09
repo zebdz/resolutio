@@ -2,8 +2,8 @@ import { PrismaClient } from '@/generated/prisma/client';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { HandleJoinRequestUseCase } from '../HandleJoinRequestUseCase';
 import { OrganizationErrors } from '../OrganizationErrors';
-import { BoardRepository } from '../../../domain/board/BoardRepository';
-import { Board } from '../../../domain/board/Board';
+import { Organization } from '../../../domain/organization/Organization';
+import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 
 // Mock PrismaClient
 class MockPrismaClient {
@@ -17,86 +17,142 @@ class MockPrismaClient {
   };
 }
 
-// Mock BoardRepository
-class MockBoardRepository implements BoardRepository {
-  private boards: Map<string, any> = new Map();
-  private boardMembers: Map<string, Set<string>> = new Map();
+// Mock OrganizationRepository
+class MockOrganizationRepository implements OrganizationRepository {
+  private organizations: Map<string, Organization> = new Map();
+  private memberships: Map<string, Set<string>> = new Map(); // userId -> Set<orgId>
+  private removedMemberships: Array<{ userId: string; orgId: string }> = [];
 
-  async save(board: Board): Promise<Board> {
-    return board;
+  async save(org: Organization): Promise<Organization> {
+    return org;
   }
-
-  async findById(id: string): Promise<Board | null> {
-    return this.boards.get(id) || null;
+  async findById(id: string): Promise<Organization | null> {
+    return this.organizations.get(id) || null;
   }
+  async findByName(_name: string): Promise<Organization | null> {
+    return null;
+  }
+  async findByCreatorId(_creatorId: string): Promise<Organization[]> {
+    return [];
+  }
+  async findByParentId(parentId: string): Promise<Organization[]> {
+    return Array.from(this.organizations.values()).filter(
+      (org) => org.parentId === parentId
+    );
+  }
+  async getAncestorIds(organizationId: string): Promise<string[]> {
+    const org = await this.findById(organizationId);
 
-  async findByOrganizationId(organizationId: string): Promise<Board[]> {
+    if (!org || !org.parentId) {
+      return [];
+    }
+
+    const ancestors: string[] = [org.parentId];
+    const parentAncestors = await this.getAncestorIds(org.parentId);
+
+    return [...ancestors, ...parentAncestors];
+  }
+  async getDescendantIds(organizationId: string): Promise<string[]> {
+    const children = await this.findByParentId(organizationId);
+    const descendants: string[] = children.map((c) => c.id);
+
+    for (const child of children) {
+      const childDescendants = await this.getDescendantIds(child.id);
+      descendants.push(...childDescendants);
+    }
+
+    return descendants;
+  }
+  async isUserMember(userId: string, organizationId: string): Promise<boolean> {
+    const userOrgs = this.memberships.get(userId);
+
+    return userOrgs ? userOrgs.has(organizationId) : false;
+  }
+  async isUserAdmin(
+    _userId: string,
+    _organizationId: string
+  ): Promise<boolean> {
+    return false;
+  }
+  async findMembershipsByUserId(userId: string): Promise<Organization[]> {
+    const userOrgIds = this.memberships.get(userId) || new Set();
+    const orgs: Organization[] = [];
+
+    for (const orgId of userOrgIds) {
+      const org = await this.findById(orgId);
+
+      if (org) {
+        orgs.push(org);
+      }
+    }
+
+    return orgs;
+  }
+  async findAdminOrganizationsByUserId(
+    _userId: string
+  ): Promise<Organization[]> {
+    return [];
+  }
+  async findAllWithStats(): Promise<
+    Array<{
+      organization: Organization;
+      memberCount: number;
+      firstAdmin: { id: string; firstName: string; lastName: string } | null;
+    }>
+  > {
+    return [];
+  }
+  async update(org: Organization): Promise<Organization> {
+    return org;
+  }
+  async findAcceptedMemberUserIdsIncludingDescendants(
+    _orgId: string
+  ): Promise<string[]> {
+    return [];
+  }
+  async removeUserFromOrganization(
+    userId: string,
+    organizationId: string
+  ): Promise<void> {
+    this.removedMemberships.push({ userId, orgId: organizationId });
+    const userOrgs = this.memberships.get(userId);
+
+    if (userOrgs) {
+      userOrgs.delete(organizationId);
+    }
+  }
+  async findPendingRequestsByUserId(_userId: string): Promise<Organization[]> {
     return [];
   }
 
-  async findGeneralBoardByOrganizationId(
-    organizationId: string
-  ): Promise<Board | null> {
-    const board = Array.from(this.boards.values()).find(
-      (b) => b.organizationId === organizationId && b.isGeneral
-    );
-
-    return board || null;
+  // Test helpers
+  addOrganization(org: Organization) {
+    this.organizations.set(org.id, org);
   }
 
-  async isUserMember(userId: string, boardId: string): Promise<boolean> {
-    const members = this.boardMembers.get(boardId);
-
-    return members ? members.has(userId) : false;
-  }
-
-  async addUserToBoard(userId: string, boardId: string): Promise<void> {
-    if (!this.boardMembers.has(boardId)) {
-      this.boardMembers.set(boardId, new Set());
+  addMembership(userId: string, organizationId: string) {
+    if (!this.memberships.has(userId)) {
+      this.memberships.set(userId, new Set());
     }
 
-    this.boardMembers.get(boardId)!.add(userId);
+    this.memberships.get(userId)!.add(organizationId);
   }
 
-  async removeUserFromBoard(userId: string, boardId: string): Promise<void> {
-    const members = this.boardMembers.get(boardId);
-
-    if (members) {
-      members.delete(userId);
-    }
-  }
-
-  async update(board: Board): Promise<Board> {
-    return board;
-  }
-
-  // Helper methods for testing
-  setGeneralBoard(organizationId: string, boardId: string): void {
-    this.boards.set(boardId, {
-      id: boardId,
-      name: 'General Board',
-      organizationId,
-      isGeneral: true,
-    });
-  }
-
-  getBoardMembers(boardId: string): string[] {
-    const members = this.boardMembers.get(boardId);
-
-    return members ? Array.from(members) : [];
+  getRemovedMemberships() {
+    return this.removedMemberships;
   }
 }
 
 describe('HandleJoinRequestUseCase', () => {
   let useCase: HandleJoinRequestUseCase;
   let prisma: MockPrismaClient;
-  let boardRepository: MockBoardRepository;
+  let organizationRepository: MockOrganizationRepository;
   let requests: Map<string, any>;
   let adminRoles: Map<string, Set<string>>;
 
   beforeEach(() => {
     prisma = new MockPrismaClient();
-    boardRepository = new MockBoardRepository();
+    organizationRepository = new MockOrganizationRepository();
     requests = new Map();
     adminRoles = new Map();
 
@@ -136,7 +192,7 @@ describe('HandleJoinRequestUseCase', () => {
 
     useCase = new HandleJoinRequestUseCase({
       prisma: prisma as unknown as PrismaClient,
-      boardRepository,
+      organizationRepository,
     });
   });
 
@@ -381,27 +437,51 @@ describe('HandleJoinRequestUseCase', () => {
     }
   });
 
-  it('should automatically add accepted user to general board', async () => {
-    const organizationId = 'org-123';
+  it('should remove user from parent org membership when accepting into child org', async () => {
+    const parentOrgId = 'org-parent';
+    const childOrgId = 'org-child';
     const requesterId = 'user-456';
     const adminId = 'admin-789';
-    const generalBoardId = 'board-general';
 
-    // Set up: admin role
-    if (!adminRoles.has(organizationId)) {
-      adminRoles.set(organizationId, new Set());
-    }
+    // Set up organizations in hierarchy
+    const parentResult = Organization.create(
+      'Parent Org',
+      'Parent desc',
+      'creator-1'
+    );
+    expect(parentResult.success).toBe(true);
 
-    adminRoles.get(organizationId)!.add(adminId);
+    if (!parentResult.success) {return;}
 
-    // Set up: general board exists
-    boardRepository.setGeneralBoard(organizationId, generalBoardId);
+    const parentOrg = parentResult.value;
+    (parentOrg as any).props.id = parentOrgId;
+    organizationRepository.addOrganization(parentOrg);
 
-    // Set up: pending request
-    const key = `${organizationId}-${requesterId}`;
+    const childResult = Organization.create(
+      'Child Org',
+      'Child desc',
+      'creator-1',
+      parentOrgId
+    );
+    expect(childResult.success).toBe(true);
+
+    if (!childResult.success) {return;}
+
+    const childOrg = childResult.value;
+    (childOrg as any).props.id = childOrgId;
+    organizationRepository.addOrganization(childOrg);
+
+    // User is accepted member of parent org
+    organizationRepository.addMembership(requesterId, parentOrgId);
+
+    // Set up: admin role for child org
+    adminRoles.set(childOrgId, new Set([adminId]));
+
+    // Set up: pending request to join child org
+    const key = `${childOrgId}-${requesterId}`;
     requests.set(key, {
       id: 'request-1',
-      organizationId,
+      organizationId: childOrgId,
       userId: requesterId,
       status: 'pending',
       createdAt: new Date(),
@@ -413,7 +493,7 @@ describe('HandleJoinRequestUseCase', () => {
     });
 
     const result = await useCase.execute({
-      organizationId,
+      organizationId: childOrgId,
       requesterId,
       adminId,
       action: 'accept',
@@ -421,10 +501,77 @@ describe('HandleJoinRequestUseCase', () => {
 
     expect(result.success).toBe(true);
 
-    if (result.success) {
-      // Verify user was added to general board
-      const members = boardRepository.getBoardMembers(generalBoardId);
-      expect(members).toContain(requesterId);
-    }
+    // Verify user was removed from parent org
+    const removed = organizationRepository.getRemovedMemberships();
+    expect(removed).toContainEqual({ userId: requesterId, orgId: parentOrgId });
+  });
+
+  it('should remove user from child org membership when accepting into parent org', async () => {
+    const parentOrgId = 'org-parent';
+    const childOrgId = 'org-child';
+    const requesterId = 'user-456';
+    const adminId = 'admin-789';
+
+    // Set up organizations in hierarchy
+    const parentResult = Organization.create(
+      'Parent Org',
+      'Parent desc',
+      'creator-1'
+    );
+    expect(parentResult.success).toBe(true);
+
+    if (!parentResult.success) {return;}
+
+    const parentOrg = parentResult.value;
+    (parentOrg as any).props.id = parentOrgId;
+    organizationRepository.addOrganization(parentOrg);
+
+    const childResult = Organization.create(
+      'Child Org',
+      'Child desc',
+      'creator-1',
+      parentOrgId
+    );
+    expect(childResult.success).toBe(true);
+
+    if (!childResult.success) {return;}
+
+    const childOrg = childResult.value;
+    (childOrg as any).props.id = childOrgId;
+    organizationRepository.addOrganization(childOrg);
+
+    // User is accepted member of child org
+    organizationRepository.addMembership(requesterId, childOrgId);
+
+    // Set up: admin role for parent org
+    adminRoles.set(parentOrgId, new Set([adminId]));
+
+    // Set up: pending request to join parent org
+    const key = `${parentOrgId}-${requesterId}`;
+    requests.set(key, {
+      id: 'request-1',
+      organizationId: parentOrgId,
+      userId: requesterId,
+      status: 'pending',
+      createdAt: new Date(),
+      acceptedAt: null,
+      rejectedAt: null,
+      rejectionReason: null,
+      acceptedByUserId: null,
+      rejectedByUserId: null,
+    });
+
+    const result = await useCase.execute({
+      organizationId: parentOrgId,
+      requesterId,
+      adminId,
+      action: 'accept',
+    });
+
+    expect(result.success).toBe(true);
+
+    // Verify user was removed from child org
+    const removed = organizationRepository.getRemovedMemberships();
+    expect(removed).toContainEqual({ userId: requesterId, orgId: childOrgId });
   });
 });

@@ -31,14 +31,8 @@ class MockBoardRepository implements BoardRepository {
     );
   }
 
-  async findGeneralBoardByOrganizationId(
-    organizationId: string
-  ): Promise<Board | null> {
-    return (
-      Array.from(this.boards.values()).find(
-        (b) => b.organizationId === organizationId && b.isGeneral
-      ) || null
-    );
+  async findBoardMembers(boardId: string): Promise<{ userId: string }[]> {
+    return [];
   }
 
   async isUserMember(userId: string, boardId: string): Promise<boolean> {
@@ -299,23 +293,7 @@ describe('CreateBoardUseCase', () => {
       if (result.success) {
         expect(result.value.board.name).toBe('Test Board');
         expect(result.value.board.organizationId).toBe('org-1');
-        expect(result.value.board.isGeneral).toBe(false);
         expect(result.value.board.id).toBeTruthy();
-      }
-    });
-
-    it('should create a general board when isGeneral is true', async () => {
-      const result = await useCase.execute({
-        name: 'General Board',
-        organizationId: 'org-1',
-        adminUserId: 'admin-1',
-        isGeneral: true,
-      });
-
-      expect(result.success).toBe(true);
-
-      if (result.success) {
-        expect(result.value.board.isGeneral).toBe(true);
       }
     });
 

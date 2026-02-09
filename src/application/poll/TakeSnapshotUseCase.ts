@@ -15,7 +15,8 @@ interface TakeSnapshotCommand {
 
 /**
  * Takes a participant snapshot for a poll (DRAFT → READY).
- * Creates participant records from current board members.
+ * For board-specific polls: creates participants from board members.
+ * For org-wide polls (boardId=null): creates participants from org members + descendants.
  */
 export class TakeSnapshotUseCase {
   constructor(
@@ -43,15 +44,9 @@ export class TakeSnapshotUseCase {
     const isSuperAdmin = await this.userRepository.isSuperAdmin(command.userId);
 
     if (!isSuperAdmin) {
-      const board = await this.boardRepository.findById(poll.boardId);
-
-      if (!board) {
-        return failure(PollErrors.BOARD_NOT_FOUND);
-      }
-
       const isAdmin = await this.organizationRepository.isUserAdmin(
         command.userId,
-        board.organizationId
+        poll.organizationId
       );
 
       if (!isAdmin) {
@@ -66,26 +61,29 @@ export class TakeSnapshotUseCase {
       return failure(snapshotResult.error);
     }
 
-    // Get the board
-    const board = await this.boardRepository.findById(poll.boardId);
+    // Get member user IDs based on poll type
+    let memberUserIds: string[];
 
-    if (!board) {
-      return failure(PollErrors.BOARD_NOT_FOUND);
+    if (poll.boardId) {
+      // Board-specific poll: use board members
+      const boardUsers = await this.boardRepository.findBoardMembers(
+        poll.boardId
+      );
+      memberUserIds = boardUsers.map((bu) => bu.userId);
+    } else {
+      // Org-wide poll: use org members + descendants (deduplicated)
+      memberUserIds =
+        await this.organizationRepository.findAcceptedMemberUserIdsIncludingDescendants(
+          poll.organizationId
+        );
     }
-
-    // Get all board members
-    const boardUsers = await this.boardRepository.findBoardMembers(board.id);
 
     // Create participants with initial weight of 1.0
     const participants: PollParticipant[] = [];
     const historyRecords: ParticipantWeightHistory[] = [];
 
-    for (const boardUser of boardUsers) {
-      const participantResult = PollParticipant.create(
-        poll.id,
-        boardUser.userId,
-        1.0
-      );
+    for (const userId of memberUserIds) {
+      const participantResult = PollParticipant.create(poll.id, userId, 1.0);
 
       if (!participantResult.success) {
         return failure(participantResult.error);
@@ -97,7 +95,7 @@ export class TakeSnapshotUseCase {
       const historyResult = ParticipantWeightHistory.create(
         '', // participantId assigned in transaction
         poll.id,
-        boardUser.userId,
+        userId,
         0, // oldWeight (initial)
         1.0, // newWeight
         command.userId, // changedBy (admin)

@@ -29,14 +29,10 @@ class MockBoardRepository implements BoardRepository {
     );
   }
 
-  async findGeneralBoardByOrganizationId(
-    organizationId: string
-  ): Promise<Board | null> {
-    return (
-      Array.from(this.boards.values()).find(
-        (b) => b.organizationId === organizationId && b.isGeneral
-      ) || null
-    );
+  async findBoardMembers(boardId: string): Promise<{ userId: string }[]> {
+    const members = this.members.get(boardId);
+
+    return members ? Array.from(members).map((userId) => ({ userId })) : [];
   }
 
   async isUserMember(userId: string, boardId: string): Promise<boolean> {
@@ -321,17 +317,9 @@ describe('AddBoardMemberUseCase', () => {
         (board as any).props.id = 'board-1';
         boardRepository.addBoard(board);
       }
-
-      const generalBoardResult = Board.create('Test Board', 'org-1', true);
-
-      if (generalBoardResult.success) {
-        const generalBoard = generalBoardResult.value;
-        (generalBoard as any).props.id = 'general-board';
-        boardRepository.addBoard(generalBoard);
-      }
     });
 
-    it('should succeed when user is not a member of the organization if the board is not general', async () => {
+    it('should succeed when adding any user to a board', async () => {
       const result = await useCase.execute({
         boardId: 'board-1',
         userId: 'non-member-user',
@@ -339,20 +327,6 @@ describe('AddBoardMemberUseCase', () => {
       });
 
       expect(result.success).toBe(true);
-    });
-
-    it('should fail when user is not a member of the organization if the board is general', async () => {
-      const result = await useCase.execute({
-        boardId: 'general-board',
-        userId: 'non-member-user',
-        adminUserId: 'admin-1',
-      });
-
-      expect(result.success).toBe(false);
-
-      if (!result.success) {
-        expect(result.error).toBe('board.errors.userNotOrgMember');
-      }
     });
 
     it('should fail when user is already a member of the board', async () => {

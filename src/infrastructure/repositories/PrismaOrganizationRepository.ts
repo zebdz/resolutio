@@ -158,12 +158,14 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }
 
   async isUserMember(userId: string, organizationId: string): Promise<boolean> {
-    const membership = await this.prisma.organizationUser.findUnique({
+    // Check membership in this org or any descendant
+    const descendantIds = await this.getDescendantIds(organizationId);
+    const allOrgIds = [organizationId, ...descendantIds];
+
+    const membership = await this.prisma.organizationUser.findFirst({
       where: {
-        organizationId_userId: {
-          organizationId,
-          userId,
-        },
+        userId,
+        organizationId: { in: allOrgIds },
         status: 'accepted',
       },
     });
@@ -254,6 +256,64 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       createdAt: updated.createdAt,
       archivedAt: updated.archivedAt,
     });
+  }
+
+  async findAcceptedMemberUserIdsIncludingDescendants(
+    organizationId: string
+  ): Promise<string[]> {
+    // Get all descendant org IDs
+    const descendantIds = await this.getDescendantIds(organizationId);
+    const allOrgIds = [organizationId, ...descendantIds];
+
+    // Get all accepted members across all these orgs
+    const members = await this.prisma.organizationUser.findMany({
+      where: {
+        organizationId: { in: allOrgIds },
+        status: 'accepted',
+      },
+      select: { userId: true },
+    });
+
+    // Deduplicate
+    return [...new Set(members.map((m: { userId: string }) => m.userId))];
+  }
+
+  async removeUserFromOrganization(
+    userId: string,
+    organizationId: string
+  ): Promise<void> {
+    await this.prisma.organizationUser.delete({
+      where: {
+        organizationId_userId: {
+          organizationId,
+          userId,
+        },
+      },
+    });
+  }
+
+  async findPendingRequestsByUserId(userId: string): Promise<Organization[]> {
+    const memberships = await this.prisma.organizationUser.findMany({
+      where: {
+        userId,
+        status: 'pending',
+      },
+      include: {
+        organization: true,
+      },
+    });
+
+    return memberships.map((m) =>
+      Organization.reconstitute({
+        id: m.organization.id,
+        name: m.organization.name,
+        description: m.organization.description,
+        parentId: m.organization.parentId,
+        createdById: m.organization.createdById,
+        createdAt: m.organization.createdAt,
+        archivedAt: m.organization.archivedAt,
+      })
+    );
   }
 
   async findAllWithStats(excludeUserMemberships?: string): Promise<

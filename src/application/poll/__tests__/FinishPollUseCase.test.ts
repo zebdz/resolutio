@@ -3,11 +3,9 @@ import { FinishPollUseCase } from '../FinishPollUseCase';
 import { Poll } from '../../../domain/poll/Poll';
 import { Question } from '../../../domain/poll/Question';
 import { Answer } from '../../../domain/poll/Answer';
-import { Board } from '../../../domain/board/Board';
 import { Organization } from '../../../domain/organization/Organization';
 import { PollRepository } from '../../../domain/poll/PollRepository';
 import { DraftRepository } from '../../../domain/poll/DraftRepository';
-import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../../domain/user/UserRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
@@ -17,28 +15,17 @@ import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
 describe('FinishPollUseCase', () => {
   let pollRepository: Partial<PollRepository>;
   let draftRepository: Partial<DraftRepository>;
-  let boardRepository: Partial<BoardRepository>;
   let organizationRepository: Partial<OrganizationRepository>;
   let userRepository: Partial<UserRepository>;
   let useCase: FinishPollUseCase;
   let poll: Poll;
-  let board: Board;
 
   beforeEach(() => {
-    // Create a test board
-    board = Board.reconstitute({
-      id: 'board-1',
-      name: 'Test Board',
-      organizationId: 'org-1',
-      isGeneral: false,
-      createdAt: new Date(),
-      archivedAt: null,
-    });
-
     // Create a test poll
     const pollResult = Poll.create(
       'Test Poll',
       'Test Description',
+      'org-1',
       'board-1',
       'user-1',
       new Date('2024-01-01'),
@@ -81,10 +68,6 @@ describe('FinishPollUseCase', () => {
       deleteAllPollDrafts: vi.fn().mockResolvedValue(success(undefined)),
     };
 
-    boardRepository = {
-      findById: vi.fn().mockResolvedValue(board),
-    };
-
     organizationRepository = {
       isUserAdmin: vi.fn().mockResolvedValue(true),
     };
@@ -96,7 +79,6 @@ describe('FinishPollUseCase', () => {
     useCase = new FinishPollUseCase(
       pollRepository as PollRepository,
       draftRepository as DraftRepository,
-      boardRepository as BoardRepository,
       organizationRepository as OrganizationRepository,
       userRepository as UserRepository
     );

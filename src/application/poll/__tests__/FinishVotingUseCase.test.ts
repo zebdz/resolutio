@@ -245,6 +245,7 @@ describe('FinishVotingUseCase', () => {
     const pollResult = Poll.create(
       'Test Poll',
       'Test Description',
+      'org-1',
       'board-1',
       'user-admin',
       new Date('2026-01-15'),
@@ -419,6 +420,7 @@ describe('FinishVotingUseCase', () => {
     const inactivePollResult = Poll.create(
       'Inactive Poll',
       'Test Description',
+      'org-1',
       'board-1',
       'user-admin',
       new Date('2026-01-15'),

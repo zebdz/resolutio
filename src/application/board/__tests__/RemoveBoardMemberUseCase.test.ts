@@ -29,14 +29,10 @@ class MockBoardRepository implements BoardRepository {
     );
   }
 
-  async findGeneralBoardByOrganizationId(
-    organizationId: string
-  ): Promise<Board | null> {
-    return (
-      Array.from(this.boards.values()).find(
-        (b) => b.organizationId === organizationId && b.isGeneral
-      ) || null
-    );
+  async findBoardMembers(boardId: string): Promise<{ userId: string }[]> {
+    const members = this.members.get(boardId);
+
+    return members ? Array.from(members).map((userId) => ({ userId })) : [];
   }
 
   async isUserMember(userId: string, boardId: string): Promise<boolean> {

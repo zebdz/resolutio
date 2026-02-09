@@ -32,6 +32,7 @@ describe('GetUserVotingProgressUseCase', () => {
     const pollResult = Poll.create(
       'Test Poll',
       'Test Description',
+      'org-1',
       'board-1',
       'user-admin',
       new Date('2026-01-15'),

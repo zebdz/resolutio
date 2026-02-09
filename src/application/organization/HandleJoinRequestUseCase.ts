@@ -1,12 +1,12 @@
 import { PrismaClient } from '@/generated/prisma/client';
+import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { HandleJoinRequestInput } from './HandleJoinRequestSchema';
 import { OrganizationErrors } from './OrganizationErrors';
-import { BoardRepository } from '../../domain/board/BoardRepository';
 
 export interface HandleJoinRequestDependencies {
   prisma: PrismaClient;
-  boardRepository: BoardRepository;
+  organizationRepository: OrganizationRepository;
 }
 
 export class HandleJoinRequestUseCase {
@@ -67,17 +67,25 @@ export class HandleJoinRequestUseCase {
         },
       });
 
-      // Add user to the general board
-      const generalBoard =
-        await this.deps.boardRepository.findGeneralBoardByOrganizationId(
-          organizationId
+      // Remove user from existing memberships in hierarchy orgs
+      const ancestorIds =
+        await this.deps.organizationRepository.getAncestorIds(organizationId);
+      const descendantIds =
+        await this.deps.organizationRepository.getDescendantIds(organizationId);
+      const hierarchyOrgIds = [...ancestorIds, ...descendantIds];
+
+      const userMemberships =
+        await this.deps.organizationRepository.findMembershipsByUserId(
+          requesterId
         );
 
-      if (generalBoard) {
-        await this.deps.boardRepository.addUserToBoard(
-          requesterId,
-          generalBoard.id
-        );
+      for (const membership of userMemberships) {
+        if (hierarchyOrgIds.includes(membership.id)) {
+          await this.deps.organizationRepository.removeUserFromOrganization(
+            requesterId,
+            membership.id
+          );
+        }
       }
     } else {
       await this.deps.prisma.organizationUser.update({

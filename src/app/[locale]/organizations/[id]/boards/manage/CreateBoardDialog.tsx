@@ -41,7 +41,6 @@ export default function CreateBoardDialog({
     const formData = new FormData();
     formData.append('name', boardName);
     formData.append('organizationId', organizationId);
-    formData.append('isGeneral', 'false');
 
     const result = await createBoardAction(formData);
 

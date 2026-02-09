@@ -2,12 +2,14 @@ import { Result, success, failure } from '../../domain/shared/Result';
 import { Poll } from '../../domain/poll/Poll';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
+import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { PollErrors } from './PollErrors';
 
 export interface CreatePollInput {
   title: string;
   description: string;
-  boardId: string;
+  organizationId: string;
+  boardId: string | null;
   createdBy: string;
   startDate: Date;
   endDate: Date;
@@ -16,31 +18,44 @@ export interface CreatePollInput {
 export class CreatePollUseCase {
   constructor(
     private pollRepository: PollRepository,
-    private boardRepository: BoardRepository
+    private boardRepository: BoardRepository,
+    private organizationRepository: OrganizationRepository
   ) {}
 
   async execute(input: CreatePollInput): Promise<Result<Poll, string>> {
-    // 1. Check if board exists
-    const board = await this.boardRepository.findById(input.boardId);
+    // 1. If boardId provided, validate board exists and check board membership
+    if (input.boardId) {
+      const board = await this.boardRepository.findById(input.boardId);
 
-    if (!board) {
-      return failure(PollErrors.BOARD_NOT_FOUND);
+      if (!board) {
+        return failure(PollErrors.BOARD_NOT_FOUND);
+      }
+
+      const isMember = await this.boardRepository.isUserMember(
+        input.createdBy,
+        input.boardId
+      );
+
+      if (!isMember) {
+        return failure(PollErrors.NOT_BOARD_MEMBER);
+      }
+    } else {
+      // Org-wide poll: check org membership
+      const isMember = await this.organizationRepository.isUserMember(
+        input.createdBy,
+        input.organizationId
+      );
+
+      if (!isMember) {
+        return failure(PollErrors.NOT_ORG_MEMBER);
+      }
     }
 
-    // 2. Check if user is a board member
-    const isMember = await this.boardRepository.isUserMember(
-      input.createdBy,
-      input.boardId
-    );
-
-    if (!isMember) {
-      return failure(PollErrors.NOT_BOARD_MEMBER);
-    }
-
-    // 3. Create poll domain object with validation
+    // 2. Create poll domain object with validation
     const pollResult = Poll.create(
       input.title,
       input.description,
+      input.organizationId,
       input.boardId,
       input.createdBy,
       input.startDate,
@@ -51,7 +66,7 @@ export class CreatePollUseCase {
       return failure(pollResult.error);
     }
 
-    // 4. Persist the validated domain object
+    // 3. Persist the validated domain object
     const result = await this.pollRepository.createPoll(pollResult.value);
 
     return result;

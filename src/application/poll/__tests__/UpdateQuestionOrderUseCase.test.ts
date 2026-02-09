@@ -19,6 +19,7 @@ describe('UpdateQuestionOrderUseCase', () => {
     const pollResult = Poll.create(
       'Test Poll',
       'Description',
+      'org-1',
       'board-1',
       'user-1',
       new Date('2025-01-01'),

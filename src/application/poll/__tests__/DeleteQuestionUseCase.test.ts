@@ -22,6 +22,7 @@ describe('DeleteQuestionUseCase', () => {
     const pollResult = Poll.create(
       'Test Poll',
       'Test Description',
+      'org-1',
       'board-1',
       'user-1',
       new Date('2026-01-15'),

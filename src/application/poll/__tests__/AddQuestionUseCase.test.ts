@@ -35,6 +35,12 @@ class MockPollRepository implements PollRepository {
     );
   }
 
+  async getPollsByOrganizationId(
+    orgId: string
+  ): Promise<Result<Poll[], string>> {
+    return success([]);
+  }
+
   async getPollsByUserId(userId: string): Promise<Result<Poll[], string>> {
     return success(Array.from(this.polls.values()));
   }
@@ -241,6 +247,7 @@ describe('AddQuestionUseCase', () => {
     const pollResult = Poll.create(
       'Test Poll',
       'Description',
+      'org-1',
       'board-1',
       'user-1',
       new Date('2025-01-01'),
@@ -280,6 +287,7 @@ describe('AddQuestionUseCase', () => {
     const pollResult = Poll.create(
       'Test Poll',
       'Description',
+      'org-1',
       'board-1',
       'user-1',
       new Date('2025-01-01'),
@@ -328,6 +336,7 @@ describe('AddQuestionUseCase', () => {
     const pollResult = Poll.create(
       'Test Poll',
       'Description',
+      'org-1',
       'board-1',
       'user-1',
       new Date('2025-01-01'),
@@ -358,6 +367,7 @@ describe('AddQuestionUseCase', () => {
     const pollResult = Poll.create(
       'Test Poll',
       'Description',
+      'org-1',
       'board-1',
       'user-1',
       new Date('2025-01-01'),
@@ -388,6 +398,7 @@ describe('AddQuestionUseCase', () => {
     const pollResult = Poll.create(
       'Test Poll',
       'Description',
+      'org-1',
       'board-1',
       'user-1',
       new Date('2025-01-01'),
@@ -437,6 +448,7 @@ describe('AddQuestionUseCase', () => {
     const pollResult = Poll.create(
       'Test Poll',
       'Description',
+      'org-1',
       'board-1',
       'user-1',
       new Date('2025-01-01'),

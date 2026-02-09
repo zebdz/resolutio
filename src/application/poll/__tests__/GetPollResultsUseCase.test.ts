@@ -9,10 +9,8 @@ import { PollParticipant } from '../../../domain/poll/PollParticipant';
 import { PollRepository } from '../../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../../domain/poll/VoteRepository';
-import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../../domain/user/UserRepository';
-import { Board } from '../../../domain/board/Board';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { Decimal } from 'decimal.js';
@@ -22,12 +20,10 @@ describe('GetPollResultsUseCase', () => {
   let pollRepository: Partial<PollRepository>;
   let participantRepository: Partial<ParticipantRepository>;
   let voteRepository: Partial<VoteRepository>;
-  let boardRepository: Partial<BoardRepository>;
   let organizationRepository: Partial<OrganizationRepository>;
   let userRepository: Partial<UserRepository>;
   let useCase: GetPollResultsUseCase;
   let poll: Poll;
-  let board: Board;
   let question: Question;
   let answer1: Answer;
   let answer2: Answer;
@@ -41,6 +37,7 @@ describe('GetPollResultsUseCase', () => {
     const pollResult = Poll.create(
       'Test Poll',
       'Test Description',
+      'org-1',
       'board-1',
       'user-1',
       new Date('2026-01-15'),
@@ -51,12 +48,6 @@ describe('GetPollResultsUseCase', () => {
     (poll as any).props.id = 'poll-1';
     // Set state directly to FINISHED (questions added to props below)
     (poll as any).props.state = PollState.FINISHED;
-
-    // Create board
-    const boardResult = Board.create('org-1', 'Test Board', 'user-admin');
-    expect(boardResult.success).toBe(true);
-    board = boardResult.value;
-    (board as any).props.id = 'board-1';
 
     // Create question
     const questionResult = Question.create(
@@ -136,10 +127,6 @@ describe('GetPollResultsUseCase', () => {
       getVotesByPoll: vi.fn().mockResolvedValue(success([vote1, vote2])),
     };
 
-    boardRepository = {
-      findById: vi.fn().mockResolvedValue(board),
-    };
-
     organizationRepository = {
       isUserAdmin: vi.fn().mockResolvedValue(true),
       isUserMember: vi.fn().mockResolvedValue(true),
@@ -161,7 +148,6 @@ describe('GetPollResultsUseCase', () => {
       pollRepository as PollRepository,
       participantRepository as ParticipantRepository,
       voteRepository as VoteRepository,
-      boardRepository as BoardRepository,
       organizationRepository as OrganizationRepository,
       userRepository as UserRepository
     );
@@ -345,21 +331,6 @@ describe('GetPollResultsUseCase', () => {
 
     if (!result.success) {
       expect(result.error).toBe(PollErrors.NOT_FOUND);
-    }
-  });
-
-  it('should reject when board not found', async () => {
-    boardRepository.findById = vi.fn().mockResolvedValue(null);
-
-    const result = await useCase.execute({
-      pollId: 'poll-1',
-      userId: 'user-admin',
-    });
-
-    expect(result.success).toBe(false);
-
-    if (!result.success) {
-      expect(result.error).toBe(PollErrors.BOARD_NOT_FOUND);
     }
   });
 

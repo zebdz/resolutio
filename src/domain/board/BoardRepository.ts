@@ -16,13 +16,6 @@ export interface BoardRepository {
    */
   findByOrganizationId(organizationId: string): Promise<Board[]>;
 
-  /**
-   * Finds the general board for an organization
-   */
-  findGeneralBoardByOrganizationId(
-    organizationId: string
-  ): Promise<Board | null>;
-
   findBoardMembers(boardId: string): Promise<{ userId: string }[]>;
 
   /**

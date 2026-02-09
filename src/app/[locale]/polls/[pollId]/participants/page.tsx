@@ -13,12 +13,10 @@ import {
   prisma,
   PrismaOrganizationRepository,
   PrismaUserRepository,
-  PrismaBoardRepository,
 } from '@/infrastructure/index';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
-const boardRepository = new PrismaBoardRepository(prisma);
 
 interface ParticipantsPageProps {
   params: Promise<{
@@ -47,16 +45,10 @@ export default async function ParticipantsPage({
 
   const poll = pollResult.data;
 
-  const board = await boardRepository.findById(poll.boardId);
-
-  if (!board) {
-    redirect('/polls');
-  }
-
   // Fetch user's admin organizations and superadmin status for authorization
   const isOrgAdmin = await organizationRepository.isUserAdmin(
     user.id,
-    board.organizationId
+    poll.organizationId
   );
   const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
   const canManage = isSuperAdmin || isOrgAdmin;

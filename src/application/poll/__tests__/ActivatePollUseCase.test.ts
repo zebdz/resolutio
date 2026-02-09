@@ -3,12 +3,10 @@ import { ActivatePollUseCase } from '../ActivatePollUseCase';
 import { Poll } from '../../../domain/poll/Poll';
 import { Question } from '../../../domain/poll/Question';
 import { Answer } from '../../../domain/poll/Answer';
-import { Board } from '../../../domain/board/Board';
 import {
   PollRepository,
   UpdateQuestionOrderData,
 } from '../../../domain/poll/PollRepository';
-import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../../domain/user/UserRepository';
 import { User } from '../../../domain/user/User';
@@ -34,6 +32,12 @@ class MockPollRepository implements PollRepository {
   }
 
   async getPollsByBoardId(boardId: string): Promise<Result<Poll[], string>> {
+    return success([]);
+  }
+
+  async getPollsByOrganizationId(
+    orgId: string
+  ): Promise<Result<Poll[], string>> {
     return success([]);
   }
 
@@ -175,57 +179,6 @@ class MockPollRepository implements PollRepository {
   }
 }
 
-class MockBoardRepository implements BoardRepository {
-  private boards: Map<string, Board> = new Map();
-
-  async save(board: Board): Promise<Board> {
-    this.boards.set(board.id, board);
-
-    return board;
-  }
-
-  async findById(id: string): Promise<Board | null> {
-    return this.boards.get(id) || null;
-  }
-
-  async findByOrganizationId(organizationId: string): Promise<Board[]> {
-    return [];
-  }
-
-  async findGeneralBoardByOrganizationId(
-    organizationId: string
-  ): Promise<Board | null> {
-    return null;
-  }
-
-  async findBoardMembers(boardId: string): Promise<{ userId: string }[]> {
-    return [];
-  }
-
-  async isUserMember(userId: string, boardId: string): Promise<boolean> {
-    return false;
-  }
-
-  async addUserToBoard(
-    userId: string,
-    boardId: string,
-    addedBy?: string
-  ): Promise<void> {}
-
-  async removeUserFromBoard(
-    userId: string,
-    boardId: string,
-    removedBy?: string,
-    removedReason?: string
-  ): Promise<void> {}
-
-  async update(board: Board): Promise<Board> {
-    this.boards.set(board.id, board);
-
-    return board;
-  }
-}
-
 class MockOrganizationRepository implements OrganizationRepository {
   private admins: Set<string> = new Set();
 
@@ -284,6 +237,12 @@ class MockOrganizationRepository implements OrganizationRepository {
   async update(organization: any): Promise<any> {
     return organization;
   }
+
+  async findAcceptedMemberUserIdsIncludingDescendants(
+    organizationId: string
+  ): Promise<string[]> {
+    return [];
+  }
 }
 
 class MockUserRepository implements UserRepository {
@@ -327,6 +286,7 @@ function createReadyPoll(id: string, boardId: string, createdBy: string): Poll {
   const pollResult = Poll.create(
     'Test Poll',
     'Test Description',
+    'org-1',
     boardId,
     createdBy,
     new Date('2024-01-01'),
@@ -357,42 +317,27 @@ function createReadyPoll(id: string, boardId: string, createdBy: string): Poll {
 
 describe('ActivatePollUseCase', () => {
   let pollRepository: MockPollRepository;
-  let boardRepository: MockBoardRepository;
   let organizationRepository: MockOrganizationRepository;
   let userRepository: MockUserRepository;
   let useCase: ActivatePollUseCase;
-  let board: Board;
 
   beforeEach(() => {
     pollRepository = new MockPollRepository();
-    boardRepository = new MockBoardRepository();
     organizationRepository = new MockOrganizationRepository();
     userRepository = new MockUserRepository();
 
     useCase = new ActivatePollUseCase(
       pollRepository,
-      boardRepository,
       organizationRepository,
       userRepository
     );
-
-    // Create a test board
-    board = Board.reconstitute({
-      id: 'board-1',
-      name: 'Test Board',
-      organizationId: 'org-1',
-      isGeneral: false,
-      createdAt: new Date(),
-      archivedAt: null,
-    });
-    boardRepository.save(board);
 
     // Set admin-1 as admin of org-1
     organizationRepository.setAdmin('admin-1', 'org-1');
   });
 
   it('should activate poll in READY state', async () => {
-    const poll = createReadyPoll('poll-1', board.id, 'admin-1');
+    const poll = createReadyPoll('poll-1', 'board-1', 'admin-1');
     await pollRepository.createPoll(poll);
 
     const result = await useCase.execute({
@@ -421,7 +366,8 @@ describe('ActivatePollUseCase', () => {
     const pollResult = Poll.create(
       'Test Poll',
       'Test Description',
-      board.id,
+      'org-1',
+      'board-1',
       'admin-1',
       new Date('2024-01-01'),
       new Date('2024-12-31')
@@ -440,7 +386,7 @@ describe('ActivatePollUseCase', () => {
   });
 
   it('should fail if poll is already ACTIVE', async () => {
-    const poll = createReadyPoll('poll-1', board.id, 'admin-1');
+    const poll = createReadyPoll('poll-1', 'board-1', 'admin-1');
     poll.activate();
     await pollRepository.createPoll(poll);
 
@@ -454,7 +400,7 @@ describe('ActivatePollUseCase', () => {
   });
 
   it('should fail if poll is FINISHED', async () => {
-    const poll = createReadyPoll('poll-1', board.id, 'admin-1');
+    const poll = createReadyPoll('poll-1', 'board-1', 'admin-1');
     poll.activate();
     poll.finish();
     await pollRepository.createPoll(poll);
@@ -470,7 +416,7 @@ describe('ActivatePollUseCase', () => {
 
   describe('authorization', () => {
     it('should reject non-admin user', async () => {
-      const poll = createReadyPoll('poll-1', board.id, 'admin-1');
+      const poll = createReadyPoll('poll-1', 'board-1', 'admin-1');
       await pollRepository.createPoll(poll);
 
       const result = await useCase.execute({
@@ -483,7 +429,7 @@ describe('ActivatePollUseCase', () => {
     });
 
     it('should allow admin user', async () => {
-      const poll = createReadyPoll('poll-1', board.id, 'admin-1');
+      const poll = createReadyPoll('poll-1', 'board-1', 'admin-1');
       await pollRepository.createPoll(poll);
 
       const result = await useCase.execute({
@@ -496,7 +442,7 @@ describe('ActivatePollUseCase', () => {
 
     it('should allow superadmin even if not org admin', async () => {
       userRepository.setSuperAdmin('super-user');
-      const poll = createReadyPoll('poll-1', board.id, 'admin-1');
+      const poll = createReadyPoll('poll-1', 'board-1', 'admin-1');
       await pollRepository.createPoll(poll);
 
       const result = await useCase.execute({

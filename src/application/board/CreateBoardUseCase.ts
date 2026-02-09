@@ -9,7 +9,6 @@ export interface CreateBoardInput {
   name: string;
   organizationId: string;
   adminUserId: string;
-  isGeneral?: boolean;
 }
 
 export interface CreateBoardDependencies {
@@ -36,7 +35,6 @@ export class CreateBoardUseCase {
           id: string;
           name: string;
           organizationId: string;
-          isGeneral: boolean;
           createdAt: Date;
         };
       },
@@ -69,11 +67,7 @@ export class CreateBoardUseCase {
     }
 
     // Create the board entity
-    const boardResult = Board.create(
-      input.name,
-      input.organizationId,
-      input.isGeneral || false
-    );
+    const boardResult = Board.create(input.name, input.organizationId);
 
     if (!boardResult.success) {
       return failure(boardResult.error);
@@ -87,7 +81,6 @@ export class CreateBoardUseCase {
         id: savedBoard.id,
         name: savedBoard.name,
         organizationId: savedBoard.organizationId,
-        isGeneral: savedBoard.isGeneral,
         createdAt: savedBoard.createdAt,
       },
     });

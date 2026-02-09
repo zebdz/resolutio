@@ -2,7 +2,6 @@ import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
-import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { PollErrors } from './PollErrors';
@@ -21,7 +20,6 @@ export class DiscardSnapshotUseCase {
     private pollRepository: PollRepository,
     private participantRepository: ParticipantRepository,
     private voteRepository: VoteRepository,
-    private boardRepository: BoardRepository,
     private organizationRepository: OrganizationRepository,
     private userRepository: UserRepository
   ) {}
@@ -45,15 +43,9 @@ export class DiscardSnapshotUseCase {
     const isSuperAdmin = await this.userRepository.isSuperAdmin(command.userId);
 
     if (!isSuperAdmin) {
-      const board = await this.boardRepository.findById(poll.boardId);
-
-      if (!board) {
-        return failure(PollErrors.BOARD_NOT_FOUND);
-      }
-
       const isAdmin = await this.organizationRepository.isUserAdmin(
         command.userId,
-        board.organizationId
+        poll.organizationId
       );
 
       if (!isAdmin) {

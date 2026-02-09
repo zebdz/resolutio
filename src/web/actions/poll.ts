@@ -55,7 +55,8 @@ const userRepository = new PrismaUserRepository(prisma);
 // Use cases
 const createPollUseCase = new CreatePollUseCase(
   pollRepository,
-  boardRepository
+  boardRepository,
+  organizationRepository
 );
 const updatePollUseCase = new UpdatePollUseCase(pollRepository, voteRepository);
 const addQuestionUseCase = new AddQuestionUseCase(
@@ -104,13 +105,11 @@ const takeSnapshotUseCase = new TakeSnapshotUseCase(
 );
 const activatePollUseCase = new ActivatePollUseCase(
   pollRepository,
-  boardRepository,
   organizationRepository,
   userRepository
 );
 const deactivatePollUseCase = new DeactivatePollUseCase(
   pollRepository,
-  boardRepository,
   organizationRepository,
   userRepository
 );
@@ -118,14 +117,12 @@ const discardSnapshotUseCase = new DiscardSnapshotUseCase(
   pollRepository,
   participantRepository,
   voteRepository,
-  boardRepository,
   organizationRepository,
   userRepository
 );
 const finishPollUseCase = new FinishPollUseCase(
   pollRepository,
   draftRepository,
-  boardRepository,
   organizationRepository,
   userRepository
 );
@@ -147,10 +144,12 @@ export async function createPollAction(
     }
 
     // Extract form data
+    const boardIdRaw = formData.get('boardId') as string | null;
     const input = {
       title: formData.get('title') as string,
       description: formData.get('description') as string,
-      boardId: formData.get('boardId') as string,
+      organizationId: formData.get('organizationId') as string,
+      boardId: boardIdRaw && boardIdRaw.trim() ? boardIdRaw : null,
       startDate: new Date(formData.get('startDate') as string),
       endDate: new Date(formData.get('endDate') as string),
     };
@@ -184,11 +183,12 @@ export async function createPollAction(
     });
 
     if (!result.success) {
-      const tError = await getTranslations(result.error.split('.')[0]);
+      const errorParts = result.error.split('.');
+      const tError = await getTranslations(errorParts.shift());
 
       return {
         success: false,
-        error: tError(result.error),
+        error: tError(errorParts.join('.')),
       };
     }
 
@@ -344,11 +344,12 @@ export async function updateQuestionOrderAction(input: {
     const result = await updateQuestionOrderUseCase.execute(validation.data);
 
     if (!result.success) {
-      const tError = await getTranslations(result.error.split('.')[0]);
+      const errorParts = result.error.split('.');
+      const tError = await getTranslations(errorParts.shift());
 
       return {
         success: false,
-        error: tError(result.error),
+        error: tError(errorParts.join('.')),
       };
     }
 
@@ -383,11 +384,12 @@ export async function getUserPollsAction(): Promise<ActionResult<any[]>> {
     const result = await pollRepository.getPollsByUserId(user.id);
 
     if (!result.success) {
-      const tError = await getTranslations(result.error.split('.')[0]);
+      const errorParts = result.error.split('.');
+      const tError = await getTranslations(errorParts.shift());
 
       return {
         success: false,
-        error: tError(result.error),
+        error: tError(errorParts.join('.')),
       };
     }
 
@@ -395,10 +397,6 @@ export async function getUserPollsAction(): Promise<ActionResult<any[]>> {
     const pollsWithVotingStatus = await Promise.all(
       result.value.map(async (poll) => {
         const pollJson: any = poll.toJSON();
-
-        // Get organizationId from board
-        const board = await boardRepository.findById(poll.boardId);
-        pollJson.organizationId = board?.organizationId || null;
 
         // Check if user can vote
         const participant = await prisma.pollParticipant.findFirst({
@@ -475,11 +473,12 @@ export async function getPollsByBoardIdAction(
     const result = await pollRepository.getPollsByBoardId(boardId);
 
     if (!result.success) {
-      const tError = await getTranslations(result.error.split('.')[0]);
+      const errorParts = result.error.split('.');
+      const tError = await getTranslations(errorParts.shift());
 
       return {
         success: false,
-        error: tError(result.error),
+        error: tError(errorParts.join('.')),
       };
     }
 
@@ -516,16 +515,15 @@ export async function getPollByIdAction(
     const result = await pollRepository.getPollById(pollId);
 
     if (!result.success) {
-      const translationKey = result.error.split('.')[0];
-      const tError = translationKey
-        ? await getTranslations(translationKey)
-        : null;
-
       console.error(`getPollByIdAction error: ${result.error}`);
+
+      const errorParts = result.error.split('.');
+      const namespace = errorParts.shift();
+      const tError = namespace ? await getTranslations(namespace) : null;
 
       return {
         success: false,
-        error: tError ? tError(result.error) : t('generic'),
+        error: tError ? tError(errorParts.join('.')) : t('generic'),
       };
     }
 
@@ -536,14 +534,17 @@ export async function getPollByIdAction(
       };
     }
 
-    // Check if user is a board member
+    // Check if user is an org member (covers both board-specific and org-wide polls)
     const poll = result.value;
-    const isMember = await boardRepository.isUserMember(user.id, poll.boardId);
+    const isMember = await organizationRepository.isUserMember(
+      user.id,
+      poll.organizationId
+    );
 
     if (!isMember) {
       return {
         success: false,
-        error: t('board.errors.notMember'),
+        error: t('organization.errors.notMember'),
       };
     }
 
@@ -615,11 +616,12 @@ export async function updatePollAction(
     });
 
     if (!result.success) {
-      const tError = await getTranslations(result.error.split('.')[0]);
+      const errorParts = result.error.split('.');
+      const tError = await getTranslations(errorParts.shift());
 
       return {
         success: false,
-        error: tError(result.error),
+        error: tError(errorParts.join('.')),
       };
     }
 
@@ -1202,17 +1204,6 @@ export async function canManagePollAction(
       };
     }
 
-    const board = await boardRepository.findById(poll.boardId);
-
-    if (!board) {
-      const tPoll = await getTranslations('poll.errors');
-
-      return {
-        success: false,
-        error: tPoll('boardNotFound'),
-      };
-    }
-
     const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
 
     if (isSuperAdmin) {
@@ -1221,7 +1212,7 @@ export async function canManagePollAction(
 
     const isOrgAdmin = await organizationRepository.isUserAdmin(
       user.id,
-      board.organizationId
+      poll.organizationId
     );
 
     return { success: true, data: isOrgAdmin };

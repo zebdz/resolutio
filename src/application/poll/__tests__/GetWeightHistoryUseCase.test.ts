@@ -5,9 +5,7 @@ import { PollParticipant } from '../../../domain/poll/PollParticipant';
 import { ParticipantWeightHistory } from '../../../domain/poll/ParticipantWeightHistory';
 import { PollRepository } from '../../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
-import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
-import { Board } from '../../../domain/board/Board';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { OrganizationErrors } from '../../organization/OrganizationErrors';
@@ -16,12 +14,10 @@ import { Decimal } from 'decimal.js';
 describe('GetWeightHistoryUseCase', () => {
   let pollRepository: Partial<PollRepository>;
   let participantRepository: Partial<ParticipantRepository>;
-  let boardRepository: Partial<BoardRepository>;
   let organizationRepository: Partial<OrganizationRepository>;
   let prisma: any;
   let useCase: GetWeightHistoryUseCase;
   let poll: Poll;
-  let board: Board;
   let participant: PollParticipant;
   let historyEntry: ParticipantWeightHistory;
 
@@ -30,6 +26,7 @@ describe('GetWeightHistoryUseCase', () => {
     const pollResult = Poll.create(
       'Test Poll',
       'Test Description',
+      'org-1',
       'board-1',
       'user-admin',
       new Date('2026-01-15'),
@@ -42,15 +39,6 @@ describe('GetWeightHistoryUseCase', () => {
       (poll as any).props.id = 'poll-1';
       poll.takeSnapshot();
       poll.activate();
-    }
-
-    // Create board
-    const boardResult = Board.create('org-1', 'Test Board', 'user-admin');
-    expect(boardResult.success).toBe(true);
-
-    if (boardResult.success) {
-      board = boardResult.value;
-      (board as any).props.id = 'board-1';
     }
 
     // Create participant
@@ -93,10 +81,6 @@ describe('GetWeightHistoryUseCase', () => {
       getWeightHistory: vi.fn().mockResolvedValue(success([historyEntry])),
     };
 
-    boardRepository = {
-      findById: vi.fn().mockResolvedValue(board),
-    };
-
     organizationRepository = {
       isUserAdmin: vi.fn().mockResolvedValue(true),
     };
@@ -130,7 +114,6 @@ describe('GetWeightHistoryUseCase', () => {
     useCase = new GetWeightHistoryUseCase(
       pollRepository as PollRepository,
       participantRepository as ParticipantRepository,
-      boardRepository as BoardRepository,
       organizationRepository as OrganizationRepository,
       prisma
     );
@@ -164,21 +147,6 @@ describe('GetWeightHistoryUseCase', () => {
 
     if (!result.success) {
       expect(result.error).toBe(PollErrors.NOT_FOUND);
-    }
-  });
-
-  it('should reject when board not found', async () => {
-    boardRepository.findById = vi.fn().mockResolvedValue(null);
-
-    const result = await useCase.execute({
-      pollId: 'poll-1',
-      adminUserId: 'user-admin',
-    });
-
-    expect(result.success).toBe(false);
-
-    if (!result.success) {
-      expect(result.error).toBe(PollErrors.BOARD_NOT_FOUND);
     }
   });
 

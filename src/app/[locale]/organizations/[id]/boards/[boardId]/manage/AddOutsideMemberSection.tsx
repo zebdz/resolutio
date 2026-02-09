@@ -21,12 +21,10 @@ type User = {
 
 type AddOutsideMemberSectionProps = {
   boardId: string;
-  isGeneral: boolean;
 };
 
 export default function AddOutsideMemberSection({
   boardId,
-  isGeneral,
 }: AddOutsideMemberSectionProps) {
   const t = useTranslations('organization.boards.manageSingle');
   const router = useRouter();
@@ -92,11 +90,6 @@ export default function AddOutsideMemberSection({
       setIsAdding(false);
     }
   };
-
-  // Don't show this section for general boards
-  if (isGeneral) {
-    return null;
-  }
 
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">

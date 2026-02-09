@@ -55,23 +55,21 @@ export class JoinOrganizationUseCase {
       }
     }
 
-    // Check hierarchy constraints
-    // Get all ancestors of this organization
+    // Check hierarchy constraints - block if pending request anywhere in hierarchy
     const ancestorIds =
       await this.deps.organizationRepository.getAncestorIds(organizationId);
-    // Get all descendants of this organization
     const descendantIds =
       await this.deps.organizationRepository.getDescendantIds(organizationId);
-    // All related organizations in the hierarchy
-    const hierarchyIds = [organizationId, ...ancestorIds, ...descendantIds];
+    const hierarchyIds = [...ancestorIds, ...descendantIds];
 
-    // Check if user is a member of any organization in this hierarchy
-    const userOrganizations =
-      await this.deps.organizationRepository.findMembershipsByUserId(userId);
+    const pendingOrgs =
+      await this.deps.organizationRepository.findPendingRequestsByUserId(
+        userId
+      );
 
-    for (const userOrg of userOrganizations) {
-      if (hierarchyIds.includes(userOrg.id)) {
-        return failure(OrganizationErrors.HIERARCHY_CONFLICT);
+    for (const pendingOrg of pendingOrgs) {
+      if (hierarchyIds.includes(pendingOrg.id)) {
+        return failure(OrganizationErrors.PENDING_HIERARCHY_REQUEST);
       }
     }
 

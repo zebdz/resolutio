@@ -1,7 +1,6 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { DraftRepository } from '../../domain/poll/DraftRepository';
-import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { PollErrors } from './PollErrors';
@@ -15,7 +14,6 @@ export class FinishPollUseCase {
   constructor(
     private pollRepository: PollRepository,
     private draftRepository: DraftRepository,
-    private boardRepository: BoardRepository,
     private organizationRepository: OrganizationRepository,
     private userRepository: UserRepository
   ) {}
@@ -38,15 +36,9 @@ export class FinishPollUseCase {
     const isSuperAdmin = await this.userRepository.isSuperAdmin(command.userId);
 
     if (!isSuperAdmin) {
-      const board = await this.boardRepository.findById(poll.boardId);
-
-      if (!board) {
-        return failure(PollErrors.BOARD_NOT_FOUND);
-      }
-
       const isAdmin = await this.organizationRepository.isUserAdmin(
         command.userId,
-        board.organizationId
+        poll.organizationId
       );
 
       if (!isAdmin) {

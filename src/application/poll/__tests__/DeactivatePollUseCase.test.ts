@@ -3,13 +3,11 @@ import { DeactivatePollUseCase } from '../DeactivatePollUseCase';
 import { Poll } from '../../../domain/poll/Poll';
 import { Question } from '../../../domain/poll/Question';
 import { Answer } from '../../../domain/poll/Answer';
-import { Board } from '../../../domain/board/Board';
 import { Organization } from '../../../domain/organization/Organization';
 import {
   PollRepository,
   UpdateQuestionOrderData,
 } from '../../../domain/poll/PollRepository';
-import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../../domain/user/UserRepository';
 import { User } from '../../../domain/user/User';
@@ -36,6 +34,12 @@ class MockPollRepository implements PollRepository {
   }
 
   async getPollsByBoardId(boardId: string): Promise<Result<Poll[], string>> {
+    return success([]);
+  }
+
+  async getPollsByOrganizationId(
+    orgId: string
+  ): Promise<Result<Poll[], string>> {
     return success([]);
   }
 
@@ -223,57 +227,6 @@ class MockPollRepository implements PollRepository {
   }
 }
 
-class MockBoardRepository implements BoardRepository {
-  private boards: Map<string, Board> = new Map();
-
-  async save(board: Board): Promise<Board> {
-    this.boards.set(board.id, board);
-
-    return board;
-  }
-
-  async findById(id: string): Promise<Board | null> {
-    return this.boards.get(id) || null;
-  }
-
-  async findByOrganizationId(organizationId: string): Promise<Board[]> {
-    return [];
-  }
-
-  async findGeneralBoardByOrganizationId(
-    organizationId: string
-  ): Promise<Board | null> {
-    return null;
-  }
-
-  async findBoardMembers(boardId: string): Promise<{ userId: string }[]> {
-    return [];
-  }
-
-  async isUserMember(userId: string, boardId: string): Promise<boolean> {
-    return false;
-  }
-
-  async addUserToBoard(
-    userId: string,
-    boardId: string,
-    addedBy?: string
-  ): Promise<void> {}
-
-  async removeUserFromBoard(
-    userId: string,
-    boardId: string,
-    removedBy?: string,
-    removedReason?: string
-  ): Promise<void> {}
-
-  async update(board: Board): Promise<Board> {
-    this.boards.set(board.id, board);
-
-    return board;
-  }
-}
-
 class MockOrganizationRepository implements OrganizationRepository {
   private admins: Set<string> = new Set();
 
@@ -340,6 +293,12 @@ class MockOrganizationRepository implements OrganizationRepository {
   async update(organization: Organization): Promise<Organization> {
     return organization;
   }
+
+  async findAcceptedMemberUserIdsIncludingDescendants(
+    organizationId: string
+  ): Promise<string[]> {
+    return [];
+  }
 }
 
 class MockUserRepository implements UserRepository {
@@ -380,36 +339,21 @@ class MockUserRepository implements UserRepository {
 
 describe('DeactivatePollUseCase', () => {
   let repository: MockPollRepository;
-  let boardRepository: MockBoardRepository;
   let organizationRepository: MockOrganizationRepository;
   let userRepository: MockUserRepository;
   let useCase: DeactivatePollUseCase;
   let poll: Poll;
-  let board: Board;
 
   beforeEach(() => {
     repository = new MockPollRepository();
-    boardRepository = new MockBoardRepository();
     organizationRepository = new MockOrganizationRepository();
     userRepository = new MockUserRepository();
 
     useCase = new DeactivatePollUseCase(
       repository,
-      boardRepository,
       organizationRepository,
       userRepository
     );
-
-    // Create a test board
-    board = Board.reconstitute({
-      id: 'board-1',
-      name: 'Test Board',
-      organizationId: 'org-1',
-      isGeneral: false,
-      createdAt: new Date(),
-      archivedAt: null,
-    });
-    boardRepository.save(board);
 
     // Set admin-1 as admin of org-1
     organizationRepository.setAdmin('admin-1', 'org-1');
@@ -418,6 +362,7 @@ describe('DeactivatePollUseCase', () => {
     const pollResult = Poll.create(
       'Test Poll',
       'Test Description',
+      'org-1',
       'board-1',
       'user-1',
       new Date('2024-01-01'),

@@ -57,17 +57,6 @@ export class AddBoardMemberUseCase {
       }
     }
 
-    // Check if the user being added is a member of the organization
-    const isOrgMember = await this.organizationRepository.isUserMember(
-      input.userId,
-      board.organizationId
-    );
-
-    // If the board is general, only organization members can be added
-    if (board.isGeneral && !isOrgMember) {
-      return failure(BoardErrors.USER_NOT_ORG_MEMBER);
-    }
-
     // Check if user is already a member of the board
     const isBoardMember = await this.boardRepository.isUserMember(
       input.userId,

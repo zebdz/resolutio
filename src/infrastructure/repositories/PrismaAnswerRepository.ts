@@ -18,7 +18,9 @@ export class PrismaAnswerRepository implements AnswerRepository {
 
       return success(this.toDomainAnswer(created));
     } catch (error) {
-      return failure(`Failed to create answer: ${error}`);
+      console.error('Failed to create answer:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -36,7 +38,9 @@ export class PrismaAnswerRepository implements AnswerRepository {
 
       return success(this.toDomainAnswer(answer));
     } catch (error) {
-      return failure(`Failed to get answer: ${error}`);
+      console.error('Failed to get answer:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -54,7 +58,9 @@ export class PrismaAnswerRepository implements AnswerRepository {
 
       return success(answers.map((a) => this.toDomainAnswer(a)));
     } catch (error) {
-      return failure(`Failed to get answers: ${error}`);
+      console.error('Failed to get answers:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -71,7 +77,9 @@ export class PrismaAnswerRepository implements AnswerRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to update answer: ${error}`);
+      console.error('Failed to update answer:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -84,7 +92,9 @@ export class PrismaAnswerRepository implements AnswerRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to delete answer: ${error}`);
+      console.error('Failed to delete answer:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 

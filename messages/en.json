@@ -61,7 +61,10 @@
       "rejected": "Rejected",
       "reason": "Reason",
       "rejectedBy": "Rejected by",
-      "rejectedOn": "on"
+      "rejectedOn": "on",
+      "cancel": "Cancel Request",
+      "cancelling": "Cancelling...",
+      "cancelSuccess": "Join request cancelled"
     }
   },
   "account": {
@@ -106,7 +109,8 @@
       "notAdmin": "You are not an admin of this organization",
       "invalidStatus": "Invalid request status",
       "requestNotFound": "Join request not found",
-      "notPending": "Join request is not pending"
+      "notPending": "Join request is not pending",
+      "pendingHierarchyRequest": "You already have a pending request in a related organization. Cancel it first."
     },
     "create": {
       "title": "Create Organization",
@@ -141,7 +145,8 @@
       "errors": {
         "alreadyMember": "You are already a member of this organization",
         "pendingRequest": "You already have a pending request",
-        "hierarchyConflict": "You cannot join this organization due to hierarchy constraints"
+        "hierarchyConflict": "You cannot join this organization due to hierarchy constraints",
+        "pendingHierarchyRequest": "You already have a pending request in a related organization. Cancel it first."
       }
     },
     "pendingRequests": {
@@ -298,7 +303,14 @@
     "myPolls": "My Polls",
     "noPollsYet": "No polls created yet",
     "noBoardMembership": "You must be a member of a board to create polls. Join an organization and become a board member first.",
-    "selectBoard": "Select Board",
+    "noOrgMembership": "You must be a member of an organization to create polls. Join an organization first.",
+    "selectOrganization": "Select Organization",
+    "selectAnOrganization": "Select an organization",
+    "loadingOrganizations": "Loading organizations...",
+    "noOrganizationsAvailable": "No organizations available",
+    "orgWidePoll": "Organization-wide poll (no specific board)",
+    "selectQuestionToEdit": "Select a question from the sidebar to edit",
+    "selectBoard": "Select Board (optional)",
     "pollDetails": "Poll Details",
     "pollTitle": "Poll Title",
     "pollDescription": "Poll Description",
@@ -371,12 +383,14 @@
       "cannotModifyHasVotes": "Cannot modify a poll that has votes",
       "notPollCreator": "Only the poll creator can edit it",
       "notBoardMember": "You must be a board member to create polls",
+      "notOrgMember": "You must be an organization member to create polls",
       "boardNotFound": "Board not found",
       "notAuthorized": "You are not authorized to perform this action",
       "noUpdates": "No updates provided",
       "titleRequired": "Poll title is required",
       "descriptionRequired": "Poll description is required",
-      "boardRequired": "Board is required",
+      "orgRequired": "Organization is required",
+      "loadOrganizations": "Failed to load organizations",
       "atLeastOneQuestionRequired": "Please add at least one question",
       "invalidDates": "Start date must be before end date",
       "questionTextRequired": "Question text is required",

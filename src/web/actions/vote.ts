@@ -9,7 +9,6 @@ import {
   prisma,
   PrismaPollRepository,
   PrismaOrganizationRepository,
-  PrismaBoardRepository,
   PrismaUserRepository,
   PrismaParticipantRepository,
   PrismaVoteRepository,
@@ -29,7 +28,6 @@ const participantRepository = new PrismaParticipantRepository(prisma);
 const voteRepository = new PrismaVoteRepository(prisma);
 const draftRepository = new PrismaDraftRepository(prisma);
 const organizationRepository = new PrismaOrganizationRepository(prisma);
-const boardRepository = new PrismaBoardRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 
 // Use cases
@@ -55,7 +53,6 @@ const getPollResultsUseCase = new GetPollResultsUseCase(
   pollRepository,
   participantRepository,
   voteRepository,
-  boardRepository,
   organizationRepository,
   userRepository
 );

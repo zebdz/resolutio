@@ -89,6 +89,7 @@ model Organization {
   members     OrganizationUser[]
   admins      OrganizationAdminUser[]
   boards      Board[]
+  polls       Poll[]
 
   @@index([parentId])
   @@index([createdById])
@@ -137,7 +138,6 @@ model Board {
   id             String    @id @default(cuid())
   name           String
   organizationId String    @map("organization_id")
-  isGeneral      Boolean   @default(false) @map("is_general")
   createdAt      DateTime  @default(now()) @map("created_at")
   archivedAt     DateTime? @map("archived_at")
 
@@ -147,7 +147,6 @@ model Board {
 
   @@unique([name, organizationId])
   @@index([organizationId])
-  @@index([organizationId, isGeneral])
   @@map("boards")
 }
 
@@ -179,7 +178,8 @@ model Poll {
   id             String    @id @default(cuid())
   title          String
   description    String
-  boardId        String    @map("board_id")
+  organizationId String    @map("organization_id")
+  boardId        String?   @map("board_id")
   startDate      DateTime  @map("start_date")
   endDate        DateTime  @map("end_date")
   state          PollState @default(DRAFT)
@@ -188,12 +188,14 @@ model Poll {
   createdAt      DateTime  @default(now()) @map("created_at")
   archivedAt     DateTime? @map("archived_at")
 
-  board        Board                          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  organization Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  board        Board?                          @relation(fields: [boardId], references: [id], onDelete: Cascade)
   creator      User                           @relation(fields: [createdBy], references: [id])
   questions    Question[]
   participants PollParticipant[]
   voteDrafts   VoteDraft[]
 
+  @@index([organizationId])
   @@index([boardId])
   @@index([state])
   @@index([createdBy])

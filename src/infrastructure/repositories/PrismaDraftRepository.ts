@@ -30,7 +30,9 @@ export class PrismaDraftRepository implements DraftRepository {
 
       return success(this.toDomainDraft(created));
     } catch (error) {
-      return failure(`Failed to save draft: ${error}`);
+      console.error('Failed to save draft:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -49,7 +51,9 @@ export class PrismaDraftRepository implements DraftRepository {
 
       return success(drafts.map((d) => this.toDomainDraft(d)));
     } catch (error) {
-      return failure(`Failed to get user drafts: ${error}`);
+      console.error('Failed to get user drafts:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -67,7 +71,9 @@ export class PrismaDraftRepository implements DraftRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to delete user drafts: ${error}`);
+      console.error('Failed to delete user drafts:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -79,7 +85,9 @@ export class PrismaDraftRepository implements DraftRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to delete all poll drafts: ${error}`);
+      console.error('Failed to delete all poll drafts:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -99,7 +107,9 @@ export class PrismaDraftRepository implements DraftRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to delete drafts by question: ${error}`);
+      console.error('Failed to delete drafts by question:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -121,7 +131,9 @@ export class PrismaDraftRepository implements DraftRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to delete draft by answer: ${error}`);
+      console.error('Failed to delete draft by answer:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 

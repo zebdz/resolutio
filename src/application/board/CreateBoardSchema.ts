@@ -6,7 +6,6 @@ export const CreateBoardSchema = z.object({
     .min(1, 'Board name is required')
     .max(255, 'Board name must be less than 255 characters'),
   organizationId: z.string().cuid('Invalid organization ID'),
-  isGeneral: z.boolean().optional().default(false),
 });
 
 export type CreateBoardInput = z.infer<typeof CreateBoardSchema>;

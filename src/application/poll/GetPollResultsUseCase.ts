@@ -5,7 +5,6 @@ import { PollParticipant } from '../../domain/poll/PollParticipant';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
-import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { PollErrors } from './PollErrors';
 import { UserRepository } from '@/src/domain/user/UserRepository';
@@ -50,7 +49,6 @@ export class GetPollResultsUseCase {
     private pollRepository: PollRepository,
     private participantRepository: ParticipantRepository,
     private voteRepository: VoteRepository,
-    private boardRepository: BoardRepository,
     private organizationRepository: OrganizationRepository,
     private userRepository: UserRepository
   ) {}
@@ -73,14 +71,7 @@ export class GetPollResultsUseCase {
       return failure(PollErrors.NOT_FOUND);
     }
 
-    // 2. Get board and organization to check permissions
-    const board = await this.boardRepository.findById(poll.boardId);
-
-    if (!board) {
-      return failure(PollErrors.BOARD_NOT_FOUND);
-    }
-
-    // 3. Check authorization
+    // 2. Check authorization
     // If poll is active (not finished), only admins can view results
     // If poll is finished, any organization member can view
 
@@ -88,7 +79,7 @@ export class GetPollResultsUseCase {
 
     const isOrganizationAdmin = await this.organizationRepository.isUserAdmin(
       userId,
-      board.organizationId
+      poll.organizationId
     );
 
     const isAdmin = isSuperAdmin || isOrganizationAdmin;
@@ -101,7 +92,7 @@ export class GetPollResultsUseCase {
       // Poll is finished, check if user is organization member
       const isMember = await this.organizationRepository.isUserMember(
         userId,
-        board.organizationId
+        poll.organizationId
       );
 
       if (!isMember) {

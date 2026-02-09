@@ -19,6 +19,7 @@ export class PrismaPollRepository implements PollRepository {
         data: {
           title: poll.title,
           description: poll.description,
+          organizationId: poll.organizationId,
           boardId: poll.boardId,
           createdBy: poll.createdBy,
           startDate: poll.startDate,
@@ -40,7 +41,9 @@ export class PrismaPollRepository implements PollRepository {
 
       return success(this.toDomainPoll(created));
     } catch (error) {
-      return failure(`Failed to create poll: ${error}`);
+      console.error('Failed to create poll:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -68,7 +71,9 @@ export class PrismaPollRepository implements PollRepository {
 
       return success(this.toDomainPoll(poll));
     } catch (error) {
-      return failure(`Failed to get poll: ${error}`);
+      console.error('Failed to get poll:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -96,22 +101,19 @@ export class PrismaPollRepository implements PollRepository {
 
       return success(polls.map((poll) => this.toDomainPoll(poll)));
     } catch (error) {
-      return failure(`Failed to get polls by board: ${error}`);
+      console.error('Failed to get polls by board:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
-  async getPollsByUserId(userId: string): Promise<Result<Poll[], string>> {
+  async getPollsByOrganizationId(
+    orgId: string
+  ): Promise<Result<Poll[], string>> {
     try {
       const polls = await this.prisma.poll.findMany({
         where: {
-          board: {
-            members: {
-              some: {
-                userId,
-                removedAt: null,
-              },
-            },
-          },
+          organizationId: orgId,
           archivedAt: null,
         },
         include: {
@@ -131,7 +133,67 @@ export class PrismaPollRepository implements PollRepository {
 
       return success(polls.map((poll) => this.toDomainPoll(poll)));
     } catch (error) {
-      return failure(`Failed to get polls by user: ${error}`);
+      console.error('Failed to get polls by organization:', error);
+
+      return failure('common.errors.unexpected');
+    }
+  }
+
+  async getPollsByUserId(userId: string): Promise<Result<Poll[], string>> {
+    try {
+      const polls = await this.prisma.poll.findMany({
+        where: {
+          OR: [
+            {
+              organization: {
+                members: {
+                  some: {
+                    userId,
+                    status: 'accepted',
+                  },
+                },
+              },
+            },
+            {
+              board: {
+                members: {
+                  some: {
+                    userId,
+                    removedAt: null,
+                  },
+                },
+              },
+            },
+            {
+              participants: {
+                some: {
+                  userId,
+                },
+              },
+            },
+          ],
+          archivedAt: null,
+        },
+        include: {
+          questions: {
+            where: { archivedAt: null },
+            include: {
+              answers: {
+                where: { archivedAt: null },
+                orderBy: { order: 'asc' },
+              },
+            },
+            orderBy: [{ page: 'asc' }, { order: 'asc' }],
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return success(polls.map((poll) => this.toDomainPoll(poll)));
+    } catch (error) {
+      console.error('Failed to get polls by user:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -152,7 +214,9 @@ export class PrismaPollRepository implements PollRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to update poll: ${error}`);
+      console.error('Failed to update poll:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -165,7 +229,9 @@ export class PrismaPollRepository implements PollRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to delete poll: ${error}`);
+      console.error('Failed to delete poll:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -178,6 +244,7 @@ export class PrismaPollRepository implements PollRepository {
       id: prismaData.id,
       title: prismaData.title,
       description: prismaData.description,
+      organizationId: prismaData.organizationId,
       boardId: prismaData.boardId,
       startDate: prismaData.startDate,
       endDate: prismaData.endDate,

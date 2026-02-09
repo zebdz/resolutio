@@ -7,9 +7,7 @@ import { Answer } from '../../../domain/poll/Answer';
 import { PollRepository } from '../../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../../domain/poll/VoteRepository';
-import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
-import { Board } from '../../../domain/board/Board';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { OrganizationErrors } from '../../organization/OrganizationErrors';
@@ -19,12 +17,10 @@ describe('GetParticipantsUseCase', () => {
   let pollRepository: Partial<PollRepository>;
   let participantRepository: Partial<ParticipantRepository>;
   let voteRepository: Partial<VoteRepository>;
-  let boardRepository: Partial<BoardRepository>;
   let organizationRepository: Partial<OrganizationRepository>;
   let prisma: any;
   let useCase: GetParticipantsUseCase;
   let poll: Poll;
-  let board: Board;
   let participant: PollParticipant;
 
   beforeEach(() => {
@@ -32,6 +28,7 @@ describe('GetParticipantsUseCase', () => {
     const pollResult = Poll.create(
       'Test Poll',
       'Test Description',
+      'org-1',
       'board-1',
       'user-admin',
       new Date('2026-01-15'),
@@ -54,12 +51,6 @@ describe('GetParticipantsUseCase', () => {
     poll.addQuestion(questionResult.value);
     poll.takeSnapshot();
     // Poll is now in READY state (canModify should be true if no votes)
-
-    // Create board
-    const boardResult = Board.create('org-1', 'Test Board', 'user-admin');
-    expect(boardResult.success).toBe(true);
-    board = boardResult.value;
-    (board as any).props.id = 'board-1';
 
     // Create participant
     const participantResult = PollParticipant.create(
@@ -84,10 +75,6 @@ describe('GetParticipantsUseCase', () => {
       pollHasVotes: vi.fn().mockResolvedValue(success(false)),
     };
 
-    boardRepository = {
-      findById: vi.fn().mockResolvedValue(board),
-    };
-
     organizationRepository = {
       isUserAdmin: vi.fn().mockResolvedValue(true),
     };
@@ -107,7 +94,6 @@ describe('GetParticipantsUseCase', () => {
       pollRepository as PollRepository,
       participantRepository as ParticipantRepository,
       voteRepository as VoteRepository,
-      boardRepository as BoardRepository,
       organizationRepository as OrganizationRepository,
       prisma
     );
@@ -159,21 +145,6 @@ describe('GetParticipantsUseCase', () => {
     }
   });
 
-  it('should reject when board not found', async () => {
-    boardRepository.findById = vi.fn().mockResolvedValue(null);
-
-    const result = await useCase.execute({
-      pollId: 'poll-1',
-      adminUserId: 'user-admin',
-    });
-
-    expect(result.success).toBe(false);
-
-    if (!result.success) {
-      expect(result.error).toBe(PollErrors.BOARD_NOT_FOUND);
-    }
-  });
-
   it('should reject when user is not admin', async () => {
     organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
 
@@ -194,6 +165,7 @@ describe('GetParticipantsUseCase', () => {
     const pollWithoutSnapshot = Poll.create(
       'Test Poll',
       'Test Description',
+      'org-1',
       'board-1',
       'user-admin',
       new Date('2026-01-15'),

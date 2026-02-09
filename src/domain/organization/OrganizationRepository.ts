@@ -73,4 +73,25 @@ export interface OrganizationRepository {
    * Updates an existing organization
    */
   update(organization: Organization): Promise<Organization>;
+
+  /**
+   * Gets all accepted member user IDs for an organization and all its descendants.
+   * Used for org-wide poll snapshots. Returns deduplicated user IDs.
+   */
+  findAcceptedMemberUserIdsIncludingDescendants(
+    organizationId: string
+  ): Promise<string[]>;
+
+  /**
+   * Removes a user's membership from an organization (deletes OrganizationUser row)
+   */
+  removeUserFromOrganization(
+    userId: string,
+    organizationId: string
+  ): Promise<void>;
+
+  /**
+   * Finds organizations where user has a pending join request
+   */
+  findPendingRequestsByUserId(userId: string): Promise<Organization[]>;
 }

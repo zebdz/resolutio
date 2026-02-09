@@ -3,7 +3,6 @@ import { PollParticipant } from '../../domain/poll/PollParticipant';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
-import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { PollErrors } from './PollErrors';
 import { OrganizationErrors } from '../organization/OrganizationErrors';
@@ -33,7 +32,6 @@ export class GetParticipantsUseCase {
     private pollRepository: PollRepository,
     private participantRepository: ParticipantRepository,
     private voteRepository: VoteRepository,
-    private boardRepository: BoardRepository,
     private organizationRepository: OrganizationRepository,
     private prisma: any
   ) {}
@@ -56,16 +54,10 @@ export class GetParticipantsUseCase {
       return failure(PollErrors.NOT_FOUND);
     }
 
-    // 2. Get board and check admin permissions
-    const board = await this.boardRepository.findById(poll.boardId);
-
-    if (!board) {
-      return failure(PollErrors.BOARD_NOT_FOUND);
-    }
-
+    // 2. Check admin permissions
     const isAdmin = await this.organizationRepository.isUserAdmin(
       adminUserId,
-      board.organizationId
+      poll.organizationId
     );
 
     if (!isAdmin) {

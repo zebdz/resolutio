@@ -14,6 +14,8 @@ import { JoinOrganizationUseCase } from '@/application/organization/JoinOrganiza
 import { JoinOrganizationSchema } from '@/application/organization/JoinOrganizationSchema';
 import { GetOrganizationDetailsUseCase } from '@/application/organization/GetOrganizationDetailsUseCase';
 import { GetOrganizationPendingRequestsUseCase } from '@/application/organization/GetOrganizationPendingRequestsUseCase';
+import { CancelJoinRequestUseCase } from '@/application/organization/CancelJoinRequestUseCase';
+import { CancelJoinRequestSchema } from '@/application/organization/CancelJoinRequestSchema';
 import {
   prisma,
   PrismaOrganizationRepository,
@@ -33,7 +35,6 @@ const boardRepository = new PrismaBoardRepository(prisma);
 // Use cases
 const createOrganizationUseCase = new CreateOrganizationUseCase({
   organizationRepository,
-  boardRepository,
 });
 
 const listOrganizationsUseCase = new ListOrganizationsUseCase({
@@ -54,7 +55,7 @@ const getPendingRequestsUseCase = new GetPendingRequestsUseCase({
 
 const handleJoinRequestUseCase = new HandleJoinRequestUseCase({
   prisma,
-  boardRepository,
+  organizationRepository,
 });
 
 const joinOrganizationUseCase = new JoinOrganizationUseCase({
@@ -66,6 +67,11 @@ const getOrganizationDetailsUseCase = new GetOrganizationDetailsUseCase({
   organizationRepository,
   boardRepository,
   prisma,
+});
+
+const cancelJoinRequestUseCase = new CancelJoinRequestUseCase({
+  prisma,
+  organizationRepository,
 });
 
 const getOrganizationPendingRequestsUseCase =
@@ -119,14 +125,10 @@ export async function createOrganizationAction(
       };
     }
 
-    // Get the translated default board name
-    const defaultBoardName = tOrg('defaultBoardName');
-
     // Execute use case
     const result = await createOrganizationUseCase.execute(
       validation.data,
-      user.id,
-      defaultBoardName
+      user.id
     );
 
     if (!result.success) {
@@ -591,7 +593,6 @@ export async function getOrganizationDetailsAction(
     boards: Array<{
       id: string;
       name: string;
-      isGeneral: boolean;
       memberCount: number;
       isUserMember: boolean;
     }>;
@@ -629,7 +630,6 @@ export async function getOrganizationDetailsAction(
         boards: result.value.boards.map((b) => ({
           id: b.board.id,
           name: b.board.name,
-          isGeneral: b.board.isGeneral,
           memberCount: b.memberCount,
           isUserMember: b.isUserMember,
         })),
@@ -699,5 +699,112 @@ export async function getOrganizationPendingRequestsAction(
       success: false,
       error: t('generic'),
     };
+  }
+}
+
+export async function cancelJoinRequestAction(
+  organizationId: string
+): Promise<ActionResult> {
+  const t = await getTranslations('common.errors');
+  const tOrg = await getTranslations('organization');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    const validation = CancelJoinRequestSchema.safeParse({
+      organizationId,
+      userId: user.id,
+    });
+
+    if (!validation.success) {
+      return {
+        success: false,
+        error: t('validationFailed'),
+      };
+    }
+
+    const result = await cancelJoinRequestUseCase.execute(validation.data);
+
+    if (!result.success) {
+      const errorMessage = result.error.startsWith('organization.errors.')
+        ? tOrg(result.error.replace('organization.', '') as any)
+        : result.error;
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+
+    return {
+      success: true,
+      data: undefined,
+    };
+  } catch (error) {
+    console.error('Error cancelling join request:', error);
+
+    return {
+      success: false,
+      error: t('generic'),
+    };
+  }
+}
+
+export async function getUserMemberOrganizationsAction(): Promise<
+  ActionResult<Array<{ id: string; name: string }>>
+> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    // Get direct memberships
+    const memberships = await organizationRepository.findMembershipsByUserId(
+      user.id
+    );
+
+    // For each, get ancestor orgs
+    const allOrgIds = new Set<string>();
+    const orgMap = new Map<string, string>();
+
+    for (const org of memberships) {
+      allOrgIds.add(org.id);
+      orgMap.set(org.id, org.name);
+
+      const ancestorIds = await organizationRepository.getAncestorIds(org.id);
+
+      for (const ancestorId of ancestorIds) {
+        if (!allOrgIds.has(ancestorId)) {
+          allOrgIds.add(ancestorId);
+          const ancestor = await organizationRepository.findById(ancestorId);
+
+          if (ancestor && !ancestor.isArchived()) {
+            orgMap.set(ancestor.id, ancestor.name);
+          }
+        }
+      }
+    }
+
+    const orgs = Array.from(orgMap.entries()).map(([id, name]) => ({
+      id,
+      name,
+    }));
+
+    return { success: true, data: orgs };
+  } catch (error) {
+    console.error('Error getting user member organizations:', error);
+
+    return { success: false, error: t('generic') };
   }
 }

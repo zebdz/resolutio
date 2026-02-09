@@ -13,12 +13,9 @@ import { PollSidebar } from '@/web/components/PollSidebar';
 import { QuestionForm } from '@/web/components/QuestionForm';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { QuestionType } from '@/domain/poll/QuestionType';
-import {
-  createPollAction,
-  addQuestionAction,
-  updateQuestionOrderAction,
-} from '@/web/actions/poll';
+import { createPollAction, addQuestionAction } from '@/web/actions/poll';
 import { getUserBoardsAction } from '@/web/actions/board';
+import { getUserMemberOrganizationsAction } from '@/web/actions/organization';
 
 interface Answer {
   id: string;
@@ -39,6 +36,7 @@ interface Question {
 interface PollData {
   title: string;
   description: string;
+  organizationId: string;
   boardId: string;
   startDate: string;
   endDate: string;
@@ -49,18 +47,23 @@ export function CreatePollForm() {
   const t = useTranslations('poll');
   const tCommon = useTranslations('common');
 
+  const [organizations, setOrganizations] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
   const [boards, setBoards] = useState<
     Array<{
       id: string;
       name: string;
+      organizationId: string;
       organizationName: string;
     }>
   >([]);
-  const [isLoadingBoards, setIsLoadingBoards] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [pollData, setPollData] = useState<PollData>({
     title: '',
     description: '',
+    organizationId: '',
     boardId: '',
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
@@ -73,31 +76,45 @@ export function CreatePollForm() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load user's boards
+  // Load organizations and boards
   useEffect(() => {
-    async function loadBoards() {
+    async function loadData() {
       try {
-        const result = await getUserBoardsAction();
+        const [orgsResult, boardsResult] = await Promise.all([
+          getUserMemberOrganizationsAction(),
+          getUserBoardsAction(),
+        ]);
 
-        if (result.success) {
-          setBoards(result.data);
+        if (orgsResult.success) {
+          setOrganizations(orgsResult.data);
 
-          // Auto-select first board if available
-          if (result.data.length > 0 && !pollData.boardId) {
-            setPollData((prev) => ({ ...prev, boardId: result.data[0].id }));
+          if (orgsResult.data.length > 0 && !pollData.organizationId) {
+            setPollData((prev) => ({
+              ...prev,
+              organizationId: orgsResult.data[0].id,
+            }));
           }
         } else {
-          setError(result.error);
+          setError(orgsResult.error);
+        }
+
+        if (boardsResult.success) {
+          setBoards(boardsResult.data);
         }
       } catch (err) {
-        setError(t('errors.loadBoards'));
+        setError(t('errors.loadOrganizations'));
       } finally {
-        setIsLoadingBoards(false);
+        setIsLoading(false);
       }
     }
 
-    loadBoards();
+    loadData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Filter boards by selected organization
+  const filteredBoards = boards.filter(
+    (b) => b.organizationId === pollData.organizationId
+  );
 
   // Get active question
   const activeQuestion = questions.find((q) => q.id === activeQuestionId);
@@ -211,6 +228,12 @@ export function CreatePollForm() {
       setError(null);
 
       // Validate
+      if (!pollData.organizationId) {
+        setError(t('errors.orgRequired'));
+
+        return;
+      }
+
       if (!pollData.title.trim()) {
         setError(t('errors.titleRequired'));
 
@@ -219,12 +242,6 @@ export function CreatePollForm() {
 
       if (!pollData.description.trim()) {
         setError(t('errors.descriptionRequired'));
-
-        return;
-      }
-
-      if (!pollData.boardId) {
-        setError(t('errors.boardRequired'));
 
         return;
       }
@@ -262,7 +279,12 @@ export function CreatePollForm() {
       const pollFormData = new FormData();
       pollFormData.append('title', pollData.title);
       pollFormData.append('description', pollData.description);
-      pollFormData.append('boardId', pollData.boardId);
+      pollFormData.append('organizationId', pollData.organizationId);
+
+      if (pollData.boardId) {
+        pollFormData.append('boardId', pollData.boardId);
+      }
+
       pollFormData.append('startDate', pollData.startDate);
       pollFormData.append('endDate', pollData.endDate);
 
@@ -350,7 +372,7 @@ export function CreatePollForm() {
             {t('cancel')}
           </Button>
           <Button color="blue" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'Saving...' : t('save')}
+            {isSaving ? tCommon('saving') : t('save')}
           </Button>
         </div>
       </div>
@@ -365,6 +387,38 @@ export function CreatePollForm() {
       {/* Poll Basic Info */}
       <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-4">
         <Field>
+          <Label>{t('selectOrganization')}</Label>
+          <Select
+            name="organizationId"
+            value={pollData.organizationId}
+            onChange={(e) =>
+              setPollData({
+                ...pollData,
+                organizationId: e.target.value,
+                boardId: '',
+              })
+            }
+            disabled={isLoading || organizations.length === 0}
+            required
+          >
+            {isLoading ? (
+              <option value="">{t('loadingOrganizations')}</option>
+            ) : organizations.length === 0 ? (
+              <option value="">{t('noOrganizationsAvailable')}</option>
+            ) : (
+              <>
+                <option value="">{t('selectAnOrganization')}</option>
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name}
+                  </option>
+                ))}
+              </>
+            )}
+          </Select>
+        </Field>
+
+        <Field>
           <Label>{t('selectBoard')}</Label>
           <Select
             name="boardId"
@@ -372,23 +426,14 @@ export function CreatePollForm() {
             onChange={(e) =>
               setPollData({ ...pollData, boardId: e.target.value })
             }
-            disabled={isLoadingBoards || boards.length === 0}
-            required
+            disabled={isLoading || !pollData.organizationId}
           >
-            {isLoadingBoards ? (
-              <option value="">{t('loadingBoards')}</option>
-            ) : boards.length === 0 ? (
-              <option value="">{t('noBoardsAvailable')}</option>
-            ) : (
-              <>
-                <option value="">{t('selectABoard')}</option>
-                {boards.map((board) => (
-                  <option key={board.id} value={board.id}>
-                    {board.name} - {board.organizationName}
-                  </option>
-                ))}
-              </>
-            )}
+            <option value="">{t('orgWidePoll')}</option>
+            {filteredBoards.map((board) => (
+              <option key={board.id} value={board.id}>
+                {board.name}
+              </option>
+            ))}
           </Select>
         </Field>
 
@@ -512,7 +557,7 @@ export function CreatePollForm() {
           ) : (
             <div className="p-12 text-center bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
               <p className="text-zinc-500 dark:text-zinc-400">
-                Select a question from the sidebar to edit
+                {t('selectQuestionToEdit')}
               </p>
             </div>
           )}

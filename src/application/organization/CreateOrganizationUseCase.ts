@@ -1,14 +1,11 @@
 import { Organization } from '../../domain/organization/Organization';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
-import { BoardRepository } from '../../domain/board/BoardRepository';
-import { Board } from '../../domain/board/Board';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { CreateOrganizationInput } from './CreateOrganizationSchema';
 import { OrganizationErrors } from './OrganizationErrors';
 
 export interface CreateOrganizationDependencies {
   organizationRepository: OrganizationRepository;
-  boardRepository: BoardRepository;
 }
 
 export class CreateOrganizationUseCase {
@@ -16,11 +13,8 @@ export class CreateOrganizationUseCase {
 
   async execute(
     input: CreateOrganizationInput,
-    userId: string,
-    defaultBoardName: string
-  ): Promise<
-    Result<{ organization: Organization; generalBoard: Board }, string>
-  > {
+    userId: string
+  ): Promise<Result<{ organization: Organization }, string>> {
     const { name, description, parentId } = input;
 
     // Check if organization with this name already exists
@@ -61,19 +55,8 @@ export class CreateOrganizationUseCase {
     // Save the organization
     const savedOrg = await this.deps.organizationRepository.save(organization);
 
-    // Create the general board with the translated name
-    const boardResult = Board.create(defaultBoardName, savedOrg.id, true);
-
-    if (!boardResult.success) {
-      return failure(boardResult.error);
-    }
-
-    const generalBoard = boardResult.value;
-    const savedBoard = await this.deps.boardRepository.save(generalBoard);
-
     return success({
       organization: savedOrg,
-      generalBoard: savedBoard,
     });
   }
 }

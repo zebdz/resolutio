@@ -3,11 +3,15 @@
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Badge } from '@/app/components/catalyst/badge';
+import { Button } from '@/app/components/catalyst/button';
 import { Heading } from '@/app/components/catalyst/heading';
 import { Text } from '@/app/components/catalyst/text';
 import { Divider } from '@/app/components/catalyst/divider';
 import { Link } from '@/src/i18n/routing';
-import { getUserOrganizationsAction } from '@/web/actions/organization';
+import {
+  getUserOrganizationsAction,
+  cancelJoinRequestAction,
+} from '@/web/actions/organization';
 
 interface UserOrganization {
   id: string;
@@ -30,6 +34,7 @@ export function UserOrganizationsList() {
   const [pending, setPending] = useState<UserOrganization[]>([]);
   const [rejected, setRejected] = useState<UserOrganization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -66,6 +71,19 @@ export function UserOrganizationsList() {
 
     loadOrganizations();
   }, []);
+
+  const handleCancel = async (organizationId: string) => {
+    setCancellingId(organizationId);
+    const result = await cancelJoinRequestAction(organizationId);
+
+    if (result.success) {
+      setPending((prev) => prev.filter((org) => org.id !== organizationId));
+    } else {
+      setError(result.error);
+    }
+
+    setCancellingId(null);
+  };
 
   if (isLoading) {
     return (
@@ -141,27 +159,39 @@ export function UserOrganizationsList() {
             </Heading>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {pending.map((org) => (
-                <Link
+                <div
                   key={org.id}
-                  href={`/organizations/${org.id}`}
-                  className="block rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
+                  className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
                 >
-                  <div className="flex items-start justify-between">
-                    <Heading level={3} className="text-lg font-semibold">
-                      {org.name}
-                    </Heading>
-                    <Badge color="yellow">{t('joinRequest.pending')}</Badge>
-                  </div>
-                  <Text className="mt-2 line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">
-                    {org.description}
-                  </Text>
-                  {org.requestedAt && (
-                    <Text className="mt-4 text-xs text-zinc-500 dark:text-zinc-500">
-                      {t('joinRequest.requested')}{' '}
-                      {org.requestedAt.toLocaleDateString()}
+                  <Link href={`/organizations/${org.id}`} className="block">
+                    <div className="flex items-start justify-between">
+                      <Heading level={3} className="text-lg font-semibold">
+                        {org.name}
+                      </Heading>
+                      <Badge color="yellow">{t('joinRequest.pending')}</Badge>
+                    </div>
+                    <Text className="mt-2 line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">
+                      {org.description}
                     </Text>
-                  )}
-                </Link>
+                    {org.requestedAt && (
+                      <Text className="mt-4 text-xs text-zinc-500 dark:text-zinc-500">
+                        {t('joinRequest.requested')}{' '}
+                        {org.requestedAt.toLocaleDateString()}
+                      </Text>
+                    )}
+                  </Link>
+                  <div className="mt-4">
+                    <Button
+                      color="red"
+                      onClick={() => handleCancel(org.id)}
+                      disabled={cancellingId === org.id}
+                    >
+                      {cancellingId === org.id
+                        ? t('joinRequest.cancelling')
+                        : t('joinRequest.cancel')}
+                    </Button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>

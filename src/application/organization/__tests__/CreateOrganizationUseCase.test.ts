@@ -2,8 +2,6 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { CreateOrganizationUseCase } from '../CreateOrganizationUseCase';
 import { Organization } from '../../../domain/organization/Organization';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
-import { BoardRepository } from '../../../domain/board/BoardRepository';
-import { Board } from '../../../domain/board/Board';
 import { OrganizationErrors } from '../OrganizationErrors';
 import { OrganizationDomainCodes } from '@/src/domain/organization/OrganizationDomainCodes';
 
@@ -60,7 +58,6 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
 
   async isUserMember(userId: string, organizationId: string): Promise<boolean> {
-    // For testing purposes, we'll track this in memory
     return false;
   }
 
@@ -105,74 +102,14 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
 }
 
-class MockBoardRepository implements BoardRepository {
-  private boards: Board[] = [];
-
-  async save(board: Board): Promise<Board> {
-    (board as any).props.id = `board-${Date.now()}`;
-    this.boards.push(board);
-
-    return board;
-  }
-
-  async findById(id: string): Promise<Board | null> {
-    return this.boards.find((board) => board.id === id) || null;
-  }
-
-  async findByOrganizationId(organizationId: string): Promise<Board[]> {
-    return this.boards.filter(
-      (board) => board.organizationId === organizationId
-    );
-  }
-
-  async findGeneralBoardByOrganizationId(
-    organizationId: string
-  ): Promise<Board | null> {
-    return (
-      this.boards.find(
-        (board) => board.organizationId === organizationId && board.isGeneral
-      ) || null
-    );
-  }
-
-  async isUserMember(userId: string, boardId: string): Promise<boolean> {
-    return false;
-  }
-
-  async addUserToBoard(userId: string, boardId: string): Promise<void> {
-    // Mock implementation
-  }
-
-  async removeUserFromBoard(userId: string, boardId: string): Promise<void> {
-    // Mock implementation
-  }
-
-  async update(board: Board): Promise<Board> {
-    const index = this.boards.findIndex((b) => b.id === board.id);
-
-    if (index !== -1) {
-      this.boards[index] = board;
-    }
-
-    return board;
-  }
-
-  getBoards(): Board[] {
-    return this.boards;
-  }
-}
-
 describe('CreateOrganizationUseCase', () => {
   let useCase: CreateOrganizationUseCase;
   let organizationRepository: MockOrganizationRepository;
-  let boardRepository: MockBoardRepository;
 
   beforeEach(() => {
     organizationRepository = new MockOrganizationRepository();
-    boardRepository = new MockBoardRepository();
     useCase = new CreateOrganizationUseCase({
       organizationRepository,
-      boardRepository,
     });
   });
 
@@ -183,7 +120,7 @@ describe('CreateOrganizationUseCase', () => {
       parentId: null,
     };
 
-    const result = await useCase.execute(input, 'user-123', 'General Meeting');
+    const result = await useCase.execute(input, 'user-123');
 
     expect(result.success).toBe(true);
 
@@ -195,43 +132,6 @@ describe('CreateOrganizationUseCase', () => {
     }
   });
 
-  it('should create a general board with English name for English users', async () => {
-    const input = {
-      name: 'Test Organization',
-      description: 'This is a test organization',
-      parentId: null,
-    };
-
-    const result = await useCase.execute(input, 'user-123', 'General Meeting');
-
-    expect(result.success).toBe(true);
-
-    if (result.success) {
-      expect(result.value.generalBoard.name).toBe('General Meeting');
-      expect(result.value.generalBoard.isGeneral).toBe(true);
-      expect(result.value.generalBoard.organizationId).toBe(
-        result.value.organization.id
-      );
-    }
-  });
-
-  it('should create a general board with Russian name for Russian users', async () => {
-    const input = {
-      name: 'Тестовая организация',
-      description: 'Это тестовая организация',
-      parentId: null,
-    };
-
-    const result = await useCase.execute(input, 'user-456', 'Общее собрание');
-
-    expect(result.success).toBe(true);
-
-    if (result.success) {
-      expect(result.value.generalBoard.name).toBe('Общее собрание');
-      expect(result.value.generalBoard.isGeneral).toBe(true);
-    }
-  });
-
   it('should fail if organization name is empty', async () => {
     const input = {
       name: '',
@@ -239,7 +139,7 @@ describe('CreateOrganizationUseCase', () => {
       parentId: null,
     };
 
-    const result = await useCase.execute(input, 'user-123', 'General Meeting');
+    const result = await useCase.execute(input, 'user-123');
 
     expect(result.success).toBe(false);
 
@@ -257,7 +157,7 @@ describe('CreateOrganizationUseCase', () => {
       parentId: null,
     };
 
-    const result = await useCase.execute(input, 'user-123', 'General Meeting');
+    const result = await useCase.execute(input, 'user-123');
 
     expect(result.success).toBe(false);
 
@@ -275,7 +175,7 @@ describe('CreateOrganizationUseCase', () => {
       parentId: 'non-existent-org',
     };
 
-    const result = await useCase.execute(input, 'user-123', 'General Meeting');
+    const result = await useCase.execute(input, 'user-123');
 
     expect(result.success).toBe(false);
 
@@ -292,11 +192,7 @@ describe('CreateOrganizationUseCase', () => {
       parentId: null,
     };
 
-    const parentResult = await useCase.execute(
-      parentInput,
-      'user-123',
-      'General Meeting'
-    );
+    const parentResult = await useCase.execute(parentInput, 'user-123');
     expect(parentResult.success).toBe(true);
 
     if (parentResult.success) {
@@ -309,11 +205,7 @@ describe('CreateOrganizationUseCase', () => {
         parentId,
       };
 
-      const childResult = await useCase.execute(
-        childInput,
-        'user-456',
-        'General Meeting'
-      );
+      const childResult = await useCase.execute(childInput, 'user-456');
 
       expect(childResult.success).toBe(true);
 

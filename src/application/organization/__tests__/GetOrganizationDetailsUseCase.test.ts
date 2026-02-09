@@ -144,16 +144,6 @@ class MockBoardRepository implements BoardRepository {
     );
   }
 
-  async findGeneralBoardByOrganizationId(
-    organizationId: string
-  ): Promise<Board | null> {
-    return (
-      Array.from(this.boards.values()).find(
-        (b) => b.organizationId === organizationId && b.isGeneral
-      ) || null
-    );
-  }
-
   async isUserMember(userId: string, boardId: string): Promise<boolean> {
     return this.boardMembers.get(boardId)?.has(userId) || false;
   }
@@ -298,7 +288,7 @@ describe('GetOrganizationDetailsUseCase', () => {
         await organizationRepository.save(organization);
       }
 
-      const board1Result = Board.create('General Board', 'org-1', true);
+      const board1Result = Board.create('General Board', 'org-1');
       expect(board1Result.success).toBe(true);
 
       if (board1Result.success) {
@@ -307,7 +297,7 @@ describe('GetOrganizationDetailsUseCase', () => {
         await boardRepository.save(board1);
       }
 
-      const board2Result = Board.create('Special Board', 'org-1', false);
+      const board2Result = Board.create('Special Board', 'org-1');
       expect(board2Result.success).toBe(true);
 
       if (board2Result.success) {

@@ -28,7 +28,9 @@ export class PrismaParticipantRepository implements ParticipantRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to create participants: ${error}`);
+      console.error('Failed to create participants:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -43,7 +45,9 @@ export class PrismaParticipantRepository implements ParticipantRepository {
 
       return success(participants.map((p) => this.toDomainParticipant(p)));
     } catch (error) {
-      return failure(`Failed to get participants: ${error}`);
+      console.error('Failed to get participants:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -61,7 +65,9 @@ export class PrismaParticipantRepository implements ParticipantRepository {
 
       return success(this.toDomainParticipant(participant));
     } catch (error) {
-      return failure(`Failed to get participant: ${error}`);
+      console.error('Failed to get participant:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -85,7 +91,9 @@ export class PrismaParticipantRepository implements ParticipantRepository {
 
       return success(this.toDomainParticipant(participant));
     } catch (error) {
-      return failure(`Failed to get participant: ${error}`);
+      console.error('Failed to get participant:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -102,7 +110,9 @@ export class PrismaParticipantRepository implements ParticipantRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to update participant weight: ${error}`);
+      console.error('Failed to update participant weight:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -116,7 +126,9 @@ export class PrismaParticipantRepository implements ParticipantRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to delete participant: ${error}`);
+      console.error('Failed to delete participant:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -130,7 +142,9 @@ export class PrismaParticipantRepository implements ParticipantRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to delete participants: ${error}`);
+      console.error('Failed to delete participants:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -152,7 +166,9 @@ export class PrismaParticipantRepository implements ParticipantRepository {
 
       return success(this.toDomainWeightHistory(created));
     } catch (error) {
-      return failure(`Failed to create weight history: ${error}`);
+      console.error('Failed to create weight history:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -167,7 +183,9 @@ export class PrismaParticipantRepository implements ParticipantRepository {
 
       return success(history.map((h) => this.toDomainWeightHistory(h)));
     } catch (error) {
-      return failure(`Failed to get weight history: ${error}`);
+      console.error('Failed to get weight history:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -182,7 +200,9 @@ export class PrismaParticipantRepository implements ParticipantRepository {
 
       return success(history.map((h) => this.toDomainWeightHistory(h)));
     } catch (error) {
-      return failure(`Failed to get participant weight history: ${error}`);
+      console.error('Failed to get participant weight history:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -247,7 +267,9 @@ export class PrismaParticipantRepository implements ParticipantRepository {
 
       return success(savedParticipants.map((p) => this.toDomainParticipant(p)));
     } catch (error) {
-      return failure(`Failed to execute activation: ${error}`);
+      console.error('Failed to execute activation:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 

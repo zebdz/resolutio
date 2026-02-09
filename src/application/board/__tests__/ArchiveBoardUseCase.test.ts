@@ -28,14 +28,8 @@ class MockBoardRepository implements BoardRepository {
     );
   }
 
-  async findGeneralBoardByOrganizationId(
-    organizationId: string
-  ): Promise<Board | null> {
-    return (
-      Array.from(this.boards.values()).find(
-        (b) => b.organizationId === organizationId && b.isGeneral
-      ) || null
-    );
+  async findBoardMembers(boardId: string): Promise<{ userId: string }[]> {
+    return [];
   }
 
   async isUserMember(userId: string, boardId: string): Promise<boolean> {
@@ -327,27 +321,6 @@ describe('ArchiveBoardUseCase', () => {
 
       if (!result.success) {
         expect(result.error).toBe('domain.board.boardAlreadyArchived');
-      }
-    });
-
-    it('should fail when trying to archive the general board', async () => {
-      const boardResult = Board.create('General Board', 'org-1', true);
-
-      if (boardResult.success) {
-        const board = boardResult.value;
-        (board as any).props.id = 'board-general';
-        boardRepository.addBoard(board);
-      }
-
-      const result = await useCase.execute({
-        boardId: 'board-general',
-        adminUserId: 'admin-1',
-      });
-
-      expect(result.success).toBe(false);
-
-      if (!result.success) {
-        expect(result.error).toBe('board.errors.cannotArchiveGeneral');
       }
     });
   });

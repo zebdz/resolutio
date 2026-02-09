@@ -8,6 +8,8 @@ import {
   UpdateQuestionOrderData,
 } from '../../../domain/poll/PollRepository';
 import { BoardRepository } from '../../../domain/board/BoardRepository';
+import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
+import { Organization } from '../../../domain/organization/Organization';
 import { Board } from '../../../domain/board/Board';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
@@ -22,7 +24,6 @@ class MockPollRepository implements PollRepository {
 
   async createPoll(poll: Poll): Promise<Result<Poll, string>> {
     const id = `poll-${this.nextId++}`;
-    // Use reflection to set the id
     (poll as any).props.id = id;
     this.polls.set(id, poll);
 
@@ -36,6 +37,16 @@ class MockPollRepository implements PollRepository {
   async getPollsByBoardId(boardId: string): Promise<Result<Poll[], string>> {
     const polls = Array.from(this.polls.values()).filter(
       (p) => p.boardId === boardId && !p.isArchived()
+    );
+
+    return success(polls);
+  }
+
+  async getPollsByOrganizationId(
+    orgId: string
+  ): Promise<Result<Poll[], string>> {
+    const polls = Array.from(this.polls.values()).filter(
+      (p) => p.organizationId === orgId && !p.isArchived()
     );
 
     return success(polls);
@@ -173,7 +184,7 @@ class MockPollRepository implements PollRepository {
 // Mock BoardRepository
 class MockBoardRepository implements BoardRepository {
   private boards: Map<string, Board> = new Map();
-  private members: Map<string, Set<string>> = new Map(); // boardId -> Set of userIds
+  private members: Map<string, Set<string>> = new Map();
 
   async save(board: Board): Promise<Board> {
     this.boards.set(board.id, board);
@@ -191,14 +202,10 @@ class MockBoardRepository implements BoardRepository {
     );
   }
 
-  async findGeneralBoardByOrganizationId(
-    organizationId: string
-  ): Promise<Board | null> {
-    return (
-      Array.from(this.boards.values()).find(
-        (b) => b.organizationId === organizationId && b.isGeneral
-      ) || null
-    );
+  async findBoardMembers(boardId: string): Promise<{ userId: string }[]> {
+    const members = this.members.get(boardId);
+
+    return members ? Array.from(members).map((userId) => ({ userId })) : [];
   }
 
   async isUserMember(userId: string, boardId: string): Promise<boolean> {
@@ -242,193 +249,236 @@ class MockBoardRepository implements BoardRepository {
   }
 }
 
+// Mock OrganizationRepository (partial - only methods needed)
+class MockOrganizationRepository {
+  private members: Map<string, Set<string>> = new Map();
+
+  async isUserMember(userId: string, organizationId: string): Promise<boolean> {
+    return this.members.get(organizationId)?.has(userId) || false;
+  }
+
+  addMember(userId: string, organizationId: string): void {
+    if (!this.members.has(organizationId)) {
+      this.members.set(organizationId, new Set());
+    }
+
+    this.members.get(organizationId)!.add(userId);
+  }
+}
+
 describe('CreatePollUseCase', () => {
   let useCase: CreatePollUseCase;
   let pollRepository: MockPollRepository;
   let boardRepository: MockBoardRepository;
+  let organizationRepository: MockOrganizationRepository;
 
   beforeEach(() => {
     pollRepository = new MockPollRepository();
     boardRepository = new MockBoardRepository();
-    useCase = new CreatePollUseCase(pollRepository, boardRepository);
+    organizationRepository = new MockOrganizationRepository();
+    useCase = new CreatePollUseCase(
+      pollRepository,
+      boardRepository,
+      organizationRepository as unknown as OrganizationRepository
+    );
   });
 
-  it('should create a poll when user is a board member', async () => {
-    // Arrange
-    const boardResult = Board.create('Test Board', 'org-1', false);
-    expect(boardResult.success).toBe(true);
-    const board = boardResult.value;
-    (board as any).props.id = 'board-1';
-    boardRepository.addBoard(board);
-    await boardRepository.addUserToBoard('user-1', 'board-1');
+  describe('board-specific polls', () => {
+    it('should create a poll when user is a board member', async () => {
+      const boardResult = Board.create('Test Board', 'org-1');
+      expect(boardResult.success).toBe(true);
+      const board = boardResult.value;
+      (board as any).props.id = 'board-1';
+      boardRepository.addBoard(board);
+      await boardRepository.addUserToBoard('user-1', 'board-1');
 
-    const startDate = new Date('2025-01-01');
-    const endDate = new Date('2025-12-31');
+      const startDate = new Date('2025-01-01');
+      const endDate = new Date('2025-12-31');
 
-    // Act
-    const result = await useCase.execute({
-      title: 'Test Poll',
-      description: 'This is a test poll',
-      boardId: 'board-1',
-      createdBy: 'user-1',
-      startDate,
-      endDate,
+      const result = await useCase.execute({
+        title: 'Test Poll',
+        description: 'This is a test poll',
+        organizationId: 'org-1',
+        boardId: 'board-1',
+        createdBy: 'user-1',
+        startDate,
+        endDate,
+      });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.title).toBe('Test Poll');
+        expect(result.value.description).toBe('This is a test poll');
+        expect(result.value.organizationId).toBe('org-1');
+        expect(result.value.boardId).toBe('board-1');
+        expect(result.value.createdBy).toBe('user-1');
+        expect(result.value.startDate).toEqual(startDate);
+        expect(result.value.endDate).toEqual(endDate);
+        expect(result.value.isDraft()).toBe(true);
+      }
     });
 
-    // Assert
-    expect(result.success).toBe(true);
+    it('should fail when user is not a board member', async () => {
+      const boardResult = Board.create('Test Board', 'org-1');
+      expect(boardResult.success).toBe(true);
+      const board = boardResult.value;
+      (board as any).props.id = 'board-1';
+      boardRepository.addBoard(board);
 
-    if (result.success) {
-      expect(result.value.title).toBe('Test Poll');
-      expect(result.value.description).toBe('This is a test poll');
-      expect(result.value.boardId).toBe('board-1');
-      expect(result.value.createdBy).toBe('user-1');
-      expect(result.value.startDate).toEqual(startDate);
-      expect(result.value.endDate).toEqual(endDate);
-      expect(result.value.isDraft()).toBe(true);
-    }
+      const result = await useCase.execute({
+        title: 'Test Poll',
+        description: 'This is a test poll',
+        organizationId: 'org-1',
+        boardId: 'board-1',
+        createdBy: 'user-1',
+        startDate: new Date('2025-01-01'),
+        endDate: new Date('2025-12-31'),
+      });
+
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        expect(result.error).toBe(PollErrors.NOT_BOARD_MEMBER);
+      }
+    });
+
+    it('should fail when board does not exist', async () => {
+      const result = await useCase.execute({
+        title: 'Test Poll',
+        description: 'This is a test poll',
+        organizationId: 'org-1',
+        boardId: 'non-existent-board',
+        createdBy: 'user-1',
+        startDate: new Date('2025-01-01'),
+        endDate: new Date('2025-12-31'),
+      });
+
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        expect(result.error).toBe(PollErrors.BOARD_NOT_FOUND);
+      }
+    });
   });
 
-  it('should fail when user is not a board member', async () => {
-    // Arrange
-    const boardResult = Board.create('Test Board', 'org-1', false);
-    expect(boardResult.success).toBe(true);
-    const board = boardResult.value;
-    (board as any).props.id = 'board-1';
-    boardRepository.addBoard(board);
-    // Note: not adding user as member
+  describe('org-wide polls', () => {
+    it('should create an org-wide poll when user is org member', async () => {
+      organizationRepository.addMember('user-1', 'org-1');
 
-    const startDate = new Date('2025-01-01');
-    const endDate = new Date('2025-12-31');
+      const startDate = new Date('2025-01-01');
+      const endDate = new Date('2025-12-31');
 
-    // Act
-    const result = await useCase.execute({
-      title: 'Test Poll',
-      description: 'This is a test poll',
-      boardId: 'board-1',
-      createdBy: 'user-1',
-      startDate,
-      endDate,
+      const result = await useCase.execute({
+        title: 'Org-Wide Poll',
+        description: 'A poll for the whole organization',
+        organizationId: 'org-1',
+        boardId: null,
+        createdBy: 'user-1',
+        startDate,
+        endDate,
+      });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.title).toBe('Org-Wide Poll');
+        expect(result.value.organizationId).toBe('org-1');
+        expect(result.value.boardId).toBeNull();
+        expect(result.value.createdBy).toBe('user-1');
+      }
     });
 
-    // Assert
-    expect(result.success).toBe(false);
+    it('should fail when user is not an org member', async () => {
+      const result = await useCase.execute({
+        title: 'Org-Wide Poll',
+        description: 'A poll for the whole organization',
+        organizationId: 'org-1',
+        boardId: null,
+        createdBy: 'user-1',
+        startDate: new Date('2025-01-01'),
+        endDate: new Date('2025-12-31'),
+      });
 
-    if (!result.success) {
-      expect(result.error).toBe(PollErrors.NOT_BOARD_MEMBER);
-    }
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        expect(result.error).toBe(PollErrors.NOT_ORG_MEMBER);
+      }
+    });
   });
 
-  it('should fail when board does not exist', async () => {
-    // Arrange
-    const startDate = new Date('2025-01-01');
-    const endDate = new Date('2025-12-31');
+  describe('validation', () => {
+    it('should fail when title is empty', async () => {
+      const boardResult = Board.create('Test Board', 'org-1');
+      const board = boardResult.value;
+      (board as any).props.id = 'board-1';
+      boardRepository.addBoard(board);
+      await boardRepository.addUserToBoard('user-1', 'board-1');
 
-    // Act
-    const result = await useCase.execute({
-      title: 'Test Poll',
-      description: 'This is a test poll',
-      boardId: 'non-existent-board',
-      createdBy: 'user-1',
-      startDate,
-      endDate,
+      const result = await useCase.execute({
+        title: '',
+        description: 'This is a test poll',
+        organizationId: 'org-1',
+        boardId: 'board-1',
+        createdBy: 'user-1',
+        startDate: new Date('2025-01-01'),
+        endDate: new Date('2025-12-31'),
+      });
+
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        expect(result.error).toContain('title');
+      }
     });
 
-    // Assert
-    expect(result.success).toBe(false);
+    it('should fail when description is empty', async () => {
+      const boardResult = Board.create('Test Board', 'org-1');
+      const board = boardResult.value;
+      (board as any).props.id = 'board-1';
+      boardRepository.addBoard(board);
+      await boardRepository.addUserToBoard('user-1', 'board-1');
 
-    if (!result.success) {
-      expect(result.error).toBe(PollErrors.BOARD_NOT_FOUND);
-    }
-  });
+      const result = await useCase.execute({
+        title: 'Test Poll',
+        description: '',
+        organizationId: 'org-1',
+        boardId: 'board-1',
+        createdBy: 'user-1',
+        startDate: new Date('2025-01-01'),
+        endDate: new Date('2025-12-31'),
+      });
 
-  it('should fail when title is empty', async () => {
-    // Arrange
-    const boardResult = Board.create('Test Board', 'org-1', false);
-    expect(boardResult.success).toBe(true);
-    const board = boardResult.value;
-    (board as any).props.id = 'board-1';
-    boardRepository.addBoard(board);
-    await boardRepository.addUserToBoard('user-1', 'board-1');
+      expect(result.success).toBe(false);
 
-    const startDate = new Date('2025-01-01');
-    const endDate = new Date('2025-12-31');
-
-    // Act
-    const result = await useCase.execute({
-      title: '',
-      description: 'This is a test poll',
-      boardId: 'board-1',
-      createdBy: 'user-1',
-      startDate,
-      endDate,
+      if (!result.success) {
+        expect(result.error).toContain('description');
+      }
     });
 
-    // Assert
-    expect(result.success).toBe(false);
+    it('should fail when start date is after end date', async () => {
+      const boardResult = Board.create('Test Board', 'org-1');
+      const board = boardResult.value;
+      (board as any).props.id = 'board-1';
+      boardRepository.addBoard(board);
+      await boardRepository.addUserToBoard('user-1', 'board-1');
 
-    if (!result.success) {
-      expect(result.error).toContain('title');
-    }
-  });
+      const result = await useCase.execute({
+        title: 'Test Poll',
+        description: 'This is a test poll',
+        organizationId: 'org-1',
+        boardId: 'board-1',
+        createdBy: 'user-1',
+        startDate: new Date('2025-12-31'),
+        endDate: new Date('2025-01-01'),
+      });
 
-  it('should fail when description is empty', async () => {
-    // Arrange
-    const boardResult = Board.create('Test Board', 'org-1', false);
-    expect(boardResult.success).toBe(true);
-    const board = boardResult.value;
-    (board as any).props.id = 'board-1';
-    boardRepository.addBoard(board);
-    await boardRepository.addUserToBoard('user-1', 'board-1');
+      expect(result.success).toBe(false);
 
-    const startDate = new Date('2025-01-01');
-    const endDate = new Date('2025-12-31');
-
-    // Act
-    const result = await useCase.execute({
-      title: 'Test Poll',
-      description: '',
-      boardId: 'board-1',
-      createdBy: 'user-1',
-      startDate,
-      endDate,
+      if (!result.success) {
+        expect(result.error).toBe(PollDomainCodes.POLL_INVALID_DATES);
+      }
     });
-
-    // Assert
-    expect(result.success).toBe(false);
-
-    if (!result.success) {
-      expect(result.error).toContain('description');
-    }
-  });
-
-  it('should fail when start date is after end date', async () => {
-    // Arrange
-    const boardResult = Board.create('Test Board', 'org-1', false);
-    expect(boardResult.success).toBe(true);
-    const board = boardResult.value;
-    (board as any).props.id = 'board-1';
-    boardRepository.addBoard(board);
-    await boardRepository.addUserToBoard('user-1', 'board-1');
-
-    const startDate = new Date('2025-12-31');
-    const endDate = new Date('2025-01-01');
-
-    // Act
-    const result = await useCase.execute({
-      title: 'Test Poll',
-      description: 'This is a test poll',
-      boardId: 'board-1',
-      createdBy: 'user-1',
-      startDate,
-      endDate,
-    });
-
-    // Assert
-    expect(result.success).toBe(false);
-
-    if (!result.success) {
-      expect(result.error).toBe(PollDomainCodes.POLL_INVALID_DATES);
-    }
   });
 });

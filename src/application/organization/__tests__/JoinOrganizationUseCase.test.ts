@@ -26,6 +26,7 @@ class MockPrismaClient {
 class MockOrganizationRepository implements OrganizationRepository {
   private organizations: Map<string, Organization> = new Map();
   private memberships: Map<string, Set<string>> = new Map(); // userId -> Set<orgId>
+  private pendingRequests: Map<string, Set<string>> = new Map(); // userId -> Set<orgId>
 
   async save(organization: Organization): Promise<Organization> {
     (organization as any).props.id = `org-${Date.now()}`;
@@ -91,7 +92,10 @@ class MockOrganizationRepository implements OrganizationRepository {
     return userOrgs ? userOrgs.has(organizationId) : false;
   }
 
-  async isUserAdmin(userId: string, organizationId: string): Promise<boolean> {
+  async isUserAdmin(
+    _userId: string,
+    _organizationId: string
+  ): Promise<boolean> {
     return false;
   }
 
@@ -111,7 +115,7 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
 
   async findAdminOrganizationsByUserId(
-    userId: string
+    _userId: string
   ): Promise<Organization[]> {
     return [];
   }
@@ -136,6 +140,38 @@ class MockOrganizationRepository implements OrganizationRepository {
     return organization;
   }
 
+  async findAcceptedMemberUserIdsIncludingDescendants(
+    _organizationId: string
+  ): Promise<string[]> {
+    return [];
+  }
+
+  async removeUserFromOrganization(
+    userId: string,
+    organizationId: string
+  ): Promise<void> {
+    const userOrgs = this.memberships.get(userId);
+
+    if (userOrgs) {
+      userOrgs.delete(organizationId);
+    }
+  }
+
+  async findPendingRequestsByUserId(userId: string): Promise<Organization[]> {
+    const pendingOrgIds = this.pendingRequests.get(userId) || new Set();
+    const orgs: Organization[] = [];
+
+    for (const orgId of pendingOrgIds) {
+      const org = await this.findById(orgId);
+
+      if (org) {
+        orgs.push(org);
+      }
+    }
+
+    return orgs;
+  }
+
   // Helper methods for tests
   addMembership(userId: string, organizationId: string) {
     if (!this.memberships.has(userId)) {
@@ -143,6 +179,14 @@ class MockOrganizationRepository implements OrganizationRepository {
     }
 
     this.memberships.get(userId)!.add(organizationId);
+  }
+
+  addPendingRequest(userId: string, organizationId: string) {
+    if (!this.pendingRequests.has(userId)) {
+      this.pendingRequests.set(userId, new Set());
+    }
+
+    this.pendingRequests.get(userId)!.add(organizationId);
   }
 
   addOrganization(org: Organization) {
@@ -165,7 +209,6 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should successfully create a join request', async () => {
-    // Create an organization
     const orgResult = Organization.create(
       'Test Organization',
       'Test description',
@@ -178,7 +221,6 @@ describe('JoinOrganizationUseCase', () => {
       (org as any).props.id = 'org-123';
       organizationRepository.addOrganization(org);
 
-      // Join the organization
       const result = await useCase.execute(
         { organizationId: 'org-123' },
         'user-456'
@@ -202,7 +244,6 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should fail if organization is archived', async () => {
-    // Create and archive an organization
     const orgResult = Organization.create(
       'Archived Organization',
       'Test description',
@@ -230,7 +271,6 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should fail if user is already a member', async () => {
-    // Create organization
     const orgResult = Organization.create(
       'Test Organization',
       'Test description',
@@ -243,7 +283,6 @@ describe('JoinOrganizationUseCase', () => {
       (org as any).props.id = 'org-123';
       organizationRepository.addOrganization(org);
 
-      // Mock existing membership with accepted status
       prisma.organizationUser.findUnique = async () => ({
         organizationId: 'org-123',
         userId: 'user-456',
@@ -266,7 +305,6 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should fail if user has a pending request', async () => {
-    // Create organization
     const orgResult = Organization.create(
       'Test Organization',
       'Test description',
@@ -279,7 +317,6 @@ describe('JoinOrganizationUseCase', () => {
       (org as any).props.id = 'org-123';
       organizationRepository.addOrganization(org);
 
-      // Mock existing membership with pending status
       prisma.organizationUser.findUnique = async () => ({
         organizationId: 'org-123',
         userId: 'user-456',
@@ -301,8 +338,7 @@ describe('JoinOrganizationUseCase', () => {
     }
   });
 
-  it('should fail if user is member of parent organization', async () => {
-    // Create parent organization
+  it('should allow join request when member of parent org', async () => {
     const parentResult = Organization.create(
       'Parent Organization',
       'Parent description',
@@ -315,7 +351,6 @@ describe('JoinOrganizationUseCase', () => {
       (parent as any).props.id = 'org-parent';
       organizationRepository.addOrganization(parent);
 
-      // Create child organization
       const childResult = Organization.create(
         'Child Organization',
         'Child description',
@@ -332,23 +367,18 @@ describe('JoinOrganizationUseCase', () => {
         // User is member of parent
         organizationRepository.addMembership('user-456', 'org-parent');
 
-        // Try to join child
+        // Try to join child - should succeed now
         const result = await useCase.execute(
           { organizationId: 'org-child' },
           'user-456'
         );
 
-        expect(result.success).toBe(false);
-
-        if (!result.success) {
-          expect(result.error).toBe(OrganizationErrors.HIERARCHY_CONFLICT);
-        }
+        expect(result.success).toBe(true);
       }
     }
   });
 
-  it('should fail if user is member of child organization', async () => {
-    // Create parent organization
+  it('should allow join request when member of child org', async () => {
     const parentResult = Organization.create(
       'Parent Organization',
       'Parent description',
@@ -361,7 +391,6 @@ describe('JoinOrganizationUseCase', () => {
       (parent as any).props.id = 'org-parent';
       organizationRepository.addOrganization(parent);
 
-      // Create child organization
       const childResult = Organization.create(
         'Child Organization',
         'Child description',
@@ -378,7 +407,93 @@ describe('JoinOrganizationUseCase', () => {
         // User is member of child
         organizationRepository.addMembership('user-456', 'org-child');
 
-        // Try to join parent
+        // Try to join parent - should succeed now
+        const result = await useCase.execute(
+          { organizationId: 'org-parent' },
+          'user-456'
+        );
+
+        expect(result.success).toBe(true);
+      }
+    }
+  });
+
+  it('should fail if pending request in ancestor org', async () => {
+    const parentResult = Organization.create(
+      'Parent Organization',
+      'Parent description',
+      'creator-123'
+    );
+    expect(parentResult.success).toBe(true);
+
+    if (parentResult.success) {
+      const parent = parentResult.value;
+      (parent as any).props.id = 'org-parent';
+      organizationRepository.addOrganization(parent);
+
+      const childResult = Organization.create(
+        'Child Organization',
+        'Child description',
+        'creator-123',
+        'org-parent'
+      );
+      expect(childResult.success).toBe(true);
+
+      if (childResult.success) {
+        const child = childResult.value;
+        (child as any).props.id = 'org-child';
+        organizationRepository.addOrganization(child);
+
+        // User has pending request in parent
+        organizationRepository.addPendingRequest('user-456', 'org-parent');
+
+        // Try to join child - should fail
+        const result = await useCase.execute(
+          { organizationId: 'org-child' },
+          'user-456'
+        );
+
+        expect(result.success).toBe(false);
+
+        if (!result.success) {
+          expect(result.error).toBe(
+            OrganizationErrors.PENDING_HIERARCHY_REQUEST
+          );
+        }
+      }
+    }
+  });
+
+  it('should fail if pending request in descendant org', async () => {
+    const parentResult = Organization.create(
+      'Parent Organization',
+      'Parent description',
+      'creator-123'
+    );
+    expect(parentResult.success).toBe(true);
+
+    if (parentResult.success) {
+      const parent = parentResult.value;
+      (parent as any).props.id = 'org-parent';
+      organizationRepository.addOrganization(parent);
+
+      const childResult = Organization.create(
+        'Child Organization',
+        'Child description',
+        'creator-123',
+        'org-parent'
+      );
+      expect(childResult.success).toBe(true);
+
+      if (childResult.success) {
+        const child = childResult.value;
+        (child as any).props.id = 'org-child';
+        organizationRepository.addOrganization(child);
+
+        // User has pending request in child
+        organizationRepository.addPendingRequest('user-456', 'org-child');
+
+        // Try to join parent - should fail
         const result = await useCase.execute(
           { organizationId: 'org-parent' },
           'user-456'
@@ -387,7 +502,9 @@ describe('JoinOrganizationUseCase', () => {
         expect(result.success).toBe(false);
 
         if (!result.success) {
-          expect(result.error).toBe(OrganizationErrors.HIERARCHY_CONFLICT);
+          expect(result.error).toBe(
+            OrganizationErrors.PENDING_HIERARCHY_REQUEST
+          );
         }
       }
     }

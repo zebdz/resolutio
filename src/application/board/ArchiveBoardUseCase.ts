@@ -35,11 +35,6 @@ export class ArchiveBoardUseCase {
       return failure(BoardErrors.NOT_FOUND);
     }
 
-    // Cannot archive the general board
-    if (board.isGeneral) {
-      return failure(BoardErrors.CANNOT_ARCHIVE_GENERAL);
-    }
-
     // Check authorization: superadmin or org admin
     const isSuperAdmin = await this.userRepository.isSuperAdmin(
       input.adminUserId

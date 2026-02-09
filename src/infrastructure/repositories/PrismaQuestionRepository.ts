@@ -32,7 +32,9 @@ export class PrismaQuestionRepository implements QuestionRepository {
 
       return success(this.toDomainQuestion(created));
     } catch (error) {
-      return failure(`Failed to create question: ${error}`);
+      console.error('Failed to create question:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -56,7 +58,9 @@ export class PrismaQuestionRepository implements QuestionRepository {
 
       return success(this.toDomainQuestion(question));
     } catch (error) {
-      return failure(`Failed to get question: ${error}`);
+      console.error('Failed to get question:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -80,7 +84,9 @@ export class PrismaQuestionRepository implements QuestionRepository {
 
       return success(questions.map((q) => this.toDomainQuestion(q)));
     } catch (error) {
-      return failure(`Failed to get questions: ${error}`);
+      console.error('Failed to get questions:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -100,7 +106,9 @@ export class PrismaQuestionRepository implements QuestionRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to update question: ${error}`);
+      console.error('Failed to update question:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -122,7 +130,9 @@ export class PrismaQuestionRepository implements QuestionRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to update question order: ${error}`);
+      console.error('Failed to update question order:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -135,7 +145,9 @@ export class PrismaQuestionRepository implements QuestionRepository {
 
       return success(undefined);
     } catch (error) {
-      return failure(`Failed to delete question: ${error}`);
+      console.error('Failed to delete question:', error);
+
+      return failure('common.errors.unexpected');
     }
   }
 

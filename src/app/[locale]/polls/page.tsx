@@ -4,8 +4,8 @@ import { Heading, Subheading } from '@/app/components/catalyst/heading';
 import { Button } from '@/app/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import { PlusIcon } from '@heroicons/react/20/solid';
-import { getUserBoardsAction } from '@/web/actions/board';
 import { getUserPollsAction } from '@/web/actions/poll';
+import { getUserMemberOrganizationsAction } from '@/web/actions/organization';
 import { PollCard } from '@/web/components/PollCard';
 import { Toaster } from 'sonner';
 import {
@@ -26,10 +26,9 @@ export default async function PollsPage() {
     return <AuthenticatedLayout>{null}</AuthenticatedLayout>;
   }
 
-  // Check if user is a member of any boards
-  const boardsResult = await getUserBoardsAction();
-  const userBoards = boardsResult.success ? boardsResult.data : [];
-  const hasBoardMembership = userBoards.length > 0;
+  // Check if user is a member of any organization
+  const orgsResult = await getUserMemberOrganizationsAction();
+  const hasOrgMembership = orgsResult.success && orgsResult.data.length > 0;
 
   // Fetch user's polls
   const pollsResult = await getUserPollsAction();
@@ -53,18 +52,18 @@ export default async function PollsPage() {
             <Subheading>{t('myPolls')}</Subheading>
           </div>
           <Link href="/polls/create">
-            <Button color="blue" disabled={!hasBoardMembership}>
+            <Button color="blue" disabled={!hasOrgMembership}>
               <PlusIcon className="w-5 h-5 mr-2" />
               {t('createPoll')}
             </Button>
           </Link>
         </div>
 
-        {/* No board membership warning */}
-        {!hasBoardMembership && (
+        {/* No org membership warning */}
+        {!hasOrgMembership && (
           <div className="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20">
             <p className="text-sm text-yellow-800 dark:text-yellow-200">
-              {t('noBoardMembership')}
+              {t('noOrgMembership')}
             </p>
           </div>
         )}
@@ -75,7 +74,7 @@ export default async function PollsPage() {
             <p className="text-zinc-500 dark:text-zinc-400">
               {t('noPollsYet')}
             </p>
-            {hasBoardMembership && (
+            {hasOrgMembership && (
               <Link href="/polls/create" className="mt-4 inline-block">
                 <Button color="blue">
                   <PlusIcon className="w-5 h-5 mr-2" />

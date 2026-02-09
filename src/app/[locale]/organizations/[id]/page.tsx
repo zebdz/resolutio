@@ -8,7 +8,6 @@ import { Divider } from '@/app/components/catalyst/divider';
 import { Link } from '@/src/i18n/routing';
 import { getOrganizationDetailsAction } from '@/web/actions/organization';
 import { JoinOrganizationButton } from './JoinOrganizationButton';
-import { UsersIcon } from '@heroicons/react/16/solid';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 
 export default async function OrganizationDetailPage({
@@ -99,11 +98,6 @@ export default async function OrganizationDetailPage({
                         <Heading level={3} className="text-lg font-semibold">
                           {board.name}
                         </Heading>
-                        {board.isGeneral && (
-                          <Badge color="blue" className="shrink-0">
-                            <UsersIcon className="h-5 w-5 sm:h-4 sm:w-4" />
-                          </Badge>
-                        )}
                       </div>
 
                       <div className="flex items-center gap-2">

@@ -10,7 +10,8 @@ export const CreatePollSchema = z
       .string()
       .min(1, 'Poll description is required')
       .max(5000, 'Poll description is too long'),
-    boardId: z.string().min(1, 'Board ID is required'),
+    organizationId: z.string().min(1, 'Organization ID is required'),
+    boardId: z.string().nullable().default(null),
     startDate: z.coerce.date(),
     endDate: z.coerce.date(),
   })

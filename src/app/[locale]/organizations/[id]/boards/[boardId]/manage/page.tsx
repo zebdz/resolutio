@@ -59,15 +59,10 @@ export default async function ManageSingleBoardPage({ params }: PageProps) {
           <AddMemberSection boardId={boardId} availableUsers={availableUsers} />
         </div>
 
-        {/* Add Outside Member Section (only for non-general boards) */}
-        {!board.isGeneral && (
-          <div className="mb-8">
-            <AddOutsideMemberSection
-              boardId={boardId}
-              isGeneral={board.isGeneral}
-            />
-          </div>
-        )}
+        {/* Add Outside Member Section */}
+        <div className="mb-8">
+          <AddOutsideMemberSection boardId={boardId} />
+        </div>
 
         {/* Members List */}
         <div>
