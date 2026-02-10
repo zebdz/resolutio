@@ -1,6 +1,10 @@
 import { PrismaClient } from '@/generated/prisma/client';
 import { Organization } from '../../domain/organization/Organization';
-import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import {
+  OrganizationRepository,
+  OrganizationAncestor,
+  OrganizationTreeNode,
+} from '../../domain/organization/OrganizationRepository';
 
 export class PrismaOrganizationRepository implements OrganizationRepository {
   constructor(private prisma: PrismaClient) {}
@@ -316,11 +320,139 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     );
   }
 
+  async getAncestors(organizationId: string): Promise<OrganizationAncestor[]> {
+    const ancestors: OrganizationAncestor[] = [];
+    let currentId: string | null = organizationId;
+    const MAX_DEPTH = 100;
+
+    while (currentId && ancestors.length < MAX_DEPTH) {
+      const org: { parentId: string | null } | null =
+        await this.prisma.organization.findUnique({
+          where: { id: currentId },
+          select: { parentId: true },
+        });
+
+      if (!org?.parentId) {
+        break;
+      }
+
+      const parent: {
+        id: string;
+        name: string;
+        parentId: string | null;
+        archivedAt: Date | null;
+      } | null = await this.prisma.organization.findUnique({
+        where: { id: org.parentId },
+        select: { id: true, name: true, parentId: true, archivedAt: true },
+      });
+
+      if (!parent) {
+        break;
+      }
+
+      const memberCount = await this.prisma.organizationUser.findMany({
+        where: { organizationId: parent.id, status: 'accepted' },
+        select: { userId: true },
+      });
+
+      ancestors.push({
+        id: parent.id,
+        name: parent.name,
+        memberCount: memberCount.length,
+      });
+
+      currentId = parent.id;
+    }
+
+    return ancestors;
+  }
+
+  async getChildrenWithStats(
+    organizationId: string
+  ): Promise<OrganizationAncestor[]> {
+    const children = await this.prisma.organization.findMany({
+      where: { parentId: organizationId, archivedAt: null },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: { members: { where: { status: 'accepted' } } },
+        },
+      },
+    });
+
+    return children.map(
+      (child: { id: string; name: string; _count: { members: number } }) => ({
+        id: child.id,
+        name: child.name,
+        memberCount: child._count.members,
+      })
+    );
+  }
+
+  async getHierarchyTree(organizationId: string): Promise<{
+    ancestors: OrganizationAncestor[];
+    tree: OrganizationTreeNode;
+  }> {
+    const ancestors = await this.getAncestors(organizationId);
+
+    // Find root: last ancestor or the org itself if no ancestors
+    const rootId =
+      ancestors.length > 0
+        ? ancestors[ancestors.length - 1].id
+        : organizationId;
+
+    const tree = await this.buildSubtree(rootId, 0);
+
+    return { ancestors, tree };
+  }
+
+  private async buildSubtree(
+    orgId: string,
+    depth: number
+  ): Promise<OrganizationTreeNode> {
+    const MAX_DEPTH = 100;
+
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { id: true, name: true },
+    });
+
+    const memberCount = await this.prisma.organizationUser.count({
+      where: { organizationId: orgId, status: 'accepted' },
+    });
+
+    const node: OrganizationTreeNode = {
+      id: org?.id ?? orgId,
+      name: org?.name ?? '',
+      memberCount,
+      children: [],
+    };
+
+    if (depth >= MAX_DEPTH) {
+      return node;
+    }
+
+    const children = await this.prisma.organization.findMany({
+      where: { parentId: orgId, archivedAt: null },
+      select: { id: true },
+    });
+
+    node.children = await Promise.all(
+      children.map((child: { id: string }) =>
+        this.buildSubtree(child.id, depth + 1)
+      )
+    );
+
+    return node;
+  }
+
   async findAllWithStats(excludeUserMemberships?: string): Promise<
     Array<{
       organization: Organization;
       memberCount: number;
       firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      parentOrg: { id: string; name: string } | null;
     }>
   > {
     const whereClause: any = {
@@ -365,6 +497,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             },
           },
         },
+        parent: {
+          select: { id: true, name: true },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -390,6 +525,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
               lastName: org.admins[0].user.lastName,
             }
           : null,
+      parentOrg: org.parent
+        ? { id: org.parent.id, name: org.parent.name }
+        : null,
     }));
   }
 }

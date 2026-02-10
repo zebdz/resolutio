@@ -113,6 +113,28 @@ class MockOrganizationRepository implements OrganizationRepository {
 
     this.adminRoles.get(userId)!.add(orgId);
   }
+
+  async getAncestors(): Promise<
+    { id: string; name: string; memberCount: number }[]
+  > {
+    return [];
+  }
+
+  async getChildrenWithStats(): Promise<
+    { id: string; name: string; memberCount: number }[]
+  > {
+    return [];
+  }
+
+  async getHierarchyTree(): Promise<{
+    ancestors: { id: string; name: string; memberCount: number }[];
+    tree: { id: string; name: string; memberCount: number; children: any[] };
+  }> {
+    return {
+      ancestors: [],
+      tree: { id: '', name: '', memberCount: 0, children: [] },
+    };
+  }
 }
 
 describe('GetAdminOrganizationsUseCase', () => {

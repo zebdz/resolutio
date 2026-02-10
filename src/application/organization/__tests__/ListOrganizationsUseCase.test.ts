@@ -81,12 +81,14 @@ class MockOrganizationRepository implements OrganizationRepository {
       organization: Organization;
       memberCount: number;
       firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      parentOrg: { id: string; name: string } | null;
     }>
   > {
     const result: Array<{
       organization: Organization;
       memberCount: number;
       firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      parentOrg: { id: string; name: string } | null;
     }> = [];
 
     for (const org of this.organizations.values()) {
@@ -104,10 +106,21 @@ class MockOrganizationRepository implements OrganizationRepository {
         firstAdmin: null,
       };
 
+      let parentOrg: { id: string; name: string } | null = null;
+
+      if (org.parentId) {
+        const parent = this.organizations.get(org.parentId);
+
+        if (parent) {
+          parentOrg = { id: parent.id, name: parent.name };
+        }
+      }
+
       result.push({
         organization: org,
         memberCount: orgStats.memberCount,
         firstAdmin: orgStats.firstAdmin,
+        parentOrg,
       });
     }
 
@@ -141,6 +154,28 @@ class MockOrganizationRepository implements OrganizationRepository {
     }
 
     this.userMemberships.get(userId)!.add(orgId);
+  }
+
+  async getAncestors(): Promise<
+    { id: string; name: string; memberCount: number }[]
+  > {
+    return [];
+  }
+
+  async getChildrenWithStats(): Promise<
+    { id: string; name: string; memberCount: number }[]
+  > {
+    return [];
+  }
+
+  async getHierarchyTree(): Promise<{
+    ancestors: { id: string; name: string; memberCount: number }[];
+    tree: { id: string; name: string; memberCount: number; children: any[] };
+  }> {
+    return {
+      ancestors: [],
+      tree: { id: '', name: '', memberCount: 0, children: [] },
+    };
   }
 }
 

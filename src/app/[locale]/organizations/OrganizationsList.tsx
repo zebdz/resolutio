@@ -17,6 +17,7 @@ interface Organization {
   description: string;
   memberCount: number;
   firstAdmin: { id: string; firstName: string; lastName: string } | null;
+  parentOrg?: { id: string; name: string } | null;
 }
 
 interface OrganizationsListProps {
@@ -26,6 +27,7 @@ interface OrganizationsListProps {
 
 export function OrganizationsList({ organizations }: OrganizationsListProps) {
   const t = useTranslations('organization.list');
+  const tOrg = useTranslations('organization');
   const router = useRouter();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -102,6 +104,11 @@ export function OrganizationsList({ organizations }: OrganizationsListProps) {
               className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
             >
               <div className="space-y-4">
+                {org.parentOrg && (
+                  <Text className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {tOrg('parentOrg', { name: org.parentOrg.name })}
+                  </Text>
+                )}
                 <Link href={`/organizations/${org.id}`}>
                   <Heading
                     level={3}

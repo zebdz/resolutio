@@ -197,6 +197,7 @@ export async function listOrganizationsAction(): Promise<
       description: string;
       memberCount: number;
       firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      parentOrg: { id: string; name: string } | null;
     }>;
   }>
 > {
@@ -224,6 +225,7 @@ export async function listOrganizationsAction(): Promise<
           description: item.organization.description,
           memberCount: item.memberCount,
           firstAdmin: item.firstAdmin,
+          parentOrg: item.parentOrg,
         })),
       },
     };
@@ -332,6 +334,7 @@ export async function getAdminOrganizationsAction(): Promise<
       id: string;
       name: string;
       description: string;
+      parentOrg: { id: string; name: string } | null;
     }>;
   }>
 > {
@@ -357,15 +360,31 @@ export async function getAdminOrganizationsAction(): Promise<
       };
     }
 
-    return {
-      success: true,
-      data: {
-        organizations: result.value.organizations.map((org) => ({
+    // Fetch parent info for each org
+    const organizations = await Promise.all(
+      result.value.organizations.map(async (org) => {
+        let parentOrg: { id: string; name: string } | null = null;
+
+        if (org.parentId) {
+          const parent = await organizationRepository.findById(org.parentId);
+
+          if (parent) {
+            parentOrg = { id: parent.id, name: parent.name };
+          }
+        }
+
+        return {
           id: org.id,
           name: org.name,
           description: org.description,
-        })),
-      },
+          parentOrg,
+        };
+      })
+    );
+
+    return {
+      success: true,
+      data: { organizations },
     };
   } catch (error) {
     console.error('Error getting admin organizations:', error);
@@ -384,12 +403,14 @@ export async function getUserOrganizationsAction(): Promise<
       name: string;
       description: string;
       joinedAt: Date;
+      parentOrg: { id: string; name: string } | null;
     }>;
     pending: Array<{
       id: string;
       name: string;
       description: string;
       requestedAt: Date;
+      parentOrg: { id: string; name: string } | null;
     }>;
     rejected: Array<{
       id: string;
@@ -402,6 +423,7 @@ export async function getUserOrganizationsAction(): Promise<
         firstName: string;
         lastName: string;
       };
+      parentOrg: { id: string; name: string } | null;
     }>;
   }>
 > {
@@ -434,12 +456,14 @@ export async function getUserOrganizationsAction(): Promise<
           name: item.organization.name,
           description: item.organization.description,
           joinedAt: item.joinedAt,
+          parentOrg: item.parentOrg,
         })),
         pending: result.value.pending.map((item) => ({
           id: item.organization.id,
           name: item.organization.name,
           description: item.organization.description,
           requestedAt: item.requestedAt,
+          parentOrg: item.parentOrg,
         })),
         rejected: result.value.rejected.map((item) => ({
           id: item.organization.id,
@@ -448,6 +472,7 @@ export async function getUserOrganizationsAction(): Promise<
           rejectedAt: item.rejectedAt,
           rejectionReason: item.rejectionReason,
           rejectedBy: item.rejectedBy,
+          parentOrg: item.parentOrg,
         })),
       },
     };
@@ -606,6 +631,13 @@ export async function getOrganizationDetailsAction(
     isUserMember: boolean;
     isUserAdmin: boolean;
     firstAdmin: { id: string; firstName: string; lastName: string } | null;
+    ancestors: Array<{ id: string; name: string; memberCount: number }>;
+    hierarchyTree: {
+      id: string;
+      name: string;
+      memberCount: number;
+      children: any[];
+    };
   }>
 > {
   const t = await getTranslations('common.errors');
@@ -643,6 +675,8 @@ export async function getOrganizationDetailsAction(
         isUserMember: result.value.isUserMember,
         isUserAdmin: result.value.isUserAdmin,
         firstAdmin: result.value.firstAdmin,
+        ancestors: result.value.ancestors,
+        hierarchyTree: result.value.hierarchyTree,
       },
     };
   } catch (error) {

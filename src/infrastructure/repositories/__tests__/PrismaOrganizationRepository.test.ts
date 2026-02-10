@@ -15,6 +15,7 @@ function createMockPrisma() {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
+      count: vi.fn(),
       delete: vi.fn(),
     },
     organizationAdminUser: {
@@ -578,6 +579,260 @@ describe('PrismaOrganizationRepository', () => {
       expect(mockPrisma.organizationAdminUser.findMany).toHaveBeenCalledWith({
         where: { userId: 'user-1' },
         include: { organization: true },
+      });
+    });
+  });
+
+  // ─── getAncestors ───────────────────────────────────────────────
+
+  describe('getAncestors', () => {
+    it('returns empty array for root org (no parent)', async () => {
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        parentId: null,
+      });
+
+      const result = await repo.getAncestors('root-org');
+
+      expect(result).toEqual([]);
+    });
+
+    it('returns [parent] for org with one parent', async () => {
+      // child lookup → has parent
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        parentId: 'parent-1',
+      });
+      // parent lookup → root (no parent), plus name + member count
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        id: 'parent-1',
+        name: 'Parent Org',
+        parentId: null,
+        archivedAt: null,
+      });
+      mockPrisma.organizationUser.findMany.mockResolvedValueOnce([
+        { userId: 'u1' },
+        { userId: 'u2' },
+      ]);
+      // next iteration: parent has no parent → stop
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        parentId: null,
+      });
+
+      const result = await repo.getAncestors('child-1');
+
+      expect(result).toEqual([
+        { id: 'parent-1', name: 'Parent Org', memberCount: 2 },
+      ]);
+    });
+
+    it('returns [parent, grandparent] for 3-level hierarchy', async () => {
+      // grandchild → has parent child-1
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        parentId: 'child-1',
+      });
+      // fetch child-1 details
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        id: 'child-1',
+        name: 'Child Org',
+        parentId: 'root-1',
+        archivedAt: null,
+      });
+      mockPrisma.organizationUser.findMany.mockResolvedValueOnce([
+        { userId: 'u1' },
+      ]);
+      // child-1 → has parent root-1
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        parentId: 'root-1',
+      });
+      // fetch root-1 details
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        id: 'root-1',
+        name: 'Root Org',
+        parentId: null,
+        archivedAt: null,
+      });
+      mockPrisma.organizationUser.findMany.mockResolvedValueOnce([
+        { userId: 'u1' },
+        { userId: 'u2' },
+        { userId: 'u3' },
+      ]);
+      // root-1 has no parent → stop
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        parentId: null,
+      });
+
+      const result = await repo.getAncestors('grandchild-1');
+
+      expect(result).toEqual([
+        { id: 'child-1', name: 'Child Org', memberCount: 1 },
+        { id: 'root-1', name: 'Root Org', memberCount: 3 },
+      ]);
+    });
+  });
+
+  // ─── getChildrenWithStats ─────────────────────────────────────
+
+  describe('getChildrenWithStats', () => {
+    it('returns empty array when no children', async () => {
+      mockPrisma.organization.findMany.mockResolvedValueOnce([]);
+
+      const result = await repo.getChildrenWithStats('org-1');
+
+      expect(result).toEqual([]);
+    });
+
+    it('returns children with member counts, excluding archived', async () => {
+      mockPrisma.organization.findMany.mockResolvedValueOnce([
+        {
+          id: 'child-1',
+          name: 'Child 1',
+          _count: { members: 5 },
+        },
+        {
+          id: 'child-2',
+          name: 'Child 2',
+          _count: { members: 0 },
+        },
+      ]);
+
+      const result = await repo.getChildrenWithStats('org-1');
+
+      expect(result).toEqual([
+        { id: 'child-1', name: 'Child 1', memberCount: 5 },
+        { id: 'child-2', name: 'Child 2', memberCount: 0 },
+      ]);
+
+      expect(mockPrisma.organization.findMany).toHaveBeenCalledWith({
+        where: { parentId: 'org-1', archivedAt: null },
+        select: {
+          id: true,
+          name: true,
+          _count: {
+            select: { members: { where: { status: 'accepted' } } },
+          },
+        },
+      });
+    });
+  });
+
+  // ─── getHierarchyTree ──────────────────────────────────────────
+
+  describe('getHierarchyTree', () => {
+    it('returns single-node tree for root org with no children', async () => {
+      // getAncestors: root has no parent
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        parentId: null,
+      });
+      // buildSubtree for root: fetch org details
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        id: 'root-1',
+        name: 'Root Org',
+      });
+      mockPrisma.organizationUser.count.mockResolvedValueOnce(3);
+      // no children
+      mockPrisma.organization.findMany.mockResolvedValueOnce([]);
+
+      const result = await repo.getHierarchyTree('root-1');
+
+      expect(result.ancestors).toEqual([]);
+      expect(result.tree).toEqual({
+        id: 'root-1',
+        name: 'Root Org',
+        memberCount: 3,
+        children: [],
+      });
+    });
+
+    it('returns correct tree for root → child → grandchild', async () => {
+      // getAncestors for grandchild-1:
+      // 1st findUnique: grandchild has parent child-1
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        parentId: 'child-1',
+      });
+      // fetch child-1 details
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        id: 'child-1',
+        name: 'Child',
+        parentId: 'root-1',
+        archivedAt: null,
+      });
+      mockPrisma.organizationUser.findMany.mockResolvedValueOnce([
+        { userId: 'u1' },
+      ]);
+      // child-1 has parent root-1
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        parentId: 'root-1',
+      });
+      // fetch root-1 details
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        id: 'root-1',
+        name: 'Root',
+        parentId: null,
+        archivedAt: null,
+      });
+      mockPrisma.organizationUser.findMany.mockResolvedValueOnce([
+        { userId: 'u1' },
+        { userId: 'u2' },
+      ]);
+      // root-1 has no parent → stop
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        parentId: null,
+      });
+
+      // buildSubtree from root-1:
+      // root node
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        id: 'root-1',
+        name: 'Root',
+      });
+      mockPrisma.organizationUser.count.mockResolvedValueOnce(2);
+      // root children: [child-1]
+      mockPrisma.organization.findMany.mockResolvedValueOnce([
+        { id: 'child-1' },
+      ]);
+      // child-1 node
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        id: 'child-1',
+        name: 'Child',
+      });
+      mockPrisma.organizationUser.count.mockResolvedValueOnce(1);
+      // child-1 children: [grandchild-1]
+      mockPrisma.organization.findMany.mockResolvedValueOnce([
+        { id: 'grandchild-1' },
+      ]);
+      // grandchild-1 node
+      mockPrisma.organization.findUnique.mockResolvedValueOnce({
+        id: 'grandchild-1',
+        name: 'Grandchild',
+      });
+      mockPrisma.organizationUser.count.mockResolvedValueOnce(0);
+      // grandchild-1 children: []
+      mockPrisma.organization.findMany.mockResolvedValueOnce([]);
+
+      const result = await repo.getHierarchyTree('grandchild-1');
+
+      expect(result.ancestors).toEqual([
+        { id: 'child-1', name: 'Child', memberCount: 1 },
+        { id: 'root-1', name: 'Root', memberCount: 2 },
+      ]);
+      expect(result.tree).toEqual({
+        id: 'root-1',
+        name: 'Root',
+        memberCount: 2,
+        children: [
+          {
+            id: 'child-1',
+            name: 'Child',
+            memberCount: 1,
+            children: [
+              {
+                id: 'grandchild-1',
+                name: 'Grandchild',
+                memberCount: 0,
+                children: [],
+              },
+            ],
+          },
+        ],
       });
     });
   });

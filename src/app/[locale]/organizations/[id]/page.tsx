@@ -9,6 +9,7 @@ import { Link } from '@/src/i18n/routing';
 import { getOrganizationDetailsAction } from '@/web/actions/organization';
 import { JoinOrganizationButton } from './JoinOrganizationButton';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { OrgHierarchyTree } from '@/app/components/OrgHierarchyTree';
 
 export default async function OrganizationDetailPage({
   params,
@@ -37,8 +38,14 @@ export default async function OrganizationDetailPage({
     );
   }
 
-  const { organization, boards, isUserMember, isUserAdmin, firstAdmin } =
-    result.data;
+  const {
+    organization,
+    boards,
+    isUserMember,
+    isUserAdmin,
+    firstAdmin,
+    hierarchyTree,
+  } = result.data;
 
   return (
     <AuthenticatedLayout>
@@ -62,6 +69,9 @@ export default async function OrganizationDetailPage({
             {organization.description}
           </Text>
         </div>
+
+        {/* Hierarchy Tree */}
+        <OrgHierarchyTree tree={hierarchyTree} currentOrgId={id} />
 
         {/* Action Buttons for Logged-in Users */}
         {user && !isUserMember && (

@@ -26,12 +26,14 @@ interface UserOrganization {
     firstName: string;
     lastName: string;
   };
+  parentOrg?: { id: string; name: string } | null;
 }
 
 interface AdminOrganization {
   id: string;
   name: string;
   description: string;
+  parentOrg?: { id: string; name: string } | null;
 }
 
 interface UserOrganizationsListProps {
@@ -42,6 +44,7 @@ export function UserOrganizationsList({
   adminOrganizations,
 }: UserOrganizationsListProps) {
   const t = useTranslations('home');
+  const tOrg = useTranslations('organization');
   const [member, setMember] = useState<UserOrganization[]>([]);
   const [pending, setPending] = useState<UserOrganization[]>([]);
   const [rejected, setRejected] = useState<UserOrganization[]>([]);
@@ -60,18 +63,21 @@ export function UserOrganizationsList({
           result.data.member.map((org) => ({
             ...org,
             joinedAt: new Date(org.joinedAt),
+            parentOrg: org.parentOrg,
           }))
         );
         setPending(
           result.data.pending.map((org) => ({
             ...org,
             requestedAt: new Date(org.requestedAt),
+            parentOrg: org.parentOrg,
           }))
         );
         setRejected(
           result.data.rejected.map((org) => ({
             ...org,
             rejectedAt: new Date(org.rejectedAt),
+            parentOrg: org.parentOrg,
           }))
         );
       } else {
@@ -150,6 +156,11 @@ export function UserOrganizationsList({
                 href={`/organizations/${org.id}`}
                 className="block rounded-lg border border-zinc-200 bg-white p-6 transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
               >
+                {org.parentOrg && (
+                  <Text className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    {tOrg('parentOrg', { name: org.parentOrg.name })}
+                  </Text>
+                )}
                 <div className="flex items-start justify-between">
                   <Heading level={3} className="text-lg font-semibold">
                     {org.name}
@@ -190,6 +201,11 @@ export function UserOrganizationsList({
                   href={`/organizations/${org.id}`}
                   className="block rounded-lg border border-zinc-200 bg-white p-6 transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
                 >
+                  {org.parentOrg && (
+                    <Text className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      {tOrg('parentOrg', { name: org.parentOrg.name })}
+                    </Text>
+                  )}
                   <div className="flex items-start justify-between">
                     <Heading level={3} className="text-lg font-semibold">
                       {org.name}

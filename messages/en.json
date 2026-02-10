@@ -134,6 +134,7 @@
         "hierarchyConflict": "You cannot create an organization under a parent where you are already a member"
       }
     },
+    "parentOrg": "Part of {name}",
     "list": {
       "title": "Browse Organizations",
       "subtitle": "Find and join organizations",
@@ -191,7 +192,11 @@
       "showResults": "Show Results",
       "viewDetails": "View Details",
       "noBoards": "No boards available",
-      "createBoard": "Create Board"
+      "createBoard": "Create Board",
+      "hierarchy": "Organization Hierarchy",
+      "collapseHierarchy": "Collapse",
+      "expandHierarchy": "Expand",
+      "memberCount": "{count, plural, =0 {No members} =1 {1 member} other {# members}}"
     },
     "pendingRequestsPage": {
       "title": "Pending Join Requests",

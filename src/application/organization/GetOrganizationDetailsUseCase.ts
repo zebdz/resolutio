@@ -1,4 +1,8 @@
-import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import {
+  OrganizationRepository,
+  OrganizationAncestor,
+  OrganizationTreeNode,
+} from '../../domain/organization/OrganizationRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
@@ -23,6 +27,8 @@ export interface OrganizationDetailsResult {
   isUserMember: boolean;
   isUserAdmin: boolean;
   firstAdmin: { id: string; firstName: string; lastName: string } | null;
+  ancestors: OrganizationAncestor[];
+  hierarchyTree: OrganizationTreeNode;
 }
 
 export interface GetOrganizationDetailsDependencies {
@@ -100,6 +106,10 @@ export class GetOrganizationDetailsUseCase {
         ));
     }
 
+    // Get hierarchy tree
+    const hierarchy =
+      await this.deps.organizationRepository.getHierarchyTree(organizationId);
+
     // Get first admin
     const firstAdmin = await this.deps.prisma.organizationAdminUser.findFirst({
       where: { organizationId },
@@ -127,6 +137,8 @@ export class GetOrganizationDetailsUseCase {
             lastName: firstAdmin.user.lastName,
           }
         : null,
+      ancestors: hierarchy.ancestors,
+      hierarchyTree: hierarchy.tree,
     });
   }
 }

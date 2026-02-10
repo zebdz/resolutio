@@ -7,6 +7,7 @@ export interface ListOrganizationsResult {
     organization: Organization;
     memberCount: number;
     firstAdmin: { id: string; firstName: string; lastName: string } | null;
+    parentOrg: { id: string; name: string } | null;
   }>;
 }
 

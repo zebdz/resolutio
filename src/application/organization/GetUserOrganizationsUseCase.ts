@@ -5,11 +5,13 @@ import { Organization } from '../../domain/organization/Organization';
 export interface MemberOrganization {
   organization: Organization;
   joinedAt: Date;
+  parentOrg: { id: string; name: string } | null;
 }
 
 export interface PendingOrganization {
   organization: Organization;
   requestedAt: Date;
+  parentOrg: { id: string; name: string } | null;
 }
 
 export interface RejectedOrganization {
@@ -21,6 +23,7 @@ export interface RejectedOrganization {
     firstName: string;
     lastName: string;
   };
+  parentOrg: { id: string; name: string } | null;
 }
 
 export interface GetUserOrganizationsResult {
@@ -44,7 +47,13 @@ export class GetUserOrganizationsUseCase {
         userId,
       },
       include: {
-        organization: true,
+        organization: {
+          include: {
+            parent: {
+              select: { id: true, name: true },
+            },
+          },
+        },
         rejectedBy: {
           select: {
             id: true,
@@ -73,15 +82,24 @@ export class GetUserOrganizationsUseCase {
         archivedAt: membership.organization.archivedAt,
       });
 
+      const parentOrg = (membership.organization as any).parent
+        ? {
+            id: (membership.organization as any).parent.id,
+            name: (membership.organization as any).parent.name,
+          }
+        : null;
+
       if (membership.status === 'accepted' && membership.acceptedAt) {
         member.push({
           organization: org,
           joinedAt: membership.acceptedAt,
+          parentOrg,
         });
       } else if (membership.status === 'pending') {
         pending.push({
           organization: org,
           requestedAt: membership.createdAt,
+          parentOrg,
         });
       } else if (
         membership.status === 'rejected' &&
@@ -97,6 +115,7 @@ export class GetUserOrganizationsUseCase {
             firstName: membership.rejectedBy.firstName,
             lastName: membership.rejectedBy.lastName,
           },
+          parentOrg,
         });
       }
     }

@@ -1,5 +1,18 @@
 import { Organization } from './Organization';
 
+export interface OrganizationAncestor {
+  id: string;
+  name: string;
+  memberCount: number;
+}
+
+export interface OrganizationTreeNode {
+  id: string;
+  name: string;
+  memberCount: number;
+  children: OrganizationTreeNode[];
+}
+
 export interface OrganizationRepository {
   /**
    * Saves a new organization to the database
@@ -66,6 +79,7 @@ export interface OrganizationRepository {
       organization: Organization;
       memberCount: number;
       firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      parentOrg: { id: string; name: string } | null;
     }>
   >;
 
@@ -94,4 +108,23 @@ export interface OrganizationRepository {
    * Finds organizations where user has a pending join request
    */
   findPendingRequestsByUserId(userId: string): Promise<Organization[]>;
+
+  /**
+   * Gets ancestors with name + member count, ordered [parent, grandparent, ...]
+   */
+  getAncestors(organizationId: string): Promise<OrganizationAncestor[]>;
+
+  /**
+   * Gets direct children with name + member count (excludes archived)
+   */
+  getChildrenWithStats(organizationId: string): Promise<OrganizationAncestor[]>;
+
+  /**
+   * Gets full hierarchy tree: ancestors list + recursive subtree from root.
+   * Excludes archived orgs. Max recursion depth: 100.
+   */
+  getHierarchyTree(organizationId: string): Promise<{
+    ancestors: OrganizationAncestor[];
+    tree: OrganizationTreeNode;
+  }>;
 }
