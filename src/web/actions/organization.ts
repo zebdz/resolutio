@@ -37,6 +37,7 @@ const userRepository = new PrismaUserRepository(prisma);
 // Use cases
 const createOrganizationUseCase = new CreateOrganizationUseCase({
   organizationRepository,
+  userRepository,
 });
 
 const listOrganizationsUseCase = new ListOrganizationsUseCase({

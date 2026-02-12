@@ -1,11 +1,13 @@
 import { Organization } from '../../domain/organization/Organization';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { CreateOrganizationInput } from './CreateOrganizationSchema';
 import { OrganizationErrors } from './OrganizationErrors';
 
 export interface CreateOrganizationDependencies {
   organizationRepository: OrganizationRepository;
+  userRepository: UserRepository;
 }
 
 export class CreateOrganizationUseCase {
@@ -35,6 +37,20 @@ export class CreateOrganizationUseCase {
 
       if (parentOrg.isArchived()) {
         return failure(OrganizationErrors.PARENT_ARCHIVED);
+      }
+
+      // Check authorization: superadmin or parent org admin
+      const isSuperAdmin = await this.deps.userRepository.isSuperAdmin(userId);
+
+      if (!isSuperAdmin) {
+        const isAdmin = await this.deps.organizationRepository.isUserAdmin(
+          userId,
+          parentId
+        );
+
+        if (!isAdmin) {
+          return failure(OrganizationErrors.NOT_ADMIN);
+        }
       }
     }
 

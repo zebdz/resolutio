@@ -2,12 +2,16 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { CreateOrganizationUseCase } from '../CreateOrganizationUseCase';
 import { Organization } from '../../../domain/organization/Organization';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
+import { UserRepository } from '../../../domain/user/UserRepository';
+import { User } from '../../../domain/user/User';
+import { PhoneNumber } from '../../../domain/user/PhoneNumber';
 import { OrganizationErrors } from '../OrganizationErrors';
-import { OrganizationDomainCodes } from '@/src/domain/organization/OrganizationDomainCodes';
+import { OrganizationDomainCodes } from '@/domain/organization/OrganizationDomainCodes';
 
 // Mock repositories
 class MockOrganizationRepository implements OrganizationRepository {
   private organizations: Organization[] = [];
+  private admins: Map<string, Set<string>> = new Map();
 
   async save(organization: Organization): Promise<Organization> {
     (organization as any).props.id = `org-${Date.now()}`;
@@ -62,7 +66,17 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
 
   async isUserAdmin(userId: string, organizationId: string): Promise<boolean> {
-    return false;
+    const admins = this.admins.get(organizationId);
+
+    return admins ? admins.has(userId) : false;
+  }
+
+  addAdmin(organizationId: string, userId: string): void {
+    if (!this.admins.has(organizationId)) {
+      this.admins.set(organizationId, new Set());
+    }
+
+    this.admins.get(organizationId)!.add(userId);
   }
 
   async findMembershipsByUserId(userId: string): Promise<Organization[]> {
@@ -124,14 +138,53 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
 }
 
+class MockUserRepository implements UserRepository {
+  private superAdmins: Set<string> = new Set();
+
+  async findById(id: string): Promise<User | null> {
+    return null;
+  }
+
+  async findByIds(ids: string[]): Promise<User[]> {
+    return [];
+  }
+
+  async findByPhoneNumber(phoneNumber: PhoneNumber): Promise<User | null> {
+    return null;
+  }
+
+  async save(user: User): Promise<User> {
+    return user;
+  }
+
+  async exists(phoneNumber: PhoneNumber): Promise<boolean> {
+    return false;
+  }
+
+  async searchUsers(query: string): Promise<User[]> {
+    return [];
+  }
+
+  async isSuperAdmin(userId: string): Promise<boolean> {
+    return this.superAdmins.has(userId);
+  }
+
+  addSuperAdmin(userId: string): void {
+    this.superAdmins.add(userId);
+  }
+}
+
 describe('CreateOrganizationUseCase', () => {
   let useCase: CreateOrganizationUseCase;
   let organizationRepository: MockOrganizationRepository;
+  let userRepository: MockUserRepository;
 
   beforeEach(() => {
     organizationRepository = new MockOrganizationRepository();
+    userRepository = new MockUserRepository();
     useCase = new CreateOrganizationUseCase({
       organizationRepository,
+      userRepository,
     });
   });
 
@@ -206,7 +259,7 @@ describe('CreateOrganizationUseCase', () => {
     }
   });
 
-  it('should create a child organization under a valid parent', async () => {
+  it('should create a child organization under a valid parent when user is admin', async () => {
     // First create a parent organization
     const parentInput = {
       name: 'Parent Organization',
@@ -219,15 +272,74 @@ describe('CreateOrganizationUseCase', () => {
 
     if (parentResult.success) {
       const parentId = parentResult.value.organization.id;
+      organizationRepository.addAdmin(parentId, 'admin-user');
 
-      // Now create a child organization
       const childInput = {
         name: 'Child Organization',
         description: 'This is a child organization',
         parentId,
       };
 
-      const childResult = await useCase.execute(childInput, 'user-456');
+      const childResult = await useCase.execute(childInput, 'admin-user');
+
+      expect(childResult.success).toBe(true);
+
+      if (childResult.success) {
+        expect(childResult.value.organization.parentId).toBe(parentId);
+      }
+    }
+  });
+
+  it('should fail to create child organization when user is not admin of parent', async () => {
+    const parentInput = {
+      name: 'Parent Organization',
+      description: 'This is a parent organization',
+      parentId: null,
+    };
+
+    const parentResult = await useCase.execute(parentInput, 'user-123');
+    expect(parentResult.success).toBe(true);
+
+    if (parentResult.success) {
+      const parentId = parentResult.value.organization.id;
+
+      const childInput = {
+        name: 'Child Organization',
+        description: 'This is a child organization',
+        parentId,
+      };
+
+      const childResult = await useCase.execute(childInput, 'non-admin-user');
+
+      expect(childResult.success).toBe(false);
+
+      if (!childResult.success) {
+        expect(childResult.error).toBe(OrganizationErrors.NOT_ADMIN);
+      }
+    }
+  });
+
+  it('should allow superadmin to create child organization without being org admin', async () => {
+    const parentInput = {
+      name: 'Parent Organization',
+      description: 'This is a parent organization',
+      parentId: null,
+    };
+
+    const parentResult = await useCase.execute(parentInput, 'user-123');
+    expect(parentResult.success).toBe(true);
+
+    if (parentResult.success) {
+      const parentId = parentResult.value.organization.id;
+      userRepository.addSuperAdmin('superadmin-1');
+
+      const childInput = {
+        name: 'Child Organization',
+        description: 'This is a child organization',
+        parentId,
+      };
+
+      const childResult = await useCase.execute(childInput, 'superadmin-1');
 
       expect(childResult.success).toBe(true);
 

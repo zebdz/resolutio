@@ -16,13 +16,22 @@ export default defineConfig({
     ],
   },
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './'),
-      '@/src': path.resolve(__dirname, './src'),
-      '@/domain': path.resolve(__dirname, './src/domain'),
-      '@/application': path.resolve(__dirname, './src/application'),
-      '@/infrastructure': path.resolve(__dirname, './src/infrastructure'),
-      '@/web': path.resolve(__dirname, './src/web'),
-    },
+    alias: [
+      { find: '@/src', replacement: path.resolve(__dirname, './src') },
+      {
+        find: '@/domain',
+        replacement: path.resolve(__dirname, './src/domain'),
+      },
+      {
+        find: '@/application',
+        replacement: path.resolve(__dirname, './src/application'),
+      },
+      {
+        find: '@/infrastructure',
+        replacement: path.resolve(__dirname, './src/infrastructure'),
+      },
+      { find: '@/web', replacement: path.resolve(__dirname, './src/web') },
+      { find: '@', replacement: path.resolve(__dirname, './') },
+    ],
   },
 });
