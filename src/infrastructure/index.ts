@@ -12,6 +12,8 @@ export { PrismaVoteRepository } from './repositories/PrismaVoteRepository';
 export { PrismaQuestionRepository } from './repositories/PrismaQuestionRepository';
 export { PrismaAnswerRepository } from './repositories/PrismaAnswerRepository';
 export { PrismaDraftRepository } from './repositories/PrismaDraftRepository';
+export { PrismaJoinParentRequestRepository } from './repositories/PrismaJoinParentRequestRepository';
+export { PrismaNotificationRepository } from './repositories/PrismaNotificationRepository';
 
 // Auth
 export { Argon2PasswordHasher } from './auth/Argon2PasswordHasher';

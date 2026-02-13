@@ -127,4 +127,14 @@ export interface OrganizationRepository {
     ancestors: OrganizationAncestor[];
     tree: OrganizationTreeNode;
   }>;
+
+  /**
+   * Gets all admin user IDs for an organization
+   */
+  findAdminUserIds(organizationId: string): Promise<string[]>;
+
+  /**
+   * Sets the parentId of an organization (used for join parent request acceptance)
+   */
+  setParentId(organizationId: string, parentId: string | null): Promise<void>;
 }

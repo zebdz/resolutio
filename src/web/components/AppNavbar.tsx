@@ -15,11 +15,14 @@ import {
   ChartBarIcon,
   ShieldCheckIcon,
   UserCircleIcon,
+  BellIcon,
 } from '@heroicons/react/20/solid';
+import { Badge } from '@/app/components/catalyst/badge';
 import { LocaleSwitcher } from './LocaleSwitcher';
 
 interface AppNavbarProps {
   isSuperAdmin: boolean;
+  unreadNotificationCount: number;
 }
 
 function isItemCurrent(itemHref: string, pathname: string): boolean {
@@ -33,7 +36,10 @@ function isItemCurrent(itemHref: string, pathname: string): boolean {
   return pathWithoutLocale.startsWith(itemHref);
 }
 
-export function AppNavbar({ isSuperAdmin }: AppNavbarProps) {
+export function AppNavbar({
+  isSuperAdmin,
+  unreadNotificationCount,
+}: AppNavbarProps) {
   const t = useTranslations('navbar');
   const pathname = usePathname();
 
@@ -68,6 +74,23 @@ export function AppNavbar({ isSuperAdmin }: AppNavbarProps) {
       <NavbarSpacer />
 
       <NavbarSection>
+        <NavbarItem
+          href="/notifications"
+          current={isItemCurrent('/notifications', pathname)}
+          aria-label={t('notifications')}
+        >
+          <div className="relative" data-slot="icon">
+            <BellIcon className="size-full" />
+            {unreadNotificationCount > 0 && (
+              <Badge
+                color="red"
+                className="absolute -top-1.5 -right-2.5 min-w-[1.25rem] justify-center px-1 py-0 text-[10px]"
+              >
+                {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+              </Badge>
+            )}
+          </div>
+        </NavbarItem>
         <NavbarItem
           href="/account"
           current={isItemCurrent('/account', pathname)}

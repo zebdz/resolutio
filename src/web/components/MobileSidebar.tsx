@@ -16,11 +16,14 @@ import {
   ChartBarIcon,
   ShieldCheckIcon,
   UserCircleIcon,
+  BellIcon,
 } from '@heroicons/react/20/solid';
+import { Badge } from '@/app/components/catalyst/badge';
 import { LocaleSwitcher } from './LocaleSwitcher';
 
 interface MobileSidebarProps {
   isSuperAdmin: boolean;
+  unreadNotificationCount: number;
 }
 
 function isItemCurrent(itemHref: string, pathname: string): boolean {
@@ -34,7 +37,10 @@ function isItemCurrent(itemHref: string, pathname: string): boolean {
   return pathWithoutLocale.startsWith(itemHref);
 }
 
-export function MobileSidebar({ isSuperAdmin }: MobileSidebarProps) {
+export function MobileSidebar({
+  isSuperAdmin,
+  unreadNotificationCount,
+}: MobileSidebarProps) {
   const t = useTranslations('navbar');
   const pathname = usePathname();
 
@@ -76,6 +82,22 @@ export function MobileSidebar({ isSuperAdmin }: MobileSidebarProps) {
         </SidebarSection>
 
         <SidebarSection>
+          <SidebarItem
+            href="/notifications"
+            current={isItemCurrent('/notifications', pathname)}
+          >
+            <BellIcon data-slot="icon" />
+            <SidebarLabel>
+              {t('notifications')}
+              {unreadNotificationCount > 0 && (
+                <Badge color="red" className="ml-2">
+                  {unreadNotificationCount > 99
+                    ? '99+'
+                    : unreadNotificationCount}
+                </Badge>
+              )}
+            </SidebarLabel>
+          </SidebarItem>
           <SidebarItem
             href="/account"
             current={isItemCurrent('/account', pathname)}

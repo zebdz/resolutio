@@ -7,7 +7,12 @@ import { Badge } from '@/app/components/catalyst/badge';
 import { Divider } from '@/app/components/catalyst/divider';
 import { Link } from '@/src/i18n/routing';
 import { getOrganizationDetailsAction } from '@/web/actions/organization';
+import {
+  getChildOrgJoinParentRequestAction,
+  getIncomingJoinParentRequestsAction,
+} from '@/web/actions/joinParentRequest';
 import { JoinOrganizationButton } from './JoinOrganizationButton';
+import { CancelJoinParentButton } from './CancelJoinParentButton';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 import { OrgHierarchyTree } from '@/app/components/OrgHierarchyTree';
 
@@ -47,6 +52,33 @@ export default async function OrganizationDetailPage({
     hierarchyTree,
   } = result.data;
 
+  const tJoinParent = await getTranslations('organization.joinParent');
+
+  // Fetch join parent request data for admins
+  let pendingParentRequest: {
+    id: string;
+    parentOrgId: string;
+    parentOrgName: string;
+    message: string;
+    createdAt: Date;
+  } | null = null;
+  let incomingParentRequestCount = 0;
+
+  if (isUserAdmin) {
+    const [childReqResult, incomingReqResult] = await Promise.all([
+      getChildOrgJoinParentRequestAction(id),
+      getIncomingJoinParentRequestsAction(id),
+    ]);
+
+    if (childReqResult.success) {
+      pendingParentRequest = childReqResult.data.request;
+    }
+
+    if (incomingReqResult.success) {
+      incomingParentRequestCount = incomingReqResult.data.requests.length;
+    }
+  }
+
   return (
     <AuthenticatedLayout>
       <div className="space-y-8">
@@ -79,13 +111,47 @@ export default async function OrganizationDetailPage({
         )}
 
         {isUserAdmin && (
-          <div className="flex gap-4 flex-wrap">
-            <Link href={`/organizations/${id}/pending-requests`}>
-              <Button color="amber">{t('pendingRequests')}</Button>
-            </Link>
-            <Link href={`/organizations/${id}/boards/manage`}>
-              <Button color="blue">{t('manageBoards')}</Button>
-            </Link>
+          <div className="space-y-4">
+            <div className="flex gap-4 flex-wrap">
+              <Link href={`/organizations/${id}/pending-requests`}>
+                <Button color="amber">{t('pendingRequests')}</Button>
+              </Link>
+              <Link href={`/organizations/${id}/boards/manage`}>
+                <Button color="blue">{t('manageBoards')}</Button>
+              </Link>
+              <Link href={`/organizations/${id}/join-parent-requests`}>
+                <Button color="amber">
+                  {tJoinParent('manageRequests')}
+                  {incomingParentRequestCount > 0 && (
+                    <Badge color="red" className="ml-2">
+                      {incomingParentRequestCount}
+                    </Badge>
+                  )}
+                </Button>
+              </Link>
+            </div>
+
+            {/* Pending Parent Request Status */}
+            {pendingParentRequest ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+                <Text className="font-medium text-amber-800 dark:text-amber-200">
+                  {tJoinParent('pendingRequestDescription', {
+                    parentName: pendingParentRequest.parentOrgName,
+                  })}
+                </Text>
+                <Text className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+                  {tJoinParent('requestMessage')}:{' '}
+                  {pendingParentRequest.message}
+                </Text>
+                <div className="mt-3">
+                  <CancelJoinParentButton requestId={pendingParentRequest.id} />
+                </div>
+              </div>
+            ) : (
+              <Link href={`/organizations/${id}/join-parent`}>
+                <Button color="indigo">{tJoinParent('title')}</Button>
+              </Link>
+            )}
           </div>
         )}
 

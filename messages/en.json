@@ -112,7 +112,15 @@
       "invalidStatus": "Invalid request status",
       "requestNotFound": "Join request not found",
       "notPending": "Join request is not pending",
-      "pendingHierarchyRequest": "You already have a pending request in a related organization. Cancel it first."
+      "pendingHierarchyRequest": "You already have a pending request in a related organization. Cancel it first.",
+      "cannotJoinOwnDescendant": "Cannot join a descendant organization as parent",
+      "pendingParentRequest": "There is already a pending request to join a parent organization",
+      "parentRequestNotFound": "Parent join request not found",
+      "parentRequestNotPending": "Parent join request is not pending",
+      "sameOrganization": "Cannot request to join the same organization",
+      "childOrgNotFound": "Child organization not found",
+      "childOrgArchived": "Child organization is archived",
+      "rejectionReasonRequired": "Rejection reason is required"
     },
     "create": {
       "title": "Create Organization",
@@ -211,6 +219,59 @@
       "rejecting": "Rejecting...",
       "actions": "Actions"
     },
+    "joinParent": {
+      "title": "Request to Join Parent Organization",
+      "subtitle": "Send a request for {organization} to join a parent organization",
+      "selectParent": "Select Parent Organization",
+      "selectParentPlaceholder": "Choose an organization...",
+      "message": "Message",
+      "messagePlaceholder": "Explain why your organization wants to join this parent...",
+      "submit": "Send Request",
+      "submitting": "Sending...",
+      "success": "Join parent request sent successfully",
+      "cancel": "Cancel",
+      "pendingRequest": "Pending Parent Request",
+      "pendingRequestDescription": "Your organization has a pending request to join {parentName}",
+      "cancelRequest": "Cancel Request",
+      "cancelling": "Cancelling...",
+      "cancelSuccess": "Join parent request cancelled",
+      "requestMessage": "Message",
+      "requestedAt": "Requested on",
+      "incomingRequests": "Incoming Parent Requests",
+      "incomingRequestsCount": "{count, plural, =0 {No requests} =1 {1 request} other {# requests}}",
+      "noIncomingRequests": "No incoming parent requests",
+      "noIncomingRequestsDescription": "When child organizations request to join, their requests will appear here.",
+      "childOrg": "Child Organization",
+      "requestingAdmin": "Requesting Admin",
+      "accept": "Accept",
+      "reject": "Reject",
+      "accepting": "Accepting...",
+      "rejecting": "Rejecting...",
+      "rejectDialogTitle": "Reject Parent Join Request",
+      "rejectDialogDescription": "Are you sure you want to reject {childOrg}'s request to join your organization?",
+      "rejectionReasonLabel": "Reason for rejection",
+      "rejectionReasonPlaceholder": "Explain why this request is being rejected...",
+      "confirmReject": "Reject Request",
+      "acceptSuccess": "Request accepted. Organization is now a child.",
+      "rejectSuccess": "Request rejected.",
+      "noOrganizationsAvailable": "No organizations available to join",
+      "loadingOrganizations": "Loading organizations...",
+      "managementTitle": "Join Parent Requests",
+      "incomingSection": "Incoming Requests",
+      "outgoingSection": "Outgoing Requests",
+      "noOutgoingRequests": "No outgoing requests",
+      "noOutgoingRequestsDescription": "When this organization requests to join a parent, those requests will appear here.",
+      "statusPending": "Pending",
+      "statusAccepted": "Accepted",
+      "statusRejected": "Rejected",
+      "columnStatus": "Status",
+      "columnParentOrg": "Parent Organization",
+      "columnChildOrg": "Child Organization",
+      "columnHandlingAdmin": "Handling Admin",
+      "columnRejectionReason": "Rejection Reason",
+      "columnHandledAt": "Handled At",
+      "manageRequests": "Manage Requests"
+    },
     "boards": {
       "isGeneral": "general",
       "manage": {
@@ -283,6 +344,7 @@
     "saving": "Saving...",
     "delete": "Delete",
     "edit": "Edit",
+    "actions": "Actions",
     "errors": {
       "unexpected": "An unexpected error occurred. Please try again.",
       "validationFailed": "Validation failed",
@@ -506,12 +568,49 @@
       "weight": "Weight"
     }
   },
+  "notification": {
+    "errors": {
+      "notFound": "Notification not found",
+      "notOwner": "This notification does not belong to you",
+      "emptyIds": "No notifications selected",
+      "someNotFound": "Some notifications were not found"
+    },
+    "types": {
+      "orgJoinedParent": {
+        "title": "Organization joined parent",
+        "body": "{childOrgName} has joined {parentOrgName}"
+      },
+      "joinParentRequestReceived": {
+        "title": "New join parent request",
+        "body": "{childOrgName} wants to join {parentOrgName}"
+      }
+    },
+    "page": {
+      "title": "Notifications",
+      "empty": "No notifications yet",
+      "markAllRead": "Mark all as read",
+      "markRead": "Mark as read",
+      "unread": "Unread",
+      "date": "Date",
+      "allRead": "All notifications marked as read",
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "deleteSelected": "Delete selected",
+      "confirmDelete": "Delete {count} notifications?",
+      "confirmDeleteDescription": "This action cannot be undone. Selected notifications will be permanently deleted.",
+      "deleted": "Notifications deleted",
+      "delete": "Delete",
+      "loadMore": "Load more",
+      "cancel": "Cancel"
+    }
+  },
   "navbar": {
     "logo": "Resolutio",
     "organizations": "Organizations",
     "polls": "Polls",
     "admin": "Admin",
-    "account": "Account"
+    "account": "Account",
+    "notifications": "Notifications"
   },
   "domain": {
     "organization": {
@@ -520,6 +619,12 @@
       "organizationDescriptionEmpty": "Organization description cannot be empty",
       "organizationDescriptionTooLong": "Organization description cannot exceed 1000 characters",
       "organizationAlreadyArchived": "Organization is already archived"
+    },
+    "joinParentRequest": {
+      "messageEmpty": "Message cannot be empty",
+      "messageTooLong": "Message cannot exceed 2000 characters",
+      "notPending": "Join parent request is not pending",
+      "rejectionReasonRequired": "Rejection reason is required"
     },
     "board": {
       "boardNameEmpty": "Board name cannot be empty",

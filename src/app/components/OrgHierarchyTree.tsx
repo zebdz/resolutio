@@ -28,10 +28,14 @@ function TreeDiagram({
 }) {
   const t = useTranslations('organization.detail');
   const [zoom, setZoom] = useState(1);
+  const [isPanning, setIsPanning] = useState(false);
   const zoomRef = useRef(1);
   const baseBoxRef = useRef({ x: 0, y: 0, w: 0, h: 0 });
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const panStartRef = useRef({ x: 0, y: 0 });
+  const viewBoxStartRef = useRef({ x: 0, y: 0 });
+  const isPanningRef = useRef(false);
   const router = useRouter();
 
   const applyZoom = useCallback((level: number) => {
@@ -39,9 +43,18 @@ function TreeDiagram({
       return;
     }
 
-    const { x, y, w, h } = baseBoxRef.current;
-    const cx = x + w / 2;
-    const cy = y + h / 2;
+    const { w, h } = baseBoxRef.current;
+    // Read current viewBox center to preserve pan offset
+    const parts = svgRef.current
+      .getAttribute('viewBox')
+      ?.split(' ')
+      .map(Number);
+    const curVbX = parts?.[0] ?? baseBoxRef.current.x;
+    const curVbY = parts?.[1] ?? baseBoxRef.current.y;
+    const curVbW = parts?.[2] ?? w;
+    const curVbH = parts?.[3] ?? h;
+    const cx = curVbX + curVbW / 2;
+    const cy = curVbY + curVbH / 2;
     const nw = w / level;
     const nh = h / level;
     svgRef.current.setAttribute(
@@ -68,8 +81,15 @@ function TreeDiagram({
   }, [updateZoom]);
 
   const zoomReset = useCallback(() => {
-    updateZoom(1);
-  }, [updateZoom]);
+    // Reset both zoom and pan to original view
+    if (svgRef.current) {
+      const { x, y, w, h } = baseBoxRef.current;
+      svgRef.current.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+    }
+
+    zoomRef.current = 1;
+    setZoom(1);
+  }, []);
 
   // Scroll-wheel zoom
   useEffect(() => {
@@ -93,6 +113,93 @@ function TreeDiagram({
 
     return () => container.removeEventListener('wheel', handleWheel);
   }, [zoomIn, zoomOut]);
+
+  // Pointer drag-to-pan (activates only after moving beyond threshold)
+  useEffect(() => {
+    const container = containerRef.current;
+
+    if (!container) {
+      return;
+    }
+
+    const DRAG_THRESHOLD = 4; // px — below this, treat as click
+    let pointerDown = false;
+
+    const onPointerDown = (e: PointerEvent) => {
+      if ((e.target as HTMLElement).closest('button, a')) {
+        return;
+      }
+
+      pointerDown = true;
+      isPanningRef.current = false;
+      panStartRef.current = { x: e.clientX, y: e.clientY };
+      const parts = svgRef.current
+        ?.getAttribute('viewBox')
+        ?.split(' ')
+        .map(Number);
+
+      if (parts) {
+        viewBoxStartRef.current = { x: parts[0], y: parts[1] };
+      }
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!pointerDown || !svgRef.current) {
+        return;
+      }
+
+      const mx = e.clientX - panStartRef.current.x;
+      const my = e.clientY - panStartRef.current.y;
+
+      // Activate panning only after exceeding threshold
+      if (!isPanningRef.current) {
+        if (Math.abs(mx) < DRAG_THRESHOLD && Math.abs(my) < DRAG_THRESHOLD) {
+          return;
+        }
+
+        isPanningRef.current = true;
+        setIsPanning(true);
+      }
+
+      const parts = svgRef.current
+        .getAttribute('viewBox')
+        ?.split(' ')
+        .map(Number);
+
+      if (!parts) {
+        return;
+      }
+
+      const vbW = parts[2];
+      const vbH = parts[3];
+      const scale_x = vbW / container.clientWidth;
+      const scale_y = vbH / container.clientHeight;
+      const dx = mx * scale_x;
+      const dy = my * scale_y;
+      svgRef.current.setAttribute(
+        'viewBox',
+        `${viewBoxStartRef.current.x - dx} ${viewBoxStartRef.current.y - dy} ${vbW} ${vbH}`
+      );
+    };
+
+    const onPointerUp = () => {
+      pointerDown = false;
+      isPanningRef.current = false;
+      setIsPanning(false);
+    };
+
+    container.addEventListener('pointerdown', onPointerDown);
+    container.addEventListener('pointermove', onPointerMove);
+    container.addEventListener('pointerup', onPointerUp);
+    container.addEventListener('pointercancel', onPointerUp);
+
+    return () => {
+      container.removeEventListener('pointerdown', onPointerDown);
+      container.removeEventListener('pointermove', onPointerMove);
+      container.removeEventListener('pointerup', onPointerUp);
+      container.removeEventListener('pointercancel', onPointerUp);
+    };
+  }, []);
 
   // Render d3 tree
   useEffect(() => {
@@ -213,7 +320,10 @@ function TreeDiagram({
   }, [tree, currentOrgId, router, t]);
 
   return (
-    <div ref={containerRef} className="relative overflow-hidden px-4 pb-4">
+    <div
+      ref={containerRef}
+      className={`relative overflow-hidden px-4 pb-4 touch-none ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+    >
       <div className="absolute right-6 top-2 z-10 flex items-center gap-1 rounded-lg border border-zinc-200 bg-white/90 px-1 py-0.5 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/90">
         <button
           onClick={zoomOut}
@@ -240,7 +350,7 @@ function TreeDiagram({
       </div>
       <svg
         ref={svgRef}
-        className="mx-auto w-full text-zinc-800 dark:text-zinc-200"
+        className="mx-auto w-full select-none text-zinc-800 dark:text-zinc-200"
         style={{ height: 'min(600px, 70vw)' }}
         preserveAspectRatio="xMidYMid meet"
       />

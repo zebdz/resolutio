@@ -112,7 +112,15 @@
       "invalidStatus": "Неверный статус заявки",
       "requestNotFound": "Заявка на вступление не найдена",
       "notPending": "Заявка на вступление не ожидает рассмотрения",
-      "pendingHierarchyRequest": "У вас уже есть ожидающий запрос в связанной организации. Сначала отмените его."
+      "pendingHierarchyRequest": "У вас уже есть ожидающий запрос в связанной организации. Сначала отмените его.",
+      "cannotJoinOwnDescendant": "Нельзя присоединиться к дочерней организации в качестве родителя",
+      "pendingParentRequest": "Уже есть ожидающий запрос на присоединение к родительской организации",
+      "parentRequestNotFound": "Запрос на присоединение к родительской организации не найден",
+      "parentRequestNotPending": "Запрос на присоединение к родительской организации не ожидает рассмотрения",
+      "sameOrganization": "Нельзя запросить присоединение к той же организации",
+      "childOrgNotFound": "Дочерняя организация не найдена",
+      "childOrgArchived": "Дочерняя организация архивирована",
+      "rejectionReasonRequired": "Причина отклонения обязательна"
     },
     "create": {
       "title": "Создать организацию",
@@ -211,6 +219,59 @@
       "rejecting": "Отклонение...",
       "actions": "Действия"
     },
+    "joinParent": {
+      "title": "Запрос на присоединение к родительской организации",
+      "subtitle": "Отправить запрос на присоединение {organization} к родительской организации",
+      "selectParent": "Выберите родительскую организацию",
+      "selectParentPlaceholder": "Выберите организацию...",
+      "message": "Сообщение",
+      "messagePlaceholder": "Объясните, почему ваша организация хочет присоединиться...",
+      "submit": "Отправить запрос",
+      "submitting": "Отправка...",
+      "success": "Запрос на присоединение отправлен",
+      "cancel": "Отмена",
+      "pendingRequest": "Ожидающий запрос на присоединение",
+      "pendingRequestDescription": "Ваша организация ожидает одобрения на присоединение к {parentName}",
+      "cancelRequest": "Отменить запрос",
+      "cancelling": "Отмена...",
+      "cancelSuccess": "Запрос на присоединение отменён",
+      "requestMessage": "Сообщение",
+      "requestedAt": "Дата запроса",
+      "incomingRequests": "Входящие запросы на присоединение",
+      "incomingRequestsCount": "{count, plural, =0 {Нет запросов} =1 {1 запрос} few {# запроса} other {# запросов}}",
+      "noIncomingRequests": "Нет входящих запросов",
+      "noIncomingRequestsDescription": "Когда дочерние организации запросят присоединение, их запросы появятся здесь.",
+      "childOrg": "Дочерняя организация",
+      "requestingAdmin": "Запрашивающий администратор",
+      "accept": "Принять",
+      "reject": "Отклонить",
+      "accepting": "Принятие...",
+      "rejecting": "Отклонение...",
+      "rejectDialogTitle": "Отклонить запрос на присоединение",
+      "rejectDialogDescription": "Вы уверены, что хотите отклонить запрос организации {childOrg} на присоединение?",
+      "rejectionReasonLabel": "Причина отклонения",
+      "rejectionReasonPlaceholder": "Объясните, почему этот запрос отклоняется...",
+      "confirmReject": "Отклонить запрос",
+      "acceptSuccess": "Запрос принят. Организация теперь является дочерней.",
+      "rejectSuccess": "Запрос отклонён.",
+      "noOrganizationsAvailable": "Нет доступных организаций для присоединения",
+      "loadingOrganizations": "Загрузка организаций...",
+      "managementTitle": "Запросы на присоединение",
+      "incomingSection": "Входящие запросы",
+      "outgoingSection": "Исходящие запросы",
+      "noOutgoingRequests": "Нет исходящих запросов",
+      "noOutgoingRequestsDescription": "Когда эта организация отправит запрос на присоединение к родительской, запросы появятся здесь.",
+      "statusPending": "В ожидании",
+      "statusAccepted": "Принят",
+      "statusRejected": "Отклонён",
+      "columnStatus": "Статус",
+      "columnParentOrg": "Родительская организация",
+      "columnChildOrg": "Дочерняя организация",
+      "columnHandlingAdmin": "Обработавший администратор",
+      "columnRejectionReason": "Причина отклонения",
+      "columnHandledAt": "Дата обработки",
+      "manageRequests": "Управление запросами"
+    },
     "boards": {
       "isGeneral": "Общее",
       "manage": {
@@ -283,6 +344,7 @@
     "saving": "Сохранение...",
     "delete": "Удалить",
     "edit": "Редактировать",
+    "actions": "Действия",
     "errors": {
       "unexpected": "Произошла непредвиденная ошибка. Пожалуйста, попробуйте еще раз.",
       "validationFailed": "Ошибка валидации",
@@ -506,12 +568,49 @@
       "weight": "Вес"
     }
   },
+  "notification": {
+    "errors": {
+      "notFound": "Уведомление не найдено",
+      "notOwner": "Это уведомление не принадлежит вам",
+      "emptyIds": "Уведомления не выбраны",
+      "someNotFound": "Некоторые уведомления не найдены"
+    },
+    "types": {
+      "orgJoinedParent": {
+        "title": "Организация присоединилась к родительской",
+        "body": "{childOrgName} присоединилась к {parentOrgName}"
+      },
+      "joinParentRequestReceived": {
+        "title": "Новый запрос на присоединение",
+        "body": "{childOrgName} хочет присоединиться к {parentOrgName}"
+      }
+    },
+    "page": {
+      "title": "Уведомления",
+      "empty": "Уведомлений пока нет",
+      "markAllRead": "Прочитать все",
+      "markRead": "Прочитать",
+      "unread": "Непрочитанные",
+      "date": "Дата",
+      "allRead": "Все уведомления отмечены как прочитанные",
+      "selectAll": "Выбрать все",
+      "deselectAll": "Снять выбор",
+      "deleteSelected": "Удалить выбранные",
+      "confirmDelete": "Удалить {count} уведомлений?",
+      "confirmDeleteDescription": "Это действие нельзя отменить. Выбранные уведомления будут удалены навсегда.",
+      "deleted": "Уведомления удалены",
+      "delete": "Удалить",
+      "loadMore": "Загрузить ещё",
+      "cancel": "Отмена"
+    }
+  },
   "navbar": {
     "logo": "Resolutio",
     "organizations": "Организации",
     "polls": "Опросы",
     "admin": "Админ",
-    "account": "Аккаунт"
+    "account": "Аккаунт",
+    "notifications": "Уведомления"
   },
   "domain": {
     "organization": {
@@ -520,6 +619,12 @@
       "organizationDescriptionEmpty": "Описание организации не может быть пустым",
       "organizationDescriptionTooLong": "Описание организации не может превышать 1000 символов",
       "organizationAlreadyArchived": "Организация уже архивирована"
+    },
+    "joinParentRequest": {
+      "messageEmpty": "Сообщение не может быть пустым",
+      "messageTooLong": "Сообщение не может превышать 2000 символов",
+      "notPending": "Запрос на присоединение к родителю не ожидает рассмотрения",
+      "rejectionReasonRequired": "Причина отклонения обязательна"
     },
     "board": {
       "boardNameEmpty": "Название доски не может быть пустым",

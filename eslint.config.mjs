@@ -26,6 +26,7 @@ const eslintConfig = defineConfig([
       ],
       '@typescript-eslint/no-explicit-any': 'off', // temporarily disable TODO: enable later
       '@typescript-eslint/no-unused-vars': 'off', // temporarily disable TODO: enable later
+      'react-hooks/incompatible-library': 'off', // @tanstack/react-virtual not yet compatible with React Compiler
     },
   },
   // Override default ignores of eslint-config-next.

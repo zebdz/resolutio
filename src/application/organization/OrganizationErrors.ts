@@ -22,6 +22,16 @@ export const OrganizationErrors = {
   INVALID_STATUS: 'organization.errors.invalidStatus',
   REQUEST_NOT_FOUND: 'organization.errors.requestNotFound',
   NOT_PENDING: 'organization.errors.notPending',
+
+  // Join Parent Request
+  CANNOT_JOIN_OWN_DESCENDANT: 'organization.errors.cannotJoinOwnDescendant',
+  PENDING_PARENT_REQUEST: 'organization.errors.pendingParentRequest',
+  PARENT_REQUEST_NOT_FOUND: 'organization.errors.parentRequestNotFound',
+  PARENT_REQUEST_NOT_PENDING: 'organization.errors.parentRequestNotPending',
+  SAME_ORGANIZATION: 'organization.errors.sameOrganization',
+  CHILD_ORG_NOT_FOUND: 'organization.errors.childOrgNotFound',
+  CHILD_ORG_ARCHIVED: 'organization.errors.childOrgArchived',
+  REJECTION_REASON_REQUIRED: 'organization.errors.rejectionReasonRequired',
 } as const;
 
 export type OrganizationError =

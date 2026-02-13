@@ -47,6 +47,9 @@ model User {
   pollParticipants   PollParticipant[]
   voteDrafts         VoteDraft[]
   weightChanges      ParticipantWeightHistory[] @relation("WeightChangedBy")
+  requestedParentJoinRequests OrganizationJoinParentRequest[] @relation("RequestingAdmin")
+  handledParentJoinRequests   OrganizationJoinParentRequest[] @relation("HandlingAdmin")
+  notifications              Notification[]
 
   @@map("users")
 }
@@ -83,13 +86,15 @@ model Organization {
   archivedAt  DateTime? @map("archived_at")
 
   // Relations
-  createdBy   User                    @relation(fields: [createdById], references: [id])
-  parent      Organization?           @relation("OrganizationHierarchy", fields: [parentId], references: [id])
-  children    Organization[]          @relation("OrganizationHierarchy")
-  members     OrganizationUser[]
-  admins      OrganizationAdminUser[]
-  boards      Board[]
-  polls       Poll[]
+  createdBy           User                    @relation(fields: [createdById], references: [id])
+  parent              Organization?           @relation("OrganizationHierarchy", fields: [parentId], references: [id])
+  children            Organization[]          @relation("OrganizationHierarchy")
+  members             OrganizationUser[]
+  admins              OrganizationAdminUser[]
+  boards              Board[]
+  polls               Poll[]
+  childJoinRequests   OrganizationJoinParentRequest[] @relation("ChildOrgJoinParent")
+  parentJoinRequests  OrganizationJoinParentRequest[] @relation("ParentOrgJoinParent")
 
   @@index([parentId])
   @@index([createdById])
@@ -316,4 +321,47 @@ model VoteDraft {
   @@index([userId])
   @@index([pollId, userId])
   @@map("vote_drafts")
+}
+
+// Organization Join Parent Request
+model OrganizationJoinParentRequest {
+  id                String    @id @default(cuid())
+  childOrgId        String    @map("child_org_id")
+  parentOrgId       String    @map("parent_org_id")
+  requestingAdminId String    @map("requesting_admin_id")
+  handlingAdminId   String?   @map("handling_admin_id")
+  message           String
+  status            String    @default("pending") // "pending" | "accepted" | "rejected"
+  rejectionReason   String?   @map("rejection_reason")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  handledAt         DateTime? @map("handled_at")
+
+  childOrg        Organization @relation("ChildOrgJoinParent", fields: [childOrgId], references: [id], onDelete: Cascade)
+  parentOrg       Organization @relation("ParentOrgJoinParent", fields: [parentOrgId], references: [id], onDelete: Cascade)
+  requestingAdmin User         @relation("RequestingAdmin", fields: [requestingAdminId], references: [id])
+  handlingAdmin   User?        @relation("HandlingAdmin", fields: [handlingAdminId], references: [id])
+
+  @@index([childOrgId])
+  @@index([parentOrgId])
+  @@index([requestingAdminId])
+  @@index([handlingAdminId])
+  @@map("organization_join_parent_requests")
+}
+
+// Notification
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  type      String
+  title     String
+  body      String
+  data      Json?
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, readAt])
+  @@map("notifications")
 }

@@ -447,6 +447,25 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return node;
   }
 
+  async findAdminUserIds(organizationId: string): Promise<string[]> {
+    const admins = await this.prisma.organizationAdminUser.findMany({
+      where: { organizationId },
+      select: { userId: true },
+    });
+
+    return admins.map((a) => a.userId);
+  }
+
+  async setParentId(
+    organizationId: string,
+    parentId: string | null
+  ): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { parentId },
+    });
+  }
+
   async findAllWithStats(excludeUserMemberships?: string): Promise<
     Array<{
       organization: Organization;

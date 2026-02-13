@@ -135,6 +135,13 @@ class MockOrganizationRepository implements OrganizationRepository {
       tree: { id: '', name: '', memberCount: 0, children: [] },
     };
   }
+  async setParentId(
+    organizationId: string,
+    parentId: string | null
+  ): Promise<void> {}
+  async findAdminUserIds(): Promise<string[]> {
+    return [];
+  }
 }
 
 describe('GetAdminOrganizationsUseCase', () => {
