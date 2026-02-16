@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/app/components/catalyst/button';
 import {
   Dialog,
@@ -26,15 +25,16 @@ interface PollControlsProps {
   pollId: string;
   state: PollState;
   hasQuestions: boolean;
+  onStateChange: () => void;
 }
 
 export default function PollControls({
   pollId,
   state,
   hasQuestions,
+  onStateChange,
 }: PollControlsProps) {
   const t = useTranslations('poll');
-  const router = useRouter();
   const [isTakingSnapshot, setIsTakingSnapshot] = useState(false);
   const [isDiscardingSnapshot, setIsDiscardingSnapshot] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
@@ -56,7 +56,7 @@ export default function PollControls({
 
       if (result.success) {
         toast.success(t('snapshotTaken'));
-        router.refresh();
+        onStateChange();
       } else {
         toast.error(result.error);
       }
@@ -75,7 +75,7 @@ export default function PollControls({
 
       if (result.success) {
         toast.success(t('snapshotDiscarded'));
-        router.refresh();
+        onStateChange();
       } else {
         toast.error(result.error);
       }
@@ -94,7 +94,7 @@ export default function PollControls({
 
       if (result.success) {
         toast.success(t('pollActivated'));
-        router.push('/polls');
+        onStateChange();
       } else {
         toast.error(result.error);
       }
@@ -113,7 +113,7 @@ export default function PollControls({
 
       if (result.success) {
         toast.success(t('pollDeactivated'));
-        router.refresh();
+        onStateChange();
       } else {
         toast.error(result.error);
       }
@@ -133,7 +133,7 @@ export default function PollControls({
       if (result.success) {
         toast.success(t('pollFinished'));
         setShowFinishDialog(false);
-        router.push('/polls');
+        onStateChange();
       } else {
         toast.error(result.error);
       }

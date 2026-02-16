@@ -278,6 +278,7 @@ export function PollsList({
               poll={poll}
               userId={userId}
               canManage={isSuperAdmin || adminOrgIdSet.has(poll.organizationId)}
+              onPollStateChange={fetchPolls}
             />
           ))}
         </div>

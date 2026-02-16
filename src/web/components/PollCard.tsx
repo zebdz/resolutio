@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/app/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import {
@@ -23,11 +22,11 @@ interface PollCardProps {
   poll: any;
   userId: string;
   canManage: boolean;
+  onPollStateChange: () => void;
 }
 
-export function PollCard({ poll, userId, canManage }: PollCardProps) {
+export function PollCard({ poll, userId, canManage, onPollStateChange }: PollCardProps) {
   const t = useTranslations('poll');
-  const router = useRouter();
   const [isTakingSnapshot, setIsTakingSnapshot] = useState(false);
   const [isDiscardingSnapshot, setIsDiscardingSnapshot] = useState(false);
   const [isDeactivating, setIsDeactivating] = useState(false);
@@ -61,7 +60,7 @@ export function PollCard({ poll, userId, canManage }: PollCardProps) {
 
       if (result.success) {
         toast.success(t('snapshotTaken'));
-        router.refresh();
+        onPollStateChange();
       } else {
         toast.error(result.error);
       }
@@ -84,7 +83,7 @@ export function PollCard({ poll, userId, canManage }: PollCardProps) {
 
       if (result.success) {
         toast.success(t('snapshotDiscarded'));
-        router.refresh();
+        onPollStateChange();
       } else {
         toast.error(result.error);
       }
@@ -107,7 +106,7 @@ export function PollCard({ poll, userId, canManage }: PollCardProps) {
 
       if (result.success) {
         toast.success(t('pollDeactivated'));
-        router.refresh();
+        onPollStateChange();
       } else {
         toast.error(result.error);
       }
@@ -130,7 +129,7 @@ export function PollCard({ poll, userId, canManage }: PollCardProps) {
 
       if (result.success) {
         toast.success(t('pollActivated'));
-        router.refresh();
+        onPollStateChange();
       } else {
         toast.error(result.error);
       }
@@ -149,7 +148,7 @@ export function PollCard({ poll, userId, canManage }: PollCardProps) {
 
       if (result.success) {
         toast.success(t('pollFinished'));
-        router.refresh();
+        onPollStateChange();
       } else {
         toast.error(result.error);
       }

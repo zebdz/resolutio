@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Heading } from '@/app/components/catalyst/heading';
@@ -80,98 +80,98 @@ export function EditPollForm() {
   const [canEdit, setCanEdit] = useState(false);
   const [canManage, setCanManage] = useState(false);
 
+  const loadPoll = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Check if poll can be edited
+      const canEditResult = await canEditPollAction(pollId);
+
+      if (!canEditResult.success) {
+        setError(canEditResult.error);
+        setIsLoading(false);
+
+        return;
+      }
+
+      if (!canEditResult.data.canEdit) {
+        let errorMessage = t('errors.cannotModifyFinished');
+
+        if (canEditResult.data.reason === 'active') {
+          errorMessage = t('errors.cannotModifyActive');
+        } else if (canEditResult.data.reason === 'hasVotes') {
+          errorMessage = t('errors.cannotModifyHasVotes');
+        } else if (canEditResult.data.reason === 'notCreator') {
+          errorMessage = t('errors.notPollCreator');
+        }
+
+        setError(errorMessage);
+        setCanEdit(false);
+        setIsLoading(false);
+
+        return;
+      }
+
+      setCanEdit(true);
+
+      // Check if user can manage poll
+      const manageResult = await canManagePollAction(pollId);
+
+      if (manageResult.success) {
+        setCanManage(manageResult.data);
+      }
+
+      // Load poll data
+      const result = await getPollByIdAction(pollId);
+
+      if (result.success) {
+        const poll = result.data;
+
+        setPollData({
+          title: poll.title,
+          description: poll.description,
+          startDate: new Date(poll.startDate).toISOString().split('T')[0],
+          endDate: new Date(poll.endDate).toISOString().split('T')[0],
+          state: poll.state,
+        });
+
+        // Load questions
+        if (poll.questions && poll.questions.length > 0) {
+          const loadedQuestions = poll.questions.map((q: any) => ({
+            id: q.id,
+            text: q.text,
+            details: q.details || '',
+            questionType: q.questionType as QuestionType,
+            page: q.page,
+            order: q.order,
+            answers: q.answers
+              ? q.answers.map((a: any) => ({
+                  id: a.id,
+                  text: a.text,
+                  order: a.order,
+                }))
+              : [],
+          }));
+
+          setQuestions(loadedQuestions);
+          setOriginalQuestions(JSON.parse(JSON.stringify(loadedQuestions))); // Deep copy
+          setActiveQuestionId(loadedQuestions[0].id);
+        }
+      } else {
+        setError(result.error);
+      }
+    } catch (err) {
+      setError(t('errors.pollNotFound'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [pollId, t]);
+
   // Load poll data
   useEffect(() => {
-    async function loadPoll() {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        // Check if poll can be edited
-        const canEditResult = await canEditPollAction(pollId);
-
-        if (!canEditResult.success) {
-          setError(canEditResult.error);
-          setIsLoading(false);
-
-          return;
-        }
-
-        if (!canEditResult.data.canEdit) {
-          let errorMessage = t('errors.cannotModifyFinished');
-
-          if (canEditResult.data.reason === 'active') {
-            errorMessage = t('errors.cannotModifyActive');
-          } else if (canEditResult.data.reason === 'hasVotes') {
-            errorMessage = t('errors.cannotModifyHasVotes');
-          } else if (canEditResult.data.reason === 'notCreator') {
-            errorMessage = t('errors.notPollCreator');
-          }
-
-          setError(errorMessage);
-          setCanEdit(false);
-          setIsLoading(false);
-
-          return;
-        }
-
-        setCanEdit(true);
-
-        // Check if user can manage poll
-        const manageResult = await canManagePollAction(pollId);
-
-        if (manageResult.success) {
-          setCanManage(manageResult.data);
-        }
-
-        // Load poll data
-        const result = await getPollByIdAction(pollId);
-
-        if (result.success) {
-          const poll = result.data;
-
-          setPollData({
-            title: poll.title,
-            description: poll.description,
-            startDate: new Date(poll.startDate).toISOString().split('T')[0],
-            endDate: new Date(poll.endDate).toISOString().split('T')[0],
-            state: poll.state,
-          });
-
-          // Load questions
-          if (poll.questions && poll.questions.length > 0) {
-            const loadedQuestions = poll.questions.map((q: any) => ({
-              id: q.id,
-              text: q.text,
-              details: q.details || '',
-              questionType: q.questionType as QuestionType,
-              page: q.page,
-              order: q.order,
-              answers: q.answers
-                ? q.answers.map((a: any) => ({
-                    id: a.id,
-                    text: a.text,
-                    order: a.order,
-                  }))
-                : [],
-            }));
-
-            setQuestions(loadedQuestions);
-            setOriginalQuestions(JSON.parse(JSON.stringify(loadedQuestions))); // Deep copy
-            setActiveQuestionId(loadedQuestions[0].id);
-          }
-        } else {
-          setError(result.error);
-        }
-      } catch (err) {
-        setError(t('errors.pollNotFound'));
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
     loadPoll();
-  }, [pollId, t]);
+  }, [loadPoll]);
 
   // Get active question
   const activeQuestion = questions.find((q) => q.id === activeQuestionId);
@@ -612,6 +612,7 @@ export function EditPollForm() {
           pollId={pollId}
           state={pollData.state}
           hasQuestions={questions.length > 0}
+          onStateChange={loadPoll}
         />
       )}
 
