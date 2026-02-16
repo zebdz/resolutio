@@ -86,10 +86,13 @@ git push origin master
 Option B: Test manually first
 
 ```bash
+# SERVER_IP is defined in .github/workflows/deploy.yml
+export SERVER_IP=89.111.155.217
+
 yarn build
 tar -czf deploy.tar.gz .next/ node_modules/ generated/ prisma/ public/ package.json next.config.ts prisma.config.ts migrate-production.sh deploy-on-server.sh
-scp -i ~/.ssh/id_ed25519_www_root_resolutio deploy.tar.gz www-root@89.111.171.11:/var/www/www-root/data/www/resolutio.site/
-ssh -i ~/.ssh/id_ed25519_www_root_resolutio www-root@89.111.171.11
+scp -i ~/.ssh/id_ed25519_www_root_resolutio deploy.tar.gz www-root@$SERVER_IP:/var/www/www-root/data/www/resolutio.site/
+ssh -i ~/.ssh/id_ed25519_www_root_resolutio www-root@$SERVER_IP
 cd /var/www/www-root/data/www/resolutio.site
 ./deploy-on-server.sh
 ```
@@ -112,7 +115,8 @@ cd /var/www/www-root/data/www/resolutio.site
            ▼
 ┌─────────────────────┐
 │  SCP to server      │
-│  89.111.171.11      │
+│  (see SERVER_IP     │
+│   in deploy.yml)    │
 └──────────┬──────────┘
            │
            ▼

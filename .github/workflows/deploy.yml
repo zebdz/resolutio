@@ -11,7 +11,7 @@ jobs:
 
     env:
       SERVER_USER: www-root
-      SERVER_IP: 89.111.171.11
+      SERVER_IP: 89.111.155.217
       DEPLOY_DIR: /var/www/www-root/data/www/resolutio.site
       SITE_URL: https://resolutio.site
 
