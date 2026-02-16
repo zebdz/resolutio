@@ -365,3 +365,4 @@ model Notification {
   @@index([userId, readAt])
   @@map("notifications")
 }
+
