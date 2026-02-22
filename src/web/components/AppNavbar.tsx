@@ -15,9 +15,8 @@ import {
   ChartBarIcon,
   ShieldCheckIcon,
   UserCircleIcon,
-  BellIcon,
 } from '@heroicons/react/20/solid';
-import { Badge } from '@/app/components/catalyst/badge';
+import { BellIcon } from '@heroicons/react/24/outline';
 import { LocaleSwitcher } from './LocaleSwitcher';
 
 interface AppNavbarProps {
@@ -80,14 +79,11 @@ export function AppNavbar({
           aria-label={t('notifications')}
         >
           <div className="relative" data-slot="icon">
-            <BellIcon className="size-full" />
+            <BellIcon className="size-full stroke-2" />
             {unreadNotificationCount > 0 && (
-              <Badge
-                color="red"
-                className="absolute -top-1.5 -right-2.5 min-w-[1.25rem] justify-center px-1 py-0 text-[10px]"
-              >
+              <span className="absolute -top-3 -right-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold leading-none text-white ring-2 ring-white dark:ring-zinc-900">
                 {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
-              </Badge>
+              </span>
             )}
           </div>
         </NavbarItem>
