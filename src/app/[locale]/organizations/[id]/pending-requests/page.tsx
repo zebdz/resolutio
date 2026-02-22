@@ -1,14 +1,16 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import {
-  getPendingRequestsAction,
+  getOrganizationPendingRequestsAction,
   getOrganizationDetailsAction,
 } from '@/web/actions/organization';
 import { Button } from '@/app/components/catalyst/button';
 import { Heading, Subheading } from '@/app/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
-import { PendingRequestsList } from '@/app/[locale]/organizations/pending-requests/PendingRequestsList';
+import { OrgPendingRequestsList } from './OrgPendingRequestsList';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+
+const DEFAULT_PAGE_SIZE = 10;
 
 type PageProps = {
   params: Promise<{
@@ -36,17 +38,16 @@ export default async function OrganizationPendingRequestsPage({
     redirect(`/${locale}/organizations/${organizationId}`);
   }
 
-  // Get all pending requests for organizations where user is admin
-  const requestsResult = await getPendingRequestsAction();
+  // Get pending requests for this specific organization
+  const requestsResult = await getOrganizationPendingRequestsAction(
+    organizationId,
+    1,
+    DEFAULT_PAGE_SIZE
+  );
 
   if (!requestsResult.success) {
     notFound();
   }
-
-  // Filter requests for this specific organization
-  const filteredRequests = requestsResult.data.requests.filter(
-    (req) => req.organizationId === organizationId
-  );
 
   const { organization } = detailsResult.data;
 
@@ -69,7 +70,13 @@ export default async function OrganizationPendingRequestsPage({
           </Subheading>
         </div>
 
-        <PendingRequestsList requests={filteredRequests} />
+        <OrgPendingRequestsList
+          organizationId={organizationId}
+          organizationName={organization.name}
+          requests={requestsResult.data.requests}
+          totalCount={requestsResult.data.totalCount}
+          defaultPageSize={DEFAULT_PAGE_SIZE}
+        />
       </div>
     </AuthenticatedLayout>
   );

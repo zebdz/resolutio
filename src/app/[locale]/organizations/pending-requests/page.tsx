@@ -5,12 +5,15 @@ import { getPendingRequestsAction } from '@/web/actions/organization';
 import { PendingRequestsList } from './PendingRequestsList';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 
+const DEFAULT_PAGE_SIZE = 10;
+
 export default async function PendingRequestsPage() {
   const t = await getTranslations('organization.pendingRequests');
 
-  // Fetch pending requests for organizations where user is admin
-  const result = await getPendingRequestsAction();
+  // Fetch first page of pending requests
+  const result = await getPendingRequestsAction(1, DEFAULT_PAGE_SIZE);
   const requests = result.success ? result.data.requests : [];
+  const totalCount = result.success ? result.data.totalCount : 0;
 
   return (
     <AuthenticatedLayout>
@@ -24,7 +27,11 @@ export default async function PendingRequestsPage() {
         </div>
 
         {/* Pending Requests List */}
-        <PendingRequestsList requests={requests} />
+        <PendingRequestsList
+          requests={requests}
+          totalCount={totalCount}
+          defaultPageSize={DEFAULT_PAGE_SIZE}
+        />
       </div>
     </AuthenticatedLayout>
   );

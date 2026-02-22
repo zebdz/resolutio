@@ -15,6 +15,12 @@ export interface PendingRequest {
 
 export interface GetPendingRequestsResult {
   requests: PendingRequest[];
+  totalCount: number;
+}
+
+export interface GetPendingRequestsPagination {
+  page: number;
+  pageSize: number;
 }
 
 export interface GetPendingRequestsDependencies {
@@ -25,7 +31,8 @@ export class GetPendingRequestsUseCase {
   constructor(private deps: GetPendingRequestsDependencies) {}
 
   async execute(
-    adminId: string
+    adminId: string,
+    pagination?: GetPendingRequestsPagination
   ): Promise<Result<GetPendingRequestsResult, string>> {
     // 1. Get all organizations where user is admin
     const adminRoles = await this.deps.prisma.organizationAdminUser.findMany({
@@ -38,19 +45,26 @@ export class GetPendingRequestsUseCase {
     });
 
     if (adminRoles.length === 0) {
-      return success({ requests: [] });
+      return success({ requests: [], totalCount: 0 });
     }
 
     const organizationIds = adminRoles.map((role) => role.organizationId);
 
-    // 2. Get all pending requests for those organizations
-    const pendingRequests = await this.deps.prisma.organizationUser.findMany({
-      where: {
-        organizationId: {
-          in: organizationIds,
-        },
-        status: 'pending',
+    const whereClause = {
+      organizationId: {
+        in: organizationIds,
       },
+      status: 'pending' as const,
+    };
+
+    // 2. Get total count
+    const totalCount = await this.deps.prisma.organizationUser.count({
+      where: whereClause,
+    });
+
+    // 3. Get pending requests with optional pagination
+    const findManyArgs: any = {
+      where: whereClause,
       include: {
         user: {
           select: {
@@ -70,10 +84,18 @@ export class GetPendingRequestsUseCase {
       orderBy: {
         createdAt: 'asc',
       },
-    });
+    };
 
-    // 3. Map to result format
-    const requests: PendingRequest[] = pendingRequests.map((req) => ({
+    if (pagination && pagination.page > 0 && pagination.pageSize > 0) {
+      findManyArgs.skip = (pagination.page - 1) * pagination.pageSize;
+      findManyArgs.take = pagination.pageSize;
+    }
+
+    const pendingRequests =
+      await this.deps.prisma.organizationUser.findMany(findManyArgs);
+
+    // 4. Map to result format
+    const requests: PendingRequest[] = pendingRequests.map((req: any) => ({
       organizationId: req.organizationId,
       organizationName: req.organization.name,
       requester: {
@@ -85,6 +107,6 @@ export class GetPendingRequestsUseCase {
       requestedAt: req.createdAt,
     }));
 
-    return success({ requests });
+    return success({ requests, totalCount });
   }
 }

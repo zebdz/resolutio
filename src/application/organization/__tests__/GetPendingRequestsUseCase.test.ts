@@ -9,6 +9,7 @@ class MockPrismaClient {
   };
   organizationUser = {
     findMany: async (args: any): Promise<any[]> => [],
+    count: async (args: any): Promise<number> => 0,
   };
 }
 
@@ -34,12 +35,35 @@ describe('GetPendingRequestsUseCase', () => {
 
       const orgIds = args.where.organizationId.in;
 
-      return pendingRequests
+      let filtered = pendingRequests
         .filter(
           (req) =>
             orgIds.includes(req.organizationId) && req.status === 'pending'
         )
         .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+      if (args.skip !== undefined) {
+        filtered = filtered.slice(args.skip);
+      }
+
+      if (args.take !== undefined) {
+        filtered = filtered.slice(0, args.take);
+      }
+
+      return filtered;
+    };
+
+    prisma.organizationUser.count = async (args: any) => {
+      if (!args.where.organizationId || !args.where.organizationId.in) {
+        return 0;
+      }
+
+      const orgIds = args.where.organizationId.in;
+
+      return pendingRequests.filter(
+        (req) =>
+          orgIds.includes(req.organizationId) && req.status === 'pending'
+      ).length;
     };
 
     useCase = new GetPendingRequestsUseCase({
@@ -388,6 +412,129 @@ describe('GetPendingRequestsUseCase', () => {
       expect(result.value.requests[0].organizationName).toBe(
         'Organization One'
       );
+    }
+  });
+
+  it('should return totalCount alongside requests', async () => {
+    adminRoles.push({
+      organizationId: 'org-1',
+      userId: 'admin-123',
+      organization: { id: 'org-1', name: 'Org One' },
+    });
+
+    pendingRequests.push(
+      {
+        id: 'r-1',
+        organizationId: 'org-1',
+        userId: 'u-1',
+        status: 'pending',
+        createdAt: new Date('2024-01-01'),
+        user: { id: 'u-1', firstName: 'A', lastName: 'B', phoneNumber: '+1' },
+        organization: { id: 'org-1', name: 'Org One' },
+      },
+      {
+        id: 'r-2',
+        organizationId: 'org-1',
+        userId: 'u-2',
+        status: 'pending',
+        createdAt: new Date('2024-01-02'),
+        user: { id: 'u-2', firstName: 'C', lastName: 'D', phoneNumber: '+2' },
+        organization: { id: 'org-1', name: 'Org One' },
+      }
+    );
+
+    const result = await useCase.execute('admin-123');
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.totalCount).toBe(2);
+      expect(result.value.requests).toHaveLength(2);
+    }
+  });
+
+  it('should paginate results with page and pageSize', async () => {
+    adminRoles.push({
+      organizationId: 'org-1',
+      userId: 'admin-123',
+      organization: { id: 'org-1', name: 'Org One' },
+    });
+
+    for (let i = 1; i <= 5; i++) {
+      pendingRequests.push({
+        id: `r-${i}`,
+        organizationId: 'org-1',
+        userId: `u-${i}`,
+        status: 'pending',
+        createdAt: new Date(`2024-01-${String(i).padStart(2, '0')}`),
+        user: {
+          id: `u-${i}`,
+          firstName: `User${i}`,
+          lastName: 'Test',
+          phoneNumber: `+${i}`,
+        },
+        organization: { id: 'org-1', name: 'Org One' },
+      });
+    }
+
+    // Page 1 of size 2
+    const result1 = await useCase.execute('admin-123', { page: 1, pageSize: 2 });
+    expect(result1.success).toBe(true);
+    if (result1.success) {
+      expect(result1.value.requests).toHaveLength(2);
+      expect(result1.value.totalCount).toBe(5);
+      expect(result1.value.requests[0].requester.firstName).toBe('User1');
+      expect(result1.value.requests[1].requester.firstName).toBe('User2');
+    }
+
+    // Page 2 of size 2
+    const result2 = await useCase.execute('admin-123', { page: 2, pageSize: 2 });
+    expect(result2.success).toBe(true);
+    if (result2.success) {
+      expect(result2.value.requests).toHaveLength(2);
+      expect(result2.value.totalCount).toBe(5);
+      expect(result2.value.requests[0].requester.firstName).toBe('User3');
+      expect(result2.value.requests[1].requester.firstName).toBe('User4');
+    }
+
+    // Page 3 of size 2 (last page, only 1 item)
+    const result3 = await useCase.execute('admin-123', { page: 3, pageSize: 2 });
+    expect(result3.success).toBe(true);
+    if (result3.success) {
+      expect(result3.value.requests).toHaveLength(1);
+      expect(result3.value.totalCount).toBe(5);
+      expect(result3.value.requests[0].requester.firstName).toBe('User5');
+    }
+  });
+
+  it('should return all results when no pagination params', async () => {
+    adminRoles.push({
+      organizationId: 'org-1',
+      userId: 'admin-123',
+      organization: { id: 'org-1', name: 'Org One' },
+    });
+
+    for (let i = 1; i <= 3; i++) {
+      pendingRequests.push({
+        id: `r-${i}`,
+        organizationId: 'org-1',
+        userId: `u-${i}`,
+        status: 'pending',
+        createdAt: new Date(`2024-01-${String(i).padStart(2, '0')}`),
+        user: {
+          id: `u-${i}`,
+          firstName: `User${i}`,
+          lastName: 'Test',
+          phoneNumber: `+${i}`,
+        },
+        organization: { id: 'org-1', name: 'Org One' },
+      });
+    }
+
+    const result = await useCase.execute('admin-123');
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.value.requests).toHaveLength(3);
+      expect(result.value.totalCount).toBe(3);
     }
   });
 });

@@ -21,6 +21,7 @@ import {
   PrismaOrganizationRepository,
   PrismaBoardRepository,
   PrismaUserRepository,
+  PrismaNotificationRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
 
@@ -33,6 +34,7 @@ export type ActionResult<T = void> =
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const boardRepository = new PrismaBoardRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
+const notificationRepository = new PrismaNotificationRepository(prisma);
 
 // Use cases
 const createOrganizationUseCase = new CreateOrganizationUseCase({
@@ -64,6 +66,8 @@ const handleJoinRequestUseCase = new HandleJoinRequestUseCase({
 
 const joinOrganizationUseCase = new JoinOrganizationUseCase({
   organizationRepository,
+  notificationRepository,
+  userRepository,
   prisma,
 });
 
@@ -487,7 +491,10 @@ export async function getUserOrganizationsAction(): Promise<
   }
 }
 
-export async function getPendingRequestsAction(): Promise<
+export async function getPendingRequestsAction(
+  page?: number,
+  pageSize?: number
+): Promise<
   ActionResult<{
     requests: Array<{
       organizationId: string;
@@ -500,6 +507,7 @@ export async function getPendingRequestsAction(): Promise<
       };
       requestedAt: Date;
     }>;
+    totalCount: number;
   }>
 > {
   const t = await getTranslations('common.errors');
@@ -514,7 +522,13 @@ export async function getPendingRequestsAction(): Promise<
       };
     }
 
-    const result = await getPendingRequestsUseCase.execute(user.id);
+    const pagination =
+      page && pageSize ? { page, pageSize } : undefined;
+
+    const result = await getPendingRequestsUseCase.execute(
+      user.id,
+      pagination
+    );
 
     if (!result.success) {
       return {
@@ -527,6 +541,7 @@ export async function getPendingRequestsAction(): Promise<
       success: true,
       data: {
         requests: result.value.requests,
+        totalCount: result.value.totalCount,
       },
     };
   } catch (error) {
@@ -691,7 +706,9 @@ export async function getOrganizationDetailsAction(
 }
 
 export async function getOrganizationPendingRequestsAction(
-  organizationId: string
+  organizationId: string,
+  page?: number,
+  pageSize?: number
 ): Promise<
   ActionResult<{
     requests: Array<{
@@ -702,6 +719,7 @@ export async function getOrganizationPendingRequestsAction(
       phoneNumber: string;
       requestedAt: Date;
     }>;
+    totalCount: number;
   }>
 > {
   const t = await getTranslations('common.errors');
@@ -719,6 +737,8 @@ export async function getOrganizationPendingRequestsAction(
     const result = await getOrganizationPendingRequestsUseCase.execute({
       organizationId,
       adminUserId: user.id,
+      page,
+      pageSize,
     });
 
     if (!result.success) {
@@ -732,6 +752,7 @@ export async function getOrganizationPendingRequestsAction(
       success: true,
       data: {
         requests: result.value.requests,
+        totalCount: result.value.totalCount,
       },
     };
   } catch (error) {

@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { JoinOrganizationUseCase } from '../JoinOrganizationUseCase';
 import { Organization } from '../../../domain/organization/Organization';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
+import { NotificationRepository } from '../../../domain/notification/NotificationRepository';
+import { UserRepository } from '../../../domain/user/UserRepository';
+import { Notification } from '../../../domain/notification/Notification';
 import { OrganizationErrors } from '../OrganizationErrors';
 
 // Mock Prisma client
@@ -223,16 +226,73 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
 }
 
+// Mock NotificationRepository
+class MockNotificationRepository implements NotificationRepository {
+  async save(notification: Notification): Promise<Notification> {
+    return notification;
+  }
+  async saveBatch(): Promise<void> {}
+  async findById(): Promise<Notification | null> {
+    return null;
+  }
+  async findByUserId(): Promise<Notification[]> {
+    return [];
+  }
+  async getUnreadCount(): Promise<number> {
+    return 0;
+  }
+  async markAsRead(): Promise<void> {}
+  async markAllAsRead(): Promise<void> {}
+  async findByIds(): Promise<Notification[]> {
+    return [];
+  }
+  async deleteByIds(): Promise<void> {}
+  async getCountByUserId(): Promise<number> {
+    return 0;
+  }
+}
+
+// Mock UserRepository
+class MockUserRepository implements UserRepository {
+  async findById(): Promise<any> {
+    return null;
+  }
+  async findByIds(): Promise<any[]> {
+    return [];
+  }
+  async findByPhoneNumber(): Promise<any> {
+    return null;
+  }
+  async save(user: any): Promise<any> {
+    return user;
+  }
+  async exists(): Promise<boolean> {
+    return false;
+  }
+  async searchUsers(): Promise<any[]> {
+    return [];
+  }
+  async isSuperAdmin(): Promise<boolean> {
+    return false;
+  }
+}
+
 describe('JoinOrganizationUseCase', () => {
   let useCase: JoinOrganizationUseCase;
   let organizationRepository: MockOrganizationRepository;
+  let notificationRepository: MockNotificationRepository;
+  let userRepository: MockUserRepository;
   let prisma: MockPrismaClient;
 
   beforeEach(() => {
     organizationRepository = new MockOrganizationRepository();
+    notificationRepository = new MockNotificationRepository();
+    userRepository = new MockUserRepository();
     prisma = new MockPrismaClient();
     useCase = new JoinOrganizationUseCase({
       organizationRepository,
+      notificationRepository,
+      userRepository,
       prisma: prisma as any,
     });
   });

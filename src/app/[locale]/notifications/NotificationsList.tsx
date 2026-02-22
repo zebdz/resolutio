@@ -47,6 +47,7 @@ function getNotificationIcon(type: string) {
     case 'org_joined_parent':
       return <BuildingOffice2Icon className="h-5 w-5 text-blue-500" />;
     case 'join_parent_request_received':
+    case 'join_request_received':
       return <EnvelopeIcon className="h-5 w-5 text-amber-500" />;
     default:
       return <BellIcon className="h-5 w-5 text-zinc-400" />;

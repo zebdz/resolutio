@@ -5,6 +5,8 @@ import { OrganizationErrors } from './OrganizationErrors';
 export interface GetOrganizationPendingRequestsInput {
   organizationId: string;
   adminUserId: string;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface PendingRequest {
@@ -18,6 +20,7 @@ export interface PendingRequest {
 
 export interface GetOrganizationPendingRequestsResult {
   requests: PendingRequest[];
+  totalCount: number;
 }
 
 export interface GetOrganizationPendingRequestsDependencies {
@@ -31,7 +34,7 @@ export class GetOrganizationPendingRequestsUseCase {
   async execute(
     input: GetOrganizationPendingRequestsInput
   ): Promise<Result<GetOrganizationPendingRequestsResult, string>> {
-    const { organizationId, adminUserId } = input;
+    const { organizationId, adminUserId, page, pageSize } = input;
 
     // Check if organization exists
     const organization = await this.deps.prisma.organization.findUnique({
@@ -61,12 +64,28 @@ export class GetOrganizationPendingRequestsUseCase {
       }
     }
 
+    const whereClause = {
+      organizationId,
+      status: 'pending',
+    };
+
+    // Get total count
+    const totalCount = await this.deps.prisma.organizationUser.count({
+      where: whereClause,
+    });
+
+    // Build pagination args
+    const paginationArgs =
+      page && pageSize && page > 0 && pageSize > 0
+        ? {
+            skip: (page - 1) * pageSize,
+            take: pageSize,
+          }
+        : {};
+
     // Get pending requests for this organization
     const pendingRequests = await this.deps.prisma.organizationUser.findMany({
-      where: {
-        organizationId,
-        status: 'pending',
-      },
+      where: whereClause,
       include: {
         user: {
           select: {
@@ -81,6 +100,7 @@ export class GetOrganizationPendingRequestsUseCase {
       orderBy: {
         createdAt: 'asc',
       },
+      ...paginationArgs,
     });
 
     const requests: PendingRequest[] = pendingRequests.map((req: any) => ({
@@ -92,6 +112,6 @@ export class GetOrganizationPendingRequestsUseCase {
       requestedAt: req.createdAt,
     }));
 
-    return success({ requests });
+    return success({ requests, totalCount });
   }
 }

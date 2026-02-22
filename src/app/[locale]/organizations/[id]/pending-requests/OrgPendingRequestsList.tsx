@@ -6,7 +6,6 @@ import { Badge } from '@/app/components/catalyst/badge';
 import { Button } from '@/app/components/catalyst/button';
 import { Heading } from '@/app/components/catalyst/heading';
 import { Text } from '@/app/components/catalyst/text';
-import { Divider } from '@/app/components/catalyst/divider';
 import { Textarea } from '@/app/components/catalyst/textarea';
 import { Select } from '@/app/components/catalyst/select';
 import {
@@ -26,35 +25,36 @@ import {
 } from '@/app/components/catalyst/dialog';
 import {
   handleJoinRequestAction,
-  getPendingRequestsAction,
+  getOrganizationPendingRequestsAction,
 } from '@/web/actions/organization';
 
-interface PendingRequest {
-  organizationId: string;
-  organizationName: string;
-  requester: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    phoneNumber: string;
-  };
+interface OrgPendingRequest {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  phoneNumber: string;
   requestedAt: Date;
 }
 
-interface PendingRequestsListProps {
-  requests: PendingRequest[];
+interface OrgPendingRequestsListProps {
+  organizationId: string;
+  organizationName: string;
+  requests: OrgPendingRequest[];
   totalCount: number;
   defaultPageSize: number;
 }
 
 const PAGE_SIZE_OPTIONS = [5, 10, 25, 50];
 
-export function PendingRequestsList({
+export function OrgPendingRequestsList({
+  organizationId,
+  organizationName,
   requests: initialRequests,
   totalCount: initialTotalCount,
   defaultPageSize,
-}: PendingRequestsListProps) {
-  const t = useTranslations('organization.pendingRequests');
+}: OrgPendingRequestsListProps) {
+  const t = useTranslations('organization.pendingRequestsPage');
   const tCommon = useTranslations('common');
   const tPagination = useTranslations('common.pagination');
   const [requests, setRequests] = useState(initialRequests);
@@ -62,9 +62,8 @@ export function PendingRequestsList({
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(defaultPageSize);
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState<PendingRequest | null>(
-    null
-  );
+  const [selectedRequest, setSelectedRequest] =
+    useState<OrgPendingRequest | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -75,14 +74,18 @@ export function PendingRequestsList({
   const fetchPage = useCallback(
     async (page: number, size: number) => {
       setIsLoading(true);
-      const result = await getPendingRequestsAction(page, size);
+      const result = await getOrganizationPendingRequestsAction(
+        organizationId,
+        page,
+        size
+      );
       if (result.success) {
         setRequests(result.data.requests);
         setTotalCount(result.data.totalCount);
       }
       setIsLoading(false);
     },
-    []
+    [organizationId]
   );
 
   const handlePageChange = useCallback(
@@ -102,13 +105,13 @@ export function PendingRequestsList({
     [fetchPage]
   );
 
-  const handleAccept = async (request: PendingRequest) => {
+  const handleAccept = async (request: OrgPendingRequest) => {
     setIsProcessing(true);
     setError(null);
 
     const formData = new FormData();
-    formData.append('organizationId', request.organizationId);
-    formData.append('requesterId', request.requester.id);
+    formData.append('organizationId', organizationId);
+    formData.append('requesterId', request.userId);
     formData.append('action', 'accept');
 
     const result = await handleJoinRequestAction(formData);
@@ -122,7 +125,7 @@ export function PendingRequestsList({
     setIsProcessing(false);
   };
 
-  const handleRejectClick = (request: PendingRequest) => {
+  const handleRejectClick = (request: OrgPendingRequest) => {
     setSelectedRequest(request);
     setRejectionReason('');
     setIsRejectDialogOpen(true);
@@ -137,8 +140,8 @@ export function PendingRequestsList({
     setError(null);
 
     const formData = new FormData();
-    formData.append('organizationId', selectedRequest.organizationId);
-    formData.append('requesterId', selectedRequest.requester.id);
+    formData.append('organizationId', organizationId);
+    formData.append('requesterId', selectedRequest.userId);
     formData.append('action', 'reject');
 
     if (rejectionReason) {
@@ -172,41 +175,14 @@ export function PendingRequestsList({
     );
   }
 
-  // Group requests by organization (for mobile card view)
-  const requestsByOrg = requests.reduce(
-    (acc, request) => {
-      const orgId = request.organizationId;
-
-      if (!acc[orgId]) {
-        acc[orgId] = {
-          organizationId: request.organizationId,
-          organizationName: request.organizationName,
-          requests: [],
-        };
-      }
-
-      acc[orgId].requests.push(request);
-
-      return acc;
-    },
-    {} as Record<
-      string,
-      {
-        organizationId: string;
-        organizationName: string;
-        requests: PendingRequest[];
-      }
-    >
-  );
-
-  const actionButtons = (request: PendingRequest) => (
+  const actionButtons = (request: OrgPendingRequest) => (
     <div className="flex gap-2">
       <Button
         color="green"
         onClick={() => handleAccept(request)}
         disabled={isProcessing || isLoading}
       >
-        {t('accept')}
+        {t('approve')}
       </Button>
       <Button
         color="red"
@@ -285,32 +261,25 @@ export function PendingRequestsList({
           <TableHead>
             <TableRow>
               <TableHeader>{tCommon('actions')}</TableHeader>
-              <TableHeader>{t('columnStatus')}</TableHeader>
-              <TableHeader>{t('columnOrganization')}</TableHeader>
-              <TableHeader>{t('columnRequester')}</TableHeader>
+              <TableHeader>{t('requesterName')}</TableHeader>
               <TableHeader className="hidden md:table-cell">
-                {t('columnPhone')}
+                {t('phoneNumber')}
               </TableHeader>
               <TableHeader className="hidden md:table-cell">
-                {t('columnRequestedOn')}
+                {t('requestedAt')}
               </TableHeader>
             </TableRow>
           </TableHead>
           <TableBody>
-            {requests.map((request, index) => (
-              <TableRow
-                key={`${request.organizationId}-${request.requester.id}-${index}`}
-              >
+            {requests.map((request) => (
+              <TableRow key={request.userId}>
                 <TableCell>{actionButtons(request)}</TableCell>
                 <TableCell>
-                  <Badge color="yellow">{t('statusPending')}</Badge>
-                </TableCell>
-                <TableCell>{request.organizationName}</TableCell>
-                <TableCell>
-                  {request.requester.firstName} {request.requester.lastName}
+                  {request.firstName} {request.lastName}
+                  {request.middleName ? ` ${request.middleName}` : ''}
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                  {request.requester.phoneNumber}
+                  {request.phoneNumber}
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   {new Date(request.requestedAt).toLocaleDateString()}
@@ -322,50 +291,31 @@ export function PendingRequestsList({
       </div>
 
       {/* Mobile card view */}
-      <div className="space-y-8 sm:hidden">
-        {Object.values(requestsByOrg).map(
-          ({ organizationId, organizationName, requests: orgRequests }) => (
-            <div key={organizationId} className="space-y-4">
-              <div>
-                <Heading level={2} className="text-xl font-semibold">
-                  {organizationName}
+      <div className="space-y-4 sm:hidden">
+        {requests.map((request) => (
+          <div
+            key={request.userId}
+            className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1 space-y-2">
+                <Heading level={3} className="text-lg font-semibold">
+                  {request.firstName} {request.lastName}
+                  {request.middleName ? ` ${request.middleName}` : ''}
                 </Heading>
+                <Text className="text-sm text-zinc-600 dark:text-zinc-400">
+                  {request.phoneNumber}
+                </Text>
+                <Text className="text-xs text-zinc-500 dark:text-zinc-500">
+                  {t('requestedAt')}{' '}
+                  {new Date(request.requestedAt).toLocaleDateString()}
+                </Text>
               </div>
 
-              <div className="space-y-4">
-                {orgRequests.map((request, index) => (
-                  <div
-                    key={`${request.organizationId}-${request.requester.id}-${index}`}
-                    className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 space-y-2">
-                        <div className="flex items-center gap-3">
-                          <Heading level={3} className="text-lg font-semibold">
-                            {request.requester.firstName}{' '}
-                            {request.requester.lastName}
-                          </Heading>
-                          <Badge color="yellow">{t('statusPending')}</Badge>
-                        </div>
-                        <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                          {request.requester.phoneNumber}
-                        </Text>
-                        <Text className="text-xs text-zinc-500 dark:text-zinc-500">
-                          {t('requestedOn')}{' '}
-                          {new Date(request.requestedAt).toLocaleDateString()}
-                        </Text>
-                      </div>
-
-                      {actionButtons(request)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <Divider />
+              {actionButtons(request)}
             </div>
-          )
-        )}
+          </div>
+        ))}
       </div>
 
       {/* Pagination */}
@@ -380,8 +330,8 @@ export function PendingRequestsList({
         <DialogDescription>
           {selectedRequest &&
             t('rejectDialogDescription', {
-              name: `${selectedRequest.requester.firstName} ${selectedRequest.requester.lastName}`,
-              organization: selectedRequest.organizationName,
+              name: `${selectedRequest.firstName} ${selectedRequest.lastName}`,
+              organization: organizationName,
             })}
         </DialogDescription>
         <DialogBody>

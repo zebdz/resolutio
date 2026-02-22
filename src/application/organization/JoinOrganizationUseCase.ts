@@ -1,11 +1,16 @@
 import { PrismaClient } from '@/generated/prisma/client';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { NotificationRepository } from '../../domain/notification/NotificationRepository';
+import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { JoinOrganizationInput } from './JoinOrganizationSchema';
 import { OrganizationErrors } from './OrganizationErrors';
+import { NotifyJoinRequestReceivedUseCase } from '../notification/NotifyJoinRequestReceivedUseCase';
 
 export interface JoinOrganizationDependencies {
   organizationRepository: OrganizationRepository;
+  notificationRepository: NotificationRepository;
+  userRepository: UserRepository;
   prisma: PrismaClient;
 }
 
@@ -81,6 +86,18 @@ export class JoinOrganizationUseCase {
         status: 'pending',
       },
     });
+
+    // Notify admins about the new join request
+    const notifyUseCase = new NotifyJoinRequestReceivedUseCase({
+      organizationRepository: this.deps.organizationRepository,
+      notificationRepository: this.deps.notificationRepository,
+      userRepository: this.deps.userRepository,
+    });
+    await notifyUseCase
+      .execute({ organizationId, requesterUserId: userId })
+      .catch((err) => {
+        console.error('Failed to send join request notifications:', err);
+      });
 
     return success(undefined);
   }

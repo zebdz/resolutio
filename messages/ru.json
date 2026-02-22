@@ -175,7 +175,12 @@
       "rejectionReasonLabel": "Причина отклонения (необязательно)",
       "rejectionReasonPlaceholder": "Объясните, почему эта заявка отклоняется...",
       "confirmReject": "Отклонить заявку",
-      "rejecting": "Отклонение..."
+      "rejecting": "Отклонение...",
+      "columnOrganization": "Организация",
+      "columnRequester": "Заявитель",
+      "columnPhone": "Телефон",
+      "columnStatus": "Статус",
+      "columnRequestedOn": "Дата заявки"
     },
     "detail": {
       "description": "Описание",
@@ -211,13 +216,19 @@
       "subtitle": "Рассмотрите заявки на вступление в {organization}",
       "noPending": "Нет заявок",
       "noPendingDescription": "Когда пользователи подают заявки на вступление в эту организацию, они появляются здесь.",
+      "requesterName": "Заявитель",
       "requestedAt": "Дата заявки",
       "phoneNumber": "Телефон",
       "approve": "Одобрить",
       "reject": "Отклонить",
       "approving": "Одобрение...",
       "rejecting": "Отклонение...",
-      "actions": "Действия"
+      "actions": "Действия",
+      "rejectDialogTitle": "Отклонить заявку",
+      "rejectDialogDescription": "Вы уверены, что хотите отклонить заявку пользователя {name} на вступление в {organization}?",
+      "rejectionReasonLabel": "Причина отклонения (необязательно)",
+      "rejectionReasonPlaceholder": "Объясните, почему эта заявка отклоняется...",
+      "confirmReject": "Отклонить заявку"
     },
     "joinParent": {
       "title": "Запрос на присоединение к родительской организации",
@@ -345,6 +356,13 @@
     "delete": "Удалить",
     "edit": "Редактировать",
     "actions": "Действия",
+    "pagination": {
+      "rowsPerPage": "Строк на странице",
+      "showing": "Показано {from}-{to} из {total}",
+      "previous": "Назад",
+      "next": "Вперёд",
+      "page": "Страница {page} из {totalPages}"
+    },
     "errors": {
       "unexpected": "Произошла непредвиденная ошибка. Пожалуйста, попробуйте еще раз.",
       "validationFailed": "Ошибка валидации",
@@ -382,7 +400,7 @@
     "startsTo": "Начало по",
     "allStatuses": "Все статусы",
     "allOrganizations": "Все организации",
-    "allBoards": "Все советы",
+    "allBoards": "Все органы управления",
     "resetFilters": "Сбросить",
     "noFilteredPolls": "Нет голосований по заданным фильтрам",
     "draft": "Черновик",
@@ -583,6 +601,10 @@
       "joinParentRequestReceived": {
         "title": "Новый запрос на присоединение",
         "body": "{childOrgName} хочет присоединиться к {parentOrgName}"
+      },
+      "joinRequestReceived": {
+        "title": "Новый запрос на вступление",
+        "body": "{requesterName} хочет вступить в {organizationName}"
       }
     },
     "page": {

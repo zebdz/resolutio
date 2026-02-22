@@ -175,7 +175,12 @@
       "rejectionReasonLabel": "Reason for rejection (optional)",
       "rejectionReasonPlaceholder": "Explain why this request is being rejected...",
       "confirmReject": "Reject Request",
-      "rejecting": "Rejecting..."
+      "rejecting": "Rejecting...",
+      "columnOrganization": "Organization",
+      "columnRequester": "Requester",
+      "columnPhone": "Phone",
+      "columnStatus": "Status",
+      "columnRequestedOn": "Requested On"
     },
     "detail": {
       "description": "Description",
@@ -211,13 +216,19 @@
       "subtitle": "Review join requests for {organization}",
       "noPending": "No pending requests",
       "noPendingDescription": "When users request to join this organization, they will appear here.",
+      "requesterName": "Requester",
       "requestedAt": "Requested on",
       "phoneNumber": "Phone",
       "approve": "Approve",
       "reject": "Reject",
       "approving": "Approving...",
       "rejecting": "Rejecting...",
-      "actions": "Actions"
+      "actions": "Actions",
+      "rejectDialogTitle": "Reject Join Request",
+      "rejectDialogDescription": "Are you sure you want to reject {name}'s request to join {organization}?",
+      "rejectionReasonLabel": "Reason for rejection (optional)",
+      "rejectionReasonPlaceholder": "Explain why this request is being rejected...",
+      "confirmReject": "Reject Request"
     },
     "joinParent": {
       "title": "Request to Join Parent Organization",
@@ -345,6 +356,13 @@
     "delete": "Delete",
     "edit": "Edit",
     "actions": "Actions",
+    "pagination": {
+      "rowsPerPage": "Rows per page",
+      "showing": "Showing {from}-{to} of {total}",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {page} of {totalPages}"
+    },
     "errors": {
       "unexpected": "An unexpected error occurred. Please try again.",
       "validationFailed": "Validation failed",
@@ -583,6 +601,10 @@
       "joinParentRequestReceived": {
         "title": "New join parent request",
         "body": "{childOrgName} wants to join {parentOrgName}"
+      },
+      "joinRequestReceived": {
+        "title": "New join request",
+        "body": "{requesterName} wants to join {organizationName}"
       }
     },
     "page": {

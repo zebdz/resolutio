@@ -27,8 +27,8 @@ class MockPrisma {
   };
 
   organizationUser = {
-    findMany: async ({ where, include, orderBy }: any) => {
-      const filtered = this.organizationUsers.filter(
+    findMany: async ({ where, include, orderBy, skip, take }: any) => {
+      let filtered = this.organizationUsers.filter(
         (ou) =>
           ou.organizationId === where.organizationId &&
           ou.status === where.status
@@ -49,10 +49,25 @@ class MockPrisma {
         });
       }
 
+      if (skip !== undefined) {
+        filtered = filtered.slice(skip);
+      }
+
+      if (take !== undefined) {
+        filtered = filtered.slice(0, take);
+      }
+
       return filtered.map((ou) => ({
         ...ou,
         user: ou.user,
       }));
+    },
+    count: async ({ where }: any) => {
+      return this.organizationUsers.filter(
+        (ou) =>
+          ou.organizationId === where.organizationId &&
+          ou.status === where.status
+      ).length;
     },
   };
 
@@ -330,6 +345,97 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
       if (result.success) {
         expect(result.value.requests).toHaveLength(1);
         expect(result.value.requests[0].userId).toBe('user-1');
+      }
+    });
+  });
+
+  describe('pagination', () => {
+    beforeEach(() => {
+      prisma.addOrganization('org-1', 'Test Org');
+      prisma.addAdmin('org-1', 'admin-1');
+
+      const baseDate = new Date('2024-01-01');
+      for (let i = 1; i <= 5; i++) {
+        prisma.addPendingRequest(
+          'org-1',
+          {
+            id: `user-${i}`,
+            firstName: `User${i}`,
+            lastName: 'Test',
+            phoneNumber: `+${i}`,
+          },
+          new Date(baseDate.getTime() + i * 86400000)
+        );
+      }
+    });
+
+    it('should return totalCount alongside requests', async () => {
+      const result = await useCase.execute({
+        organizationId: 'org-1',
+        adminUserId: 'admin-1',
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.value.totalCount).toBe(5);
+        expect(result.value.requests).toHaveLength(5);
+      }
+    });
+
+    it('should paginate results with page and pageSize', async () => {
+      const result1 = await useCase.execute({
+        organizationId: 'org-1',
+        adminUserId: 'admin-1',
+        page: 1,
+        pageSize: 2,
+      });
+
+      expect(result1.success).toBe(true);
+      if (result1.success) {
+        expect(result1.value.requests).toHaveLength(2);
+        expect(result1.value.totalCount).toBe(5);
+        expect(result1.value.requests[0].firstName).toBe('User1');
+        expect(result1.value.requests[1].firstName).toBe('User2');
+      }
+
+      const result2 = await useCase.execute({
+        organizationId: 'org-1',
+        adminUserId: 'admin-1',
+        page: 2,
+        pageSize: 2,
+      });
+
+      expect(result2.success).toBe(true);
+      if (result2.success) {
+        expect(result2.value.requests).toHaveLength(2);
+        expect(result2.value.totalCount).toBe(5);
+        expect(result2.value.requests[0].firstName).toBe('User3');
+      }
+
+      const result3 = await useCase.execute({
+        organizationId: 'org-1',
+        adminUserId: 'admin-1',
+        page: 3,
+        pageSize: 2,
+      });
+
+      expect(result3.success).toBe(true);
+      if (result3.success) {
+        expect(result3.value.requests).toHaveLength(1);
+        expect(result3.value.totalCount).toBe(5);
+      }
+    });
+
+    it('should return all results when no pagination params', async () => {
+      const result = await useCase.execute({
+        organizationId: 'org-1',
+        adminUserId: 'admin-1',
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.value.requests).toHaveLength(5);
+        expect(result.value.totalCount).toBe(5);
       }
     });
   });
