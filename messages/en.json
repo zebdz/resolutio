@@ -605,6 +605,14 @@
       "joinRequestReceived": {
         "title": "New join request",
         "body": "{requesterName} wants to join {organizationName}"
+      },
+      "pollActivated": {
+        "title": "Poll is now active",
+        "body": "Voting has started for \"{pollTitle}\""
+      },
+      "pollFinished": {
+        "title": "Poll has ended",
+        "body": "Voting has ended for \"{pollTitle}\""
       }
     },
     "page": {

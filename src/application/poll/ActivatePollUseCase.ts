@@ -2,6 +2,9 @@ import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
+import { NotificationRepository } from '../../domain/notification/NotificationRepository';
+import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
+import { NotifyPollActivatedUseCase } from '../notification/NotifyPollActivatedUseCase';
 import { PollErrors } from './PollErrors';
 
 interface ActivatePollCommand {
@@ -17,7 +20,9 @@ export class ActivatePollUseCase {
   constructor(
     private pollRepository: PollRepository,
     private organizationRepository: OrganizationRepository,
-    private userRepository: UserRepository
+    private userRepository: UserRepository,
+    private notificationRepository: NotificationRepository,
+    private participantRepository: ParticipantRepository
   ) {}
 
   async execute(command: ActivatePollCommand): Promise<Result<void, string>> {
@@ -60,6 +65,17 @@ export class ActivatePollUseCase {
     if (!updateResult.success) {
       return failure(updateResult.error);
     }
+
+    // Notify participants
+    const notifyUseCase = new NotifyPollActivatedUseCase({
+      notificationRepository: this.notificationRepository,
+      participantRepository: this.participantRepository,
+    });
+    await notifyUseCase
+      .execute({ pollId: poll.id, pollTitle: poll.title })
+      .catch((err) => {
+        console.error('Failed to send poll activated notifications:', err);
+      });
 
     return success(undefined);
   }

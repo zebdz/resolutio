@@ -79,10 +79,12 @@ export function OrgPendingRequestsList({
         page,
         size
       );
+
       if (result.success) {
         setRequests(result.data.requests);
         setTotalCount(result.data.totalCount);
       }
+
       setIsLoading(false);
     },
     [organizationId]

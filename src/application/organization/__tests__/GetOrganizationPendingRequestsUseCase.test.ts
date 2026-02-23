@@ -355,6 +355,7 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
       prisma.addAdmin('org-1', 'admin-1');
 
       const baseDate = new Date('2024-01-01');
+
       for (let i = 1; i <= 5; i++) {
         prisma.addPendingRequest(
           'org-1',
@@ -376,6 +377,7 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.totalCount).toBe(5);
         expect(result.value.requests).toHaveLength(5);
@@ -391,6 +393,7 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
       });
 
       expect(result1.success).toBe(true);
+
       if (result1.success) {
         expect(result1.value.requests).toHaveLength(2);
         expect(result1.value.totalCount).toBe(5);
@@ -406,6 +409,7 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
       });
 
       expect(result2.success).toBe(true);
+
       if (result2.success) {
         expect(result2.value.requests).toHaveLength(2);
         expect(result2.value.totalCount).toBe(5);
@@ -420,6 +424,7 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
       });
 
       expect(result3.success).toBe(true);
+
       if (result3.success) {
         expect(result3.value.requests).toHaveLength(1);
         expect(result3.value.totalCount).toBe(5);
@@ -433,6 +438,7 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+
       if (result.success) {
         expect(result.value.requests).toHaveLength(5);
         expect(result.value.totalCount).toBe(5);

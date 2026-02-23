@@ -522,13 +522,9 @@ export async function getPendingRequestsAction(
       };
     }
 
-    const pagination =
-      page && pageSize ? { page, pageSize } : undefined;
+    const pagination = page && pageSize ? { page, pageSize } : undefined;
 
-    const result = await getPendingRequestsUseCase.execute(
-      user.id,
-      pagination
-    );
+    const result = await getPendingRequestsUseCase.execute(user.id, pagination);
 
     if (!result.success) {
       return {

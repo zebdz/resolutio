@@ -61,8 +61,7 @@ describe('GetPendingRequestsUseCase', () => {
       const orgIds = args.where.organizationId.in;
 
       return pendingRequests.filter(
-        (req) =>
-          orgIds.includes(req.organizationId) && req.status === 'pending'
+        (req) => orgIds.includes(req.organizationId) && req.status === 'pending'
       ).length;
     };
 
@@ -446,6 +445,7 @@ describe('GetPendingRequestsUseCase', () => {
     const result = await useCase.execute('admin-123');
 
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.totalCount).toBe(2);
       expect(result.value.requests).toHaveLength(2);
@@ -477,8 +477,12 @@ describe('GetPendingRequestsUseCase', () => {
     }
 
     // Page 1 of size 2
-    const result1 = await useCase.execute('admin-123', { page: 1, pageSize: 2 });
+    const result1 = await useCase.execute('admin-123', {
+      page: 1,
+      pageSize: 2,
+    });
     expect(result1.success).toBe(true);
+
     if (result1.success) {
       expect(result1.value.requests).toHaveLength(2);
       expect(result1.value.totalCount).toBe(5);
@@ -487,8 +491,12 @@ describe('GetPendingRequestsUseCase', () => {
     }
 
     // Page 2 of size 2
-    const result2 = await useCase.execute('admin-123', { page: 2, pageSize: 2 });
+    const result2 = await useCase.execute('admin-123', {
+      page: 2,
+      pageSize: 2,
+    });
     expect(result2.success).toBe(true);
+
     if (result2.success) {
       expect(result2.value.requests).toHaveLength(2);
       expect(result2.value.totalCount).toBe(5);
@@ -497,8 +505,12 @@ describe('GetPendingRequestsUseCase', () => {
     }
 
     // Page 3 of size 2 (last page, only 1 item)
-    const result3 = await useCase.execute('admin-123', { page: 3, pageSize: 2 });
+    const result3 = await useCase.execute('admin-123', {
+      page: 3,
+      pageSize: 2,
+    });
     expect(result3.success).toBe(true);
+
     if (result3.success) {
       expect(result3.value.requests).toHaveLength(1);
       expect(result3.value.totalCount).toBe(5);
@@ -532,6 +544,7 @@ describe('GetPendingRequestsUseCase', () => {
 
     const result = await useCase.execute('admin-123');
     expect(result.success).toBe(true);
+
     if (result.success) {
       expect(result.value.requests).toHaveLength(3);
       expect(result.value.totalCount).toBe(3);

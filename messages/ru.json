@@ -605,6 +605,14 @@
       "joinRequestReceived": {
         "title": "Новый запрос на вступление",
         "body": "{requesterName} хочет вступить в {organizationName}"
+      },
+      "pollActivated": {
+        "title": "Голосование началось",
+        "body": "Началось голосование «{pollTitle}»"
+      },
+      "pollFinished": {
+        "title": "Голосование завершено",
+        "body": "Завершено голосование «{pollTitle}»"
       }
     },
     "page": {

@@ -25,7 +25,12 @@ interface PollCardProps {
   onPollStateChange: () => void;
 }
 
-export function PollCard({ poll, userId, canManage, onPollStateChange }: PollCardProps) {
+export function PollCard({
+  poll,
+  userId,
+  canManage,
+  onPollStateChange,
+}: PollCardProps) {
   const t = useTranslations('poll');
   const [isTakingSnapshot, setIsTakingSnapshot] = useState(false);
   const [isDiscardingSnapshot, setIsDiscardingSnapshot] = useState(false);

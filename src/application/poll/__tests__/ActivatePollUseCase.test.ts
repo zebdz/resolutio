@@ -11,6 +11,10 @@ import { OrganizationRepository } from '../../../domain/organization/Organizatio
 import { UserRepository } from '../../../domain/user/UserRepository';
 import { User } from '../../../domain/user/User';
 import { PhoneNumber } from '../../../domain/user/PhoneNumber';
+import { NotificationRepository } from '../../../domain/notification/NotificationRepository';
+import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
+import { Notification } from '../../../domain/notification/Notification';
+import { PollParticipant } from '../../../domain/poll/PollParticipant';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
@@ -310,6 +314,85 @@ class MockUserRepository implements UserRepository {
   }
 }
 
+class MockNotificationRepository implements NotificationRepository {
+  private savedBatch: Notification[] = [];
+
+  async save(notification: Notification): Promise<Notification> {
+    return notification;
+  }
+  async saveBatch(notifications: Notification[]): Promise<void> {
+    this.savedBatch.push(...notifications);
+  }
+  async findById(): Promise<Notification | null> {
+    return null;
+  }
+  async findByUserId(): Promise<Notification[]> {
+    return [];
+  }
+  async getUnreadCount(): Promise<number> {
+    return 0;
+  }
+  async markAsRead(): Promise<void> {}
+  async markAllAsRead(): Promise<void> {}
+  async findByIds(): Promise<Notification[]> {
+    return [];
+  }
+  async deleteByIds(): Promise<void> {}
+  async getCountByUserId(): Promise<number> {
+    return 0;
+  }
+
+  getSavedBatch() {
+    return this.savedBatch;
+  }
+}
+
+class MockParticipantRepository implements ParticipantRepository {
+  private participants: Map<string, PollParticipant[]> = new Map();
+
+  async createParticipants(): Promise<Result<void, string>> {
+    return success(undefined);
+  }
+  async getParticipants(
+    pollId: string
+  ): Promise<Result<PollParticipant[], string>> {
+    return success(this.participants.get(pollId) || []);
+  }
+  async getParticipantById(): Promise<Result<PollParticipant | null, string>> {
+    return success(null);
+  }
+  async getParticipantByUserAndPoll(): Promise<
+    Result<PollParticipant | null, string>
+  > {
+    return success(null);
+  }
+  async updateParticipantWeight(): Promise<Result<void, string>> {
+    return success(undefined);
+  }
+  async deleteParticipant(): Promise<Result<void, string>> {
+    return success(undefined);
+  }
+  async deleteParticipantsByPollId(): Promise<Result<void, string>> {
+    return success(undefined);
+  }
+  async createWeightHistory(): Promise<Result<any, string>> {
+    return success({} as any);
+  }
+  async getWeightHistory(): Promise<Result<any[], string>> {
+    return success([]);
+  }
+  async getParticipantWeightHistory(): Promise<Result<any[], string>> {
+    return success([]);
+  }
+  async executeActivation(): Promise<Result<PollParticipant[], string>> {
+    return success([]);
+  }
+
+  setParticipants(pollId: string, participants: PollParticipant[]) {
+    this.participants.set(pollId, participants);
+  }
+}
+
 // Helper to create a poll in READY state
 function createReadyPoll(id: string, boardId: string, createdBy: string): Poll {
   const pollResult = Poll.create(
@@ -348,17 +431,23 @@ describe('ActivatePollUseCase', () => {
   let pollRepository: MockPollRepository;
   let organizationRepository: MockOrganizationRepository;
   let userRepository: MockUserRepository;
+  let notificationRepository: MockNotificationRepository;
+  let participantRepository: MockParticipantRepository;
   let useCase: ActivatePollUseCase;
 
   beforeEach(() => {
     pollRepository = new MockPollRepository();
     organizationRepository = new MockOrganizationRepository();
     userRepository = new MockUserRepository();
+    notificationRepository = new MockNotificationRepository();
+    participantRepository = new MockParticipantRepository();
 
     useCase = new ActivatePollUseCase(
       pollRepository,
       organizationRepository,
-      userRepository
+      userRepository,
+      notificationRepository,
+      participantRepository
     );
 
     // Set admin-1 as admin of org-1
@@ -480,6 +569,60 @@ describe('ActivatePollUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe('notifications', () => {
+    it('should notify all participants on activation', async () => {
+      const poll = createReadyPoll('poll-1', 'board-1', 'admin-1');
+      await pollRepository.createPoll(poll);
+
+      participantRepository.setParticipants('poll-1', [
+        PollParticipant.reconstitute({
+          id: 'p-1',
+          pollId: 'poll-1',
+          userId: 'user-1',
+          userWeight: 1.0,
+          snapshotAt: new Date(),
+          createdAt: new Date(),
+        }),
+        PollParticipant.reconstitute({
+          id: 'p-2',
+          pollId: 'poll-1',
+          userId: 'user-2',
+          userWeight: 1.0,
+          snapshotAt: new Date(),
+          createdAt: new Date(),
+        }),
+      ]);
+
+      await useCase.execute({ pollId: 'poll-1', userId: 'admin-1' });
+
+      const saved = notificationRepository.getSavedBatch();
+      expect(saved).toHaveLength(2);
+      expect(saved[0].type).toBe('poll_activated');
+      expect(saved.map((n) => n.userId)).toContain('user-1');
+      expect(saved.map((n) => n.userId)).toContain('user-2');
+    });
+
+    it('should not send notifications if activation fails', async () => {
+      // Poll in DRAFT state -> activation fails
+      const pollResult = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'org-1',
+        'board-1',
+        'admin-1',
+        new Date('2024-01-01'),
+        new Date('2024-12-31')
+      );
+      const poll = pollResult.value;
+      (poll as any).props.id = 'poll-1';
+      await pollRepository.createPoll(poll);
+
+      await useCase.execute({ pollId: 'poll-1', userId: 'admin-1' });
+
+      expect(notificationRepository.getSavedBatch()).toHaveLength(0);
     });
   });
 });

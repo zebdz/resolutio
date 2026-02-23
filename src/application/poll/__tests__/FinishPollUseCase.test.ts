@@ -8,6 +8,10 @@ import { PollRepository } from '../../../domain/poll/PollRepository';
 import { DraftRepository } from '../../../domain/poll/DraftRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../../domain/user/UserRepository';
+import { NotificationRepository } from '../../../domain/notification/NotificationRepository';
+import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
+import { PollParticipant } from '../../../domain/poll/PollParticipant';
+import { Notification } from '../../../domain/notification/Notification';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
@@ -17,6 +21,9 @@ describe('FinishPollUseCase', () => {
   let draftRepository: Partial<DraftRepository>;
   let organizationRepository: Partial<OrganizationRepository>;
   let userRepository: Partial<UserRepository>;
+  let notificationRepository: Partial<NotificationRepository>;
+  let participantRepository: Partial<ParticipantRepository>;
+  let savedNotifications: Notification[];
   let useCase: FinishPollUseCase;
   let poll: Poll;
 
@@ -76,11 +83,35 @@ describe('FinishPollUseCase', () => {
       isSuperAdmin: vi.fn().mockResolvedValue(false),
     };
 
+    savedNotifications = [];
+    notificationRepository = {
+      saveBatch: vi.fn().mockImplementation(async (notifs: Notification[]) => {
+        savedNotifications.push(...notifs);
+      }),
+    };
+
+    participantRepository = {
+      getParticipants: vi.fn().mockResolvedValue(
+        success([
+          PollParticipant.reconstitute({
+            id: 'p-1',
+            pollId: 'poll-1',
+            userId: 'user-1',
+            userWeight: 1.0,
+            snapshotAt: new Date(),
+            createdAt: new Date(),
+          }),
+        ])
+      ),
+    };
+
     useCase = new FinishPollUseCase(
       pollRepository as PollRepository,
       draftRepository as DraftRepository,
       organizationRepository as OrganizationRepository,
-      userRepository as UserRepository
+      userRepository as UserRepository,
+      notificationRepository as NotificationRepository,
+      participantRepository as ParticipantRepository
     );
   });
 
@@ -172,6 +203,24 @@ describe('FinishPollUseCase', () => {
       });
 
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe('notifications', () => {
+    it('should notify participants when poll is finished', async () => {
+      await useCase.execute({ pollId: poll.id, userId: 'admin-1' });
+
+      expect(savedNotifications).toHaveLength(1);
+      expect(savedNotifications[0].type).toBe('poll_finished');
+      expect(savedNotifications[0].userId).toBe('user-1');
+    });
+
+    it('should not send notifications if finish fails', async () => {
+      poll.finish(); // already finished
+
+      await useCase.execute({ pollId: poll.id, userId: 'admin-1' });
+
+      expect(savedNotifications).toHaveLength(0);
     });
   });
 });

@@ -165,6 +165,7 @@ function createOrg(id: string, name: string): Organization {
 
 function createUser(id: string, firstName: string, lastName: string): User {
   const phone = PhoneNumber.create('+79991234567');
+
   return User.reconstitute({
     id,
     firstName,
@@ -200,7 +201,10 @@ describe('NotifyJoinRequestReceivedUseCase', () => {
     userRepo.addUser(requester);
     orgRepo.setAdminUserIds('org-1', ['admin-1', 'admin-2']);
 
-    await useCase.execute({ organizationId: 'org-1', requesterUserId: 'user-1' });
+    await useCase.execute({
+      organizationId: 'org-1',
+      requesterUserId: 'user-1',
+    });
 
     const saved = notifRepo.getSavedBatch();
     expect(saved).toHaveLength(2);
@@ -232,7 +236,10 @@ describe('NotifyJoinRequestReceivedUseCase', () => {
     userRepo.addUser(requester);
     orgRepo.setAdminUserIds('org-1', []);
 
-    await useCase.execute({ organizationId: 'org-1', requesterUserId: 'user-1' });
+    await useCase.execute({
+      organizationId: 'org-1',
+      requesterUserId: 'user-1',
+    });
 
     expect(notifRepo.getSavedBatch()).toHaveLength(0);
   });

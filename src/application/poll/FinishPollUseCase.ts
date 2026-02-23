@@ -3,6 +3,9 @@ import { PollRepository } from '../../domain/poll/PollRepository';
 import { DraftRepository } from '../../domain/poll/DraftRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
+import { NotificationRepository } from '../../domain/notification/NotificationRepository';
+import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
+import { NotifyPollFinishedUseCase } from '../notification/NotifyPollFinishedUseCase';
 import { PollErrors } from './PollErrors';
 
 interface FinishPollCommand {
@@ -15,7 +18,9 @@ export class FinishPollUseCase {
     private pollRepository: PollRepository,
     private draftRepository: DraftRepository,
     private organizationRepository: OrganizationRepository,
-    private userRepository: UserRepository
+    private userRepository: UserRepository,
+    private notificationRepository: NotificationRepository,
+    private participantRepository: ParticipantRepository
   ) {}
 
   async execute(command: FinishPollCommand): Promise<Result<void, string>> {
@@ -69,6 +74,17 @@ export class FinishPollUseCase {
       // Log error but don't fail the operation
       console.error('Failed to delete poll drafts:', deleteDraftsResult.error);
     }
+
+    // Notify participants
+    const notifyUseCase = new NotifyPollFinishedUseCase({
+      notificationRepository: this.notificationRepository,
+      participantRepository: this.participantRepository,
+    });
+    await notifyUseCase
+      .execute({ pollId: poll.id, pollTitle: poll.title })
+      .catch((err) => {
+        console.error('Failed to send poll finished notifications:', err);
+      });
 
     return success(undefined);
   }

@@ -32,6 +32,7 @@ import {
   PrismaQuestionRepository,
   PrismaAnswerRepository,
   PrismaDraftRepository,
+  PrismaNotificationRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
 import { QuestionType } from '@/domain/poll/QuestionType';
@@ -53,6 +54,7 @@ const draftRepository = new PrismaDraftRepository(prisma);
 const boardRepository = new PrismaBoardRepository(prisma);
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
+const notificationRepository = new PrismaNotificationRepository(prisma);
 
 // Use cases
 const createPollUseCase = new CreatePollUseCase(
@@ -119,7 +121,9 @@ const takeSnapshotUseCase = new TakeSnapshotUseCase(
 const activatePollUseCase = new ActivatePollUseCase(
   pollRepository,
   organizationRepository,
-  userRepository
+  userRepository,
+  notificationRepository,
+  participantRepository
 );
 const deactivatePollUseCase = new DeactivatePollUseCase(
   pollRepository,
@@ -137,7 +141,9 @@ const finishPollUseCase = new FinishPollUseCase(
   pollRepository,
   draftRepository,
   organizationRepository,
-  userRepository
+  userRepository,
+  notificationRepository,
+  participantRepository
 );
 
 export async function createPollAction(

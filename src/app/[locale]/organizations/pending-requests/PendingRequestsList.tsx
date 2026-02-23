@@ -72,18 +72,17 @@ export function PendingRequestsList({
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
-  const fetchPage = useCallback(
-    async (page: number, size: number) => {
-      setIsLoading(true);
-      const result = await getPendingRequestsAction(page, size);
-      if (result.success) {
-        setRequests(result.data.requests);
-        setTotalCount(result.data.totalCount);
-      }
-      setIsLoading(false);
-    },
-    []
-  );
+  const fetchPage = useCallback(async (page: number, size: number) => {
+    setIsLoading(true);
+    const result = await getPendingRequestsAction(page, size);
+
+    if (result.success) {
+      setRequests(result.data.requests);
+      setTotalCount(result.data.totalCount);
+    }
+
+    setIsLoading(false);
+  }, []);
 
   const handlePageChange = useCallback(
     async (page: number) => {
