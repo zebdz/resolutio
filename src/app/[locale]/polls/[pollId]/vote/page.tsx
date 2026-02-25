@@ -131,7 +131,6 @@ export default async function VotePage({ params }: VotePageProps) {
         userDrafts={serializedDrafts}
         pollId={pollId}
       />
-
     </AuthenticatedLayout>
   );
 }

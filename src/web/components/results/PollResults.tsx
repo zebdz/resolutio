@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Badge } from '@/app/components/catalyst/badge';
 import VoterBreakdownDialog from './VoterBreakdownDialog';
+import ExportPdfButton from './ExportPdfButton';
 import { Button } from '@/app/components/catalyst/button';
 
 interface AnswerResult {
@@ -110,6 +111,13 @@ export default function PollResults({
             </div>
           </div>
         </div>
+
+        {/* Export PDF button — only for finished polls */}
+        {isFinished && (
+          <div className="flex justify-end">
+            <ExportPdfButton pollId={results.pollId} />
+          </div>
+        )}
 
         {/* Question results */}
         {results.questions.map((question) => {
