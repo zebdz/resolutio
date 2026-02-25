@@ -46,6 +46,7 @@ jobs:
             generated/ \
             prisma/ \
             public/ \
+            messages/ \
             package.json \
             next.config.ts \
             prisma.config.ts \
