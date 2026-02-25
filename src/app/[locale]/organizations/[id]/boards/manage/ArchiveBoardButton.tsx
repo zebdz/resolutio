@@ -36,6 +36,7 @@ export default function ArchiveBoardButton({
     const result = await archiveBoardAction(boardId);
 
     if (result.success) {
+      setIsArchiving(false);
       setIsOpen(false);
       router.refresh();
     } else {

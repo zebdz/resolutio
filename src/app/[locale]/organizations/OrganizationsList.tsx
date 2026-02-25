@@ -53,12 +53,12 @@ export function OrganizationsList({ organizations }: OrganizationsListProps) {
 
     if (result.success) {
       setSuccess(t('joinSuccess'));
-      router.refresh();
     } else {
       setError(result.error);
     }
 
     setJoiningOrgId(null);
+    router.refresh();
   };
 
   return (

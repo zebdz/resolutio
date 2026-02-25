@@ -12,6 +12,8 @@ export const CreateOrganizationSchema = z.object({
     .max(2000, 'Organization description cannot exceed 2000 characters')
     .trim(),
   parentId: z.string().optional().nullable(),
+  autoJoin: z.boolean().optional().default(true),
 });
 
-export type CreateOrganizationInput = z.infer<typeof CreateOrganizationSchema>;
+// Use z.input so autoJoin remains optional for callers (use case ignores it)
+export type CreateOrganizationInput = z.input<typeof CreateOrganizationSchema>;

@@ -62,6 +62,7 @@ export default function MembersList({ boardId, members }: MembersListProps) {
     const result = await removeBoardMemberAction(formData);
 
     if (result.success) {
+      setIsRemoving(false);
       setIsDialogOpen(false);
       setSelectedMember(null);
       router.refresh();

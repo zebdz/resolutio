@@ -28,7 +28,6 @@ import { QuestionForm } from '@/web/components/QuestionForm';
 import PollControls from '@/web/components/PollControls';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { validateHeaderName } from 'http';
-import { Toaster } from 'sonner';
 
 interface Answer {
   id: string;
@@ -744,8 +743,6 @@ export function EditPollForm() {
           )}
         </div>
       </div>
-
-      <Toaster />
     </div>
   );
 }

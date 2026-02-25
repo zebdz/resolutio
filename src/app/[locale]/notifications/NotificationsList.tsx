@@ -172,10 +172,10 @@ export function NotificationsList({
         prev.map((n) => (n.readAt ? n : { ...n, readAt: new Date() }))
       );
       setUnreadCount(0);
-      router.refresh();
     }
 
     setMarkingAll(false);
+    router.refresh();
   }
 
   function toggleSelect(id: string) {
@@ -213,11 +213,11 @@ export function NotificationsList({
       setUnreadCount((prev) => Math.max(0, prev - deletedUnread));
       setTotalCount((prev) => prev - ids.length);
       setSelectedIds(new Set());
-      router.refresh();
     }
 
     setDeleting(false);
     setShowDeleteDialog(false);
+    router.refresh();
   }
 
   function resolveLocalizedText(

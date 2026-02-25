@@ -23,6 +23,7 @@ import {
   PrismaUserRepository,
   PrismaNotificationRepository,
 } from '@/infrastructure/index';
+import { Notification } from '@/domain/notification/Notification';
 import { getCurrentUser } from '../lib/session';
 
 // Action result type for client-side handling
@@ -91,7 +92,7 @@ const getOrganizationPendingRequestsUseCase =
 
 export async function createOrganizationAction(
   formData: FormData
-): Promise<ActionResult<{ organizationId: string }>> {
+): Promise<ActionResult<{ organizationId: string; autoJoinFailed?: boolean }>> {
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
 
@@ -111,6 +112,7 @@ export async function createOrganizationAction(
       name: formData.get('name') as string,
       description: formData.get('description') as string,
       parentId: (formData.get('parentId') as string) || null,
+      autoJoin: formData.get('autoJoin') !== 'false',
     };
 
     // Validate with Zod
@@ -153,11 +155,66 @@ export async function createOrganizationAction(
       };
     }
 
-    // Return success with organization ID
+    const orgId = result.value.organization.id;
+
+    // Auto-join: create pending membership and accept it
+    if (validation.data.autoJoin) {
+      try {
+        await prisma.organizationUser.create({
+          data: {
+            organizationId: orgId,
+            userId: user.id,
+            status: 'pending',
+          },
+        });
+
+        const acceptResult = await handleJoinRequestUseCase.execute({
+          organizationId: orgId,
+          requesterId: user.id,
+          adminId: user.id,
+          action: 'accept',
+        });
+
+        if (!acceptResult.success) {
+          throw new Error(acceptResult.error);
+        }
+      } catch (autoJoinError) {
+        console.error('Auto-join failed after org creation:', autoJoinError);
+
+        // Notify user to join manually
+        const notification = Notification.create({
+          userId: user.id,
+          type: 'auto_join_failed',
+          title: 'notification.types.autoJoinFailed.title',
+          body: 'notification.types.autoJoinFailed.body',
+          data: { organizationId: orgId, organizationName: input.name },
+        });
+
+        if (notification.success) {
+          await notificationRepository
+            .save(notification.value)
+            .catch((err) =>
+              console.error(
+                'Failed to save auto-join failure notification:',
+                err
+              )
+            );
+        }
+
+        return {
+          success: true,
+          data: {
+            organizationId: orgId,
+            autoJoinFailed: true,
+          },
+        };
+      }
+    }
+
     return {
       success: true,
       data: {
-        organizationId: result.value.organization.id,
+        organizationId: orgId,
       },
     };
   } catch (error) {

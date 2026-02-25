@@ -8,7 +8,6 @@ import { Heading } from '@/app/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
 import { Button } from '@/app/components/catalyst/button';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
-import { Toaster } from 'sonner';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 
 interface VotePageProps {
@@ -133,7 +132,6 @@ export default async function VotePage({ params }: VotePageProps) {
         pollId={pollId}
       />
 
-      <Toaster />
     </AuthenticatedLayout>
   );
 }

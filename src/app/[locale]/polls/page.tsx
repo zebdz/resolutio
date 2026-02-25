@@ -6,7 +6,6 @@ import { Link } from '@/src/i18n/routing';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { searchPollsAction } from '@/web/actions/poll';
 import { getUserMemberOrganizationsAction } from '@/web/actions/organization';
-import { Toaster } from 'sonner';
 import {
   prisma,
   PrismaOrganizationRepository,
@@ -72,7 +71,6 @@ export default async function PollsPage() {
 
   return (
     <AuthenticatedLayout>
-      <Toaster />
       <div className="space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">

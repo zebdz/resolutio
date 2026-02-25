@@ -5,7 +5,6 @@ import { getPollByIdAction } from '@/web/actions/poll';
 import { getParticipantsAction } from '@/web/actions/participant';
 import ParticipantManagement from '@/web/components/participants/ParticipantManagement';
 import { Heading } from '@/app/components/catalyst/heading';
-import { Toaster } from 'sonner';
 import { ParticipantWithUser } from '@/src/application/poll/GetParticipantsUseCase';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 
@@ -107,8 +106,6 @@ export default async function ParticipantsPage({
         }}
         pollState={poll.state}
       />
-
-      <Toaster />
     </AuthenticatedLayout>
   );
 }

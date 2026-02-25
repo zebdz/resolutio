@@ -134,6 +134,9 @@
       "submit": "Create Organization",
       "creating": "Creating...",
       "cancel": "Cancel",
+      "autoJoin": "Join as member",
+      "autoJoinDescription": "Automatically join as a member after creating",
+      "autoJoinFailed": "Organization created, but auto-join failed. Please join manually.",
       "success": "Organization created successfully",
       "errors": {
         "nameRequired": "Organization name is required",
@@ -613,6 +616,10 @@
       "pollFinished": {
         "title": "Poll has ended",
         "body": "Voting has ended for \"{pollTitle}\""
+      },
+      "autoJoinFailed": {
+        "title": "Auto-join failed",
+        "body": "Please try to manually join the organization \"{organizationName}\""
       }
     },
     "page": {

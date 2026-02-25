@@ -88,7 +88,7 @@ export function UserOrganizationsList({
     };
 
     loadOrganizations();
-  }, []);
+  }, [adminOrganizations]);
 
   const handleCancel = async (organizationId: string) => {
     setCancellingId(organizationId);

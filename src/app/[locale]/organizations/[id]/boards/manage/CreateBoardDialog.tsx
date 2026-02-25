@@ -45,6 +45,7 @@ export default function CreateBoardDialog({
     const result = await createBoardAction(formData);
 
     if (result.success) {
+      setIsCreating(false);
       setIsOpen(false);
       setBoardName('');
       router.refresh();

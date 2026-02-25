@@ -14,8 +14,10 @@ import { Button } from '@/app/components/catalyst/button';
 import { Input } from '@/app/components/catalyst/input';
 import { Textarea } from '@/app/components/catalyst/textarea';
 import { Select } from '@/app/components/catalyst/select';
-import { Field, Label } from '@/app/components/catalyst/fieldset';
+import { Field, Label, Description } from '@/app/components/catalyst/fieldset';
 import { ErrorMessage } from '@/app/components/catalyst/fieldset';
+import { SwitchField, Switch } from '@/app/components/catalyst/switch';
+import { toast } from 'sonner';
 import {
   createOrganizationAction,
   getAdminOrganizationsAction,
@@ -43,6 +45,8 @@ export function CreateOrganizationDialog({
     Array<{ id: string; name: string }>
   >([]);
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(false);
+  const [autoJoin, setAutoJoin] = useState(true);
+  const [selectedParentId, setSelectedParentId] = useState('');
 
   // Load admin organizations when dialog opens
   useEffect(() => {
@@ -66,6 +70,8 @@ export function CreateOrganizationDialog({
     setIsSubmitting(false);
     setError(null);
     setFieldErrors({});
+    setAutoJoin(true);
+    setSelectedParentId('');
 
     // Reset form fields
     if (formRef.current) {
@@ -83,12 +89,14 @@ export function CreateOrganizationDialog({
     const result = await createOrganizationAction(formData);
 
     if (result.success) {
+      if (result.data.autoJoinFailed) {
+        toast.error(t('autoJoinFailed'));
+      }
+
       resetForm();
 
       onClose();
       router.refresh();
-      // Optionally redirect to the organization page
-      // router.push(`/${locale}/organizations/${result.data.organizationId}`);
     } else {
       setError(result.error);
 
@@ -162,6 +170,17 @@ export function CreateOrganizationDialog({
                   id="parentId"
                   name="parentId"
                   disabled={isSubmitting || isLoadingOrgs}
+                  value={selectedParentId}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSelectedParentId(value);
+
+                    if (value) {
+                      setAutoJoin(false);
+                    } else {
+                      setAutoJoin(true);
+                    }
+                  }}
                 >
                   <option value="">{t('noParent')}</option>
                   {adminOrganizations.map((org) => (
@@ -175,6 +194,25 @@ export function CreateOrganizationDialog({
                 )}
               </Field>
             )}
+
+            {/* Auto-join toggle (hidden when parent org is selected) */}
+            {!selectedParentId && (
+              <SwitchField>
+                <Label>{t('autoJoin')}</Label>
+                <Description>{t('autoJoinDescription')}</Description>
+                <Switch
+                  checked={autoJoin}
+                  onChange={setAutoJoin}
+                  color="blue"
+                  disabled={isSubmitting}
+                />
+              </SwitchField>
+            )}
+            <input
+              type="hidden"
+              name="autoJoin"
+              value={autoJoin ? 'true' : 'false'}
+            />
           </div>
         </DialogBody>
 

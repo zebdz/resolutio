@@ -35,6 +35,7 @@ export function JoinParentForm({
     const result = await requestJoinParentAction(formData);
 
     if (result.success) {
+      setIsSubmitting(false);
       router.back();
       router.refresh();
     } else {

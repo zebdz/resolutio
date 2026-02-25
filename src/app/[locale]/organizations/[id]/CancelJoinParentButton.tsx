@@ -25,6 +25,7 @@ export function CancelJoinParentButton({
     const result = await cancelJoinParentRequestAction(requestId);
 
     if (result.success) {
+      setIsCancelling(false);
       router.refresh();
     } else {
       setError(result.error);

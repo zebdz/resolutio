@@ -59,12 +59,12 @@ export function OutgoingRequestsTable({
 
     if (result.success) {
       setRequests((prev) => prev.filter((r) => r.id !== requestId));
-      router.refresh();
     } else {
       setError(result.error);
     }
 
     setIsProcessing(false);
+    router.refresh();
   };
 
   if (requests.length === 0) {

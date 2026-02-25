@@ -29,6 +29,7 @@ export function JoinOrganizationButton({
 
     if (result.success) {
       router.refresh();
+      setIsJoining(false);
     } else {
       setError(result.error);
       setIsJoining(false);
