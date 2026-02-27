@@ -117,7 +117,7 @@ export default async function OrganizationDetailPage({
                 <Button color="amber">{t('pendingRequests')}</Button>
               </Link>
               <Link href={`/organizations/${id}/boards/manage`}>
-                <Button color="blue">{t('manageBoards')}</Button>
+                <Button color="brand-green">{t('manageBoards')}</Button>
               </Link>
               <Link href={`/organizations/${id}/join-parent-requests`}>
                 <Button color="amber">
@@ -149,7 +149,7 @@ export default async function OrganizationDetailPage({
               </div>
             ) : (
               <Link href={`/organizations/${id}/join-parent`}>
-                <Button color="indigo">{tJoinParent('title')}</Button>
+                <Button color="brand-green">{tJoinParent('title')}</Button>
               </Link>
             )}
           </div>

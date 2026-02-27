@@ -94,7 +94,9 @@ export function AppNavbar({
           <UserCircleIcon data-slot="icon" />
           <NavbarLabel className="max-lg:hidden">{t('account')}</NavbarLabel>
         </NavbarItem>
-        <LocaleSwitcher />
+        <div className="rounded-lg bg-white/15 px-1 py-px">
+          <LocaleSwitcher />
+        </div>
       </NavbarSection>
     </Navbar>
   );

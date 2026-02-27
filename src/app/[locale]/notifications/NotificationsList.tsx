@@ -279,7 +279,7 @@ export function NotificationsList({
         </button>
 
         {unreadCount > 0 && (
-          <Badge color="blue">
+          <Badge color="teal">
             {unreadCount} {t('unread')}
           </Badge>
         )}

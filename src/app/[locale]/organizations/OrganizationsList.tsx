@@ -101,50 +101,53 @@ export function OrganizationsList({ organizations }: OrganizationsListProps) {
           {filteredOrganizations.map((org) => (
             <div
               key={org.id}
-              className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+              className="flex flex-col rounded-lg border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
             >
-              <div className="space-y-4">
+              {/* Parent org label — fixed height so cards align */}
+              <div className="mb-1 min-h-[1.25rem]">
                 {org.parentOrg && (
                   <Text className="text-xs text-zinc-500 dark:text-zinc-400">
                     {tOrg('parentOrg', { name: org.parentOrg.name })}
                   </Text>
                 )}
-                <Link href={`/organizations/${org.id}`}>
-                  <Heading
-                    level={3}
-                    className="text-lg font-semibold hover:text-blue-600 dark:hover:text-blue-400"
-                  >
-                    {org.name}
-                  </Heading>
-                </Link>
-                <Text className="line-clamp-3 text-sm text-zinc-600 dark:text-zinc-400">
-                  {org.description}
-                </Text>
+              </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Badge color="zinc">
-                      {t('memberCount', { count: org.memberCount })}
-                    </Badge>
-                  </div>
+              <Link href={`/organizations/${org.id}`}>
+                <Heading
+                  level={3}
+                  className="text-lg font-semibold hover:text-brand-green"
+                >
+                  {org.name}
+                </Heading>
+              </Link>
 
-                  {org.firstAdmin && (
-                    <Text className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {t('admin')}: {org.firstAdmin.firstName}{' '}
-                      {org.firstAdmin.lastName}
-                    </Text>
-                  )}
+              <Text className="mt-2 line-clamp-3 flex-1 text-sm text-zinc-600 dark:text-zinc-400">
+                {org.description}
+              </Text>
+
+              <div className="mt-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge color="zinc">
+                    {t('memberCount', { count: org.memberCount })}
+                  </Badge>
                 </div>
 
-                <Button
-                  color="blue"
-                  className="w-full"
-                  onClick={() => handleJoin(org.id)}
-                  disabled={joiningOrgId === org.id}
-                >
-                  {joiningOrgId === org.id ? t('joining') : t('joinButton')}
-                </Button>
+                {org.firstAdmin && (
+                  <Text className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {t('admin')}: {org.firstAdmin.firstName}{' '}
+                    {org.firstAdmin.lastName}
+                  </Text>
+                )}
               </div>
+
+              <Button
+                color="brand-green"
+                className="mt-4 w-full"
+                onClick={() => handleJoin(org.id)}
+                disabled={joiningOrgId === org.id}
+              >
+                {joiningOrgId === org.id ? t('joining') : t('joinButton')}
+              </Button>
             </div>
           ))}
         </div>

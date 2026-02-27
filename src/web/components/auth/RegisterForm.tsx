@@ -245,7 +245,7 @@ export function RegisterForm({ locale }: Props) {
 
       <Button
         type="submit"
-        color="blue"
+        color="brand-green"
         className="w-full"
         disabled={isPending}
       >

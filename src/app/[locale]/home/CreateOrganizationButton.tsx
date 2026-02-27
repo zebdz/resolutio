@@ -18,7 +18,7 @@ export function CreateOrganizationButton({
 
   return (
     <>
-      <Button color="blue" onClick={() => setIsDialogOpen(true)}>
+      <Button color="brand-green" onClick={() => setIsDialogOpen(true)}>
         <PlusIcon />
         {t('createOrganization')}
       </Button>

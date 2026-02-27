@@ -76,7 +76,7 @@ export default function AddMemberSection({
         </Field>
         <div className="flex items-end">
           <Button
-            color="indigo"
+            color="brand-green"
             onClick={handleAdd}
             disabled={isAdding || !selectedUserId}
           >

@@ -151,7 +151,7 @@ export default function AddOutsideMemberSection({
                 </p>
               </div>
               <Button
-                color="indigo"
+                color="brand-green"
                 onClick={() => handleAdd(user.id)}
                 disabled={isAdding}
               >

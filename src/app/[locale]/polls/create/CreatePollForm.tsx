@@ -371,7 +371,7 @@ export function CreatePollForm() {
           >
             {t('cancel')}
           </Button>
-          <Button color="blue" onClick={handleSave} disabled={isSaving}>
+          <Button color="brand-green" onClick={handleSave} disabled={isSaving}>
             {isSaving ? tCommon('saving') : t('save')}
           </Button>
         </div>
@@ -549,7 +549,7 @@ export function CreatePollForm() {
               <p className="text-zinc-500 dark:text-zinc-400 mb-4">
                 {t('noQuestions')}
               </p>
-              <Button color="blue" onClick={handleAddQuestion}>
+              <Button color="brand-green" onClick={handleAddQuestion}>
                 <PlusIcon className="w-5 h-5 mr-2" />
                 {t('addQuestion')}
               </Button>

@@ -226,7 +226,7 @@ export function PollCard({
             {/* Vote button for participants on active polls */}
             {isActive && poll.canVote && !poll.hasFinishedVoting && (
               <Link href={`/polls/${poll.id}/vote`} className="flex-1">
-                <Button color="blue" className="w-full">
+                <Button color="brand-green" className="w-full">
                   {t('vote')}
                 </Button>
               </Link>
@@ -254,7 +254,7 @@ export function PollCard({
           {/* Take Snapshot button for DRAFT polls */}
           {canActivateAndDeactivatePoll && isDraft && (
             <Button
-              color="blue"
+              color="brand-green"
               onClick={handleTakeSnapshot}
               disabled={isTakingSnapshot}
               className="w-full"

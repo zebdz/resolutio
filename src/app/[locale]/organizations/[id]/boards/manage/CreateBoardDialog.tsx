@@ -57,7 +57,7 @@ export default function CreateBoardDialog({
 
   return (
     <>
-      <Button color="indigo" onClick={() => setIsOpen(true)}>
+      <Button color="brand-green" onClick={() => setIsOpen(true)}>
         {t('createBoard')}
       </Button>
 
@@ -89,7 +89,7 @@ export default function CreateBoardDialog({
             {tCommon('cancel')}
           </Button>
           <Button
-            color="indigo"
+            color="brand-green"
             onClick={handleCreate}
             disabled={isCreating || !boardName.trim()}
           >

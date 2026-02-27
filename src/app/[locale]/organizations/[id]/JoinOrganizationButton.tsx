@@ -39,7 +39,7 @@ export function JoinOrganizationButton({
   return (
     <div className="space-y-4">
       <Button
-        color="blue"
+        color="brand-green"
         onClick={handleJoin}
         disabled={isJoining}
         className="w-full sm:w-auto"

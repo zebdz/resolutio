@@ -203,7 +203,7 @@ export function CreateOrganizationDialog({
                 <Switch
                   checked={autoJoin}
                   onChange={setAutoJoin}
-                  color="blue"
+                  color="brand-green"
                   disabled={isSubmitting}
                 />
               </SwitchField>
@@ -220,7 +220,7 @@ export function CreateOrganizationDialog({
           <Button plain onClick={handleClose} disabled={isSubmitting}>
             {t('cancel')}
           </Button>
-          <Button type="submit" color="blue" disabled={isSubmitting}>
+          <Button type="submit" color="brand-green" disabled={isSubmitting}>
             {isSubmitting ? t('creating') : t('submit')}
           </Button>
         </DialogActions>

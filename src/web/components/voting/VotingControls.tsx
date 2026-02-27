@@ -61,7 +61,7 @@ export default function VotingControls({
             type="button"
             onClick={onFinish}
             disabled={!canFinish || isFinishing}
-            color="blue"
+            color="brand-green"
           >
             {isFinishing ? t('finishing') : t('finish')}
           </Button>

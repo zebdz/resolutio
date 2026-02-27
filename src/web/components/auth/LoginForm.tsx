@@ -128,7 +128,7 @@ export function LoginForm() {
 
       <Button
         type="submit"
-        color="blue"
+        color="brand-green"
         className="w-full"
         disabled={isPending}
       >

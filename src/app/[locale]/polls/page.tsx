@@ -81,7 +81,7 @@ export default async function PollsPage() {
             <Subheading>{isSuperAdmin ? t('title') : t('myPolls')}</Subheading>
           </div>
           <Link href="/polls/create">
-            <Button color="blue" disabled={!hasOrgMembership}>
+            <Button color="brand-green" disabled={!hasOrgMembership}>
               <PlusIcon className="h-5 w-5 mr-2" />
               {t('createPoll')}
             </Button>

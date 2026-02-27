@@ -108,7 +108,9 @@ export function MobileSidebar({
         </SidebarSection>
 
         <div className="px-2 mt-4">
-          <LocaleSwitcher />
+          <div className="inline-block rounded-lg bg-white/15 px-1 py-px">
+            <LocaleSwitcher />
+          </div>
         </div>
       </SidebarBody>
     </Sidebar>

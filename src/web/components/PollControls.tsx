@@ -195,7 +195,7 @@ export default function PollControls({
           <div className="flex flex-wrap gap-2">
             {state === 'DRAFT' && (
               <Button
-                color="blue"
+                color="brand-green"
                 onClick={handleTakeSnapshot}
                 disabled={isTakingSnapshot || !hasQuestions}
               >

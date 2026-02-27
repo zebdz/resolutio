@@ -100,7 +100,7 @@ export function JoinParentForm({
         >
           {tCommon('cancel')}
         </Button>
-        <Button type="submit" color="indigo" disabled={isSubmitting}>
+        <Button type="submit" color="brand-green" disabled={isSubmitting}>
           {isSubmitting ? t('submitting') : t('submit')}
         </Button>
       </div>

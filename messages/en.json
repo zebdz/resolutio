@@ -36,11 +36,23 @@
     "logout": "Logout"
   },
   "landing": {
-    "title": "Take Control of Your Life",
+    "title": "You Can Change Everything",
+    "heroAccent": "You",
+    "heroLine1": "Can",
+    "heroLine2": "Change Everything",
     "subtitle": "Unite in organizations, vote on decisions, and create legal documents",
     "cta": "Get Started",
     "signIn": "Sign In",
-    "disclaimer": "Important: Only create organizations and polls that comply with the laws of your country!"
+    "disclaimer": "Important: Only create organizations and polls that comply with the laws of your country!",
+    "logoText": "Decision Making Platform",
+    "copyright": "© 2025 Resolutio",
+    "features": {
+      "voting": "Voting",
+      "publicQuestions": "Public Questions",
+      "governance": "Governance & Oversight Bodies",
+      "users": "Users",
+      "documents": "Documents"
+    }
   },
   "home": {
     "title": "My Organizations",
