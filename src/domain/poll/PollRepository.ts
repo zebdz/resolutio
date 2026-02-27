@@ -7,10 +7,13 @@ export interface PollSearchFilters {
   statuses?: PollState[];
   organizationId?: string;
   boardId?: string;
+  orgWideOnly?: boolean;
   createdFrom?: Date;
   createdTo?: Date;
   startFrom?: Date;
   startTo?: Date;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface PollRepository {
@@ -23,7 +26,7 @@ export interface PollRepository {
     filters: PollSearchFilters,
     userId?: string,
     adminOrgIds?: string[]
-  ): Promise<Result<Poll[], string>>;
+  ): Promise<Result<{ polls: Poll[]; totalCount: number }, string>>;
   updatePoll(poll: Poll): Promise<Result<void, string>>;
   deletePoll(pollId: string): Promise<Result<void, string>>;
 }

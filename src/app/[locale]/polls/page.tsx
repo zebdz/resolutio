@@ -66,8 +66,11 @@ export default async function PollsPage() {
 
   const pollsResult = await searchPollsAction({
     createdFrom: oneWeekAgo.toISOString().split('T')[0],
+    page: 1,
+    pageSize: 10,
   });
-  const polls = pollsResult.success ? pollsResult.data : [];
+  const polls = pollsResult.success ? pollsResult.data.polls : [];
+  const totalCount = pollsResult.success ? pollsResult.data.totalCount : 0;
 
   return (
     <AuthenticatedLayout>
@@ -99,6 +102,7 @@ export default async function PollsPage() {
 
         <PollsList
           initialPolls={polls}
+          initialTotalCount={totalCount}
           organizations={organizations}
           userId={user.id}
           adminOrgIds={adminOrgIds}

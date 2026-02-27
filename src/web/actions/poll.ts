@@ -1275,15 +1275,18 @@ export interface SearchPollsInput {
   statuses?: PollState[];
   organizationId?: string;
   boardId?: string;
+  orgWideOnly?: boolean;
   createdFrom?: string;
   createdTo?: string;
   startFrom?: string;
   startTo?: string;
+  page?: number;
+  pageSize?: number;
 }
 
 export async function searchPollsAction(
   input: SearchPollsInput
-): Promise<ActionResult<any[]>> {
+): Promise<ActionResult<{ polls: any[]; totalCount: number }>> {
   const t = await getTranslations('common.errors');
 
   try {
@@ -1300,10 +1303,13 @@ export async function searchPollsAction(
       statuses: input.statuses,
       organizationId: input.organizationId || undefined,
       boardId: input.boardId || undefined,
+      orgWideOnly: input.orgWideOnly,
       createdFrom: input.createdFrom ? new Date(input.createdFrom) : undefined,
       createdTo: input.createdTo ? new Date(input.createdTo) : undefined,
       startFrom: input.startFrom ? new Date(input.startFrom) : undefined,
       startTo: input.startTo ? new Date(input.startTo) : undefined,
+      page: input.page,
+      pageSize: input.pageSize,
     };
 
     // Admin org IDs so admins see their orgs' polls even if not a member
@@ -1330,7 +1336,7 @@ export async function searchPollsAction(
 
     // Enrich with canVote + hasFinishedVoting + org/board names
     const enriched = await Promise.all(
-      result.value.map(async (poll) => {
+      result.value.polls.map(async (poll) => {
         const pollJson: any = poll.toJSON();
 
         // Org + board names
@@ -1375,7 +1381,10 @@ export async function searchPollsAction(
       })
     );
 
-    return { success: true, data: enriched };
+    return {
+      success: true,
+      data: { polls: enriched, totalCount: result.value.totalCount },
+    };
   } catch (error) {
     console.error('Error searching polls:', error);
 

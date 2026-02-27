@@ -204,7 +204,7 @@ export class PrismaPollRepository implements PollRepository {
     filters: PollSearchFilters,
     userId?: string,
     adminOrgIds?: string[]
-  ): Promise<Result<Poll[], string>> {
+  ): Promise<Result<{ polls: Poll[]; totalCount: number }, string>> {
     try {
       const where: any = { archivedAt: null };
 
@@ -227,6 +227,8 @@ export class PrismaPollRepository implements PollRepository {
 
       if (filters.boardId) {
         where.boardId = filters.boardId;
+      } else if (filters.orgWideOnly) {
+        where.boardId = null;
       }
 
       if (filters.createdFrom || filters.createdTo) {
@@ -283,7 +285,7 @@ export class PrismaPollRepository implements PollRepository {
         }
       }
 
-      const polls = await this.prisma.poll.findMany({
+      const findManyArgs: any = {
         where,
         include: {
           questions: {
@@ -298,9 +300,22 @@ export class PrismaPollRepository implements PollRepository {
           },
         },
         orderBy: { createdAt: 'desc' },
-      });
+      };
 
-      return success(polls.map((poll) => this.toDomainPoll(poll)));
+      if (filters.page && filters.pageSize) {
+        findManyArgs.skip = (filters.page - 1) * filters.pageSize;
+        findManyArgs.take = filters.pageSize;
+      }
+
+      const [polls, totalCount] = await Promise.all([
+        this.prisma.poll.findMany(findManyArgs),
+        this.prisma.poll.count({ where }),
+      ]);
+
+      return success({
+        polls: polls.map((poll) => this.toDomainPoll(poll)),
+        totalCount,
+      });
     } catch (error) {
       console.error('Failed to search polls:', error);
 

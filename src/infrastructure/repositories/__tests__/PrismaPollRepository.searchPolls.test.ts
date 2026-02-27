@@ -10,6 +10,7 @@ function createMockPrisma() {
       create: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
+      count: vi.fn(),
       update: vi.fn(),
     },
   };
@@ -51,6 +52,7 @@ describe('PrismaPollRepository.searchPolls', () => {
 
   it('should return all non-archived polls when no filters', async () => {
     mockPrisma.poll.findMany.mockResolvedValue([buildPrismaPoll()]);
+    mockPrisma.poll.count.mockResolvedValue(1);
 
     const result = await repo.searchPolls({});
 
@@ -67,8 +69,9 @@ describe('PrismaPollRepository.searchPolls', () => {
       return;
     }
 
-    expect(result.value).toHaveLength(1);
-    expect(result.value[0].id).toBe('poll-1');
+    expect(result.value.polls).toHaveLength(1);
+    expect(result.value.polls[0].id).toBe('poll-1');
+    expect(result.value.totalCount).toBe(1);
   });
 
   it('should filter by titleSearch using contains insensitive', async () => {
@@ -299,5 +302,91 @@ describe('PrismaPollRepository.searchPolls', () => {
     }
 
     expect(result.error).toBe('common.errors.unexpected');
+  });
+
+  // --- Pagination tests ---
+
+  it('should apply skip and take when page and pageSize provided', async () => {
+    mockPrisma.poll.findMany.mockResolvedValue([buildPrismaPoll()]);
+    mockPrisma.poll.count.mockResolvedValue(25);
+
+    const result = await repo.searchPolls({ page: 2, pageSize: 10 });
+
+    expect(result.success).toBe(true);
+    expect(mockPrisma.poll.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 10,
+        take: 10,
+      })
+    );
+  });
+
+  it('should return totalCount from count query', async () => {
+    mockPrisma.poll.findMany.mockResolvedValue([buildPrismaPoll()]);
+    mockPrisma.poll.count.mockResolvedValue(42);
+
+    const result = await repo.searchPolls({ page: 1, pageSize: 10 });
+
+    if (!result.success) {return;}
+
+    expect(result.value.totalCount).toBe(42);
+    expect(result.value.polls).toHaveLength(1);
+  });
+
+  it('should use same where clause for count and findMany', async () => {
+    mockPrisma.poll.findMany.mockResolvedValue([]);
+    mockPrisma.poll.count.mockResolvedValue(0);
+
+    await repo.searchPolls({
+      titleSearch: 'Budget',
+      statuses: [PollState.ACTIVE],
+      page: 1,
+      pageSize: 10,
+    });
+
+    const findManyWhere = mockPrisma.poll.findMany.mock.calls[0][0].where;
+    const countWhere = mockPrisma.poll.count.mock.calls[0][0].where;
+    expect(countWhere).toEqual(findManyWhere);
+  });
+
+  it('should filter for org-wide polls (boardId is null) when orgWideOnly is true', async () => {
+    mockPrisma.poll.findMany.mockResolvedValue([]);
+    mockPrisma.poll.count.mockResolvedValue(0);
+
+    await repo.searchPolls({ orgWideOnly: true });
+
+    const where = mockPrisma.poll.findMany.mock.calls[0][0].where;
+    expect(where.boardId).toBeNull();
+  });
+
+  it('should not set boardId filter when orgWideOnly is false', async () => {
+    mockPrisma.poll.findMany.mockResolvedValue([]);
+    mockPrisma.poll.count.mockResolvedValue(0);
+
+    await repo.searchPolls({ orgWideOnly: false });
+
+    const where = mockPrisma.poll.findMany.mock.calls[0][0].where;
+    expect(where.boardId).toBeUndefined();
+  });
+
+  it('should prefer boardId over orgWideOnly when both set', async () => {
+    mockPrisma.poll.findMany.mockResolvedValue([]);
+    mockPrisma.poll.count.mockResolvedValue(0);
+
+    await repo.searchPolls({ boardId: 'board-1', orgWideOnly: true });
+
+    const where = mockPrisma.poll.findMany.mock.calls[0][0].where;
+    expect(where.boardId).toBe('board-1');
+  });
+
+  it('should not apply skip/take when pagination params omitted', async () => {
+    mockPrisma.poll.findMany.mockResolvedValue([]);
+    mockPrisma.poll.count.mockResolvedValue(0);
+
+    await repo.searchPolls({});
+
+    const call = mockPrisma.poll.findMany.mock.calls[0][0];
+    expect(call.skip).toBeUndefined();
+    expect(call.take).toBeUndefined();
   });
 });

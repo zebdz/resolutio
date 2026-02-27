@@ -418,6 +418,7 @@
     "allBoards": "All boards",
     "resetFilters": "Reset",
     "noFilteredPolls": "No polls match your filters",
+    "pollsPerPage": "Polls per page",
     "draft": "Draft",
     "ready": "Ready",
     "noPollsYet": "No polls created yet",

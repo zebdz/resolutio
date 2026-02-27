@@ -11,10 +11,17 @@ import {
   getChildOrgJoinParentRequestAction,
   getIncomingJoinParentRequestsAction,
 } from '@/web/actions/joinParentRequest';
+import { searchPollsAction } from '@/web/actions/poll';
 import { JoinOrganizationButton } from './JoinOrganizationButton';
 import { CancelJoinParentButton } from './CancelJoinParentButton';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 import { OrgHierarchyTree } from '@/app/components/OrgHierarchyTree';
+import { PollsList } from '@/web/components/PollsList';
+import {
+  prisma,
+  PrismaOrganizationRepository,
+  PrismaUserRepository,
+} from '@/infrastructure/index';
 
 export default async function OrganizationDetailPage({
   params,
@@ -76,6 +83,31 @@ export default async function OrganizationDetailPage({
 
     if (incomingReqResult.success) {
       incomingParentRequestCount = incomingReqResult.data.requests.length;
+    }
+  }
+
+  // Fetch polls data for members/admins
+  const organizationRepository = new PrismaOrganizationRepository(prisma);
+  const userRepository = new PrismaUserRepository(prisma);
+
+  let pollsData: { polls: any[]; totalCount: number } | null = null;
+  let adminOrgIds: string[] = [];
+  let isSuperAdmin = false;
+
+  if (user && (isUserMember || isUserAdmin)) {
+    isSuperAdmin = await userRepository.isSuperAdmin(user.id);
+    const adminOrgs =
+      await organizationRepository.findAdminOrganizationsByUserId(user.id);
+    adminOrgIds = adminOrgs.map((o) => o.id);
+
+    const pollsResult = await searchPollsAction({
+      organizationId: id,
+      page: 1,
+      pageSize: 10,
+    });
+
+    if (pollsResult.success) {
+      pollsData = pollsResult.data;
     }
   }
 
@@ -155,71 +187,70 @@ export default async function OrganizationDetailPage({
           </div>
         )}
 
-        {/* Boards Section - Only visible to members */}
-        {(isUserMember || isUserAdmin) && boards.length > 0 && (
+        {/* Boards Section - Visible to members and admins */}
+        {(isUserMember || isUserAdmin) && (
           <>
             <Divider />
             <div>
               <Heading level={2} className="mb-4">
                 {t('boards')}
               </Heading>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {boards.map((board) => (
-                  <div
-                    key={board.id}
-                    className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
-                  >
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between">
-                        <Heading level={3} className="text-lg font-semibold">
-                          {board.name}
-                        </Heading>
-                      </div>
+              {boards.length > 0 ? (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {boards.map((board) => (
+                    <div
+                      key={board.id}
+                      className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between">
+                          <Heading level={3} className="text-lg font-semibold">
+                            {board.name}
+                          </Heading>
+                        </div>
 
-                      <div className="flex items-center gap-2">
-                        <Badge color="zinc">
-                          {t('boardMemberCount', { count: board.memberCount })}
-                        </Badge>
-                        {board.isUserMember && (
-                          <Badge color="green">{t('boardMember')}</Badge>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <Badge color="zinc">
+                            {t('boardMemberCount', {
+                              count: board.memberCount,
+                            })}
+                          </Badge>
+                          {board.isUserMember && (
+                            <Badge color="green">{t('boardMember')}</Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border-2 border-dashed border-zinc-300 p-12 text-center dark:border-zinc-700">
+                  <Text className="text-lg text-zinc-500 dark:text-zinc-400">
+                    {t('noBoards')}
+                  </Text>
+                </div>
+              )}
             </div>
           </>
         )}
 
-        {/* No Boards Message */}
-        {isUserMember && boards.length === 0 && (
-          <>
-            <Divider />
-            <div className="rounded-lg border-2 border-dashed border-zinc-300 p-12 text-center dark:border-zinc-700">
-              <Text className="text-lg text-zinc-500 dark:text-zinc-400">
-                {t('noBoards')}
-              </Text>
-            </div>
-          </>
-        )}
-
-        {/* Recent Polls Section - Only visible to members */}
-        {isUserMember && (
+        {/* Polls Section - Visible to members and admins */}
+        {(isUserMember || isUserAdmin) && pollsData && (
           <>
             <Divider />
             <div>
               <Heading level={2} className="mb-4">
                 {t('recentPolls')}
               </Heading>
-              <div className="rounded-lg border-2 border-dashed border-zinc-300 p-12 text-center dark:border-zinc-700">
-                <Text className="text-lg text-zinc-500 dark:text-zinc-400">
-                  {t('noPolls')}
-                </Text>
-                <Text className="mt-2 text-sm text-zinc-400 dark:text-zinc-500">
-                  Polls functionality coming soon...
-                </Text>
-              </div>
+              <PollsList
+                initialPolls={pollsData.polls}
+                initialTotalCount={pollsData.totalCount}
+                userId={user!.id}
+                adminOrgIds={adminOrgIds}
+                isSuperAdmin={isSuperAdmin}
+                fixedOrganizationId={id}
+                initialBoards={boards.map((b) => ({ id: b.id, name: b.name }))}
+              />
             </div>
           </>
         )}
