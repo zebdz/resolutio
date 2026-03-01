@@ -470,19 +470,19 @@
     "vote": "Vote",
     "viewResults": "View Results",
     "manageParticipants": "Manage Participants",
-    "takeSnapshot": "Take Snapshot",
-    "discardSnapshot": "Discard Snapshot",
+    "takeSnapshot": "Freeze participants",
+    "discardSnapshot": "Discard participants",
     "activatePoll": "Activate Poll",
     "deactivatePoll": "Deactivate Poll",
     "finishPoll": "Finish Poll",
     "pollControls": "Poll Controls",
-    "takingSnapshot": "Taking snapshot...",
-    "discardingSnapshot": "Discarding snapshot...",
+    "takingSnapshot": "Freezing participants...",
+    "discardingSnapshot": "Discarding participants...",
     "activating": "Activating...",
     "deactivating": "Deactivating...",
     "finishing": "Finishing...",
-    "snapshotTaken": "Snapshot taken successfully",
-    "snapshotDiscarded": "Snapshot discarded successfully",
+    "snapshotTaken": "Participants frozen successfully",
+    "snapshotDiscarded": "Participants discarded successfully",
     "pollActivated": "Poll activated successfully",
     "pollDeactivated": "Poll deactivated successfully",
     "pollFinished": "Poll finished successfully",
@@ -755,7 +755,7 @@
       "mustBeDraft": "Poll must be in draft state",
       "mustBeReady": "Poll must be in ready state",
       "mustBeActive": "Poll must be in active state",
-      "cannotDiscardSnapshotHasVotes": "Cannot discard snapshot - poll already has votes"
+      "cannotDiscardSnapshotHasVotes": "Cannot discard participants - poll already has votes"
     }
   }
 }
