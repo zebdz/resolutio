@@ -11,6 +11,7 @@ import { PhoneInput } from '@/web/components/phone';
 import { Text } from '@/app/components/catalyst/text';
 import { AlertBanner } from '@/app/components/catalyst/alert-banner';
 import { loginAction } from '@/web/actions/auth';
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/16/solid';
 
 export function LoginForm() {
   const t = useTranslations('auth');
@@ -19,6 +20,7 @@ export function LoginForm() {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+  const [showPassword, setShowPassword] = useState(false);
 
   // Form field values
   const [formValues, setFormValues] = useState({
@@ -52,6 +54,9 @@ export function LoginForm() {
   async function handleSubmit(formData: FormData) {
     setError(null);
     setFieldErrors({});
+
+    // Override formatted phone with clean E.164 value from React state
+    formData.set('phoneNumber', formValues.phoneNumber);
 
     startTransition(async () => {
       const result = await loginAction(formData);
@@ -104,7 +109,9 @@ export function LoginForm() {
                 });
               }
 
-              if (error) {setError(null);}
+              if (error) {
+                setError(null);
+              }
             }}
             required
             disabled={isPending}
@@ -119,16 +126,31 @@ export function LoginForm() {
 
         <Field>
           <Label>{t('login.password')}</Label>
-          <Input
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            value={formValues.password}
-            onChange={handleInputChange}
-            required
-            disabled={isPending}
-            invalid={!!fieldErrors.password}
-          />
+          <div className="relative">
+            <Input
+              name="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              value={formValues.password}
+              onChange={handleInputChange}
+              required
+              disabled={isPending}
+              invalid={!!fieldErrors.password}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-3 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 sm:right-2.5 sm:top-2.5"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              disabled={isPending}
+            >
+              {showPassword ? (
+                <EyeSlashIcon className="h-5 w-5 sm:h-4 sm:w-4" />
+              ) : (
+                <EyeIcon className="h-5 w-5 sm:h-4 sm:w-4" />
+              )}
+            </button>
+          </div>
           {fieldErrors.password && (
             <Text className="text-sm text-red-600">
               {fieldErrors.password[0]}

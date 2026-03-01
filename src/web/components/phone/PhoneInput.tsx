@@ -69,7 +69,10 @@ export function PhoneInput({
     if (hadFullSelection.current) {
       hadFullSelection.current = false;
       requestAnimationFrame(() => {
-        const input = containerRef.current?.querySelector('input') as HTMLInputElement | null;
+        const input = containerRef.current?.querySelector(
+          'input'
+        ) as HTMLInputElement | null;
+
         if (input) {
           const end = input.value.length;
           input.setSelectionRange(end, end);
@@ -100,7 +103,9 @@ export function PhoneInput({
         preferredCountries={['ru', 'us', 'gb', 'de', 'fr']}
         masks={MASKS}
         isValid={(value, country: { dialCode?: string }) => {
-          if (!value || !country?.dialCode) {return true;}
+          if (!value || !country?.dialCode) {
+            return true;
+          }
 
           return value.startsWith(country.dialCode);
         }}
@@ -119,7 +124,7 @@ export function PhoneInput({
           },
         }}
         containerClass={containerClass}
-        copyNumbersOnly={false}
+        copyNumbersOnly={true}
         jumpCursorToEnd
       />
       {/* Format hint — visible only when input shows just the dial code */}

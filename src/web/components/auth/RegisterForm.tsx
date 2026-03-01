@@ -169,7 +169,9 @@ export function RegisterForm({ locale }: Props) {
                 });
               }
 
-              if (error) {setError(null);}
+              if (error) {
+                setError(null);
+              }
             }}
             required
             disabled={isPending}
