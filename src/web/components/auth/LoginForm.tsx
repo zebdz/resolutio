@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { Button } from '@/app/components/catalyst/button';
 import { Input } from '@/app/components/catalyst/input';
 import { Field, Label, FieldGroup } from '@/app/components/catalyst/fieldset';
+import { PhoneInput } from '@/web/components/phone';
 import { Text } from '@/app/components/catalyst/text';
 import { AlertBanner } from '@/app/components/catalyst/alert-banner';
 import { loginAction } from '@/web/actions/auth';
@@ -88,13 +89,23 @@ export function LoginForm() {
       <FieldGroup>
         <Field>
           <Label>{t('login.phoneNumber')}</Label>
-          <Input
+          <PhoneInput
             name="phoneNumber"
-            type="tel"
-            autoComplete="tel"
-            placeholder="+79161234567"
             value={formValues.phoneNumber}
-            onChange={handleInputChange}
+            onChange={(e164) => {
+              setFormValues((prev) => ({ ...prev, phoneNumber: e164 }));
+
+              if (fieldErrors.phoneNumber) {
+                setFieldErrors((prev) => {
+                  const newErrors = { ...prev };
+                  delete newErrors.phoneNumber;
+
+                  return newErrors;
+                });
+              }
+
+              if (error) {setError(null);}
+            }}
             required
             disabled={isPending}
             invalid={!!fieldErrors.phoneNumber}

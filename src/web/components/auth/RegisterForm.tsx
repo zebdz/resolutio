@@ -4,8 +4,9 @@ import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { useRouter } from '@/src/i18n/routing';
 import { Button } from '@/app/components/catalyst/button';
-import { Input, InputGroup } from '@/app/components/catalyst/input';
+import { Input } from '@/app/components/catalyst/input';
 import { Field, Label, FieldGroup } from '@/app/components/catalyst/fieldset';
+import { PhoneInput } from '@/web/components/phone';
 import { Text } from '@/app/components/catalyst/text';
 import { AlertBanner } from '@/app/components/catalyst/alert-banner';
 import { registerAction } from '@/web/actions/auth';
@@ -59,6 +60,8 @@ export function RegisterForm({ locale }: Props) {
     setError(null);
     setFieldErrors({});
 
+    // Override formatted phone with clean E.164 value from React state
+    formData.set('phoneNumber', formValues.phoneNumber);
     // Add the locale to form data
     formData.append('language', locale);
 
@@ -151,13 +154,23 @@ export function RegisterForm({ locale }: Props) {
 
         <Field>
           <Label>{t('register.phoneNumber')}</Label>
-          <Input
+          <PhoneInput
             name="phoneNumber"
-            type="tel"
-            autoComplete="tel"
-            placeholder="+79161234567"
             value={formValues.phoneNumber}
-            onChange={handleInputChange}
+            onChange={(e164) => {
+              setFormValues((prev) => ({ ...prev, phoneNumber: e164 }));
+
+              if (fieldErrors.phoneNumber) {
+                setFieldErrors((prev) => {
+                  const newErrors = { ...prev };
+                  delete newErrors.phoneNumber;
+
+                  return newErrors;
+                });
+              }
+
+              if (error) {setError(null);}
+            }}
             required
             disabled={isPending}
             invalid={!!fieldErrors.phoneNumber}
@@ -167,14 +180,11 @@ export function RegisterForm({ locale }: Props) {
               {fieldErrors.phoneNumber[0]}
             </Text>
           )}
-          <Text className="text-sm text-zinc-500">
-            {t('register.phoneHint')}
-          </Text>
         </Field>
 
         <Field>
           <Label>{t('register.password')}</Label>
-          <InputGroup>
+          <div className="relative">
             <Input
               name="password"
               type={showPassword ? 'text' : 'password'}
@@ -198,7 +208,7 @@ export function RegisterForm({ locale }: Props) {
                 <EyeIcon className="h-5 w-5 sm:h-4 sm:w-4" />
               )}
             </button>
-          </InputGroup>
+          </div>
           {fieldErrors.password && (
             <Text className="text-sm text-red-600">
               {fieldErrors.password[0]}
@@ -208,7 +218,7 @@ export function RegisterForm({ locale }: Props) {
 
         <Field>
           <Label>{t('register.confirmPassword')}</Label>
-          <InputGroup>
+          <div className="relative">
             <Input
               name="confirmPassword"
               type={showConfirmPassword ? 'text' : 'password'}
@@ -234,7 +244,7 @@ export function RegisterForm({ locale }: Props) {
                 <EyeIcon className="h-5 w-5 sm:h-4 sm:w-4" />
               )}
             </button>
-          </InputGroup>
+          </div>
           {fieldErrors.confirmPassword && (
             <Text className="text-sm text-red-600">
               {fieldErrors.confirmPassword[0]}

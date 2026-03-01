@@ -68,7 +68,9 @@ export function PollsList({
 
   // Fetch boards when org changes (skip when fixedOrganizationId is set)
   useEffect(() => {
-    if (fixedOrganizationId) {return;}
+    if (fixedOrganizationId) {
+      return;
+    }
 
     if (!organizationId) {
       setBoards([]);

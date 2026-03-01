@@ -757,5 +757,9 @@
       "mustBeActive": "Опрос должен быть активен",
       "cannotDiscardSnapshotHasVotes": "Нельзя сбросить список участников - опрос уже имеет голоса"
     }
+  },
+  "phone": {
+    "searchPlaceholder": "Поиск...",
+    "searchNotFound": "Страны не найдены"
   }
 }

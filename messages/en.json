@@ -757,5 +757,9 @@
       "mustBeActive": "Poll must be in active state",
       "cannotDiscardSnapshotHasVotes": "Cannot discard participants - poll already has votes"
     }
+  },
+  "phone": {
+    "searchPlaceholder": "Search...",
+    "searchNotFound": "No countries found"
   }
 }

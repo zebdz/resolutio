@@ -96,7 +96,9 @@ export default async function OrganizationDetailPage({
   let userMemberOrgIds: string[] = [];
 
   if (user) {
-    const memberOrgs = await organizationRepository.findMembershipsByUserId(user.id);
+    const memberOrgs = await organizationRepository.findMembershipsByUserId(
+      user.id
+    );
     userMemberOrgIds = memberOrgs.map((o) => o.id);
   }
 
@@ -141,7 +143,11 @@ export default async function OrganizationDetailPage({
         </div>
 
         {/* Hierarchy Tree */}
-        <OrgHierarchyTree tree={hierarchyTree} currentOrgId={id} userMemberOrgIds={userMemberOrgIds} />
+        <OrgHierarchyTree
+          tree={hierarchyTree}
+          currentOrgId={id}
+          userMemberOrgIds={userMemberOrgIds}
+        />
 
         {/* Action Buttons for Logged-in Users */}
         {user && !isUserMember && (

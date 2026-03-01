@@ -327,7 +327,9 @@ describe('PrismaPollRepository.searchPolls', () => {
 
     const result = await repo.searchPolls({ page: 1, pageSize: 10 });
 
-    if (!result.success) {return;}
+    if (!result.success) {
+      return;
+    }
 
     expect(result.value.totalCount).toBe(42);
     expect(result.value.polls).toHaveLength(1);
