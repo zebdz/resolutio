@@ -224,7 +224,8 @@
       "hierarchy": "Organization Hierarchy",
       "collapseHierarchy": "Collapse",
       "expandHierarchy": "Expand",
-      "memberCount": "{count, plural, =0 {No members} =1 {1 member} other {# members}}"
+      "memberCount": "{count, plural, =0 {No members} =1 {1 member} other {# members}}",
+      "youAreMember": "Member"
     },
     "pendingRequestsPage": {
       "title": "Pending Join Requests",

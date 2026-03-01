@@ -93,6 +93,12 @@ export default async function OrganizationDetailPage({
   let pollsData: { polls: any[]; totalCount: number } | null = null;
   let adminOrgIds: string[] = [];
   let isSuperAdmin = false;
+  let userMemberOrgIds: string[] = [];
+
+  if (user) {
+    const memberOrgs = await organizationRepository.findMembershipsByUserId(user.id);
+    userMemberOrgIds = memberOrgs.map((o) => o.id);
+  }
 
   if (user && (isUserMember || isUserAdmin)) {
     isSuperAdmin = await userRepository.isSuperAdmin(user.id);
@@ -135,7 +141,7 @@ export default async function OrganizationDetailPage({
         </div>
 
         {/* Hierarchy Tree */}
-        <OrgHierarchyTree tree={hierarchyTree} currentOrgId={id} />
+        <OrgHierarchyTree tree={hierarchyTree} currentOrgId={id} userMemberOrgIds={userMemberOrgIds} />
 
         {/* Action Buttons for Logged-in Users */}
         {user && !isUserMember && (

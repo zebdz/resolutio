@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { hierarchy, tree as d3Tree } from 'd3-hierarchy';
 import { linkRadial } from 'd3-shape';
@@ -13,6 +13,7 @@ import { Heading } from '@/app/components/catalyst/heading';
 interface OrgHierarchyTreeProps {
   tree: OrganizationTreeNode;
   currentOrgId: string;
+  userMemberOrgIds?: string[];
 }
 
 const ZOOM_STEP = 0.25;
@@ -22,9 +23,11 @@ const ZOOM_MAX = 4;
 function TreeDiagram({
   tree,
   currentOrgId,
+  userMemberOrgIds = [],
 }: {
   tree: OrganizationTreeNode;
   currentOrgId: string;
+  userMemberOrgIds?: string[];
 }) {
   const t = useTranslations('organization.detail');
   const [zoom, setZoom] = useState(1);
@@ -37,6 +40,10 @@ function TreeDiagram({
   const viewBoxStartRef = useRef({ x: 0, y: 0 });
   const isPanningRef = useRef(false);
   const router = useRouter();
+  const memberOrgSet = useMemo(
+    () => new Set(userMemberOrgIds),
+    [userMemberOrgIds]
+  );
 
   const applyZoom = useCallback((level: number) => {
     if (!svgRef.current) {
@@ -221,7 +228,7 @@ function TreeDiagram({
     layout(root);
 
     // Compute tight bounding box from actual node positions
-    const PAD = 60;
+    const PAD = 80;
     let minX = Infinity,
       maxX = -Infinity,
       minY = Infinity,
@@ -317,7 +324,42 @@ function TreeDiagram({
       .attr('font-size', '9px')
       .attr('fill', '#71717a')
       .text((d) => t('memberCount', { count: d.data.memberCount }));
-  }, [tree, currentOrgId, router, t]);
+
+    // "Member" chip for orgs the user belongs to
+    const memberNodes = node.filter((d) => memberOrgSet.has(d.data.id));
+    const chipGroup = memberNodes
+      .append('g')
+      .attr('transform', 'translate(0, 27)');
+    const chipLabel = t('youAreMember');
+    // Measure text width to size the chip background
+    const tempText = svg
+      .append('text')
+      .attr('font-size', '8px')
+      .text(chipLabel);
+    const textWidth = tempText.node()?.getComputedTextLength() ?? 30;
+    tempText.remove();
+    const chipPadX = 5;
+    const chipH = 14;
+    const chipW = textWidth + chipPadX * 2;
+    chipGroup
+      .append('rect')
+      .attr('x', -chipW / 2)
+      .attr('y', -chipH / 2)
+      .attr('width', chipW)
+      .attr('height', chipH)
+      .attr('rx', 7)
+      .attr('fill', '#dcfce7')
+      .attr('stroke', '#86efac')
+      .attr('stroke-width', 0.5);
+    chipGroup
+      .append('text')
+      .attr('text-anchor', 'middle')
+      .attr('dy', '0.32em')
+      .attr('font-size', '8px')
+      .attr('font-weight', '500')
+      .attr('fill', '#166534')
+      .text(chipLabel);
+  }, [tree, currentOrgId, router, t, memberOrgSet]);
 
   return (
     <div
@@ -361,6 +403,7 @@ function TreeDiagram({
 export function OrgHierarchyTree({
   tree,
   currentOrgId,
+  userMemberOrgIds,
 }: OrgHierarchyTreeProps) {
   const t = useTranslations('organization.detail');
   const [expanded, setExpanded] = useState(true);
@@ -381,7 +424,12 @@ export function OrgHierarchyTree({
         </Button>
       </div>
       {expanded && (
-        <TreeDiagram key={tree.id} tree={tree} currentOrgId={currentOrgId} />
+        <TreeDiagram
+          key={tree.id}
+          tree={tree}
+          currentOrgId={currentOrgId}
+          userMemberOrgIds={userMemberOrgIds}
+        />
       )}
     </div>
   );
