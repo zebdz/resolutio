@@ -1,7 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import ReactPhoneInput from 'react-phone-input-2';
 import ru from 'react-phone-input-2/lang/ru.json';
 import 'react-phone-input-2/lib/style.css';
@@ -39,6 +39,12 @@ export function PhoneInput({
 }: Props) {
   const locale = useLocale();
   const t = useTranslations('phone');
+  const containerRef = useRef<HTMLDivElement>(null);
+  // Workaround: react-phone-input-2 places cursor before the dial code
+  // when user does Ctrl+A then types a digit. We track whether the full
+  // input was selected so we can force cursor to end only in that case
+  // (not on normal mid-number edits like backspace).
+  const hadFullSelection = useRef(false);
   const [countryCode, setCountryCode] = useState('ru');
   const [dialCode, setDialCode] = useState('7');
   const [touched, setTouched] = useState(false);
@@ -59,6 +65,17 @@ export function PhoneInput({
 
     const e164 = phoneValue ? `+${phoneValue}` : '';
     onChange(e164);
+
+    if (hadFullSelection.current) {
+      hadFullSelection.current = false;
+      requestAnimationFrame(() => {
+        const input = containerRef.current?.querySelector('input') as HTMLInputElement | null;
+        if (input) {
+          const end = input.value.length;
+          input.setSelectionRange(end, end);
+        }
+      });
+    }
   }
 
   const containerClass = [
@@ -70,7 +87,7 @@ export function PhoneInput({
     .join(' ');
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <ReactPhoneInput
         country="ru"
         value={rawValue}
@@ -93,9 +110,17 @@ export function PhoneInput({
           name,
           required,
           autoComplete: 'tel',
+          onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+            const input = e.currentTarget;
+            const allSelected =
+              input.selectionStart === 0 &&
+              input.selectionEnd === input.value.length;
+            hadFullSelection.current = allSelected;
+          },
         }}
         containerClass={containerClass}
         copyNumbersOnly={false}
+        jumpCursorToEnd
       />
       {/* Format hint — visible only when input shows just the dial code */}
       {showPlaceholder && (
