@@ -14,7 +14,11 @@ export { PrismaAnswerRepository } from './repositories/PrismaAnswerRepository';
 export { PrismaDraftRepository } from './repositories/PrismaDraftRepository';
 export { PrismaJoinParentRequestRepository } from './repositories/PrismaJoinParentRequestRepository';
 export { PrismaNotificationRepository } from './repositories/PrismaNotificationRepository';
+export { PrismaOtpRepository } from './repositories/PrismaOtpRepository';
 
 // Auth
 export { Argon2PasswordHasher } from './auth/Argon2PasswordHasher';
 export { Argon2PasswordVerifier } from './auth/Argon2PasswordVerifier';
+export { OtpCodeHasherImpl } from './auth/OtpCodeHasherImpl';
+export { StubSmsOtpDeliveryChannel } from './auth/StubSmsOtpDeliveryChannel';
+export { TurnstileCaptchaVerifier } from './auth/TurnstileCaptchaVerifier';

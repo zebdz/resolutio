@@ -35,6 +35,29 @@
     },
     "logout": "Logout"
   },
+  "otp": {
+    "title": "Verify Your Phone",
+    "subtitle": "We sent a code to {phone}",
+    "codeLabel": "Verification Code",
+    "verify": "Verify",
+    "verifying": "Verifying...",
+    "resend": "Resend Code",
+    "resendIn": "Resend in {seconds}s",
+    "back": "Back",
+    "backdoorHint": "Real SMS verification coming soon. Use this code: {code}",
+    "errors": {
+      "expired": "Code has expired. Please request a new one.",
+      "invalid": "Invalid code. Please try again.",
+      "maxAttempts": "Too many attempts. Please request a new code.",
+      "throttled": "Too many requests. Please wait before trying again.",
+      "alreadyVerified": "This code has already been verified.",
+      "notFound": "Verification not found. Please request a new code.",
+      "sendFailed": "Failed to send verification code. Please try again.",
+      "captchaFailed": "CAPTCHA verification failed. Please try again.",
+      "notVerified": "Phone number has not been verified.",
+      "phoneMismatch": "Phone number does not match verification."
+    }
+  },
   "landing": {
     "title": "You Can Change Everything",
     "heroAccent": "You",
@@ -717,6 +740,9 @@
       "boardNameEmpty": "Board name cannot be empty",
       "boardNameTooLong": "Board name cannot exceed 255 characters",
       "boardAlreadyArchived": "Board is already archived"
+    },
+    "otp": {
+      "invalidCodeFormat": "Code must be 6 digits"
     },
     "poll": {
       "answerTextEmpty": "Answer text cannot be empty",

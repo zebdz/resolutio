@@ -10,6 +10,7 @@ import {
   prisma,
   PrismaUserRepository,
   PrismaSessionRepository,
+  PrismaOtpRepository,
   Argon2PasswordHasher,
   Argon2PasswordVerifier,
 } from '@/infrastructure/index';
@@ -20,7 +21,12 @@ import {
 } from '../lib/session';
 import { RegisterUserSchema } from '@/application/auth/RegisterUserSchema';
 import { LoginUserSchema } from '@/application/auth/LoginUserSchema';
-import { UnauthorizedError, DuplicateError } from '@/domain/shared/errors';
+import {
+  UnauthorizedError,
+  DuplicateError,
+  ValidationError,
+} from '@/domain/shared/errors';
+import { OtpErrors } from '@/application/auth/OtpErrors';
 
 // Helper function to check if error is a Prisma connection error
 function isDatabaseConnectionError(error: unknown): boolean {
@@ -64,13 +70,15 @@ export type ActionResult<T = void> =
 // Initialize dependencies
 const userRepository = new PrismaUserRepository(prisma);
 const sessionRepository = new PrismaSessionRepository(prisma);
+const otpRepository = new PrismaOtpRepository(prisma);
 const passwordHasher = new Argon2PasswordHasher();
 const passwordVerifier = new Argon2PasswordVerifier();
 
 // Use cases
 const registerUserUseCase = new RegisterUserUseCase(
   userRepository,
-  passwordHasher
+  passwordHasher,
+  otpRepository
 );
 const loginUserUseCase = new LoginUserUseCase(
   userRepository,
@@ -94,6 +102,7 @@ export async function registerAction(
       password: formData.get('password') as string,
       confirmPassword: formData.get('confirmPassword') as string,
       language: (formData.get('language') as Locale) || defaultLocale,
+      otpId: formData.get('otpId') as string,
     };
 
     // Validate with Zod
@@ -144,6 +153,24 @@ export async function registerAction(
         return {
           success: false,
           error: t('phoneExists'),
+        };
+      }
+
+      // Handle OTP verification errors
+      if (
+        result.error instanceof ValidationError &&
+        (result.error.message === OtpErrors.NOT_VERIFIED ||
+          result.error.message === OtpErrors.PHONE_MISMATCH)
+      ) {
+        const tOtp = await getTranslations('otp.errors');
+        const key =
+          result.error.message === OtpErrors.NOT_VERIFIED
+            ? 'notVerified'
+            : 'phoneMismatch';
+
+        return {
+          success: false,
+          error: tOtp(key),
         };
       }
 

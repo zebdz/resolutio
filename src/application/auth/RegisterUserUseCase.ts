@@ -1,8 +1,10 @@
 import { User } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
 import { UserRepository } from '@/domain/user/UserRepository';
-import { DuplicateError } from '@/domain/shared/errors';
+import { OtpRepository } from '@/domain/otp/OtpRepository';
+import { DuplicateError, ValidationError } from '@/domain/shared/errors';
 import { Result, success, failure } from '@/domain/shared/Result';
+import { OtpErrors } from './OtpErrors';
 import type { Language } from '@/domain/user/User';
 
 export interface PasswordHasher {
@@ -16,16 +18,29 @@ export interface RegisterUserInput {
   phoneNumber: string;
   password: string;
   language?: Language;
+  otpId: string;
 }
 
 export class RegisterUserUseCase {
   constructor(
     private readonly userRepository: UserRepository,
-    private readonly passwordHasher: PasswordHasher
+    private readonly passwordHasher: PasswordHasher,
+    private readonly otpRepository: OtpRepository
   ) {}
 
   async execute(input: RegisterUserInput): Promise<Result<User, Error>> {
     try {
+      // Verify OTP is verified and matches phone
+      const otp = await this.otpRepository.findById(input.otpId);
+
+      if (!otp || !otp.isVerified()) {
+        return failure(new ValidationError(OtpErrors.NOT_VERIFIED));
+      }
+
+      if (otp.identifier !== input.phoneNumber) {
+        return failure(new ValidationError(OtpErrors.PHONE_MISMATCH));
+      }
+
       // Create phone number value object
       const phoneNumber = PhoneNumber.create(input.phoneNumber);
 

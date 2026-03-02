@@ -31,14 +31,23 @@ jobs:
       - name: Build application
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
         run: yarn build
 
       - name: Create deployment package
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
+          OTP_CODE_SECRET: ${{ secrets.OTP_CODE_SECRET }}
+          OTP_EXPIRY_MINUTES: ${{ vars.OTP_EXPIRY_MINUTES || '10' }}
+          OTP_MAX_ATTEMPTS: ${{ vars.OTP_MAX_ATTEMPTS || '5' }}
         run: |
           # Create .env file for production
           echo "DATABASE_URL=$DATABASE_URL" > .env
+          echo "TURNSTILE_SECRET_KEY=$TURNSTILE_SECRET_KEY" >> .env
+          echo "OTP_CODE_SECRET=$OTP_CODE_SECRET" >> .env
+          echo "OTP_EXPIRY_MINUTES=$OTP_EXPIRY_MINUTES" >> .env
+          echo "OTP_MAX_ATTEMPTS=$OTP_MAX_ATTEMPTS" >> .env
 
           tar -czf deploy.tar.gz \
             .next/ \

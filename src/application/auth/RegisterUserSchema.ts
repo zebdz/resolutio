@@ -11,6 +11,7 @@ export const RegisterUserSchema = z
     password: z.string().min(8, 'Password must be at least 8 characters'),
     confirmPassword: z.string(),
     language: z.enum(['en', 'ru']).optional().default('ru'),
+    otpId: z.string().min(1, 'OTP verification is required'),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",

@@ -348,6 +348,25 @@ model OrganizationJoinParentRequest {
   @@map("organization_join_parent_requests")
 }
 
+// OTP Verification
+model OtpVerification {
+  id          String    @id @default(cuid())
+  identifier  String    // phone number (E.164 format)
+  channel     String    @default("sms") // "sms" | "email"
+  code        String    // hashed code
+  clientIp    String    @map("client_ip")
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5) @map("max_attempts")
+  expiresAt   DateTime  @map("expires_at")
+  verifiedAt  DateTime? @map("verified_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([identifier, channel])
+  @@index([clientIp])
+  @@index([expiresAt])
+  @@map("otp_verifications")
+}
+
 // Notification
 model Notification {
   id        String    @id @default(cuid())
