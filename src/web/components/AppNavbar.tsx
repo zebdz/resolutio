@@ -13,6 +13,7 @@ import {
 import {
   BuildingOffice2Icon,
   ChartBarIcon,
+  HomeIcon,
   ShieldCheckIcon,
   UserCircleIcon,
 } from '@heroicons/react/20/solid';
@@ -44,13 +45,22 @@ export function AppNavbar({
 
   return (
     <Navbar>
-      <NavbarSection>
-        <NavbarItem href="/home" current={isItemCurrent('/home', pathname)}>
-          <NavbarLabel className="font-bold">{t('logo')}</NavbarLabel>
-        </NavbarItem>
+      <NavbarSection className="max-lg:hidden">
+        <Link href="/" target="_blank" className="flex items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/logo-icon.svg"
+            alt="Resolutio"
+            className="h-10 w-auto"
+          />
+        </Link>
       </NavbarSection>
 
       <NavbarSection className="max-lg:hidden">
+        <NavbarItem href="/home" current={isItemCurrent('/home', pathname)}>
+          <HomeIcon data-slot="icon" />
+          <NavbarLabel>{t('home')}</NavbarLabel>
+        </NavbarItem>
         <NavbarItem
           href="/organizations"
           current={isItemCurrent('/organizations', pathname)}
@@ -81,7 +91,7 @@ export function AppNavbar({
           <div className="relative" data-slot="icon">
             <BellIcon className="size-full stroke-2" />
             {unreadNotificationCount > 0 && (
-              <span className="absolute -top-3 -right-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold leading-none text-white ring-2 ring-white dark:ring-zinc-900">
+              <span className="absolute -top-3 -right-3 flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-400 px-1 text-[11px] font-bold leading-none text-zinc-900">
                 {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
               </span>
             )}

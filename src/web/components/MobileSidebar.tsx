@@ -14,11 +14,11 @@ import {
 import {
   BuildingOffice2Icon,
   ChartBarIcon,
+  HomeIcon,
   ShieldCheckIcon,
   UserCircleIcon,
   BellIcon,
 } from '@heroicons/react/20/solid';
-import { Badge } from '@/app/components/catalyst/badge';
 import { LocaleSwitcher } from './LocaleSwitcher';
 
 interface MobileSidebarProps {
@@ -48,14 +48,34 @@ export function MobileSidebar({
     <Sidebar>
       <SidebarHeader>
         <SidebarSection>
-          <SidebarItem href="/home" current={isItemCurrent('/home', pathname)}>
-            <SidebarLabel className="font-bold">{t('logo')}</SidebarLabel>
-          </SidebarItem>
+          <Link
+            href="/"
+            target="_blank"
+            className="flex items-center gap-3 px-2 py-1"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/logo-icon.svg"
+              alt="Resolutio"
+              className="h-10 w-auto"
+            />
+            <span className="flex flex-col text-xs font-bold uppercase leading-relaxed tracking-wider text-white/90">
+              {t('logoText')
+                .split(' ')
+                .map((word) => (
+                  <span key={word}>{word}</span>
+                ))}
+            </span>
+          </Link>
         </SidebarSection>
       </SidebarHeader>
 
       <SidebarBody>
         <SidebarSection>
+          <SidebarItem href="/home" current={isItemCurrent('/home', pathname)}>
+            <HomeIcon data-slot="icon" />
+            <SidebarLabel>{t('home')}</SidebarLabel>
+          </SidebarItem>
           <SidebarItem
             href="/organizations"
             current={isItemCurrent('/organizations', pathname)}
@@ -90,11 +110,11 @@ export function MobileSidebar({
             <SidebarLabel>
               {t('notifications')}
               {unreadNotificationCount > 0 && (
-                <Badge color="red" className="ml-2">
+                <span className="ml-2 inline-flex items-center rounded-md bg-amber-400 px-1.5 py-0.5 text-xs font-bold text-zinc-900">
                   {unreadNotificationCount > 99
                     ? '99+'
                     : unreadNotificationCount}
-                </Badge>
+                </span>
               )}
             </SidebarLabel>
           </SidebarItem>
