@@ -20,6 +20,7 @@ import {
   TrashIcon,
   MegaphoneIcon,
   CheckCircleIcon,
+  XCircleIcon,
 } from '@heroicons/react/20/solid';
 import {
   markNotificationReadAction,
@@ -51,6 +52,10 @@ function getNotificationIcon(type: string) {
     case 'join_parent_request_received':
     case 'join_request_received':
       return <EnvelopeIcon className="h-5 w-5 text-amber-500" />;
+    case 'join_request_accepted':
+      return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
+    case 'join_request_rejected':
+      return <XCircleIcon className="h-5 w-5 text-red-500" />;
     case 'poll_activated':
       return <MegaphoneIcon className="h-5 w-5 text-green-500" />;
     case 'poll_finished':

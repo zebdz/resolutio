@@ -4,6 +4,8 @@ import { HandleJoinRequestUseCase } from '../HandleJoinRequestUseCase';
 import { OrganizationErrors } from '../OrganizationErrors';
 import { Organization } from '../../../domain/organization/Organization';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
+import { NotificationRepository } from '../../../domain/notification/NotificationRepository';
+import { Notification } from '../../../domain/notification/Notification';
 import { UserRepository } from '../../../domain/user/UserRepository';
 
 // Mock PrismaClient
@@ -210,10 +212,46 @@ class MockUserRepository {
   }
 }
 
+// Mock NotificationRepository
+class MockNotificationRepository implements NotificationRepository {
+  private saved: Notification[] = [];
+
+  async save(notification: Notification): Promise<Notification> {
+    this.saved.push(notification);
+    return notification;
+  }
+  async saveBatch(notifications: Notification[]): Promise<void> {
+    this.saved.push(...notifications);
+  }
+  async findById(): Promise<Notification | null> {
+    return null;
+  }
+  async findByUserId(): Promise<Notification[]> {
+    return [];
+  }
+  async getUnreadCount(): Promise<number> {
+    return 0;
+  }
+  async markAsRead(): Promise<void> {}
+  async markAllAsRead(): Promise<void> {}
+  async findByIds(): Promise<Notification[]> {
+    return [];
+  }
+  async deleteByIds(): Promise<void> {}
+  async getCountByUserId(): Promise<number> {
+    return 0;
+  }
+
+  getSaved() {
+    return this.saved;
+  }
+}
+
 describe('HandleJoinRequestUseCase', () => {
   let useCase: HandleJoinRequestUseCase;
   let prisma: MockPrismaClient;
   let organizationRepository: MockOrganizationRepository;
+  let notificationRepository: MockNotificationRepository;
   let userRepository: MockUserRepository;
   let requests: Map<string, any>;
   let adminRoles: Map<string, Set<string>>;
@@ -221,6 +259,7 @@ describe('HandleJoinRequestUseCase', () => {
   beforeEach(() => {
     prisma = new MockPrismaClient();
     organizationRepository = new MockOrganizationRepository();
+    notificationRepository = new MockNotificationRepository();
     userRepository = new MockUserRepository();
     requests = new Map();
     adminRoles = new Map();
@@ -262,6 +301,7 @@ describe('HandleJoinRequestUseCase', () => {
     useCase = new HandleJoinRequestUseCase({
       prisma: prisma as unknown as PrismaClient,
       organizationRepository,
+      notificationRepository,
       userRepository: userRepository as unknown as UserRepository,
     });
   });
@@ -714,5 +754,157 @@ describe('HandleJoinRequestUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it('should send accepted notification when accepting a request', async () => {
+    const organizationId = 'org-123';
+    const requesterId = 'user-456';
+    const adminId = 'admin-789';
+
+    const org = Organization.reconstitute({
+      id: organizationId,
+      name: 'Test Org',
+      description: 'desc',
+      parentId: null,
+      createdById: 'creator-1',
+      createdAt: new Date(),
+      archivedAt: null,
+    });
+    organizationRepository.addOrganization(org);
+
+    adminRoles.set(organizationId, new Set([adminId]));
+
+    const key = `${organizationId}-${requesterId}`;
+    requests.set(key, {
+      id: 'request-1',
+      organizationId,
+      userId: requesterId,
+      status: 'pending',
+      createdAt: new Date(),
+      acceptedAt: null,
+      rejectedAt: null,
+      rejectionReason: null,
+      acceptedByUserId: null,
+      rejectedByUserId: null,
+    });
+
+    await useCase.execute({
+      organizationId,
+      requesterId,
+      adminId,
+      action: 'accept',
+    });
+
+    // Wait for fire-and-forget notification
+    await new Promise((r) => setTimeout(r, 50));
+
+    const saved = notificationRepository.getSaved();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].type).toBe('join_request_accepted');
+    expect(saved[0].userId).toBe(requesterId);
+    expect(saved[0].data).toEqual({
+      organizationId,
+      organizationName: 'Test Org',
+    });
+  });
+
+  it('should send rejected notification when rejecting a request', async () => {
+    const organizationId = 'org-123';
+    const requesterId = 'user-456';
+    const adminId = 'admin-789';
+
+    const org = Organization.reconstitute({
+      id: organizationId,
+      name: 'Test Org',
+      description: 'desc',
+      parentId: null,
+      createdById: 'creator-1',
+      createdAt: new Date(),
+      archivedAt: null,
+    });
+    organizationRepository.addOrganization(org);
+
+    adminRoles.set(organizationId, new Set([adminId]));
+
+    const key = `${organizationId}-${requesterId}`;
+    requests.set(key, {
+      id: 'request-1',
+      organizationId,
+      userId: requesterId,
+      status: 'pending',
+      createdAt: new Date(),
+      acceptedAt: null,
+      rejectedAt: null,
+      rejectionReason: null,
+      acceptedByUserId: null,
+      rejectedByUserId: null,
+    });
+
+    await useCase.execute({
+      organizationId,
+      requesterId,
+      adminId,
+      action: 'reject',
+      rejectionReason: 'Not qualified',
+    });
+
+    // Wait for fire-and-forget notification
+    await new Promise((r) => setTimeout(r, 50));
+
+    const saved = notificationRepository.getSaved();
+    expect(saved).toHaveLength(1);
+    expect(saved[0].type).toBe('join_request_rejected');
+    expect(saved[0].userId).toBe(requesterId);
+    expect(saved[0].data).toEqual({
+      organizationId,
+      organizationName: 'Test Org',
+      rejectionReason: 'Not qualified',
+    });
+  });
+
+  it('should not send notification when silent is true', async () => {
+    const organizationId = 'org-123';
+    const requesterId = 'user-456';
+    const adminId = 'admin-789';
+
+    const org = Organization.reconstitute({
+      id: organizationId,
+      name: 'Test Org',
+      description: 'desc',
+      parentId: null,
+      createdById: 'creator-1',
+      createdAt: new Date(),
+      archivedAt: null,
+    });
+    organizationRepository.addOrganization(org);
+
+    adminRoles.set(organizationId, new Set([adminId]));
+
+    const key = `${organizationId}-${requesterId}`;
+    requests.set(key, {
+      id: 'request-1',
+      organizationId,
+      userId: requesterId,
+      status: 'pending',
+      createdAt: new Date(),
+      acceptedAt: null,
+      rejectedAt: null,
+      rejectionReason: null,
+      acceptedByUserId: null,
+      rejectedByUserId: null,
+    });
+
+    await useCase.execute({
+      organizationId,
+      requesterId,
+      adminId,
+      action: 'accept',
+      silent: true,
+    });
+
+    // Wait to ensure no fire-and-forget notification
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(notificationRepository.getSaved()).toHaveLength(0);
   });
 });

@@ -107,7 +107,9 @@
       "rejectedOn": "on",
       "cancel": "Cancel Request",
       "cancelling": "Cancelling...",
-      "cancelSuccess": "Join request cancelled"
+      "cancelSuccess": "Join request cancelled",
+      "reRequest": "Request again",
+      "reRequesting": "Requesting..."
     }
   },
   "account": {
@@ -711,6 +713,15 @@
       "joinRequestReceived": {
         "title": "New join request",
         "body": "{requesterName} wants to join {organizationName}"
+      },
+      "joinRequestAccepted": {
+        "title": "Join request accepted",
+        "body": "Your request to join {organizationName} has been accepted"
+      },
+      "joinRequestRejected": {
+        "title": "Join request rejected",
+        "body": "Your request to join {organizationName} has been rejected",
+        "bodyWithReason": "Your request to join {organizationName} has been rejected. Reason: {rejectionReason}"
       },
       "pollActivated": {
         "title": "Poll is now active",

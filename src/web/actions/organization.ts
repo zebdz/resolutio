@@ -62,6 +62,7 @@ const getPendingRequestsUseCase = new GetPendingRequestsUseCase({
 const handleJoinRequestUseCase = new HandleJoinRequestUseCase({
   prisma,
   organizationRepository,
+  notificationRepository,
   userRepository,
 });
 
@@ -173,6 +174,7 @@ export async function createOrganizationAction(
           requesterId: user.id,
           adminId: user.id,
           action: 'accept',
+          silent: true,
         });
 
         if (!acceptResult.success) {

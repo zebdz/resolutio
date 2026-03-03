@@ -6,6 +6,7 @@ export const HandleJoinRequestSchema = z.object({
   adminId: z.string().min(1, 'Admin ID is required'),
   action: z.enum(['accept', 'reject']),
   rejectionReason: z.string().max(500).optional(),
+  silent: z.boolean().optional(),
 });
 
 export type HandleJoinRequestInput = z.infer<typeof HandleJoinRequestSchema>;

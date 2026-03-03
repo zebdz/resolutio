@@ -1,13 +1,17 @@
 import { PrismaClient } from '@/generated/prisma/client';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { HandleJoinRequestInput } from './HandleJoinRequestSchema';
 import { OrganizationErrors } from './OrganizationErrors';
+import { NotifyJoinRequestAcceptedUseCase } from '../notification/NotifyJoinRequestAcceptedUseCase';
+import { NotifyJoinRequestRejectedUseCase } from '../notification/NotifyJoinRequestRejectedUseCase';
 
 export interface HandleJoinRequestDependencies {
   prisma: PrismaClient;
   organizationRepository: OrganizationRepository;
+  notificationRepository: NotificationRepository;
   userRepository: UserRepository;
 }
 
@@ -15,8 +19,14 @@ export class HandleJoinRequestUseCase {
   constructor(private deps: HandleJoinRequestDependencies) {}
 
   async execute(input: HandleJoinRequestInput): Promise<Result<void, string>> {
-    const { organizationId, requesterId, adminId, action, rejectionReason } =
-      input;
+    const {
+      organizationId,
+      requesterId,
+      adminId,
+      action,
+      rejectionReason,
+      silent,
+    } = input;
 
     // 1. Check admin permissions: superadmin or org admin
     const isSuperAdmin = await this.deps.userRepository.isSuperAdmin(adminId);
@@ -110,6 +120,32 @@ export class HandleJoinRequestUseCase {
           rejectionReason: rejectionReason || null,
         },
       });
+    }
+
+    // 5. Notify requester (fire-and-forget, skip for autoJoin)
+    if (!silent) {
+      const notifyDeps = {
+        organizationRepository: this.deps.organizationRepository,
+        notificationRepository: this.deps.notificationRepository,
+      };
+
+      if (action === 'accept') {
+        new NotifyJoinRequestAcceptedUseCase(notifyDeps)
+          .execute({ organizationId, requesterUserId: requesterId })
+          .catch((err) =>
+            console.error('Failed to notify join request accepted:', err)
+          );
+      } else {
+        new NotifyJoinRequestRejectedUseCase(notifyDeps)
+          .execute({
+            organizationId,
+            requesterUserId: requesterId,
+            rejectionReason: rejectionReason || '',
+          })
+          .catch((err) =>
+            console.error('Failed to notify join request rejected:', err)
+          );
+      }
     }
 
     return success(undefined);

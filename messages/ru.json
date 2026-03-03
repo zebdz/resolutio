@@ -107,7 +107,9 @@
       "rejectedOn": "",
       "cancel": "Отменить заявку",
       "cancelling": "Отмена...",
-      "cancelSuccess": "Заявка на вступление отменена"
+      "cancelSuccess": "Заявка на вступление отменена",
+      "reRequest": "Подать заявку повторно",
+      "reRequesting": "Подача заявки..."
     }
   },
   "account": {
@@ -711,6 +713,15 @@
       "joinRequestReceived": {
         "title": "Новый запрос на вступление",
         "body": "{requesterName} хочет вступить в {organizationName}"
+      },
+      "joinRequestAccepted": {
+        "title": "Заявка на вступление принята",
+        "body": "Ваша заявка на вступление в {organizationName} принята"
+      },
+      "joinRequestRejected": {
+        "title": "Заявка на вступление отклонена",
+        "body": "Ваша заявка на вступление в {organizationName} отклонена",
+        "bodyWithReason": "Ваша заявка на вступление в {organizationName} отклонена. Причина: {rejectionReason}"
       },
       "pollActivated": {
         "title": "Голосование началось",

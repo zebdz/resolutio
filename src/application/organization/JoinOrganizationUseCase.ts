@@ -54,10 +54,6 @@ export class JoinOrganizationUseCase {
       if (existingMembership.status === 'pending') {
         return failure(OrganizationErrors.PENDING_REQUEST);
       }
-
-      if (existingMembership.status === 'rejected') {
-        return failure(OrganizationErrors.REJECTED_REQUEST);
-      }
     }
 
     // Check hierarchy constraints - block if pending request anywhere in hierarchy
@@ -78,14 +74,29 @@ export class JoinOrganizationUseCase {
       }
     }
 
-    // Create membership request with pending status
-    await this.deps.prisma.organizationUser.create({
-      data: {
-        organizationId,
-        userId,
-        status: 'pending',
-      },
-    });
+    if (existingMembership && existingMembership.status === 'rejected') {
+      // Re-request: reset existing record back to pending
+      await this.deps.prisma.organizationUser.update({
+        where: {
+          organizationId_userId: { organizationId, userId },
+        },
+        data: {
+          status: 'pending',
+          rejectedAt: null,
+          rejectedByUserId: null,
+          rejectionReason: null,
+        },
+      });
+    } else {
+      // New request: create membership with pending status
+      await this.deps.prisma.organizationUser.create({
+        data: {
+          organizationId,
+          userId,
+          status: 'pending',
+        },
+      });
+    }
 
     // Notify admins about the new join request
     const notifyUseCase = new NotifyJoinRequestReceivedUseCase({

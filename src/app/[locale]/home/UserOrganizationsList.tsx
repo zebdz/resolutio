@@ -11,6 +11,7 @@ import { Link } from '@/src/i18n/routing';
 import {
   getUserOrganizationsAction,
   cancelJoinRequestAction,
+  joinOrganizationAction,
 } from '@/web/actions/organization';
 
 interface UserOrganization {
@@ -50,6 +51,7 @@ export function UserOrganizationsList({
   const [rejected, setRejected] = useState<UserOrganization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [reRequestingId, setReRequestingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -101,6 +103,29 @@ export function UserOrganizationsList({
     }
 
     setCancellingId(null);
+  };
+
+  const handleReRequest = async (organizationId: string) => {
+    setReRequestingId(organizationId);
+    const formData = new FormData();
+    formData.append('organizationId', organizationId);
+    const result = await joinOrganizationAction(formData);
+
+    if (result.success) {
+      const org = rejected.find((o) => o.id === organizationId);
+      setRejected((prev) => prev.filter((o) => o.id !== organizationId));
+
+      if (org) {
+        setPending((prev) => [
+          ...prev,
+          { ...org, requestedAt: new Date(), rejectedAt: undefined, rejectionReason: null, rejectedBy: undefined },
+        ]);
+      }
+    } else {
+      setError(result.error);
+    }
+
+    setReRequestingId(null);
   };
 
   if (isLoading) {
@@ -285,38 +310,50 @@ export function UserOrganizationsList({
             </Heading>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {rejected.map((org) => (
-                <Link
+                <div
                   key={org.id}
-                  href={`/organizations/${org.id}`}
-                  className="block rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950"
+                  className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950"
                 >
-                  <div className="flex items-start justify-between">
-                    <Heading level={3} className="text-lg font-semibold">
-                      {org.name}
-                    </Heading>
-                    <Badge color="red">{t('joinRequest.rejected')}</Badge>
-                  </div>
-                  <Text className="mt-2 line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">
-                    {org.description}
-                  </Text>
-                  {org.rejectionReason && (
-                    <div className="mt-4 rounded-md bg-red-100 p-3 dark:bg-red-900/20">
-                      <Text className="text-sm font-medium text-red-800 dark:text-red-200">
-                        {t('joinRequest.reason')}:
-                      </Text>
-                      <Text className="mt-1 text-sm text-red-700 dark:text-red-300">
-                        {org.rejectionReason}
-                      </Text>
+                  <Link href={`/organizations/${org.id}`} className="block">
+                    <div className="flex items-start justify-between">
+                      <Heading level={3} className="text-lg font-semibold">
+                        {org.name}
+                      </Heading>
+                      <Badge color="red">{t('joinRequest.rejected')}</Badge>
                     </div>
-                  )}
-                  {org.rejectedBy && org.rejectedAt && (
-                    <Text className="mt-4 text-xs text-zinc-500 dark:text-zinc-500">
-                      {t('joinRequest.rejectedBy')} {org.rejectedBy.firstName}{' '}
-                      {org.rejectedBy.lastName} {t('joinRequest.rejectedOn')}{' '}
-                      {org.rejectedAt.toLocaleDateString()}
+                    <Text className="mt-2 line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">
+                      {org.description}
                     </Text>
-                  )}
-                </Link>
+                    {org.rejectionReason && (
+                      <div className="mt-4 rounded-md bg-red-100 p-3 dark:bg-red-900/20">
+                        <Text className="text-sm font-medium text-red-800 dark:text-red-200">
+                          {t('joinRequest.reason')}:
+                        </Text>
+                        <Text className="mt-1 text-sm text-red-700 dark:text-red-300">
+                          {org.rejectionReason}
+                        </Text>
+                      </div>
+                    )}
+                    {org.rejectedBy && org.rejectedAt && (
+                      <Text className="mt-4 text-xs text-zinc-500 dark:text-zinc-500">
+                        {t('joinRequest.rejectedBy')} {org.rejectedBy.firstName}{' '}
+                        {org.rejectedBy.lastName} {t('joinRequest.rejectedOn')}{' '}
+                        {org.rejectedAt.toLocaleDateString()}
+                      </Text>
+                    )}
+                  </Link>
+                  <div className="mt-4">
+                    <Button
+                      color="brand-green"
+                      onClick={() => handleReRequest(org.id)}
+                      disabled={reRequestingId === org.id}
+                    >
+                      {reRequestingId === org.id
+                        ? t('joinRequest.reRequesting')
+                        : t('joinRequest.reRequest')}
+                    </Button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>

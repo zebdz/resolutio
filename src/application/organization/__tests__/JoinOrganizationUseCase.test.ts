@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { JoinOrganizationUseCase } from '../JoinOrganizationUseCase';
 import { Organization } from '../../../domain/organization/Organization';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
@@ -20,6 +20,13 @@ class MockPrismaClient {
         status: args.data.status,
         createdAt: new Date(),
         acceptedAt: null,
+      };
+    },
+    update: async (args: any) => {
+      return {
+        organizationId: args.where.organizationId_userId.organizationId,
+        userId: args.where.organizationId_userId.userId,
+        ...args.data,
       };
     },
   };
@@ -543,6 +550,113 @@ describe('JoinOrganizationUseCase', () => {
         organizationRepository.addPendingRequest('user-456', 'org-parent');
 
         // Try to join child - should fail
+        const result = await useCase.execute(
+          { organizationId: 'org-child' },
+          'user-456'
+        );
+
+        expect(result.success).toBe(false);
+
+        if (!result.success) {
+          expect(result.error).toBe(
+            OrganizationErrors.PENDING_HIERARCHY_REQUEST
+          );
+        }
+      }
+    }
+  });
+
+  it('should allow re-request when previously rejected', async () => {
+    const orgResult = Organization.create(
+      'Test Organization',
+      'Test description',
+      'creator-123'
+    );
+    expect(orgResult.success).toBe(true);
+
+    if (orgResult.success) {
+      const org = orgResult.value;
+      (org as any).props.id = 'org-123';
+      organizationRepository.addOrganization(org);
+
+      prisma.organizationUser.findUnique = async () => ({
+        organizationId: 'org-123',
+        userId: 'user-456',
+        status: 'rejected',
+        createdAt: new Date(),
+        acceptedAt: null,
+        rejectedAt: new Date(),
+        rejectedByUserId: 'admin-1',
+        rejectionReason: 'Not eligible',
+      });
+
+      const updateSpy = vi.fn(prisma.organizationUser.update);
+      prisma.organizationUser.update = updateSpy;
+
+      const result = await useCase.execute(
+        { organizationId: 'org-123' },
+        'user-456'
+      );
+
+      expect(result.success).toBe(true);
+      expect(updateSpy).toHaveBeenCalledWith({
+        where: {
+          organizationId_userId: {
+            organizationId: 'org-123',
+            userId: 'user-456',
+          },
+        },
+        data: {
+          status: 'pending',
+          rejectedAt: null,
+          rejectedByUserId: null,
+          rejectionReason: null,
+        },
+      });
+    }
+  });
+
+  it('should check hierarchy constraints when re-requesting after rejection', async () => {
+    const parentResult = Organization.create(
+      'Parent Organization',
+      'Parent description',
+      'creator-123'
+    );
+    expect(parentResult.success).toBe(true);
+
+    if (parentResult.success) {
+      const parent = parentResult.value;
+      (parent as any).props.id = 'org-parent';
+      organizationRepository.addOrganization(parent);
+
+      const childResult = Organization.create(
+        'Child Organization',
+        'Child description',
+        'creator-123',
+        'org-parent'
+      );
+      expect(childResult.success).toBe(true);
+
+      if (childResult.success) {
+        const child = childResult.value;
+        (child as any).props.id = 'org-child';
+        organizationRepository.addOrganization(child);
+
+        // User was rejected from child org
+        prisma.organizationUser.findUnique = async () => ({
+          organizationId: 'org-child',
+          userId: 'user-456',
+          status: 'rejected',
+          createdAt: new Date(),
+          acceptedAt: null,
+          rejectedAt: new Date(),
+          rejectedByUserId: 'admin-1',
+          rejectionReason: null,
+        });
+
+        // User has pending request in parent
+        organizationRepository.addPendingRequest('user-456', 'org-parent');
+
         const result = await useCase.execute(
           { organizationId: 'org-child' },
           'user-456'
