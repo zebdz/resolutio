@@ -17,6 +17,7 @@ export class PrismaUserRepository implements UserRepository {
         phoneNumber: true,
         password: true,
         language: true,
+        consentGivenAt: true,
         createdAt: true,
       },
     });
@@ -39,6 +40,7 @@ export class PrismaUserRepository implements UserRepository {
         phoneNumber: true,
         password: true,
         language: true,
+        consentGivenAt: true,
         createdAt: true,
       },
     });
@@ -57,6 +59,7 @@ export class PrismaUserRepository implements UserRepository {
         phoneNumber: true,
         password: true,
         language: true,
+        consentGivenAt: true,
         createdAt: true,
       },
     });
@@ -79,6 +82,7 @@ export class PrismaUserRepository implements UserRepository {
         phoneNumber: user.phoneNumber.getValue(),
         password: user.password,
         language: user.language,
+        consentGivenAt: user.consentGivenAt,
         createdAt: user.createdAt,
       },
       update: {
@@ -97,6 +101,7 @@ export class PrismaUserRepository implements UserRepository {
         phoneNumber: true,
         password: true,
         language: true,
+        consentGivenAt: true,
         createdAt: true,
       },
     });
@@ -131,6 +136,7 @@ export class PrismaUserRepository implements UserRepository {
         phoneNumber: true,
         password: true,
         language: true,
+        consentGivenAt: true,
         createdAt: true,
       },
       take: 20, // Limit results to 20 users
@@ -155,6 +161,7 @@ export class PrismaUserRepository implements UserRepository {
     phoneNumber: string;
     password: string;
     language: string;
+    consentGivenAt: Date | null;
     createdAt: Date;
   }): User {
     // PhoneNumber.create throws if invalid, which is correct here
@@ -169,6 +176,7 @@ export class PrismaUserRepository implements UserRepository {
       phoneNumber: phoneNumber,
       password: user.password,
       language: (user.language as Language) || 'ru',
+      consentGivenAt: user.consentGivenAt ?? undefined,
       createdAt: user.createdAt,
     });
   }

@@ -27,10 +27,15 @@
       "registering": "Creating account...",
       "haveAccount": "Already have an account?",
       "signIn": "Sign in",
+      "consentLabel": "I agree to the processing of my personal data per the <privacyPolicy>Privacy Policy</privacyPolicy>",
       "errors": {
         "phoneExists": "Phone number already registered",
         "passwordMismatch": "Passwords do not match",
-        "invalidPhone": "Invalid phone number format"
+        "invalidPhone": "Invalid phone number format",
+        "consentNotGiven": "You must consent to the processing of your personal data",
+        "firstNameRequired": "First name is required",
+        "lastNameRequired": "Last name is required",
+        "passwordTooShort": "Password must be at least 8 characters"
       }
     },
     "logout": "Logout"
@@ -69,6 +74,7 @@
     "disclaimer": "Important: Only create organizations and polls that comply with the laws of your country!",
     "logoText": "Decision Making Platform",
     "copyright": "© 2025 Resolutio",
+    "privacyPolicy": "Privacy Policy",
     "features": {
       "voting": "Voting",
       "publicQuestions": "Public Questions",
@@ -825,5 +831,56 @@
   "phone": {
     "searchPlaceholder": "Search...",
     "searchNotFound": "No countries found"
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "lastUpdated": "Last updated: March 3, 2026",
+    "intro": "This Privacy Policy describes how Resolutio (\"we\", \"us\", \"our\") collects, uses, and protects your personal data in accordance with applicable data protection laws.",
+    "dataCollected": {
+      "heading": "Data We Collect",
+      "description": "We collect and process the following personal data:",
+      "items": {
+        "name": "Full name (first name, last name, middle name)",
+        "phone": "Phone number",
+        "password": "Password (stored in hashed form)",
+        "language": "Language preference",
+        "ip": "IP address (for OTP verification)",
+        "votes": "Voting records and participation data",
+        "membership": "Organization and board membership data"
+      }
+    },
+    "legalBasis": {
+      "heading": "Legal Basis for Processing",
+      "description": "We process your personal data based on your explicit consent given during registration. You may withdraw your consent at any time by contacting us."
+    },
+    "thirdParties": {
+      "heading": "Third-Party Data Sharing",
+      "description": "We do not sell or share your personal data with third parties, except as required by law or with your explicit consent. We may use third-party services for infrastructure purposes (hosting, SMS delivery), which process data strictly on our behalf."
+    },
+    "retention": {
+      "heading": "Data Retention",
+      "description": "Your personal data is retained for the duration of your account activity. Voting records are retained indefinitely to ensure the integrity and legal validity of decisions made through the platform. You may request deletion of your account data by contacting us."
+    },
+    "userRights": {
+      "heading": "Your Rights",
+      "description": "You have the right to:",
+      "items": {
+        "access": "Access your personal data",
+        "rectification": "Request correction of inaccurate data",
+        "deletion": "Request deletion of your data (subject to legal retention requirements)",
+        "restriction": "Restrict processing of your data",
+        "portability": "Receive your data in a portable format",
+        "withdraw": "Withdraw consent at any time"
+      }
+    },
+    "contact": {
+      "heading": "Contact Us",
+      "description": "For any questions about this Privacy Policy or to exercise your rights, contact us at: {email}"
+    },
+    "updates": {
+      "heading": "Policy Updates",
+      "description": "We may update this Privacy Policy from time to time. We will notify you of any significant changes through the platform. Continued use of the service after changes constitutes acceptance of the updated policy."
+    },
+    "backToHome": "Back to home"
   }
 }

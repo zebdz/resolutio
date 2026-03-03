@@ -12,6 +12,9 @@ export const RegisterUserSchema = z
     confirmPassword: z.string(),
     language: z.enum(['en', 'ru']).optional().default('ru'),
     otpId: z.string().min(1, 'OTP verification is required'),
+    consentGiven: z.literal(true, {
+      message: 'Consent is required',
+    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match",

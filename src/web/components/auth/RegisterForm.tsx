@@ -6,8 +6,12 @@ import { useRouter } from '@/src/i18n/routing';
 import { Button } from '@/app/components/catalyst/button';
 import { Input } from '@/app/components/catalyst/input';
 import { Field, Label, FieldGroup } from '@/app/components/catalyst/fieldset';
+import {
+  Checkbox,
+  CheckboxField,
+} from '@/app/components/catalyst/checkbox';
 import { PhoneInput } from '@/web/components/phone';
-import { Text } from '@/app/components/catalyst/text';
+import { Text, TextLink } from '@/app/components/catalyst/text';
 import { AlertBanner } from '@/app/components/catalyst/alert-banner';
 import { TurnstileWidget } from './TurnstileWidget';
 import { OtpInput } from './OtpInput';
@@ -50,6 +54,7 @@ export function RegisterForm({ locale }: Props) {
     phoneNumber: '',
     password: '',
     confirmPassword: '',
+    consentGiven: false,
   });
 
   // Resend countdown timer
@@ -147,6 +152,12 @@ export function RegisterForm({ locale }: Props) {
         return;
       }
 
+      if (!formValues.consentGiven) {
+        setError(t('register.errors.consentNotGiven'));
+
+        return;
+      }
+
       const result = await requestOtpAction(formData);
 
       if (!result.success) {
@@ -188,6 +199,7 @@ export function RegisterForm({ locale }: Props) {
       registerData.set('confirmPassword', formValues.confirmPassword);
       registerData.set('language', locale);
       registerData.set('otpId', otpId || '');
+      registerData.set('consentGiven', String(formValues.consentGiven));
 
       const registerResult = await registerAction(registerData);
 
@@ -476,6 +488,29 @@ export function RegisterForm({ locale }: Props) {
             </Text>
           )}
         </Field>
+        <CheckboxField>
+          <Checkbox
+            color="green"
+            checked={formValues.consentGiven}
+            onChange={(checked) => {
+              setFormValues((prev) => ({ ...prev, consentGiven: checked }));
+
+              if (error) {
+                setError(null);
+              }
+            }}
+            disabled={isPending}
+          />
+          <Label className="text-sm font-normal">
+            {t.rich('register.consentLabel', {
+              privacyPolicy: (chunks) => (
+                <TextLink href="/privacy" target="_blank">
+                  {chunks}
+                </TextLink>
+              ),
+            })}
+          </Label>
+        </CheckboxField>
       </FieldGroup>
 
       <TurnstileWidget
@@ -488,7 +523,7 @@ export function RegisterForm({ locale }: Props) {
         type="submit"
         color="brand-green"
         className="w-full"
-        disabled={isPending || !captchaToken}
+        disabled={isPending || !captchaToken || !formValues.consentGiven}
       >
         {isPending ? t('register.registering') : t('register.submit')}
       </Button>

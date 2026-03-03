@@ -65,6 +65,17 @@ describe('User', () => {
       const user = User.create({ ...validProps, language: 'ru' });
       expect(user.language).toBe('ru');
     });
+
+    it('should create user with consentGivenAt', () => {
+      const consentDate = new Date('2026-03-03');
+      const user = User.create({ ...validProps, consentGivenAt: consentDate });
+      expect(user.consentGivenAt).toEqual(consentDate);
+    });
+
+    it('should create user without consentGivenAt', () => {
+      const user = User.create(validProps);
+      expect(user.consentGivenAt).toBeUndefined();
+    });
   });
 
   describe('getFullName', () => {
@@ -105,6 +116,24 @@ describe('User', () => {
       expect(user.firstName).toBe('John');
       expect(user.language).toBe('en');
       expect(user.createdAt).toEqual(new Date('2024-01-01'));
+    });
+
+    it('should reconstitute a user with consentGivenAt', () => {
+      const consentDate = new Date('2026-01-15');
+      const props = {
+        id: 'user-456',
+        firstName: 'Jane',
+        lastName: 'Doe',
+        phoneNumber: PhoneNumber.create('+79161234567'),
+        password: 'hashedpassword123',
+        language: 'ru' as const,
+        createdAt: new Date('2024-01-01'),
+        consentGivenAt: consentDate,
+      };
+
+      const user = User.reconstitute(props);
+
+      expect(user.consentGivenAt).toEqual(consentDate);
     });
   });
 

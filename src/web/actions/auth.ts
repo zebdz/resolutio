@@ -27,6 +27,7 @@ import {
   ValidationError,
 } from '@/domain/shared/errors';
 import { OtpErrors } from '@/application/auth/OtpErrors';
+import { AuthErrors } from '@/application/auth/AuthErrors';
 
 // Helper function to check if error is a Prisma connection error
 function isDatabaseConnectionError(error: unknown): boolean {
@@ -103,6 +104,7 @@ export async function registerAction(
       confirmPassword: formData.get('confirmPassword') as string,
       language: (formData.get('language') as Locale) || defaultLocale,
       otpId: formData.get('otpId') as string,
+      consentGiven: formData.get('consentGiven') === 'true',
     };
 
     // Validate with Zod
@@ -153,6 +155,19 @@ export async function registerAction(
         return {
           success: false,
           error: t('phoneExists'),
+        };
+      }
+
+      // Handle consent error
+      if (
+        result.error instanceof ValidationError &&
+        result.error.message === AuthErrors.CONSENT_NOT_GIVEN
+      ) {
+        const tAuth = await getTranslations('auth.register.errors');
+
+        return {
+          success: false,
+          error: tAuth('consentNotGiven'),
         };
       }
 

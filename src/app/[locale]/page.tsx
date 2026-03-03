@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import Image from 'next/image';
 import { Button } from '@/app/components/catalyst/button';
+import { Link } from '@/src/i18n/routing';
 import { LocaleSwitcher } from '@/web/components/LocaleSwitcher';
 
 export async function generateMetadata() {
@@ -174,6 +175,18 @@ export default async function HomePage() {
           </div>
         </div>
       </main>
+
+      <footer className="border-t border-white/20 px-6 py-6 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 sm:flex-row">
+          <Link
+            href="/privacy"
+            className="text-sm text-white/70 hover:text-white"
+          >
+            {t('privacyPolicy')}
+          </Link>
+          <span className="text-sm text-white/50">{t('copyright')}</span>
+        </div>
+      </footer>
     </div>
   );
 }

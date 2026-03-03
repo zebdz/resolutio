@@ -5,6 +5,7 @@ import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { DuplicateError, ValidationError } from '@/domain/shared/errors';
 import { Result, success, failure } from '@/domain/shared/Result';
 import { OtpErrors } from './OtpErrors';
+import { AuthErrors } from './AuthErrors';
 import type { Language } from '@/domain/user/User';
 
 export interface PasswordHasher {
@@ -19,6 +20,7 @@ export interface RegisterUserInput {
   password: string;
   language?: Language;
   otpId: string;
+  consentGiven: boolean;
 }
 
 export class RegisterUserUseCase {
@@ -30,6 +32,13 @@ export class RegisterUserUseCase {
 
   async execute(input: RegisterUserInput): Promise<Result<User, Error>> {
     try {
+      // Validate consent
+      if (!input.consentGiven) {
+        return failure(
+          new ValidationError(AuthErrors.CONSENT_NOT_GIVEN)
+        );
+      }
+
       // Verify OTP is verified and matches phone
       const otp = await this.otpRepository.findById(input.otpId);
 
@@ -62,6 +71,7 @@ export class RegisterUserUseCase {
         phoneNumber,
         password: hashedPassword,
         language: input.language || 'ru',
+        consentGivenAt: new Date(),
       });
 
       // Save user

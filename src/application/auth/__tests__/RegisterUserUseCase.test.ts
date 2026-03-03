@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { RegisterUserUseCase } from '../RegisterUserUseCase';
 import { OtpErrors } from '../OtpErrors';
+import { AuthErrors } from '../AuthErrors';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { User } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
@@ -124,7 +125,21 @@ describe('RegisterUserUseCase', () => {
     password: 'securepass',
     otpId: 'otp-1',
     language: 'ru' as const,
+    consentGiven: true,
   };
+
+  it('should fail when consentGiven is false', async () => {
+    const result = await useCase.execute({
+      ...validInput,
+      consentGiven: false,
+    });
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error.message).toBe(AuthErrors.CONSENT_NOT_GIVEN);
+    }
+  });
 
   it('should fail when OTP not found', async () => {
     const result = await useCase.execute(validInput);
@@ -207,6 +222,7 @@ describe('RegisterUserUseCase', () => {
       expect(result.value.firstName).toBe('John');
       expect(result.value.lastName).toBe('Doe');
       expect(result.value.phoneNumber.getValue()).toBe('+79161234567');
+      expect(result.value.consentGivenAt).toBeInstanceOf(Date);
     }
   });
 
