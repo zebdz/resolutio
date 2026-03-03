@@ -190,7 +190,8 @@ export async function getUserVotingProgressAction(
  * Finish voting on a poll
  */
 export async function finishVotingAction(
-  pollId: string
+  pollId: string,
+  willingToSignProtocol: boolean
 ): Promise<ActionResult<void>> {
   const t = await getTranslations('common.errors');
 
@@ -209,6 +210,7 @@ export async function finishVotingAction(
     const result = await finishVotingUseCase.execute({
       pollId,
       userId: user.id,
+      willingToSignProtocol,
     });
 
     if (!result.success) {

@@ -94,6 +94,7 @@ function createParticipant(pollId: string, userId: string): PollParticipant {
     pollId,
     userId,
     userWeight: 1.0,
+    willingToSignProtocol: null,
     snapshotAt: new Date(),
     createdAt: new Date(),
   });

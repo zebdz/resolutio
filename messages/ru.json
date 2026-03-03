@@ -560,7 +560,9 @@
       "cannotVote": "Вы не можете голосовать в этом опросе",
       "alreadyVoted": "Вы уже завершили этот опрос",
       "pollNotActive": "Этот опрос в настоящее время не активен",
-      "pollNotFound": "Опрос не найден"
+      "pollNotFound": "Опрос не найден",
+      "willingToSignProtocolTitle": "Готов подписать финальный протокол",
+      "willingToSignProtocolDescription": "Включая это, вы подтверждаете готовность подписать финальный протокол данного голосования"
     },
     "participants": {
       "title": "Управление участниками",
@@ -624,6 +626,12 @@
       "finished": "Завершён",
       "close": "Закрыть",
       "weight": "Вес",
+      "protocolSignWillingness": "Готовность к подписанию протокола",
+      "willingToSignProtocol": "Готовы подписать",
+      "protocolNotWilling": "Не готовы подписать",
+      "willingToSignProtocolCount": "{count} готовы",
+      "protocolNotWillingCount": "{count} не готовы",
+      "exportProtocolPdf": "Экспорт подписантов в PDF",
       "pdf": {
         "exportPdf": "Экспорт в PDF",
         "exporting": "Экспорт...",
@@ -659,6 +667,20 @@
         "generatedOn": "Сформировано: {date}",
         "singleChoice": "Один вариант",
         "multipleChoice": "Несколько вариантов"
+      },
+      "protocolPdf": {
+        "exporting": "Экспорт...",
+        "title": "ГОТОВНОСТЬ К ПОДПИСАНИЮ ПРОТОКОЛА",
+        "organization": "Организация",
+        "board": "Орган управления",
+        "pollName": "Голосование",
+        "willingSection": "ГОТОВЫ ПОДПИСАТЬ",
+        "notWillingSection": "НЕ ГОТОВЫ ПОДПИСАТЬ",
+        "columnNumber": "№",
+        "columnFullName": "ФИО",
+        "columnPhone": "Номер телефона",
+        "pageOf": "Стр. {current} из {total}",
+        "generatedOn": "Сформировано: {date}"
       }
     }
   },
@@ -716,6 +738,8 @@
   },
   "navbar": {
     "logo": "Resolutio",
+    "logoText": "Платформа принятия решений",
+    "home": "Главная",
     "organizations": "Организации",
     "polls": "Опросы",
     "admin": "Админ",
@@ -781,7 +805,21 @@
       "mustBeDraft": "Опрос должен быть в состоянии черновика",
       "mustBeReady": "Опрос должен быть в состоянии готовности",
       "mustBeActive": "Опрос должен быть активен",
-      "cannotDiscardSnapshotHasVotes": "Нельзя сбросить список участников - опрос уже имеет голоса"
+      "cannotDiscardSnapshotHasVotes": "Нельзя сбросить список участников - опрос уже имеет голоса",
+      "pollFinished": "Опрос уже завершён",
+      "pollNotActive": "Опрос не активен",
+      "alreadyVoted": "Вы уже проголосовали в этом опросе",
+      "notParticipant": "Вы не являетесь участником этого опроса",
+      "mustAnswerAllQuestions": "Необходимо ответить на все вопросы перед завершением",
+      "invalidWeight": "Недопустимый вес голоса",
+      "cannotModifyParticipantsHasVotes": "Нельзя изменять участников - опрос уже имеет голоса",
+      "questionInvalidPage": "Недопустимый номер страницы вопроса",
+      "questionInvalidOrder": "Недопустимый порядок вопроса",
+      "questionInvalidType": "Недопустимый тип вопроса",
+      "questionCannotAddAnswerArchived": "Нельзя добавить ответ к архивному вопросу",
+      "questionCannotRemoveAnswerArchived": "Нельзя удалить ответ у архивного вопроса",
+      "questionAnswerNotFound": "Ответ не найден в вопросе",
+      "answerInvalidOrder": "Недопустимый порядок ответа"
     }
   },
   "phone": {

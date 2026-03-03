@@ -36,12 +36,22 @@ export interface QuestionResult {
   totalVotes: number;
 }
 
+export interface ProtocolSignWillingnessEntry {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  middleName: string | null;
+  phoneNumber: string;
+  willingToSignProtocol: boolean;
+}
+
 export interface GetPollResultsResult {
   poll: Poll;
   results: QuestionResult[];
   totalParticipants: number;
   totalParticipantWeight: number;
   canViewVoters: boolean;
+  protocolSignWillingness: ProtocolSignWillingnessEntry[];
 }
 
 export class GetPollResultsUseCase {
@@ -219,12 +229,35 @@ export class GetPollResultsUseCase {
       });
     }
 
+    // 9. Build protocol sign willingness data (admin only)
+    let protocolSignWillingness: ProtocolSignWillingnessEntry[] = [];
+
+    if (isAdmin) {
+      const votedParticipants = participants.filter(
+        (p) => p.willingToSignProtocol !== null
+      );
+
+      protocolSignWillingness = votedParticipants.map((p) => {
+        const user = users?.find((u) => u.id === p.userId);
+
+        return {
+          userId: p.userId,
+          firstName: user?.firstName ?? 'Unknown',
+          lastName: user?.lastName ?? 'Unknown',
+          middleName: user?.middleName ?? null,
+          phoneNumber: user?.phoneNumber?.getValue() ?? '',
+          willingToSignProtocol: p.willingToSignProtocol!,
+        };
+      });
+    }
+
     return success({
       poll,
       results,
       totalParticipants: participants.length,
       totalParticipantWeight,
-      canViewVoters: isAdmin, // || poll.createdBy === userId,
+      canViewVoters: isAdmin,
+      protocolSignWillingness,
     });
   }
 }

@@ -54,7 +54,9 @@ export function RegisterForm({ locale }: Props) {
 
   // Resend countdown timer
   useEffect(() => {
-    if (resendCountdown <= 0) {return;}
+    if (resendCountdown <= 0) {
+      return;
+    }
 
     const timer = setInterval(() => {
       setResendCountdown((prev) => prev - 1);
@@ -203,7 +205,9 @@ export function RegisterForm({ locale }: Props) {
   }
 
   function handleResendOtp() {
-    if (resendCountdown > 0) {return;}
+    if (resendCountdown > 0) {
+      return;
+    }
 
     // Reset captcha token to force re-verification would be ideal,
     // but for simplicity we reuse the existing token
@@ -250,7 +254,9 @@ export function RegisterForm({ locale }: Props) {
             onChange={(val) => {
               setOtpCode(val);
 
-              if (error) {setError(null);}
+              if (error) {
+                setError(null);
+              }
             }}
             disabled={isPending}
             invalid={!!error}

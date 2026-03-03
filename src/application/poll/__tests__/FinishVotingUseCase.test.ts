@@ -75,7 +75,7 @@ class MockPollRepository implements Pick<PollRepository, 'getPollById'> {
 // Mock ParticipantRepository - only implements methods used by FinishVotingUseCase
 class MockParticipantRepository implements Pick<
   ParticipantRepository,
-  'getParticipantByUserAndPoll'
+  'getParticipantByUserAndPoll' | 'updateWillingToSignProtocol'
 > {
   private participants: Map<string, PollParticipant> = new Map();
   private nextId = 1;
@@ -91,7 +91,20 @@ class MockParticipantRepository implements Pick<
     return success(participant || null);
   }
 
-  // Helper method for test setup
+  async updateWillingToSignProtocol(
+    participantId: string,
+    willingToSignProtocol: boolean
+  ): Promise<Result<void, string>> {
+    const participant = this.participants.get(participantId);
+
+    if (participant) {
+      participant.setWillingToSignProtocol(willingToSignProtocol);
+    }
+
+    return success(undefined);
+  }
+
+  // Helper methods for test setup and verification
   async createParticipants(
     participants: PollParticipant[]
   ): Promise<Result<void, string>> {
@@ -102,6 +115,10 @@ class MockParticipantRepository implements Pick<
     }
 
     return success(undefined);
+  }
+
+  getParticipant(id: string): PollParticipant | undefined {
+    return this.participants.get(id);
   }
 }
 
@@ -372,6 +389,7 @@ describe('FinishVotingUseCase', () => {
     const result = await useCase.execute({
       userId: 'user-1',
       pollId: poll.id,
+      willingToSignProtocol: true,
     });
 
     if (!result.success) {
@@ -406,6 +424,7 @@ describe('FinishVotingUseCase', () => {
     const result = await useCase.execute({
       userId: 'user-1',
       pollId: 'non-existent',
+      willingToSignProtocol: true,
     });
 
     expect(result.success).toBe(false);
@@ -435,6 +454,7 @@ describe('FinishVotingUseCase', () => {
       const result = await useCase.execute({
         userId: 'user-1',
         pollId: inactivePoll.id,
+        willingToSignProtocol: true,
       });
 
       expect(result.success).toBe(false);
@@ -452,6 +472,7 @@ describe('FinishVotingUseCase', () => {
     const result = await useCase.execute({
       userId: 'user-1',
       pollId: poll.id,
+      willingToSignProtocol: true,
     });
 
     expect(result.success).toBe(false);
@@ -465,6 +486,7 @@ describe('FinishVotingUseCase', () => {
     const result = await useCase.execute({
       userId: 'non-participant',
       pollId: poll.id,
+      willingToSignProtocol: true,
     });
 
     expect(result.success).toBe(false);
@@ -512,6 +534,7 @@ describe('FinishVotingUseCase', () => {
     const result = await useCase.execute({
       userId: 'user-1',
       pollId: poll.id,
+      willingToSignProtocol: true,
     });
 
     expect(result.success).toBe(false);
@@ -545,6 +568,7 @@ describe('FinishVotingUseCase', () => {
     const result = await useCase.execute({
       userId: 'user-1',
       pollId: poll.id,
+      willingToSignProtocol: true,
     });
 
     expect(result.success).toBe(true);
@@ -605,6 +629,7 @@ describe('FinishVotingUseCase', () => {
     const result = await useCase.execute({
       userId: 'user-1',
       pollId: poll.id,
+      willingToSignProtocol: true,
     });
 
     expect(result.success).toBe(false);
@@ -612,5 +637,73 @@ describe('FinishVotingUseCase', () => {
     if (!result.success) {
       expect(result.error).toBe(PollDomainCodes.SINGLE_CHOICE_MULTIPLE_ANSWERS);
     }
+  });
+
+  it('should save willingToSignProtocol=true when finishing voting', async () => {
+    const draft1Result = VoteDraft.create(
+      poll.id,
+      question1.id,
+      answer1.id,
+      'user-1'
+    );
+    const draft2Result = VoteDraft.create(
+      poll.id,
+      question2.id,
+      answer2.id,
+      'user-1'
+    );
+    expect(draft1Result.success && draft2Result.success).toBe(true);
+
+    if (draft1Result.success && draft2Result.success) {
+      await draftRepository.saveDraft(draft1Result.value);
+      await draftRepository.saveDraft(draft2Result.value);
+    }
+
+    const result = await useCase.execute({
+      userId: 'user-1',
+      pollId: poll.id,
+      willingToSignProtocol: true,
+    });
+
+    expect(result.success).toBe(true);
+
+    const savedParticipant = participantRepository.getParticipant(
+      participant.id
+    );
+    expect(savedParticipant?.willingToSignProtocol).toBe(true);
+  });
+
+  it('should save willingToSignProtocol=false when finishing voting', async () => {
+    const draft1Result = VoteDraft.create(
+      poll.id,
+      question1.id,
+      answer1.id,
+      'user-1'
+    );
+    const draft2Result = VoteDraft.create(
+      poll.id,
+      question2.id,
+      answer2.id,
+      'user-1'
+    );
+    expect(draft1Result.success && draft2Result.success).toBe(true);
+
+    if (draft1Result.success && draft2Result.success) {
+      await draftRepository.saveDraft(draft1Result.value);
+      await draftRepository.saveDraft(draft2Result.value);
+    }
+
+    const result = await useCase.execute({
+      userId: 'user-1',
+      pollId: poll.id,
+      willingToSignProtocol: false,
+    });
+
+    expect(result.success).toBe(true);
+
+    const savedParticipant = participantRepository.getParticipant(
+      participant.id
+    );
+    expect(savedParticipant?.willingToSignProtocol).toBe(false);
   });
 });

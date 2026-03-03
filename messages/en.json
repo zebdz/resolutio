@@ -560,7 +560,9 @@
       "cannotVote": "You are not eligible to vote on this poll",
       "alreadyVoted": "You have already completed this poll",
       "pollNotActive": "This poll is not currently active",
-      "pollNotFound": "Poll not found"
+      "pollNotFound": "Poll not found",
+      "willingToSignProtocolTitle": "Willing to sign the final protocol",
+      "willingToSignProtocolDescription": "By enabling this, you confirm willingness to sign the final protocol of this vote"
     },
     "participants": {
       "title": "Manage Participants",
@@ -624,6 +626,12 @@
       "finished": "Finished",
       "close": "Close",
       "weight": "Weight",
+      "protocolSignWillingness": "Protocol Sign Willingness",
+      "willingToSignProtocol": "Willing to sign",
+      "protocolNotWilling": "Not willing to sign",
+      "willingToSignProtocolCount": "{count} willing",
+      "protocolNotWillingCount": "{count} not willing",
+      "exportProtocolPdf": "Export signers PDF",
       "pdf": {
         "exportPdf": "Export as PDF",
         "exporting": "Exporting...",
@@ -659,6 +667,20 @@
         "generatedOn": "Generated: {date}",
         "singleChoice": "Single Choice",
         "multipleChoice": "Multiple Choice"
+      },
+      "protocolPdf": {
+        "exporting": "Exporting...",
+        "title": "PROTOCOL SIGNING WILLINGNESS",
+        "organization": "Organization",
+        "board": "Board",
+        "pollName": "Poll",
+        "willingSection": "WILLING TO SIGN",
+        "notWillingSection": "NOT WILLING TO SIGN",
+        "columnNumber": "#",
+        "columnFullName": "Full Name",
+        "columnPhone": "Phone Number",
+        "pageOf": "Page {current} of {total}",
+        "generatedOn": "Generated: {date}"
       }
     }
   },
@@ -716,6 +738,8 @@
   },
   "navbar": {
     "logo": "Resolutio",
+    "logoText": "Decision Making Platform",
+    "home": "Home",
     "organizations": "Organizations",
     "polls": "Polls",
     "admin": "Admin",
@@ -781,7 +805,21 @@
       "mustBeDraft": "Poll must be in draft state",
       "mustBeReady": "Poll must be in ready state",
       "mustBeActive": "Poll must be in active state",
-      "cannotDiscardSnapshotHasVotes": "Cannot discard participants - poll already has votes"
+      "cannotDiscardSnapshotHasVotes": "Cannot discard participants - poll already has votes",
+      "pollFinished": "Poll has already finished",
+      "pollNotActive": "Poll is not active",
+      "alreadyVoted": "You have already voted in this poll",
+      "notParticipant": "You are not a participant in this poll",
+      "mustAnswerAllQuestions": "You must answer all questions before finishing",
+      "invalidWeight": "Invalid vote weight",
+      "cannotModifyParticipantsHasVotes": "Cannot modify participants - poll already has votes",
+      "questionInvalidPage": "Invalid question page number",
+      "questionInvalidOrder": "Invalid question order",
+      "questionInvalidType": "Invalid question type",
+      "questionCannotAddAnswerArchived": "Cannot add answer to an archived question",
+      "questionCannotRemoveAnswerArchived": "Cannot remove answer from an archived question",
+      "questionAnswerNotFound": "Answer not found in question",
+      "answerInvalidOrder": "Invalid answer order"
     }
   },
   "phone": {

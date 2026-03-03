@@ -33,7 +33,9 @@ export function OtpInput({
 
   const handleChange = useCallback(
     (index: number, char: string) => {
-      if (!/^\d?$/.test(char)) {return;}
+      if (!/^\d?$/.test(char)) {
+        return;
+      }
 
       const newDigits = [...digits];
       newDigits[index] = char;

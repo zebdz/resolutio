@@ -10,6 +10,7 @@ import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
 export interface FinishVotingInput {
   pollId: string;
   userId: string;
+  willingToSignProtocol: boolean;
 }
 
 export class FinishVotingUseCase {
@@ -141,7 +142,18 @@ export class FinishVotingUseCase {
       return failure(createVotesResult.error);
     }
 
-    // 9. Delete user's drafts
+    // 9. Save willingToSignProtocol
+    const protocolResult =
+      await this.participantRepository.updateWillingToSignProtocol(
+        participant.id,
+        input.willingToSignProtocol
+      );
+
+    if (!protocolResult.success) {
+      return failure(protocolResult.error);
+    }
+
+    // 10. Delete user's drafts
     const deleteResult = await this.draftRepository.deleteUserDrafts(
       pollId,
       userId

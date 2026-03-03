@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Badge } from '@/app/components/catalyst/badge';
 import VoterBreakdownDialog from './VoterBreakdownDialog';
 import ExportPdfButton from './ExportPdfButton';
+import ExportProtocolPdfButton from './ExportProtocolPdfButton';
 import { Button } from '@/app/components/catalyst/button';
 
 interface AnswerResult {
@@ -29,12 +30,22 @@ interface QuestionResult {
   answers: AnswerResult[];
 }
 
+interface ProtocolSignWillingnessEntry {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  middleName: string | null;
+  phoneNumber: string;
+  willingToSignProtocol: boolean;
+}
+
 interface PollResultsData {
   pollId: string;
   totalParticipants: number;
   totalWeight: number;
   votedParticipants: number;
   questions: QuestionResult[];
+  protocolSignWillingness: ProtocolSignWillingnessEntry[];
 }
 
 interface PollResultsProps {
@@ -57,6 +68,7 @@ export default function PollResults({
     null
   );
   const [breakdownOpen, setBreakdownOpen] = useState(false);
+  const [protocolOpen, setProtocolOpen] = useState(false);
 
   const handleViewVoters = (answer: AnswerResult) => {
     setSelectedAnswer(answer);
@@ -228,6 +240,103 @@ export default function PollResults({
             </div>
           );
         })}
+
+        {/* Protocol sign willingness section (admin only) */}
+        {canViewVoters && results.protocolSignWillingness.length > 0 && (
+          <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+            <div className="flex items-center justify-between p-6">
+              <button
+                type="button"
+                onClick={() => setProtocolOpen(!protocolOpen)}
+                className="flex items-center gap-3 text-left cursor-pointer"
+              >
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">
+                  {t('protocolSignWillingness')}
+                </h3>
+                <Badge color="green">
+                  {t('willingToSignProtocolCount', {
+                    count: results.protocolSignWillingness.filter(
+                      (p) => p.willingToSignProtocol
+                    ).length,
+                  })}
+                </Badge>
+                <Badge color="red">
+                  {t('protocolNotWillingCount', {
+                    count: results.protocolSignWillingness.filter(
+                      (p) => !p.willingToSignProtocol
+                    ).length,
+                  })}
+                </Badge>
+                <svg
+                  className={`h-5 w-5 text-zinc-500 transition-transform ${protocolOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                  />
+                </svg>
+              </button>
+              <ExportProtocolPdfButton pollId={results.pollId} />
+            </div>
+
+            {protocolOpen && (
+              <div className="px-6 pb-6 space-y-4">
+                {/* Willing */}
+                {results.protocolSignWillingness.some(
+                  (p) => p.willingToSignProtocol
+                ) && (
+                  <div>
+                    <h4 className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">
+                      {t('willingToSignProtocol')}
+                    </h4>
+                    <ul className="space-y-1">
+                      {results.protocolSignWillingness
+                        .filter((p) => p.willingToSignProtocol)
+                        .map((p) => (
+                          <li
+                            key={p.userId}
+                            className="text-sm text-zinc-700 dark:text-zinc-300"
+                          >
+                            {p.lastName} {p.firstName}
+                            {p.middleName ? ` ${p.middleName}` : ''}
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Not willing */}
+                {results.protocolSignWillingness.some(
+                  (p) => !p.willingToSignProtocol
+                ) && (
+                  <div>
+                    <h4 className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">
+                      {t('protocolNotWilling')}
+                    </h4>
+                    <ul className="space-y-1">
+                      {results.protocolSignWillingness
+                        .filter((p) => !p.willingToSignProtocol)
+                        .map((p) => (
+                          <li
+                            key={p.userId}
+                            className="text-sm text-zinc-700 dark:text-zinc-300"
+                          >
+                            {p.lastName} {p.firstName}
+                            {p.middleName ? ` ${p.middleName}` : ''}
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {!isFinished && canViewVoters && (
           <div className="rounded-lg border border-amber-200 dark:border-amber-700 p-4 bg-amber-50 dark:bg-amber-950/20">

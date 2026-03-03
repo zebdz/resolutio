@@ -16,6 +16,7 @@ function makePrismaParticipant(overrides: Record<string, any> = {}) {
     pollId: 'poll-1',
     userId: 'user-1',
     userWeight: mockDecimal(1.0),
+    willingToSignProtocol: null,
     snapshotAt: new Date('2024-06-01'),
     createdAt: new Date('2024-06-01'),
     ...overrides,
@@ -112,6 +113,7 @@ describe('PrismaParticipantRepository', () => {
         pollId: 'poll-1',
         userId: 'user-1',
         userWeight: 1.0,
+        willingToSignProtocol: null,
         snapshotAt: new Date(),
         createdAt: new Date(),
       });
@@ -120,6 +122,7 @@ describe('PrismaParticipantRepository', () => {
         pollId: 'poll-1',
         userId: 'user-2',
         userWeight: 2.0,
+        willingToSignProtocol: null,
         snapshotAt: new Date(),
         createdAt: new Date(),
       });
@@ -187,6 +190,7 @@ describe('PrismaParticipantRepository', () => {
         pollId: 'poll-1',
         userId: 'user-1',
         userWeight: 1.5,
+        willingToSignProtocol: null,
         snapshotAt: new Date(),
         createdAt: new Date(),
       });
@@ -303,6 +307,7 @@ describe('PrismaParticipantRepository', () => {
         pollId: 'poll-1',
         userId: 'user-1',
         userWeight: 4.2,
+        willingToSignProtocol: null,
         snapshotAt: new Date(),
         createdAt: new Date(),
       });
@@ -325,6 +330,7 @@ describe('PrismaParticipantRepository', () => {
         pollId: 'poll-1',
         userId: 'user-1',
         userWeight: 1.0,
+        willingToSignProtocol: null,
         snapshotAt: new Date(),
         createdAt: new Date(),
       });

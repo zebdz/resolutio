@@ -116,6 +116,7 @@ describe('PollParticipant Domain', () => {
         pollId: 'poll-1',
         userId: 'user-1',
         userWeight: 2.5,
+        willingToSignProtocol: null,
         snapshotAt,
         createdAt,
       });

@@ -98,6 +98,7 @@ describe('FinishPollUseCase', () => {
             pollId: 'poll-1',
             userId: 'user-1',
             userWeight: 1.0,
+            willingToSignProtocol: null,
             snapshotAt: new Date(),
             createdAt: new Date(),
           }),

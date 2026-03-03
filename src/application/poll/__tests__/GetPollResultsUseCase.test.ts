@@ -14,7 +14,8 @@ import { UserRepository } from '../../../domain/user/UserRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { Decimal } from 'decimal.js';
-import { User } from '@/generated/prisma';
+import { User } from '../../../domain/user/User';
+import { PhoneNumber } from '../../../domain/user/PhoneNumber';
 
 describe('GetPollResultsUseCase', () => {
   let pollRepository: Partial<PollRepository>;
@@ -133,12 +134,26 @@ describe('GetPollResultsUseCase', () => {
     };
 
     userRepository = {
-      findByIds: vi
-        .fn()
-        .mockResolvedValue([
-          { id: 'user-1', firstName: 'Alice', lastName: 'Smith' } as User,
-          { id: 'user-2', firstName: 'Bob', lastName: 'Johnson' } as User,
-        ]),
+      findByIds: vi.fn().mockResolvedValue([
+        User.reconstitute({
+          id: 'user-1',
+          firstName: 'Alice',
+          lastName: 'Smith',
+          phoneNumber: PhoneNumber.create('+79001234567'),
+          password: 'hashed',
+          language: 'ru',
+          createdAt: new Date(),
+        }),
+        User.reconstitute({
+          id: 'user-2',
+          firstName: 'Bob',
+          lastName: 'Johnson',
+          phoneNumber: PhoneNumber.create('+79007654321'),
+          password: 'hashed',
+          language: 'ru',
+          createdAt: new Date(),
+        }),
+      ]),
       isSuperAdmin: vi.fn((userId) =>
         Promise.resolve(userId === 'user-superadmin')
       ),
@@ -462,6 +477,94 @@ describe('GetPollResultsUseCase', () => {
       expect(answer1Result?.voteCount).toBe(1);
       expect(answer2Result?.voteCount).toBe(2);
       expect(answer2Result?.totalWeight).toBe(5.0); // 3.0 + 2.0
+    }
+  });
+
+  it('should include protocolSignWillingness for admin with voted participants', async () => {
+    // Set willingToSignProtocol on participants
+    participant1.setWillingToSignProtocol(true);
+    participant2.setWillingToSignProtocol(false);
+
+    userRepository.findByIds = vi.fn().mockResolvedValue([
+      User.reconstitute({
+        id: 'user-1',
+        firstName: 'Alice',
+        lastName: 'Smith',
+        middleName: 'M.',
+        phoneNumber: PhoneNumber.create('+79001234567'),
+        password: 'hashed',
+        language: 'ru',
+        createdAt: new Date(),
+      }),
+      User.reconstitute({
+        id: 'user-2',
+        firstName: 'Bob',
+        lastName: 'Johnson',
+        phoneNumber: PhoneNumber.create('+79007654321'),
+        password: 'hashed',
+        language: 'ru',
+        createdAt: new Date(),
+      }),
+    ]);
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      userId: 'user-admin',
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.protocolSignWillingness).toHaveLength(2);
+
+      const willing = result.value.protocolSignWillingness.find(
+        (p) => p.userId === 'user-1'
+      );
+      expect(willing?.willingToSignProtocol).toBe(true);
+      expect(willing?.firstName).toBe('Alice');
+      expect(willing?.middleName).toBe('M.');
+      expect(willing?.phoneNumber).toBe('+79001234567');
+
+      const notWilling = result.value.protocolSignWillingness.find(
+        (p) => p.userId === 'user-2'
+      );
+      expect(notWilling?.willingToSignProtocol).toBe(false);
+      expect(notWilling?.middleName).toBeNull();
+    }
+  });
+
+  it('should exclude participants who have not voted from protocolSignWillingness', async () => {
+    // Only participant1 has voted (willingToSignProtocol set)
+    participant1.setWillingToSignProtocol(true);
+    // participant2 has null (not voted yet)
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      userId: 'user-admin',
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.protocolSignWillingness).toHaveLength(1);
+      expect(result.value.protocolSignWillingness[0].userId).toBe('user-1');
+    }
+  });
+
+  it('should return empty protocolSignWillingness for non-admin', async () => {
+    participant1.setWillingToSignProtocol(true);
+    organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
+    organizationRepository.isUserMember = vi.fn().mockResolvedValue(true);
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      userId: 'user-member',
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.protocolSignWillingness).toHaveLength(0);
     }
   });
 });

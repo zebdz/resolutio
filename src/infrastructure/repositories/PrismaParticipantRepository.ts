@@ -132,6 +132,24 @@ export class PrismaParticipantRepository implements ParticipantRepository {
     }
   }
 
+  async updateWillingToSignProtocol(
+    participantId: string,
+    willingToSignProtocol: boolean
+  ): Promise<Result<void, string>> {
+    try {
+      await this.prisma.pollParticipant.update({
+        where: { id: participantId },
+        data: { willingToSignProtocol },
+      });
+
+      return success(undefined);
+    } catch (error) {
+      console.error('Failed to update willingToSignProtocol:', error);
+
+      return failure('common.errors.unexpected');
+    }
+  }
+
   async deleteParticipantsByPollId(
     pollId: string
   ): Promise<Result<void, string>> {
@@ -279,6 +297,7 @@ export class PrismaParticipantRepository implements ParticipantRepository {
       pollId: prismaData.pollId,
       userId: prismaData.userId,
       userWeight: prismaData.userWeight.toNumber(),
+      willingToSignProtocol: prismaData.willingToSignProtocol ?? null,
       snapshotAt: prismaData.snapshotAt,
       createdAt: prismaData.createdAt,
     });

@@ -28,7 +28,9 @@ export class PrismaOtpRepository implements OtpRepository {
       where: { id },
     });
 
-    if (!record) {return null;}
+    if (!record) {
+      return null;
+    }
 
     return this.toDomain(record);
   }
@@ -42,7 +44,9 @@ export class PrismaOtpRepository implements OtpRepository {
       orderBy: { createdAt: 'desc' },
     });
 
-    if (!record) {return null;}
+    if (!record) {
+      return null;
+    }
 
     return this.toDomain(record);
   }

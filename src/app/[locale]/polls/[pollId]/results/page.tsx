@@ -8,6 +8,7 @@ import { Heading } from '@/app/components/catalyst/heading';
 import {
   AnswerResult,
   QuestionResult,
+  ProtocolSignWillingnessEntry,
 } from '@/src/application/poll/GetPollResultsUseCase';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 
@@ -106,6 +107,19 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
           : [], // Empty array if user doesn't have permission
       })),
     })),
+    // SECURITY: Only include protocol sign willingness if user has admin permission
+    protocolSignWillingness: canViewVoters
+      ? results.protocolSignWillingness.map(
+          (entry: ProtocolSignWillingnessEntry) => ({
+            userId: entry.userId,
+            firstName: entry.firstName,
+            lastName: entry.lastName,
+            middleName: entry.middleName,
+            phoneNumber: entry.phoneNumber,
+            willingToSignProtocol: entry.willingToSignProtocol,
+          })
+        )
+      : [],
   };
 
   return (

@@ -6,6 +6,7 @@ export interface PollParticipantProps {
   pollId: string;
   userId: string;
   userWeight: number;
+  willingToSignProtocol: boolean | null;
   snapshotAt: Date;
   createdAt: Date;
 }
@@ -32,6 +33,7 @@ export class PollParticipant {
       pollId,
       userId,
       userWeight,
+      willingToSignProtocol: null,
       snapshotAt: new Date(),
       createdAt: new Date(),
     });
@@ -64,11 +66,18 @@ export class PollParticipant {
     return this.props.snapshotAt;
   }
 
+  public get willingToSignProtocol(): boolean | null {
+    return this.props.willingToSignProtocol;
+  }
+
   public get createdAt(): Date {
     return this.props.createdAt;
   }
 
   // Business logic
+  public setWillingToSignProtocol(value: boolean): void {
+    this.props.willingToSignProtocol = value;
+  }
   public updateWeight(newWeight: number): Result<WeightChangeEvent, string> {
     if (newWeight < 0) {
       return failure(PollDomainCodes.INVALID_WEIGHT);

@@ -37,7 +37,9 @@ export function getRetryAfter(
   // The delay applies based on how many OTPs have been sent before this one
   const delay = calculateThrottleDelay(recentCount);
 
-  if (delay === 0) {return 0;}
+  if (delay === 0) {
+    return 0;
+  }
 
   const elapsedSeconds = (Date.now() - lastOtpCreatedAt.getTime()) / 1000;
   const remaining = Math.ceil(delay - elapsedSeconds);

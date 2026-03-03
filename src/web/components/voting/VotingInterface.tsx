@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { submitDraftAction, finishVotingAction } from '@/web/actions/vote';
 import { Button } from '@/app/components/catalyst/button';
+import { Switch, SwitchField } from '@/app/components/catalyst/switch';
+import { Label, Description } from '@/app/components/catalyst/fieldset';
 import VotingQuestion from './VotingQuestion';
 import VotingProgress from './VotingProgress';
 import VotingControls from './VotingControls';
@@ -91,6 +93,7 @@ export default function VotingInterface({
 
   const [isSaving, setIsSaving] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [willingToSignProtocol, setWillingToSignProtocol] = useState(true);
 
   const currentQuestions = questionsByPage[currentPage] || [];
 
@@ -178,7 +181,7 @@ export default function VotingInterface({
     setIsFinishing(true);
 
     try {
-      const result = await finishVotingAction(pollId);
+      const result = await finishVotingAction(pollId, willingToSignProtocol);
 
       if (result.success) {
         toast.success(t('votingComplete'));
@@ -229,6 +232,24 @@ export default function VotingInterface({
             />
           ))}
       </div>
+
+      {/* Protocol signing willingness (last page only) */}
+      {isLastPage && (
+        <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 bg-white dark:bg-zinc-900">
+          <SwitchField>
+            <Label className="text-lg font-semibold text-zinc-900 dark:text-white">
+              {t('willingToSignProtocolTitle')}
+            </Label>
+            <Description>{t('willingToSignProtocolDescription')}</Description>
+            <Switch
+              color="brand-green"
+              checked={willingToSignProtocol}
+              onChange={setWillingToSignProtocol}
+              disabled={isSaving || isFinishing}
+            />
+          </SwitchField>
+        </div>
+      )}
 
       {/* Navigation Controls */}
       <VotingControls

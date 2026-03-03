@@ -266,9 +266,10 @@ model PollParticipant {
   id         String   @id @default(cuid())
   pollId     String   @map("poll_id")
   userId     String   @map("user_id")
-  userWeight Decimal  @default(1.0) @map("user_weight") @db.Decimal(10, 2)
-  snapshotAt DateTime @default(now()) @map("snapshot_at")
-  createdAt  DateTime @default(now()) @map("created_at")
+  userWeight          Decimal  @default(1.0) @map("user_weight") @db.Decimal(10, 2)
+  willingToSignProtocol Boolean? @map("willing_to_sign_protocol")
+  snapshotAt          DateTime @default(now()) @map("snapshot_at")
+  createdAt           DateTime @default(now()) @map("created_at")
 
   poll          Poll                           @relation(fields: [pollId], references: [id], onDelete: Cascade)
   user          User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
