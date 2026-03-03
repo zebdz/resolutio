@@ -66,6 +66,16 @@ class MockOrganizationRepository implements OrganizationRepository {
 
     return descendants;
   }
+  async getFullTreeOrgIds(organizationId: string): Promise<string[]> {
+    const ancestorIds = await this.getAncestorIds(organizationId);
+    const rootId =
+      ancestorIds.length > 0
+        ? ancestorIds[ancestorIds.length - 1]
+        : organizationId;
+    const allDescendants = await this.getDescendantIds(rootId);
+
+    return [rootId, ...allDescendants].filter((id) => id !== organizationId);
+  }
   async isUserMember(userId: string, organizationId: string): Promise<boolean> {
     const userOrgs = this.memberships.get(userId);
 
@@ -218,6 +228,7 @@ class MockNotificationRepository implements NotificationRepository {
 
   async save(notification: Notification): Promise<Notification> {
     this.saved.push(notification);
+
     return notification;
   }
   async saveBatch(notifications: Notification[]): Promise<void> {
@@ -691,6 +702,98 @@ describe('HandleJoinRequestUseCase', () => {
     // Verify user was removed from child org
     const removed = organizationRepository.getRemovedMemberships();
     expect(removed).toContainEqual({ userId: requesterId, orgId: childOrgId });
+  });
+
+  it('should remove user from sibling org membership when accepting into sibling org', async () => {
+    const parentOrgId = 'org-parent';
+    const siblingAId = 'org-sibling-a';
+    const siblingBId = 'org-sibling-b';
+    const requesterId = 'user-456';
+    const adminId = 'admin-789';
+
+    // Set up parent
+    const parentResult = Organization.create(
+      'Parent Org',
+      'Parent desc',
+      'creator-1'
+    );
+    expect(parentResult.success).toBe(true);
+
+    if (!parentResult.success) {
+      return;
+    }
+
+    const parentOrg = parentResult.value;
+    (parentOrg as any).props.id = parentOrgId;
+    organizationRepository.addOrganization(parentOrg);
+
+    // Set up sibling A
+    const siblingAResult = Organization.create(
+      'Sibling A',
+      'Sibling A desc',
+      'creator-1',
+      parentOrgId
+    );
+    expect(siblingAResult.success).toBe(true);
+
+    if (!siblingAResult.success) {
+      return;
+    }
+
+    const siblingA = siblingAResult.value;
+    (siblingA as any).props.id = siblingAId;
+    organizationRepository.addOrganization(siblingA);
+
+    // Set up sibling B
+    const siblingBResult = Organization.create(
+      'Sibling B',
+      'Sibling B desc',
+      'creator-1',
+      parentOrgId
+    );
+    expect(siblingBResult.success).toBe(true);
+
+    if (!siblingBResult.success) {
+      return;
+    }
+
+    const siblingB = siblingBResult.value;
+    (siblingB as any).props.id = siblingBId;
+    organizationRepository.addOrganization(siblingB);
+
+    // User is accepted member of sibling A
+    organizationRepository.addMembership(requesterId, siblingAId);
+
+    // Set up: admin role for sibling B
+    adminRoles.set(siblingBId, new Set([adminId]));
+
+    // Set up: pending request to join sibling B
+    const key = `${siblingBId}-${requesterId}`;
+    requests.set(key, {
+      id: 'request-1',
+      organizationId: siblingBId,
+      userId: requesterId,
+      status: 'pending',
+      createdAt: new Date(),
+      acceptedAt: null,
+      rejectedAt: null,
+      rejectionReason: null,
+      acceptedByUserId: null,
+      rejectedByUserId: null,
+    });
+
+    const result = await useCase.execute({
+      organizationId: siblingBId,
+      requesterId,
+      adminId,
+      action: 'accept',
+    });
+
+    expect(result.success).toBe(true);
+
+    // Verify user was removed from sibling A
+    const removed = organizationRepository.getRemovedMemberships();
+    expect(removed).toContainEqual({ userId: requesterId, orgId: siblingAId });
   });
 
   it('should allow superadmin to accept request even if not org admin', async () => {

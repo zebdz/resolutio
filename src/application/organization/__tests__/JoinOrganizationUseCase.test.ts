@@ -96,6 +96,17 @@ class MockOrganizationRepository implements OrganizationRepository {
     return descendants;
   }
 
+  async getFullTreeOrgIds(organizationId: string): Promise<string[]> {
+    const ancestorIds = await this.getAncestorIds(organizationId);
+    const rootId =
+      ancestorIds.length > 0
+        ? ancestorIds[ancestorIds.length - 1]
+        : organizationId;
+    const allDescendants = await this.getDescendantIds(rootId);
+
+    return [rootId, ...allDescendants].filter((id) => id !== organizationId);
+  }
+
   async isUserMember(userId: string, organizationId: string): Promise<boolean> {
     const userOrgs = this.memberships.get(userId);
 
@@ -659,6 +670,64 @@ describe('JoinOrganizationUseCase', () => {
 
         const result = await useCase.execute(
           { organizationId: 'org-child' },
+          'user-456'
+        );
+
+        expect(result.success).toBe(false);
+
+        if (!result.success) {
+          expect(result.error).toBe(
+            OrganizationErrors.PENDING_HIERARCHY_REQUEST
+          );
+        }
+      }
+    }
+  });
+
+  it('should fail if pending request in sibling org', async () => {
+    const parentResult = Organization.create(
+      'Parent Organization',
+      'Parent description',
+      'creator-123'
+    );
+    expect(parentResult.success).toBe(true);
+
+    if (parentResult.success) {
+      const parent = parentResult.value;
+      (parent as any).props.id = 'org-parent';
+      organizationRepository.addOrganization(parent);
+
+      const siblingAResult = Organization.create(
+        'Sibling A',
+        'Sibling A description',
+        'creator-123',
+        'org-parent'
+      );
+      expect(siblingAResult.success).toBe(true);
+
+      const siblingBResult = Organization.create(
+        'Sibling B',
+        'Sibling B description',
+        'creator-123',
+        'org-parent'
+      );
+      expect(siblingBResult.success).toBe(true);
+
+      if (siblingAResult.success && siblingBResult.success) {
+        const siblingA = siblingAResult.value;
+        (siblingA as any).props.id = 'org-sibling-a';
+        organizationRepository.addOrganization(siblingA);
+
+        const siblingB = siblingBResult.value;
+        (siblingB as any).props.id = 'org-sibling-b';
+        organizationRepository.addOrganization(siblingB);
+
+        // User has pending request in sibling A
+        organizationRepository.addPendingRequest('user-456', 'org-sibling-a');
+
+        // Try to join sibling B - should fail
+        const result = await useCase.execute(
+          { organizationId: 'org-sibling-b' },
           'user-456'
         );
 

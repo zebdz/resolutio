@@ -64,6 +64,12 @@ export interface OrganizationRepository {
   getDescendantIds(organizationId: string): Promise<string[]>;
 
   /**
+   * Gets all organization IDs in the same hierarchy tree (root + all descendants),
+   * excluding the given organization. Used to enforce single-membership-per-tree rule.
+   */
+  getFullTreeOrgIds(organizationId: string): Promise<string[]>;
+
+  /**
    * Checks if a user is a member of an organization (accepted status)
    */
   isUserMember(userId: string, organizationId: string): Promise<boolean>;

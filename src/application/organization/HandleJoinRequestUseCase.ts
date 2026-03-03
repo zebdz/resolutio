@@ -86,11 +86,10 @@ export class HandleJoinRequestUseCase {
       });
 
       // Remove user from existing memberships in hierarchy orgs
-      const ancestorIds =
-        await this.deps.organizationRepository.getAncestorIds(organizationId);
-      const descendantIds =
-        await this.deps.organizationRepository.getDescendantIds(organizationId);
-      const hierarchyOrgIds = [...ancestorIds, ...descendantIds];
+      const hierarchyOrgIds =
+        await this.deps.organizationRepository.getFullTreeOrgIds(
+          organizationId
+        );
 
       const userMemberships =
         await this.deps.organizationRepository.findMembershipsByUserId(

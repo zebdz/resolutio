@@ -90,6 +90,7 @@ class MockNotificationRepository implements NotificationRepository {
 
   async save(notification: Notification): Promise<Notification> {
     this.saved.push(notification);
+
     return notification;
   }
   async saveBatch(notifications: Notification[]): Promise<void> {

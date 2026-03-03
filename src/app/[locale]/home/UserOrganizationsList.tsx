@@ -118,7 +118,13 @@ export function UserOrganizationsList({
       if (org) {
         setPending((prev) => [
           ...prev,
-          { ...org, requestedAt: new Date(), rejectedAt: undefined, rejectionReason: null, rejectedBy: undefined },
+          {
+            ...org,
+            requestedAt: new Date(),
+            rejectedAt: undefined,
+            rejectionReason: null,
+            rejectedBy: undefined,
+          },
         ]);
       }
     } else {

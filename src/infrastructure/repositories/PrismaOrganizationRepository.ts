@@ -163,6 +163,17 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return descendants;
   }
 
+  async getFullTreeOrgIds(organizationId: string): Promise<string[]> {
+    const ancestorIds = await this.getAncestorIds(organizationId);
+    const rootId =
+      ancestorIds.length > 0
+        ? ancestorIds[ancestorIds.length - 1]
+        : organizationId;
+    const allDescendants = await this.getDescendantIds(rootId);
+
+    return [rootId, ...allDescendants].filter((id) => id !== organizationId);
+  }
+
   async isUserMember(userId: string, organizationId: string): Promise<boolean> {
     // Check membership in this org or any descendant
     const descendantIds = await this.getDescendantIds(organizationId);

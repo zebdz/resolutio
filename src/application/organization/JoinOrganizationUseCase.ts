@@ -56,12 +56,9 @@ export class JoinOrganizationUseCase {
       }
     }
 
-    // Check hierarchy constraints - block if pending request anywhere in hierarchy
-    const ancestorIds =
-      await this.deps.organizationRepository.getAncestorIds(organizationId);
-    const descendantIds =
-      await this.deps.organizationRepository.getDescendantIds(organizationId);
-    const hierarchyIds = [...ancestorIds, ...descendantIds];
+    // Check hierarchy constraints - block if pending request anywhere in hierarchy tree
+    const hierarchyIds =
+      await this.deps.organizationRepository.getFullTreeOrgIds(organizationId);
 
     const pendingOrgs =
       await this.deps.organizationRepository.findPendingRequestsByUserId(

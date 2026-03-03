@@ -12,8 +12,8 @@ import {
   getIncomingJoinParentRequestsAction,
 } from '@/web/actions/joinParentRequest';
 import { searchPollsAction } from '@/web/actions/poll';
-import { JoinOrganizationButton } from './JoinOrganizationButton';
 import { CancelJoinParentButton } from './CancelJoinParentButton';
+import { MembershipSection } from './MembershipSection';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 import { OrgHierarchyTree } from '@/app/components/OrgHierarchyTree';
 import { PollsList } from '@/web/components/PollsList';
@@ -149,53 +149,56 @@ export default async function OrganizationDetailPage({
           userMemberOrgIds={userMemberOrgIds}
         />
 
-        {/* Action Buttons for Logged-in Users */}
-        {user && !isUserMember && (
-          <JoinOrganizationButton organizationId={id} />
-        )}
+        <MembershipSection
+          organizationId={id}
+          isUserMember={isUserMember}
+          isUserAdmin={isUserAdmin}
+        />
 
         {isUserAdmin && (
-          <div className="space-y-4">
-            <div className="flex gap-4 flex-wrap">
-              <Link href={`/organizations/${id}/pending-requests`}>
-                <Button color="amber">{t('pendingRequests')}</Button>
-              </Link>
-              <Link href={`/organizations/${id}/boards/manage`}>
-                <Button color="brand-green">{t('manageBoards')}</Button>
-              </Link>
-              <Link href={`/organizations/${id}/join-parent-requests`}>
-                <Button color="amber">
-                  {tJoinParent('manageRequests')}
-                  {incomingParentRequestCount > 0 && (
-                    <Badge color="red" className="ml-2">
-                      {incomingParentRequestCount}
-                    </Badge>
-                  )}
-                </Button>
-              </Link>
-            </div>
-
-            {/* Pending Parent Request Status */}
-            {pendingParentRequest ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
-                <Text className="font-medium text-amber-800 dark:text-amber-200">
-                  {tJoinParent('pendingRequestDescription', {
-                    parentName: pendingParentRequest.parentOrgName,
-                  })}
-                </Text>
-                <Text className="mt-1 text-sm text-amber-700 dark:text-amber-300">
-                  {tJoinParent('requestMessage')}:{' '}
-                  {pendingParentRequest.message}
-                </Text>
-                <div className="mt-3">
-                  <CancelJoinParentButton requestId={pendingParentRequest.id} />
-                </div>
+          <div className="space-y-6">
+            {/* Parent Organization Management */}
+            <div>
+              <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                {t('parentOrgSection')}
+              </Text>
+              <div className="flex flex-wrap items-start gap-3">
+                <Link href={`/organizations/${id}/join-parent-requests`}>
+                  <Button color="amber">
+                    {tJoinParent('parentOrgRequests')}
+                    {incomingParentRequestCount > 0 && (
+                      <Badge color="red" className="ml-2">
+                        {incomingParentRequestCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </Link>
+                {pendingParentRequest ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+                    <Text className="font-medium text-amber-800 dark:text-amber-200">
+                      {tJoinParent('pendingRequestDescription', {
+                        parentName: pendingParentRequest.parentOrgName,
+                      })}
+                    </Text>
+                    <Text className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+                      {tJoinParent('requestMessage')}:{' '}
+                      {pendingParentRequest.message}
+                    </Text>
+                    <div className="mt-3">
+                      <CancelJoinParentButton
+                        requestId={pendingParentRequest.id}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <Link href={`/organizations/${id}/join-parent`}>
+                    <Button color="brand-green">
+                      {tJoinParent('joinParentOrg')}
+                    </Button>
+                  </Link>
+                )}
               </div>
-            ) : (
-              <Link href={`/organizations/${id}/join-parent`}>
-                <Button color="brand-green">{tJoinParent('title')}</Button>
-              </Link>
-            )}
+            </div>
           </div>
         )}
 
@@ -204,9 +207,14 @@ export default async function OrganizationDetailPage({
           <>
             <Divider />
             <div>
-              <Heading level={2} className="mb-4">
-                {t('boards')}
-              </Heading>
+              <div className="mb-4 flex items-center justify-between">
+                <Heading level={2}>{t('boards')}</Heading>
+                {isUserAdmin && (
+                  <Link href={`/organizations/${id}/boards/manage`}>
+                    <Button color="zinc">{t('manageBoards')}</Button>
+                  </Link>
+                )}
+              </div>
               {boards.length > 0 ? (
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {boards.map((board) => (

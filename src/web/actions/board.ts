@@ -353,17 +353,21 @@ export async function getBoardDetailsAction(boardId: string): Promise<
       };
     }
 
-    // Check if user is admin of the organization
-    const isAdmin = await organizationRepository.isUserAdmin(
-      user.id,
-      board.organizationId
-    );
+    // Check if user is admin of the organization (superadmin can access any board)
+    const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
 
-    if (!isAdmin) {
-      return {
-        success: false,
-        error: 'organization.errors.notAdmin',
-      };
+    if (!isSuperAdmin) {
+      const isAdmin = await organizationRepository.isUserAdmin(
+        user.id,
+        board.organizationId
+      );
+
+      if (!isAdmin) {
+        return {
+          success: false,
+          error: 'organization.errors.notAdmin',
+        };
+      }
     }
 
     // Get board members
