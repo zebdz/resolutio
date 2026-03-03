@@ -2,9 +2,11 @@ import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { Heading } from '@/app/components/catalyst/heading';
 import { Text } from '@/app/components/catalyst/text';
-import { listOrganizationsAction } from '@/web/actions/organization';
+import { searchOrganizationsAction } from '@/web/actions/organization';
 import { OrganizationsList } from './OrganizationsList';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+
+const PAGE_SIZE = 30;
 
 export default async function OrganizationsPage() {
   const t = await getTranslations('organization.list');
@@ -14,9 +16,12 @@ export default async function OrganizationsPage() {
     return <AuthenticatedLayout>{null}</AuthenticatedLayout>;
   }
 
-  // Fetch organizations
-  const result = await listOrganizationsAction();
+  const result = await searchOrganizationsAction({
+    page: 1,
+    pageSize: PAGE_SIZE,
+  });
   const organizations = result.success ? result.data.organizations : [];
+  const totalCount = result.success ? result.data.totalCount : 0;
 
   return (
     <AuthenticatedLayout>
@@ -30,7 +35,11 @@ export default async function OrganizationsPage() {
         </div>
 
         {/* Organizations List */}
-        <OrganizationsList organizations={organizations} userId={user.id} />
+        <OrganizationsList
+          initialOrganizations={organizations}
+          initialTotalCount={totalCount}
+          userId={user.id}
+        />
       </div>
     </AuthenticatedLayout>
   );

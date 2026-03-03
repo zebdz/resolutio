@@ -203,6 +203,12 @@ class MockOrganizationRepository implements OrganizationRepository {
       tree: { id: '', name: '', memberCount: 0, children: [] },
     };
   }
+  async searchOrganizationsWithStats(): Promise<{
+    organizations: any[];
+    totalCount: number;
+  }> {
+    return { organizations: [], totalCount: 0 };
+  }
   async setParentId(
     organizationId: string,
     parentId: string | null

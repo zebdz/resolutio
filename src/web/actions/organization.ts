@@ -269,7 +269,7 @@ export async function listOrganizationsAction(): Promise<
     // Get current user to filter out their memberships
     const user = await getCurrentUser();
 
-    const result = await listOrganizationsUseCase.execute(user?.id);
+    const result = await listOrganizationsUseCase.execute({}, user?.id);
 
     if (!result.success) {
       return {
@@ -298,6 +298,59 @@ export async function listOrganizationsAction(): Promise<
       success: false,
       error: t('generic'),
     };
+  }
+}
+
+export interface SearchOrganizationsInput {
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export async function searchOrganizationsAction(
+  input: SearchOrganizationsInput
+): Promise<
+  ActionResult<{
+    organizations: Array<{
+      id: string;
+      name: string;
+      description: string;
+      memberCount: number;
+      firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      parentOrg: { id: string; name: string } | null;
+    }>;
+    totalCount: number;
+  }>
+> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    const result = await listOrganizationsUseCase.execute(input, user?.id);
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return {
+      success: true,
+      data: {
+        organizations: result.value.organizations.map((item) => ({
+          id: item.organization.id,
+          name: item.organization.name,
+          description: item.organization.description,
+          memberCount: item.memberCount,
+          firstAdmin: item.firstAdmin,
+          parentOrg: item.parentOrg,
+        })),
+        totalCount: result.value.totalCount,
+      },
+    };
+  } catch (error) {
+    console.error('Error searching organizations:', error);
+
+    return { success: false, error: t('generic') };
   }
 }
 

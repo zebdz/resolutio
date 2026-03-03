@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ListOrganizationsUseCase } from '../ListOrganizationsUseCase';
 import { Organization } from '../../../domain/organization/Organization';
-import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
+import {
+  OrganizationRepository,
+  OrganizationSearchFilters,
+  OrganizationWithStats,
+} from '../../../domain/organization/OrganizationRepository';
 
 // Mock repository
 class MockOrganizationRepository implements OrganizationRepository {
@@ -127,6 +131,67 @@ class MockOrganizationRepository implements OrganizationRepository {
     return result;
   }
 
+  async searchOrganizationsWithStats(
+    filters: OrganizationSearchFilters,
+    excludeUserMemberships?: string
+  ): Promise<{ organizations: OrganizationWithStats[]; totalCount: number }> {
+    let result: OrganizationWithStats[] = [];
+
+    for (const org of this.organizations.values()) {
+      if (excludeUserMemberships) {
+        const memberships = this.userMemberships.get(excludeUserMemberships);
+
+        if (memberships && memberships.has(org.id)) {
+          continue;
+        }
+      }
+
+      const orgStats = this.stats.get(org.id) || {
+        memberCount: 0,
+        firstAdmin: null,
+      };
+
+      let parentOrg: { id: string; name: string } | null = null;
+
+      if (org.parentId) {
+        const parent = this.organizations.get(org.parentId);
+
+        if (parent) {
+          parentOrg = { id: parent.id, name: parent.name };
+        }
+      }
+
+      // Search filter: name, description, parent org name
+      if (filters.search) {
+        const term = filters.search.toLowerCase();
+        const matchesName = org.name.toLowerCase().includes(term);
+        const matchesDesc = org.description.toLowerCase().includes(term);
+        const matchesParent = parentOrg?.name.toLowerCase().includes(term);
+
+        if (!matchesName && !matchesDesc && !matchesParent) {
+          continue;
+        }
+      }
+
+      result.push({
+        organization: org,
+        memberCount: orgStats.memberCount,
+        firstAdmin: orgStats.firstAdmin,
+        parentOrg,
+      });
+    }
+
+    const totalCount = result.length;
+
+    // Pagination
+    if (filters.page && filters.pageSize) {
+      const start = (filters.page - 1) * filters.pageSize;
+      result = result.slice(start, start + filters.pageSize);
+    }
+
+    return { organizations: result, totalCount };
+  }
+
   async update(organization: Organization): Promise<Organization> {
     this.organizations.set(organization.id, organization);
 
@@ -198,12 +263,13 @@ describe('ListOrganizationsUseCase', () => {
   });
 
   it('should return an empty list when no organizations exist', async () => {
-    const result = await useCase.execute();
+    const result = await useCase.execute({});
 
     expect(result.success).toBe(true);
 
     if (result.success) {
       expect(result.value.organizations).toEqual([]);
+      expect(result.value.totalCount).toBe(0);
     }
   });
 
@@ -233,12 +299,13 @@ describe('ListOrganizationsUseCase', () => {
       organizationRepository.addOrganization(org1);
       organizationRepository.addOrganization(org2);
 
-      const result = await useCase.execute();
+      const result = await useCase.execute({});
 
       expect(result.success).toBe(true);
 
       if (result.success) {
         expect(result.value.organizations).toHaveLength(2);
+        expect(result.value.totalCount).toBe(2);
         expect(result.value.organizations[0].organization.name).toBe(
           'Organization 1'
         );
@@ -267,7 +334,7 @@ describe('ListOrganizationsUseCase', () => {
         firstAdmin: null,
       });
 
-      const result = await useCase.execute();
+      const result = await useCase.execute({});
 
       expect(result.success).toBe(true);
 
@@ -300,7 +367,7 @@ describe('ListOrganizationsUseCase', () => {
         },
       });
 
-      const result = await useCase.execute();
+      const result = await useCase.execute({});
 
       expect(result.success).toBe(true);
 
@@ -333,7 +400,7 @@ describe('ListOrganizationsUseCase', () => {
         firstAdmin: null,
       });
 
-      const result = await useCase.execute();
+      const result = await useCase.execute({});
 
       expect(result.success).toBe(true);
 
@@ -382,7 +449,7 @@ describe('ListOrganizationsUseCase', () => {
         firstAdmin: null,
       });
 
-      const result = await useCase.execute();
+      const result = await useCase.execute({});
 
       expect(result.success).toBe(true);
 
@@ -437,7 +504,7 @@ describe('ListOrganizationsUseCase', () => {
       organizationRepository.addUserMembership('user-123', 'org-1');
       organizationRepository.addUserMembership('user-123', 'org-2');
 
-      const result = await useCase.execute('user-123');
+      const result = await useCase.execute({}, 'user-123');
 
       expect(result.success).toBe(true);
 
@@ -470,12 +537,188 @@ describe('ListOrganizationsUseCase', () => {
       organizationRepository.addUserMembership('user-123', 'org-1');
 
       // Without userId, should return all organizations
-      const result = await useCase.execute();
+      const result = await useCase.execute({});
 
       expect(result.success).toBe(true);
 
       if (result.success) {
         expect(result.value.organizations).toHaveLength(2);
+      }
+    }
+  });
+
+  it('should return paginated results', async () => {
+    // Create 5 organizations
+    for (let i = 1; i <= 5; i++) {
+      const orgResult = Organization.create(`Org ${i}`, `Desc ${i}`, 'creator');
+      expect(orgResult.success).toBe(true);
+
+      if (orgResult.success) {
+        (orgResult.value as any).props.id = `org-${i}`;
+        organizationRepository.addOrganization(orgResult.value);
+      }
+    }
+
+    const result = await useCase.execute({ page: 1, pageSize: 2 });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.organizations).toHaveLength(2);
+      expect(result.value.totalCount).toBe(5);
+    }
+  });
+
+  it('should return second page of results', async () => {
+    for (let i = 1; i <= 5; i++) {
+      const orgResult = Organization.create(`Org ${i}`, `Desc ${i}`, 'creator');
+      expect(orgResult.success).toBe(true);
+
+      if (orgResult.success) {
+        (orgResult.value as any).props.id = `org-${i}`;
+        organizationRepository.addOrganization(orgResult.value);
+      }
+    }
+
+    const result = await useCase.execute({ page: 2, pageSize: 2 });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.organizations).toHaveLength(2);
+      expect(result.value.totalCount).toBe(5);
+    }
+  });
+
+  it('should filter by search term on name', async () => {
+    const org1Result = Organization.create(
+      'Environmental Group',
+      'Desc 1',
+      'creator'
+    );
+    const org2Result = Organization.create(
+      'Tech Alliance',
+      'Desc 2',
+      'creator'
+    );
+
+    expect(org1Result.success).toBe(true);
+    expect(org2Result.success).toBe(true);
+
+    if (org1Result.success && org2Result.success) {
+      (org1Result.value as any).props.id = 'org-1';
+      (org2Result.value as any).props.id = 'org-2';
+      organizationRepository.addOrganization(org1Result.value);
+      organizationRepository.addOrganization(org2Result.value);
+
+      const result = await useCase.execute({ search: 'environ' });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.organizations).toHaveLength(1);
+        expect(result.value.organizations[0].organization.name).toBe(
+          'Environmental Group'
+        );
+        expect(result.value.totalCount).toBe(1);
+      }
+    }
+  });
+
+  it('should filter by search term on description', async () => {
+    const org1Result = Organization.create(
+      'Org A',
+      'Protecting wildlife',
+      'creator'
+    );
+    const org2Result = Organization.create(
+      'Org B',
+      'Building software',
+      'creator'
+    );
+
+    expect(org1Result.success).toBe(true);
+    expect(org2Result.success).toBe(true);
+
+    if (org1Result.success && org2Result.success) {
+      (org1Result.value as any).props.id = 'org-1';
+      (org2Result.value as any).props.id = 'org-2';
+      organizationRepository.addOrganization(org1Result.value);
+      organizationRepository.addOrganization(org2Result.value);
+
+      const result = await useCase.execute({ search: 'wildlife' });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.organizations).toHaveLength(1);
+        expect(result.value.organizations[0].organization.name).toBe('Org A');
+      }
+    }
+  });
+
+  it('should combine search with pagination', async () => {
+    // Create 5 orgs matching search, 2 not matching
+    for (let i = 1; i <= 5; i++) {
+      const orgResult = Organization.create(
+        `Green Org ${i}`,
+        `Green desc ${i}`,
+        'creator'
+      );
+      expect(orgResult.success).toBe(true);
+
+      if (orgResult.success) {
+        (orgResult.value as any).props.id = `org-green-${i}`;
+        organizationRepository.addOrganization(orgResult.value);
+      }
+    }
+
+    for (let i = 1; i <= 2; i++) {
+      const orgResult = Organization.create(
+        `Other ${i}`,
+        `Other desc ${i}`,
+        'creator'
+      );
+      expect(orgResult.success).toBe(true);
+
+      if (orgResult.success) {
+        (orgResult.value as any).props.id = `org-other-${i}`;
+        organizationRepository.addOrganization(orgResult.value);
+      }
+    }
+
+    const result = await useCase.execute({
+      search: 'green',
+      page: 1,
+      pageSize: 3,
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.organizations).toHaveLength(3);
+      expect(result.value.totalCount).toBe(5);
+    }
+  });
+
+  it('should search case-insensitively', async () => {
+    const orgResult = Organization.create(
+      'Democracy Foundation',
+      'Civic engagement',
+      'creator'
+    );
+    expect(orgResult.success).toBe(true);
+
+    if (orgResult.success) {
+      (orgResult.value as any).props.id = 'org-1';
+      organizationRepository.addOrganization(orgResult.value);
+
+      const result = await useCase.execute({ search: 'DEMOCRACY' });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.organizations).toHaveLength(1);
       }
     }
   });

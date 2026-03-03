@@ -4,6 +4,8 @@ import {
   OrganizationRepository,
   OrganizationAncestor,
   OrganizationTreeNode,
+  OrganizationSearchFilters,
+  OrganizationWithStats,
 } from '../../domain/organization/OrganizationRepository';
 
 export class PrismaOrganizationRepository implements OrganizationRepository {
@@ -548,5 +550,96 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         ? { id: org.parent.id, name: org.parent.name }
         : null,
     }));
+  }
+
+  async searchOrganizationsWithStats(
+    filters: OrganizationSearchFilters,
+    excludeUserMemberships?: string
+  ): Promise<{
+    organizations: OrganizationWithStats[];
+    totalCount: number;
+  }> {
+    const where: any = { archivedAt: null };
+
+    if (excludeUserMemberships) {
+      where.NOT = {
+        members: {
+          some: {
+            userId: excludeUserMemberships,
+            status: { in: ['pending', 'accepted'] },
+          },
+        },
+      };
+    }
+
+    if (filters.search) {
+      where.OR = [
+        { name: { contains: filters.search, mode: 'insensitive' } },
+        { description: { contains: filters.search, mode: 'insensitive' } },
+        {
+          parent: {
+            name: { contains: filters.search, mode: 'insensitive' },
+          },
+        },
+      ];
+    }
+
+    const findManyArgs: any = {
+      where,
+      include: {
+        _count: {
+          select: {
+            members: { where: { status: 'accepted' } },
+          },
+        },
+        admins: {
+          take: 1,
+          include: {
+            user: {
+              select: { id: true, firstName: true, lastName: true },
+            },
+          },
+        },
+        parent: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    };
+
+    if (filters.page && filters.pageSize) {
+      findManyArgs.skip = (filters.page - 1) * filters.pageSize;
+      findManyArgs.take = filters.pageSize;
+    }
+
+    const [organizations, totalCount] = await Promise.all([
+      this.prisma.organization.findMany(findManyArgs),
+      this.prisma.organization.count({ where }),
+    ]);
+
+    return {
+      organizations: organizations.map((org: any) => ({
+        organization: Organization.reconstitute({
+          id: org.id,
+          name: org.name,
+          description: org.description,
+          parentId: org.parentId,
+          createdById: org.createdById,
+          createdAt: org.createdAt,
+          archivedAt: org.archivedAt,
+        }),
+        memberCount: org._count.members,
+        firstAdmin:
+          org.admins.length > 0
+            ? {
+                id: org.admins[0].user.id,
+                firstName: org.admins[0].user.firstName,
+                lastName: org.admins[0].user.lastName,
+              }
+            : null,
+        parentOrg: org.parent
+          ? { id: org.parent.id, name: org.parent.name }
+          : null,
+      })),
+      totalCount,
+    };
   }
 }

@@ -1,5 +1,18 @@
 import { Organization } from './Organization';
 
+export interface OrganizationSearchFilters {
+  search?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface OrganizationWithStats {
+  organization: Organization;
+  memberCount: number;
+  firstAdmin: { id: string; firstName: string; lastName: string } | null;
+  parentOrg: { id: string; name: string } | null;
+}
+
 export interface OrganizationAncestor {
   id: string;
   name: string;
@@ -74,14 +87,21 @@ export interface OrganizationRepository {
    * Gets all organizations available to join (with member count and first admin)
    * @param excludeUserMemberships - Optional userId to exclude organizations where user is already member or has pending request
    */
-  findAllWithStats(excludeUserMemberships?: string): Promise<
-    Array<{
-      organization: Organization;
-      memberCount: number;
-      firstAdmin: { id: string; firstName: string; lastName: string } | null;
-      parentOrg: { id: string; name: string } | null;
-    }>
-  >;
+  findAllWithStats(
+    excludeUserMemberships?: string
+  ): Promise<OrganizationWithStats[]>;
+
+  /**
+   * Paginated search for organizations with stats.
+   * Searches name, description, and parent org name (case-insensitive).
+   */
+  searchOrganizationsWithStats(
+    filters: OrganizationSearchFilters,
+    excludeUserMemberships?: string
+  ): Promise<{
+    organizations: OrganizationWithStats[];
+    totalCount: number;
+  }>;
 
   /**
    * Updates an existing organization

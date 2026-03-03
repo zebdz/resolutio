@@ -18,112 +18,305 @@ const ARGON2_OPTIONS = {
 
 // ── Seeded PRNG for reproducible data ──────────────────────────
 let _seed = 42;
+
 function rand(): number {
   _seed = (_seed * 16807) % 2147483647;
+
   return (_seed - 1) / 2147483646;
 }
+
 function randInt(min: number, max: number): number {
   return Math.floor(rand() * (max - min + 1)) + min;
 }
+
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(rand() * arr.length)];
 }
+
 function pickN<T>(arr: T[], n: number): T[] {
   const copy = [...arr];
+
   for (let i = copy.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
     [copy[i], copy[j]] = [copy[j], copy[i]];
   }
+
   return copy.slice(0, Math.min(n, copy.length));
 }
+
 function daysAgo(d: number): Date {
   const date = new Date('2026-03-03');
   date.setDate(date.getDate() - d);
+
   return date;
 }
+
 function daysFromNow(d: number): Date {
   const date = new Date('2026-03-03');
   date.setDate(date.getDate() + d);
+
   return date;
 }
 
 // ── Name pools ─────────────────────────────────────────────────
 const FIRST_NAMES = [
-  'Алексей',  'Мария',     'Дмитрий',   'Елена',     'Николай',
-  'Ольга',    'Игорь',     'Анна',      'Сергей',    'Наталья',
-  'Виктор',   'Татьяна',   'Андрей',    'Светлана',  'Павел',
-  'Ирина',    'Михаил',    'Екатерина', 'Владимир',  'Юлия',
-  'Артём',    'Валентина', 'Роман',     'Людмила',   'Константин',
-  'Марина',   'Евгений',  'Оксана',    'Денис',     'Галина',
-  'Максим',   'Вера',      'Александр', 'Надежда',   'Иван',
-  'Любовь',   'Кирилл',   'Тамара',    'Олег',      'Лариса',
+  'Алексей',
+  'Мария',
+  'Дмитрий',
+  'Елена',
+  'Николай',
+  'Ольга',
+  'Игорь',
+  'Анна',
+  'Сергей',
+  'Наталья',
+  'Виктор',
+  'Татьяна',
+  'Андрей',
+  'Светлана',
+  'Павел',
+  'Ирина',
+  'Михаил',
+  'Екатерина',
+  'Владимир',
+  'Юлия',
+  'Артём',
+  'Валентина',
+  'Роман',
+  'Людмила',
+  'Константин',
+  'Марина',
+  'Евгений',
+  'Оксана',
+  'Денис',
+  'Галина',
+  'Максим',
+  'Вера',
+  'Александр',
+  'Надежда',
+  'Иван',
+  'Любовь',
+  'Кирилл',
+  'Тамара',
+  'Олег',
+  'Лариса',
 ];
 const LAST_NAMES = [
-  'Иванов',     'Петров',     'Сидоров',    'Кузнецов',  'Козлов',
-  'Новиков',    'Волков',     'Морозов',    'Лебедев',   'Соколов',
-  'Попов',      'Васильев',   'Павлов',     'Семёнов',   'Голубев',
-  'Виноградов', 'Богданов',   'Воробьёв',   'Фёдоров',   'Михайлов',
-  'Беляев',     'Тарасов',    'Белов',      'Комаров',   'Орлов',
-  'Киселёв',    'Макаров',    'Андреев',    'Ковалёв',   'Ильин',
-  'Гусев',      'Титов',      'Кузьмин',    'Кудрявцев', 'Баранов',
-  'Куликов',    'Алексеев',   'Степанов',   'Яковлев',   'Сорокин',
+  'Иванов',
+  'Петров',
+  'Сидоров',
+  'Кузнецов',
+  'Козлов',
+  'Новиков',
+  'Волков',
+  'Морозов',
+  'Лебедев',
+  'Соколов',
+  'Попов',
+  'Васильев',
+  'Павлов',
+  'Семёнов',
+  'Голубев',
+  'Виноградов',
+  'Богданов',
+  'Воробьёв',
+  'Фёдоров',
+  'Михайлов',
+  'Беляев',
+  'Тарасов',
+  'Белов',
+  'Комаров',
+  'Орлов',
+  'Киселёв',
+  'Макаров',
+  'Андреев',
+  'Ковалёв',
+  'Ильин',
+  'Гусев',
+  'Титов',
+  'Кузьмин',
+  'Кудрявцев',
+  'Баранов',
+  'Куликов',
+  'Алексеев',
+  'Степанов',
+  'Яковлев',
+  'Сорокин',
 ];
 const MIDDLE_NAMES: (string | null)[] = [
-  'Петрович',       'Сергеевич',      'Андреевич',
-  'Дмитриевич',     'Викторович',     'Александрович',
-  'Николаевич',     'Михайлович',     'Иванович',
-  'Владимирович',   'Олегович',       'Евгеньевич',
-  'Алексеевич',     'Павлович',       'Романович',
-  null, null, null, null, null, // ~25% no middle name
+  'Петрович',
+  'Сергеевич',
+  'Андреевич',
+  'Дмитриевич',
+  'Викторович',
+  'Александрович',
+  'Николаевич',
+  'Михайлович',
+  'Иванович',
+  'Владимирович',
+  'Олегович',
+  'Евгеньевич',
+  'Алексеевич',
+  'Павлович',
+  'Романович',
+  null,
+  null,
+  null,
+  null,
+  null, // ~25% no middle name
 ];
 
 // ── Org templates ──────────────────────────────────────────────
 const ORG_TYPES = [
-  'ТСЖ', 'СНТ', 'Дачный кооператив', 'Гаражный кооператив', 'Профсоюз',
-  'Спортивный клуб', 'Жилищный кооператив', 'Садовое товарищество',
-  'Кооператив', 'Объединение жителей',
+  'ТСЖ',
+  'СНТ',
+  'Дачный кооператив',
+  'Гаражный кооператив',
+  'Профсоюз',
+  'Спортивный клуб',
+  'Жилищный кооператив',
+  'Садовое товарищество',
+  'Кооператив',
+  'Объединение жителей',
 ];
 const ORG_SUFFIXES = [
-  'Солнечный', 'Берёзка', 'Рассвет', 'Дубрава', 'Прогресс', 'Олимп',
-  'Единство', 'Надежда', 'Радуга', 'Восход', 'Лесной', 'Озёрный',
-  'Полянка', 'Мечта', 'Звёздный', 'Уютный дом', 'Гармония', 'Факел',
-  'Искра', 'Заря', 'Орион', 'Парус', 'Горизонт', 'Юпитер', 'Кедр',
-  'Сосна', 'Липа', 'Рябина', 'Клён', 'Тополь', 'Ясень', 'Победа',
-  'Северный', 'Южный', 'Западный', 'Восточный', 'Центральный',
-  'Молодёжный', 'Ветеран', 'Сатурн', 'Нептун',
+  'Солнечный',
+  'Берёзка',
+  'Рассвет',
+  'Дубрава',
+  'Прогресс',
+  'Олимп',
+  'Единство',
+  'Надежда',
+  'Радуга',
+  'Восход',
+  'Лесной',
+  'Озёрный',
+  'Полянка',
+  'Мечта',
+  'Звёздный',
+  'Уютный дом',
+  'Гармония',
+  'Факел',
+  'Искра',
+  'Заря',
+  'Орион',
+  'Парус',
+  'Горизонт',
+  'Юпитер',
+  'Кедр',
+  'Сосна',
+  'Липа',
+  'Рябина',
+  'Клён',
+  'Тополь',
+  'Ясень',
+  'Победа',
+  'Северный',
+  'Южный',
+  'Западный',
+  'Восточный',
+  'Центральный',
+  'Молодёжный',
+  'Ветеран',
+  'Сатурн',
+  'Нептун',
 ];
 const CHILD_PREFIXES = [
-  'Подъезд', 'Корпус', 'Секция', 'Блок', 'Сектор',
-  'Участок', 'Дом', 'Квартал', 'Зона', 'Крыло',
+  'Подъезд',
+  'Корпус',
+  'Секция',
+  'Блок',
+  'Сектор',
+  'Участок',
+  'Дом',
+  'Квартал',
+  'Зона',
+  'Крыло',
 ];
 
 // ── Poll templates ─────────────────────────────────────────────
 const POLL_TOPICS = [
-  { t: 'Утверждение бюджета',       q: 'Утверждаете ли вы бюджет?',             a: ['Да', 'Нет', 'Воздерживаюсь'] },
-  { t: 'Ремонт кровли',             q: 'Поддерживаете ли вы ремонт?',           a: ['Да', 'Нет'] },
-  { t: 'Замена лифта',              q: 'Одобряете ли вы замену?',               a: ['Да', 'Нет', 'Нужно обсудить'] },
-  { t: 'Установка шлагбаума',       q: 'Установить шлагбаум?',                  a: ['Да', 'Нет'] },
-  { t: 'Строительство забора',      q: 'Согласны на строительство?',             a: ['Да', 'Нет', 'Частично'] },
-  { t: 'Выбор управляющей компании', q: 'Какую УК выбрать?',                    a: ['УК Комфорт', 'УК Домовой', 'УК Надёжный'] },
-  { t: 'Детская площадка',          q: 'Какой тип площадки?',                   a: ['Деревянная', 'Металлическая', 'Комбинированная'] },
-  { t: 'Благоустройство двора',     q: 'Поддерживаете благоустройство?',         a: ['Да', 'Нет'] },
-  { t: 'Видеонаблюдение',           q: 'Установить камеры?',                    a: ['Да', 'Нет', 'Только на входе'] },
-  { t: 'Субботник',                  q: 'Участвуете в субботнике?',              a: ['Да', 'Нет'] },
-  { t: 'Замена труб',               q: 'Одобряете замену?',                     a: ['Да', 'Нет', 'Частично'] },
-  { t: 'Коллективный договор',      q: 'Утверждаете договор?',                  a: ['Да', 'Нет'] },
-  { t: 'Бурение скважины',          q: 'Согласны на долевое участие?',           a: ['Да', 'Нет', 'Нужна скидка'] },
-  { t: 'Спортивный турнир',         q: 'Формат турнира?',                       a: ['Один день', 'Два дня', 'Неделя'] },
-  { t: 'Покраска фасада',           q: 'Какой цвет?',                           a: ['Бежевый', 'Серый', 'Голубой', 'Оставить'] },
-  { t: 'Парковочные места',         q: 'Поддерживаете организацию?',             a: ['Да', 'Нет'] },
-  { t: 'Установка домофона',        q: 'Установить домофон?',                   a: ['Да', 'Нет'] },
-  { t: 'Ремонт подъезда',           q: 'Какой ремонт?',                         a: ['Косметический', 'Капитальный', 'Не нужен'] },
-  { t: 'Озеленение территории',     q: 'Поддерживаете озеленение?',             a: ['Да', 'Нет'] },
-  { t: 'Ремонт дороги',             q: 'Одобряете ремонт дороги?',              a: ['Да', 'Нет', 'Частично'] },
+  {
+    t: 'Утверждение бюджета',
+    q: 'Утверждаете ли вы бюджет?',
+    a: ['Да', 'Нет', 'Воздерживаюсь'],
+  },
+  { t: 'Ремонт кровли', q: 'Поддерживаете ли вы ремонт?', a: ['Да', 'Нет'] },
+  {
+    t: 'Замена лифта',
+    q: 'Одобряете ли вы замену?',
+    a: ['Да', 'Нет', 'Нужно обсудить'],
+  },
+  { t: 'Установка шлагбаума', q: 'Установить шлагбаум?', a: ['Да', 'Нет'] },
+  {
+    t: 'Строительство забора',
+    q: 'Согласны на строительство?',
+    a: ['Да', 'Нет', 'Частично'],
+  },
+  {
+    t: 'Выбор управляющей компании',
+    q: 'Какую УК выбрать?',
+    a: ['УК Комфорт', 'УК Домовой', 'УК Надёжный'],
+  },
+  {
+    t: 'Детская площадка',
+    q: 'Какой тип площадки?',
+    a: ['Деревянная', 'Металлическая', 'Комбинированная'],
+  },
+  {
+    t: 'Благоустройство двора',
+    q: 'Поддерживаете благоустройство?',
+    a: ['Да', 'Нет'],
+  },
+  {
+    t: 'Видеонаблюдение',
+    q: 'Установить камеры?',
+    a: ['Да', 'Нет', 'Только на входе'],
+  },
+  { t: 'Субботник', q: 'Участвуете в субботнике?', a: ['Да', 'Нет'] },
+  { t: 'Замена труб', q: 'Одобряете замену?', a: ['Да', 'Нет', 'Частично'] },
+  { t: 'Коллективный договор', q: 'Утверждаете договор?', a: ['Да', 'Нет'] },
+  {
+    t: 'Бурение скважины',
+    q: 'Согласны на долевое участие?',
+    a: ['Да', 'Нет', 'Нужна скидка'],
+  },
+  {
+    t: 'Спортивный турнир',
+    q: 'Формат турнира?',
+    a: ['Один день', 'Два дня', 'Неделя'],
+  },
+  {
+    t: 'Покраска фасада',
+    q: 'Какой цвет?',
+    a: ['Бежевый', 'Серый', 'Голубой', 'Оставить'],
+  },
+  { t: 'Парковочные места', q: 'Поддерживаете организацию?', a: ['Да', 'Нет'] },
+  { t: 'Установка домофона', q: 'Установить домофон?', a: ['Да', 'Нет'] },
+  {
+    t: 'Ремонт подъезда',
+    q: 'Какой ремонт?',
+    a: ['Косметический', 'Капитальный', 'Не нужен'],
+  },
+  {
+    t: 'Озеленение территории',
+    q: 'Поддерживаете озеленение?',
+    a: ['Да', 'Нет'],
+  },
+  {
+    t: 'Ремонт дороги',
+    q: 'Одобряете ремонт дороги?',
+    a: ['Да', 'Нет', 'Частично'],
+  },
 ];
 
 const NOTIF_TYPES = [
-  'pollActivated', 'pollFinished', 'joinRequestReceived',
-  'joinRequestAccepted', 'joinRequestRejected',
+  'pollActivated',
+  'pollFinished',
+  'joinRequestReceived',
+  'joinRequestAccepted',
+  'joinRequestRejected',
 ];
 const NOTIF_TITLES: Record<string, string> = {
   pollActivated: 'Голосование началось',
@@ -134,8 +327,11 @@ const NOTIF_TITLES: Record<string, string> = {
 };
 
 const BOARD_NAMES = [
-  'Общее собрание', 'Правление', 'Финансовый комитет',
-  'Ревизионная комиссия', 'Совет дома',
+  'Общее собрание',
+  'Правление',
+  'Финансовый комитет',
+  'Ревизионная комиссия',
+  'Совет дома',
 ];
 
 // ════════════════════════════════════════════════════════════════
@@ -171,11 +367,13 @@ async function main() {
 
   const usersInput = Array.from({ length: 600 }, (_, i) => ({
     firstName: FIRST_NAMES[i % FIRST_NAMES.length],
-    lastName: LAST_NAMES[i % LAST_NAMES.length] + (i >= 40 ? `-${Math.floor(i / 40) + 1}` : ''),
+    lastName:
+      LAST_NAMES[i % LAST_NAMES.length] +
+      (i >= 40 ? `-${Math.floor(i / 40) + 1}` : ''),
     middleName: MIDDLE_NAMES[i % MIDDLE_NAMES.length],
     phoneNumber: `+7916${String(1000001 + i)}`,
     password: pw,
-    language: i % 10 === 0 ? 'en' as const : 'ru' as const,
+    language: i % 10 === 0 ? ('en' as const) : ('ru' as const),
     consentGivenAt: new Date('2026-03-03'),
   }));
 
@@ -188,11 +386,17 @@ async function main() {
   // ── 2. Organizations (~400) ─────────────────────────────────
   // 80 roots: first 50 get children, last 30 standalone
   const usedOrgNames = new Set<string>();
+
   function orgName(type: string, idx: number): string {
     const suffix = ORG_SUFFIXES[idx % ORG_SUFFIXES.length];
     let name = `${type} "${suffix}"`;
-    if (usedOrgNames.has(name)) name = `${type} "${suffix}-${idx}"`;
+
+    if (usedOrgNames.has(name)) {
+      name = `${type} "${suffix}-${idx}"`;
+    }
+
     usedOrgNames.add(name);
+
     return name;
   }
 
@@ -221,10 +425,15 @@ async function main() {
     const root = roots[i];
     const nChildren = randInt(2, 6);
     const kids: Org[] = [];
+
     for (let c = 0; c < nChildren; c++) {
       const prefix = CHILD_PREFIXES[c % CHILD_PREFIXES.length];
       const name = `${prefix} ${c + 1} — R${i + 1}`;
-      if (usedOrgNames.has(name)) continue;
+
+      if (usedOrgNames.has(name)) {
+        continue;
+      }
+
       usedOrgNames.add(name);
       const org = await prisma.organization.create({
         data: {
@@ -237,22 +446,30 @@ async function main() {
       children.push({ id: org.id, parentId: root.id });
       kids.push({ id: org.id, parentId: root.id });
     }
+
     hierarchies.push({ root, children: kids });
   }
+
   for (let i = 50; i < 80; i++) {
     hierarchies.push({ root: roots[i], children: [] });
   }
 
   const allOrgs = [...roots, ...children];
-  console.log(`Orgs: ${allOrgs.length} (${roots.length} roots, ${children.length} children)`);
+  console.log(
+    `Orgs: ${allOrgs.length} (${roots.length} roots, ${children.length} children)`
+  );
 
   // ── 3. Admins + Members ─────────────────────────────────────
   // Respect hierarchy: no user in both root and child of same tree
   const adminRows: { organizationId: string; userId: string }[] = [];
   const memberRows: {
-    organizationId: string; userId: string; status: string;
-    acceptedAt?: Date | null; rejectedAt?: Date | null;
-    rejectionReason?: string | null; rejectedByUserId?: string | null;
+    organizationId: string;
+    userId: string;
+    status: string;
+    acceptedAt?: Date | null;
+    rejectedAt?: Date | null;
+    rejectionReason?: string | null;
+    rejectedByUserId?: string | null;
   }[] = [];
   const orgMembers = new Map<string, string[]>(); // orgId → accepted user IDs
 
@@ -271,6 +488,7 @@ async function main() {
     // Root admin
     const rootAdmin = rootUsers[0];
     const ak = `${h.root.id}:${rootAdmin.id}`;
+
     if (!adminDedup.has(ak)) {
       adminDedup.add(ak);
       adminRows.push({ organizationId: h.root.id, userId: rootAdmin.id });
@@ -278,9 +496,14 @@ async function main() {
 
     // Root members
     const rootAccepted: string[] = [];
+
     for (const u of rootUsers) {
       const mk = `${h.root.id}:${u.id}`;
-      if (memberDedup.has(mk)) continue;
+
+      if (memberDedup.has(mk)) {
+        continue;
+      }
+
       memberDedup.add(mk);
       const pending = rand() < 0.05;
       const rejected = !pending && rand() < 0.03;
@@ -293,29 +516,49 @@ async function main() {
         rejectionReason: rejected ? 'Не подтверждена принадлежность' : null,
         rejectedByUserId: rejected ? rootAdmin.id : null,
       });
-      if (!pending && !rejected) rootAccepted.push(u.id);
+
+      if (!pending && !rejected) {
+        rootAccepted.push(u.id);
+      }
     }
+
     orgMembers.set(h.root.id, rootAccepted);
 
     // Children members (no overlap with root)
-    const perChild = Math.max(3, Math.floor(childPool.length / Math.max(h.children.length, 1)));
+    const perChild = Math.max(
+      3,
+      Math.floor(childPool.length / Math.max(h.children.length, 1))
+    );
+
     for (let ci = 0; ci < h.children.length; ci++) {
       const child = h.children[ci];
       const slice = childPool.slice(ci * perChild, (ci + 1) * perChild);
-      if (slice.length === 0) continue;
+
+      if (slice.length === 0) {
+        continue;
+      }
 
       const childAdmin = slice[0];
       const cak = `${child.id}:${childAdmin.id}`;
+
       if (!adminDedup.has(cak)) {
         adminDedup.add(cak);
         adminRows.push({ organizationId: child.id, userId: childAdmin.id });
       }
 
       const childAccepted: string[] = [];
+
       for (const u of slice) {
-        if (rootUserIds.has(u.id)) continue; // hierarchy constraint
+        if (rootUserIds.has(u.id)) {
+          continue;
+        } // hierarchy constraint
+
         const mk = `${child.id}:${u.id}`;
-        if (memberDedup.has(mk)) continue;
+
+        if (memberDedup.has(mk)) {
+          continue;
+        }
+
         memberDedup.add(mk);
         const pending = rand() < 0.05;
         memberRows.push({
@@ -324,18 +567,24 @@ async function main() {
           status: pending ? 'pending' : 'accepted',
           acceptedAt: !pending ? daysAgo(randInt(10, 300)) : null,
         });
-        if (!pending) childAccepted.push(u.id);
+
+        if (!pending) {
+          childAccepted.push(u.id);
+        }
       }
+
       orgMembers.set(child.id, childAccepted);
     }
   }
 
   await prisma.organizationAdminUser.createMany({ data: adminRows });
+
   for (let i = 0; i < memberRows.length; i += 500) {
     await prisma.organizationUser.createMany({
       data: memberRows.slice(i, i + 500),
     });
   }
+
   console.log(`Admins: ${adminRows.length}, Members: ${memberRows.length}`);
 
   // ── 4. Boards (~500) ────────────────────────────────────────
@@ -344,6 +593,7 @@ async function main() {
 
   for (const org of allOrgs) {
     const n = randInt(1, 3);
+
     for (let b = 0; b < n; b++) {
       try {
         const board = await prisma.board.create({
@@ -355,6 +605,7 @@ async function main() {
       }
     }
   }
+
   console.log(`Boards: ${boards.length}`);
 
   // ── 5. Board members ────────────────────────────────────────
@@ -363,13 +614,22 @@ async function main() {
 
   for (const board of boards) {
     const mems = orgMembers.get(board.orgId) ?? [];
-    if (mems.length === 0) continue;
+
+    if (mems.length === 0) {
+      continue;
+    }
+
     const count = Math.min(mems.length, randInt(2, Math.min(10, mems.length)));
     const selected = pickN(mems, count);
     const adder = selected[0];
+
     for (const uid of selected) {
       const k = `${board.id}:${uid}`;
-      if (buDedup.has(k)) continue;
+
+      if (buDedup.has(k)) {
+        continue;
+      }
+
       buDedup.add(k);
       buRows.push({ boardId: board.id, userId: uid, addedBy: adder });
     }
@@ -378,6 +638,7 @@ async function main() {
   for (let i = 0; i < buRows.length; i += 500) {
     await prisma.boardUser.createMany({ data: buRows.slice(i, i + 500) });
   }
+
   console.log(`Board members: ${buRows.length}`);
 
   // ── 6. Polls (~450) ─────────────────────────────────────────
@@ -391,10 +652,15 @@ async function main() {
   function pickState(): PollState {
     const r = rand();
     let cum = 0;
+
     for (const [s, w] of stateWeights) {
       cum += w;
-      if (r < cum) return s;
+
+      if (r < cum) {
+        return s;
+      }
     }
+
     return PollState.ACTIVE;
   }
 
@@ -417,7 +683,10 @@ async function main() {
   for (const board of boards) {
     const nPolls = randInt(0, 2);
     const mems = orgMembers.get(board.orgId) ?? [];
-    if (mems.length < 2) continue;
+
+    if (mems.length < 2) {
+      continue;
+    }
 
     const admin = adminRows.find((a) => a.organizationId === board.orgId);
     const createdBy = admin?.userId ?? mems[0];
@@ -452,6 +721,7 @@ async function main() {
         },
       });
       const answers = [];
+
       for (let a = 0; a < topic.a.length; a++) {
         const ans = await prisma.answer.create({
           data: { text: topic.a[a], questionId: question.id, order: a },
@@ -461,7 +731,10 @@ async function main() {
 
       // Participants + votes for non-DRAFT
       if (state !== PollState.DRAFT && mems.length >= 2) {
-        const pCount = Math.min(mems.length, randInt(3, Math.min(15, mems.length)));
+        const pCount = Math.min(
+          mems.length,
+          randInt(3, Math.min(15, mems.length))
+        );
         const participants = pickN(mems, pCount);
 
         const ppData = participants.map((uid) => ({
@@ -482,9 +755,14 @@ async function main() {
             userId: string;
             userWeight: number;
           }[] = [];
+
           for (const pp of ppData) {
             const vk = `${question.id}:${pp.userId}`;
-            if (voteDedup.has(vk)) continue;
+
+            if (voteDedup.has(vk)) {
+              continue;
+            }
+
             voteDedup.add(vk);
             voteData.push({
               questionId: question.id,
@@ -493,6 +771,7 @@ async function main() {
               userWeight: pp.userWeight,
             });
           }
+
           await prisma.vote.createMany({ data: voteData });
         }
       }
@@ -500,11 +779,13 @@ async function main() {
       pollCount++;
     }
   }
+
   console.log(`Polls: ${pollCount}`);
 
   // ── 7. Notifications (500) ──────────────────────────────────
   const notifData = Array.from({ length: 500 }, (_, i) => {
     const type = pick(NOTIF_TYPES);
+
     return {
       userId: pick(users).id,
       type,
@@ -523,6 +804,7 @@ async function main() {
       data: notifData.slice(i, i + 500),
     });
   }
+
   console.log(`Notifications: ${notifData.length}`);
 
   // ── 8. Join parent requests (~50) ───────────────────────────
@@ -535,14 +817,24 @@ async function main() {
     const parentIdx = i % 50;
     const childOrg = roots[childIdx];
     const parentOrg = roots[parentIdx];
-    if (!childOrg || !parentOrg) continue;
+
+    if (!childOrg || !parentOrg) {
+      continue;
+    }
 
     const k = `${childOrg.id}:${parentOrg.id}`;
-    if (jpDedup.has(k)) continue;
+
+    if (jpDedup.has(k)) {
+      continue;
+    }
+
     jpDedup.add(k);
 
     const admin = adminRows.find((a) => a.organizationId === childOrg.id);
-    if (!admin) continue;
+
+    if (!admin) {
+      continue;
+    }
 
     const status =
       rand() < 0.6 ? 'pending' : rand() < 0.5 ? 'accepted' : 'rejected';
@@ -561,6 +853,7 @@ async function main() {
     });
     jpCount++;
   }
+
   console.log(`Join parent requests: ${jpCount}`);
 
   // ── Summary ──────────────────────────────────────────────────

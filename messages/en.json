@@ -196,6 +196,8 @@
       "joinButton": "Request to Join",
       "joining": "Requesting...",
       "noOrganizations": "No organizations available",
+      "noSearchResults": "No organizations found matching your search",
+      "loadingMore": "Loading more organizations...",
       "joinSuccess": "Join request sent successfully",
       "errors": {
         "alreadyMember": "You are already a member of this organization",

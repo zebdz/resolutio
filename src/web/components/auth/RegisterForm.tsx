@@ -6,10 +6,7 @@ import { useRouter } from '@/src/i18n/routing';
 import { Button } from '@/app/components/catalyst/button';
 import { Input } from '@/app/components/catalyst/input';
 import { Field, Label, FieldGroup } from '@/app/components/catalyst/fieldset';
-import {
-  Checkbox,
-  CheckboxField,
-} from '@/app/components/catalyst/checkbox';
+import { Checkbox, CheckboxField } from '@/app/components/catalyst/checkbox';
 import { PhoneInput } from '@/web/components/phone';
 import { Text, TextLink } from '@/app/components/catalyst/text';
 import { AlertBanner } from '@/app/components/catalyst/alert-banner';

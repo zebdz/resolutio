@@ -34,9 +34,7 @@ export class RegisterUserUseCase {
     try {
       // Validate consent
       if (!input.consentGiven) {
-        return failure(
-          new ValidationError(AuthErrors.CONSENT_NOT_GIVEN)
-        );
+        return failure(new ValidationError(AuthErrors.CONSENT_NOT_GIVEN));
       }
 
       // Verify OTP is verified and matches phone

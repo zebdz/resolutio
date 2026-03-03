@@ -10,6 +10,7 @@ function createMockPrisma() {
       findUnique: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
+      count: vi.fn(),
     },
     organizationUser: {
       findUnique: vi.fn(),
@@ -476,6 +477,102 @@ describe('PrismaOrganizationRepository', () => {
       const callArgs = mockPrisma.organization.findMany.mock.calls[0][0];
       expect(callArgs.where).toEqual({ archivedAt: null });
       expect(callArgs.where.NOT).toBeUndefined();
+    });
+  });
+
+  // ─── searchOrganizationsWithStats ───────────────────────────────
+
+  describe('searchOrganizationsWithStats', () => {
+    const orgRow = (id: string, name: string, parentName?: string) => ({
+      ...makeOrgRow({ id, name }),
+      _count: { members: 3 },
+      admins: [{ user: { id: 'admin-1', firstName: 'John', lastName: 'Doe' } }],
+      parent: parentName ? { id: `parent-of-${id}`, name: parentName } : null,
+    });
+
+    it('returns orgs with totalCount', async () => {
+      mockPrisma.organization.findMany.mockResolvedValueOnce([
+        orgRow('org-1', 'Alpha'),
+      ]);
+      mockPrisma.organization.count.mockResolvedValueOnce(1);
+
+      const result = await repo.searchOrganizationsWithStats({});
+
+      expect(result.organizations).toHaveLength(1);
+      expect(result.totalCount).toBe(1);
+      expect(result.organizations[0].organization.id).toBe('org-1');
+      expect(result.organizations[0].memberCount).toBe(3);
+    });
+
+    it('applies skip/take for pagination', async () => {
+      mockPrisma.organization.findMany.mockResolvedValueOnce([]);
+      mockPrisma.organization.count.mockResolvedValueOnce(10);
+
+      await repo.searchOrganizationsWithStats({ page: 2, pageSize: 5 });
+
+      const callArgs = mockPrisma.organization.findMany.mock.calls[0][0];
+      expect(callArgs.skip).toBe(5);
+      expect(callArgs.take).toBe(5);
+    });
+
+    it('applies search filter on name and description with OR', async () => {
+      mockPrisma.organization.findMany.mockResolvedValueOnce([]);
+      mockPrisma.organization.count.mockResolvedValueOnce(0);
+
+      await repo.searchOrganizationsWithStats({ search: 'green' });
+
+      const callArgs = mockPrisma.organization.findMany.mock.calls[0][0];
+      expect(callArgs.where.OR).toEqual([
+        { name: { contains: 'green', mode: 'insensitive' } },
+        { description: { contains: 'green', mode: 'insensitive' } },
+        {
+          parent: { name: { contains: 'green', mode: 'insensitive' } },
+        },
+      ]);
+    });
+
+    it('applies exclusion filter for user memberships', async () => {
+      mockPrisma.organization.findMany.mockResolvedValueOnce([]);
+      mockPrisma.organization.count.mockResolvedValueOnce(0);
+
+      await repo.searchOrganizationsWithStats({}, 'user-1');
+
+      const callArgs = mockPrisma.organization.findMany.mock.calls[0][0];
+      expect(callArgs.where.NOT).toEqual({
+        members: {
+          some: {
+            userId: 'user-1',
+            status: { in: ['pending', 'accepted'] },
+          },
+        },
+      });
+    });
+
+    it('uses same where clause for findMany and count', async () => {
+      mockPrisma.organization.findMany.mockResolvedValueOnce([]);
+      mockPrisma.organization.count.mockResolvedValueOnce(0);
+
+      await repo.searchOrganizationsWithStats(
+        { search: 'test', page: 1, pageSize: 10 },
+        'user-1'
+      );
+
+      const findManyWhere =
+        mockPrisma.organization.findMany.mock.calls[0][0].where;
+      const countWhere = mockPrisma.organization.count.mock.calls[0][0].where;
+      expect(findManyWhere).toEqual(countWhere);
+    });
+
+    it('returns all when no filters', async () => {
+      mockPrisma.organization.findMany.mockResolvedValueOnce([]);
+      mockPrisma.organization.count.mockResolvedValueOnce(0);
+
+      await repo.searchOrganizationsWithStats({});
+
+      const callArgs = mockPrisma.organization.findMany.mock.calls[0][0];
+      expect(callArgs.where).toEqual({ archivedAt: null });
+      expect(callArgs.skip).toBeUndefined();
+      expect(callArgs.take).toBeUndefined();
     });
   });
 

@@ -1,14 +1,15 @@
-import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import {
+  OrganizationRepository,
+  OrganizationSearchFilters,
+  OrganizationWithStats,
+} from '../../domain/organization/OrganizationRepository';
 import { Result, success } from '../../domain/shared/Result';
-import { Organization } from '../../domain/organization/Organization';
+
+export type ListOrganizationsInput = OrganizationSearchFilters;
 
 export interface ListOrganizationsResult {
-  organizations: Array<{
-    organization: Organization;
-    memberCount: number;
-    firstAdmin: { id: string; firstName: string; lastName: string } | null;
-    parentOrg: { id: string; name: string } | null;
-  }>;
+  organizations: OrganizationWithStats[];
+  totalCount: number;
 }
 
 export interface ListOrganizationsDependencies {
@@ -19,13 +20,15 @@ export class ListOrganizationsUseCase {
   constructor(private deps: ListOrganizationsDependencies) {}
 
   async execute(
+    input: ListOrganizationsInput = {},
     userId?: string
   ): Promise<Result<ListOrganizationsResult, string>> {
-    const organizationsWithStats =
-      await this.deps.organizationRepository.findAllWithStats(userId);
+    const result =
+      await this.deps.organizationRepository.searchOrganizationsWithStats(
+        input,
+        userId
+      );
 
-    return success({
-      organizations: organizationsWithStats,
-    });
+    return success(result);
   }
 }
