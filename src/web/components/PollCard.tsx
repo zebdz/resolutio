@@ -168,11 +168,13 @@ export function PollCard({
   };
 
   return (
-    <div className={`relative p-6 rounded-lg border transition-colors ${
-      isParentArchived
-        ? 'border-pink-200 bg-pink-50 dark:border-pink-900 dark:bg-pink-950'
-        : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
-    }`}>
+    <div
+      className={`relative p-6 rounded-lg border transition-colors ${
+        isParentArchived
+          ? 'border-pink-200 bg-pink-50 dark:border-pink-900 dark:bg-pink-950'
+          : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
+      }`}
+    >
       {/* Edit button for creator if poll can be edited */}
       {!isParentArchived && canEditPoll && !isActive && !isFinished && (
         <Link
@@ -224,12 +226,7 @@ export function PollCard({
         {/* Organization and board */}
         <div className="text-xs text-zinc-500 dark:text-zinc-400">
           {poll.organizationName}
-          {poll.boardName && (
-            <span>
-              {' '}
-              &rsaquo; {poll.boardName}
-            </span>
-          )}
+          {poll.boardName && <span> &rsaquo; {poll.boardName}</span>}
         </div>
 
         {/* Description */}
@@ -252,13 +249,16 @@ export function PollCard({
         <div className="flex flex-col gap-2 pt-2">
           <div className="flex gap-2">
             {/* Vote button for participants on active polls */}
-            {!isParentArchived && isActive && poll.canVote && !poll.hasFinishedVoting && (
-              <Link href={`/polls/${poll.id}/vote`} className="flex-1">
-                <Button color="brand-green" className="w-full">
-                  {t('vote')}
-                </Button>
-              </Link>
-            )}
+            {!isParentArchived &&
+              isActive &&
+              poll.canVote &&
+              !poll.hasFinishedVoting && (
+                <Link href={`/polls/${poll.id}/vote`} className="flex-1">
+                  <Button color="brand-green" className="w-full">
+                    {t('vote')}
+                  </Button>
+                </Link>
+              )}
 
             {/* Results button */}
             {(isFinished || canViewResultsBeforePollEnds) && (

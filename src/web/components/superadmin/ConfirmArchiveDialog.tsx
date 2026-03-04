@@ -36,9 +36,7 @@ export function ConfirmArchiveDialog({
   return (
     <Dialog open={isOpen} onClose={onClose}>
       <DialogTitle>
-        {isArchive
-          ? t('archiveDialogTitle')
-          : t('unarchiveDialogTitle')}
+        {isArchive ? t('archiveDialogTitle') : t('unarchiveDialogTitle')}
       </DialogTitle>
       <DialogDescription>
         {isArchive
@@ -47,9 +45,7 @@ export function ConfirmArchiveDialog({
       </DialogDescription>
       <DialogBody>
         {error && (
-          <div className="text-sm text-red-600 dark:text-red-400">
-            {error}
-          </div>
+          <div className="text-sm text-red-600 dark:text-red-400">{error}</div>
         )}
       </DialogBody>
       <DialogActions>

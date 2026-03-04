@@ -244,9 +244,10 @@ class MockDraftRepository implements Pick<
   }
 }
 
-class MockOrganizationRepository
-  implements Pick<OrganizationRepository, 'findById'>
-{
+class MockOrganizationRepository implements Pick<
+  OrganizationRepository,
+  'findById'
+> {
   private org: Organization | null = null;
 
   setOrganization(org: Organization): void {

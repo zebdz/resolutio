@@ -13,8 +13,7 @@ export class NotifyOrgArchivedUseCase {
   async execute(input: { organizationId: string }): Promise<void> {
     const { organizationId } = input;
 
-    const org =
-      await this.deps.organizationRepository.findById(organizationId);
+    const org = await this.deps.organizationRepository.findById(organizationId);
 
     if (!org) {
       return;

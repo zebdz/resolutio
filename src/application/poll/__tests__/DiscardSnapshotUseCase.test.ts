@@ -85,9 +85,7 @@ describe('DiscardSnapshotUseCase', () => {
     };
 
     participantRepository = {
-      deleteParticipantsByPollId: vi
-        .fn()
-        .mockResolvedValue(success(undefined)),
+      deleteParticipantsByPollId: vi.fn().mockResolvedValue(success(undefined)),
     };
 
     useCase = new DiscardSnapshotUseCase(

@@ -38,7 +38,9 @@ describe('AppNavbar navigation logic', () => {
 
       expect(items).toHaveLength(3);
       expect(items.find((i) => i.key === 'superadmin')).toBeDefined();
-      expect(items.find((i) => i.key === 'superadmin')?.href).toBe('/superadmin');
+      expect(items.find((i) => i.key === 'superadmin')?.href).toBe(
+        '/superadmin'
+      );
     });
   });
 

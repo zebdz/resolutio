@@ -973,7 +973,7 @@ export async function getUserMemberOrganizationsAction(): Promise<
     const orgMap = new Map<string, string>();
 
     for (const org of memberships) {
-      if (org.isArchived()) continue;
+      if (org.isArchived()) {continue;}
 
       allOrgIds.add(org.id);
       orgMap.set(org.id, org.name);

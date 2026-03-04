@@ -163,12 +163,8 @@ describe('NotifyOrgUnarchivedUseCase', () => {
 
     for (const notification of saved) {
       expect(notification.type).toBe('org_unarchived');
-      expect(notification.title).toBe(
-        'notification.types.orgUnarchived.title'
-      );
-      expect(notification.body).toBe(
-        'notification.types.orgUnarchived.body'
-      );
+      expect(notification.title).toBe('notification.types.orgUnarchived.title');
+      expect(notification.body).toBe('notification.types.orgUnarchived.body');
       expect(notification.data).toEqual({
         organizationId: 'org-1',
         organizationName: 'Test Org',

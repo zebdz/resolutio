@@ -27,7 +27,9 @@ export class ArchiveOrganizationUseCase {
     this.userRepository = dependencies.userRepository;
   }
 
-  async execute(input: ArchiveOrganizationInput): Promise<Result<void, string>> {
+  async execute(
+    input: ArchiveOrganizationInput
+  ): Promise<Result<void, string>> {
     const organization = await this.organizationRepository.findById(
       input.organizationId
     );

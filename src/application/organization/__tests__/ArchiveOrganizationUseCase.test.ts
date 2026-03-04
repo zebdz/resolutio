@@ -15,6 +15,7 @@ class MockOrganizationRepository implements OrganizationRepository {
 
   async save(organization: Organization): Promise<Organization> {
     this.organizations.set(organization.id, organization);
+
     return organization;
   }
 
@@ -52,6 +53,7 @@ class MockOrganizationRepository implements OrganizationRepository {
 
   async update(organization: Organization): Promise<Organization> {
     this.organizations.set(organization.id, organization);
+
     return organization;
   }
 
@@ -241,6 +243,7 @@ describe('ArchiveOrganizationUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe('organization.errors.notFound');
       }
@@ -254,6 +257,7 @@ describe('ArchiveOrganizationUseCase', () => {
         'Test Desc',
         'creator-1'
       );
+
       if (orgResult.success) {
         const org = orgResult.value;
         (org as any).props.id = 'org-1';
@@ -268,6 +272,7 @@ describe('ArchiveOrganizationUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe('organization.errors.notAdmin');
       }
@@ -281,12 +286,14 @@ describe('ArchiveOrganizationUseCase', () => {
         'Test Desc',
         'creator-1'
       );
+
       if (orgResult.success) {
         const org = orgResult.value;
         (org as any).props.id = 'org-1';
         org.archive();
         organizationRepository.addOrganization(org);
       }
+
       userRepository.addSuperAdmin('superadmin-1');
     });
 
@@ -297,6 +304,7 @@ describe('ArchiveOrganizationUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+
       if (!result.success) {
         expect(result.error).toBe(
           'domain.organization.organizationAlreadyArchived'
@@ -312,11 +320,13 @@ describe('ArchiveOrganizationUseCase', () => {
         'Test Desc',
         'creator-1'
       );
+
       if (orgResult.success) {
         const org = orgResult.value;
         (org as any).props.id = 'org-1';
         organizationRepository.addOrganization(org);
       }
+
       userRepository.addSuperAdmin('superadmin-1');
     });
 
@@ -335,10 +345,7 @@ describe('ArchiveOrganizationUseCase', () => {
     });
 
     it('should notify members of org + descendants', async () => {
-      organizationRepository.setMemberUserIds('org-1', [
-        'user-1',
-        'user-2',
-      ]);
+      organizationRepository.setMemberUserIds('org-1', ['user-1', 'user-2']);
 
       const result = await useCase.execute({
         organizationId: 'org-1',

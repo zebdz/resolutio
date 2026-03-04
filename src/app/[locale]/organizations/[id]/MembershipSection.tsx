@@ -18,7 +18,9 @@ export async function MembershipSection({
   const showJoinButton = !isUserMember;
   const showMemberRequests = isUserAdmin;
 
-  if (!showJoinButton && !showMemberRequests) {return null;}
+  if (!showJoinButton && !showMemberRequests) {
+    return null;
+  }
 
   const t = await getTranslations('organization.detail');
 
