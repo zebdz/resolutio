@@ -479,6 +479,28 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
+  async addAdmin(organizationId: string, userId: string): Promise<void> {
+    await this.prisma.organizationAdminUser.create({
+      data: { organizationId, userId },
+    });
+  }
+
+  async removeAdmin(organizationId: string, userId: string): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const adminCount = await tx.organizationAdminUser.count({
+        where: { organizationId },
+      });
+
+      if (adminCount <= 1) {
+        throw new Error('LAST_ADMIN');
+      }
+
+      await tx.organizationAdminUser.delete({
+        where: { organizationId_userId: { organizationId, userId } },
+      });
+    });
+  }
+
   async findAllWithStats(excludeUserMemberships?: string): Promise<
     Array<{
       organization: Organization;

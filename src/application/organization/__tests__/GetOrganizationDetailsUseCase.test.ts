@@ -115,7 +115,7 @@ class MockOrganizationRepository implements OrganizationRepository {
     this.members.get(organizationId)!.add(userId);
   }
 
-  addAdmin(userId: string, organizationId: string): void {
+  async addAdmin(organizationId: string, userId: string): Promise<void> {
     if (!this.admins.has(organizationId)) {
       this.admins.set(organizationId, new Set());
     }
@@ -157,6 +157,8 @@ class MockOrganizationRepository implements OrganizationRepository {
   async findAdminUserIds(): Promise<string[]> {
     return [];
   }
+
+  async removeAdmin(): Promise<void> {}
 }
 
 // Mock BoardRepository
@@ -438,7 +440,7 @@ describe('GetOrganizationDetailsUseCase', () => {
 
     it('should correctly identify user admin status', async () => {
       organizationRepository.addMember('user-1', 'org-1');
-      organizationRepository.addAdmin('user-1', 'org-1');
+      organizationRepository.addAdmin('org-1', 'user-1');
 
       const result = await useCase.execute({
         organizationId: 'org-1',

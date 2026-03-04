@@ -37,18 +37,22 @@ export default async function ManageBoardsPage({ params }: PageProps) {
   return (
     <AuthenticatedLayout>
       <div className="mx-auto max-w-6xl px-4 py-8">
+        <Link
+          href={`/organizations/${organizationId}`}
+          className="mb-4 inline-block text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+        >
+          {tCommon('backToOrganization')}
+        </Link>
+
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 space-y-4">
           <div>
             <Heading>{t('title')}</Heading>
             <Subheading className="mt-2">
               {t('subtitle', { organization: organization.name })}
             </Subheading>
           </div>
-          <div className="flex gap-2">
-            <Link href={`/organizations/${organizationId}`}>
-              <Button color="zinc">{tCommon('back')}</Button>
-            </Link>
+          <div>
             <CreateBoardDialog organizationId={organizationId} />
           </div>
         </div>
@@ -61,8 +65,8 @@ export default async function ManageBoardsPage({ params }: PageProps) {
                 key={board.id}
                 className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
+                <div className="space-y-3">
+                  <div>
                     <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
                       {board.name}
                     </h3>
@@ -70,7 +74,7 @@ export default async function ManageBoardsPage({ params }: PageProps) {
                       {t('memberCount', { count: board.memberCount })}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Link
                       href={`/organizations/${organizationId}/boards/${board.id}/manage`}
                     >

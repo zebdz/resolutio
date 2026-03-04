@@ -110,11 +110,13 @@ class MockOrganizationRepository implements OrganizationRepository {
     return [];
   }
 
+  async removeAdmin(): Promise<void> {}
+
   // Test helpers
   addOrganization(org: Organization) {
     this.organizations.set(org.id, org);
   }
-  addAdmin(orgId: string, userId: string) {
+  async addAdmin(orgId: string, userId: string): Promise<void> {
     if (!this.adminRoles.has(orgId)) {
       this.adminRoles.set(orgId, new Set());
     }

@@ -164,4 +164,16 @@ export interface OrganizationRepository {
    * Sets the parentId of an organization (used for join parent request acceptance)
    */
   setParentId(organizationId: string, parentId: string | null): Promise<void>;
+
+  /**
+   * Adds a user as an admin of an organization
+   */
+  addAdmin(organizationId: string, userId: string): Promise<void>;
+
+  /**
+   * Removes a user as admin of an organization.
+   * Must guarantee at least 1 admin remains (transactional).
+   * Throws if this is the last admin.
+   */
+  removeAdmin(organizationId: string, userId: string): Promise<void>;
 }

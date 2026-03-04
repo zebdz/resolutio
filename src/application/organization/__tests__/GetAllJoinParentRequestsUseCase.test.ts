@@ -51,7 +51,7 @@ class MockOrganizationRepository {
 
     return admins ? admins.has(userId) : false;
   }
-  addAdmin(orgId: string, userId: string) {
+  async addAdmin(orgId: string, userId: string): Promise<void> {
     if (!this.adminRoles.has(orgId)) {
       this.adminRoles.set(orgId, new Set());
     }
@@ -118,6 +118,8 @@ class MockOrganizationRepository {
   async findAdminUserIds(): Promise<string[]> {
     return [];
   }
+
+  async removeAdmin(): Promise<void> {}
 }
 
 class MockUserRepository {

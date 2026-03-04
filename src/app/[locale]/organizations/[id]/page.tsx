@@ -3,17 +3,12 @@ import { getCurrentUser } from '@/web/lib/session';
 import { Heading } from '@/app/components/catalyst/heading';
 import { Text } from '@/app/components/catalyst/text';
 import { Button } from '@/app/components/catalyst/button';
-import { Badge } from '@/app/components/catalyst/badge';
 import { Divider } from '@/app/components/catalyst/divider';
 import { Link } from '@/src/i18n/routing';
 import { getOrganizationDetailsAction } from '@/web/actions/organization';
-import {
-  getChildOrgJoinParentRequestAction,
-  getIncomingJoinParentRequestsAction,
-} from '@/web/actions/joinParentRequest';
 import { searchPollsAction } from '@/web/actions/poll';
-import { CancelJoinParentButton } from './CancelJoinParentButton';
 import { MembershipSection } from './MembershipSection';
+import { BoardsSection } from './BoardsSection';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 import { OrgHierarchyTree } from '@/app/components/OrgHierarchyTree';
 import { PollsList } from '@/web/components/PollsList';
@@ -23,6 +18,9 @@ import {
   PrismaUserRepository,
 } from '@/infrastructure/index';
 
+const organizationRepository = new PrismaOrganizationRepository(prisma);
+const userRepository = new PrismaUserRepository(prisma);
+
 export default async function OrganizationDetailPage({
   params,
 }: {
@@ -30,7 +28,6 @@ export default async function OrganizationDetailPage({
 }) {
   const { id } = await params;
   const t = await getTranslations('organization.detail');
-  const tCommon = await getTranslations('common');
 
   const user = await getCurrentUser();
 
@@ -56,51 +53,22 @@ export default async function OrganizationDetailPage({
     hierarchyTree,
   } = result.data;
 
-  const tJoinParent = await getTranslations('organization.joinParent');
-
-  // Fetch join parent request data for admins
-  let pendingParentRequest: {
-    id: string;
-    parentOrgId: string;
-    parentOrgName: string;
-    message: string;
-    createdAt: Date;
-  } | null = null;
-  let incomingParentRequestCount = 0;
-
-  if (isUserAdmin) {
-    const [childReqResult, incomingReqResult] = await Promise.all([
-      getChildOrgJoinParentRequestAction(id),
-      getIncomingJoinParentRequestsAction(id),
-    ]);
-
-    if (childReqResult.success) {
-      pendingParentRequest = childReqResult.data.request;
-    }
-
-    if (incomingReqResult.success) {
-      incomingParentRequestCount = incomingReqResult.data.requests.length;
-    }
-  }
-
-  // Fetch polls data for members/admins
-  const organizationRepository = new PrismaOrganizationRepository(prisma);
-  const userRepository = new PrismaUserRepository(prisma);
-
+  // Fetch user data
   let pollsData: { polls: any[]; totalCount: number } | null = null;
   let adminOrgIds: string[] = [];
   let isSuperAdmin = false;
   let userMemberOrgIds: string[] = [];
 
   if (user) {
-    const memberOrgs = await organizationRepository.findMembershipsByUserId(
-      user.id
-    );
+    const [memberOrgs, superAdmin] = await Promise.all([
+      organizationRepository.findMembershipsByUserId(user.id),
+      userRepository.isSuperAdmin(user.id),
+    ]);
     userMemberOrgIds = memberOrgs.map((o) => o.id);
+    isSuperAdmin = superAdmin;
   }
 
   if (user && (isUserMember || isUserAdmin)) {
-    isSuperAdmin = await userRepository.isSuperAdmin(user.id);
     const adminOrgs =
       await organizationRepository.findAdminOrganizationsByUserId(user.id);
     adminOrgIds = adminOrgs.map((o) => o.id);
@@ -121,7 +89,16 @@ export default async function OrganizationDetailPage({
       <div className="space-y-8">
         {/* Header */}
         <div className="space-y-2">
-          <Heading className="text-3xl font-bold">{organization.name}</Heading>
+          <div className="flex items-center justify-between">
+            <Heading className="text-3xl font-bold">
+              {organization.name}
+            </Heading>
+            {(isUserAdmin || isSuperAdmin) && (
+              <Link href={`/organizations/${id}/modify`}>
+                <Button color="zinc">{t('modifyButton')}</Button>
+              </Link>
+            )}
+          </div>
           {firstAdmin && (
             <Text className="text-sm text-zinc-600 dark:text-zinc-400">
               {t('firstAdmin')}: {firstAdmin.firstName} {firstAdmin.lastName}
@@ -149,106 +126,16 @@ export default async function OrganizationDetailPage({
         <MembershipSection
           organizationId={id}
           isUserMember={isUserMember}
-          isUserAdmin={isUserAdmin}
+          showMemberRequests={false}
         />
 
-        {isUserAdmin && (
-          <div className="space-y-6">
-            {/* Parent Organization Management */}
-            <div>
-              <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
-                {t('parentOrgSection')}
-              </Text>
-              <div className="flex flex-wrap items-start gap-3">
-                <Link href={`/organizations/${id}/join-parent-requests`}>
-                  <Button color="amber">
-                    {tJoinParent('parentOrgRequests')}
-                    {incomingParentRequestCount > 0 && (
-                      <Badge color="red" className="ml-2">
-                        {incomingParentRequestCount}
-                      </Badge>
-                    )}
-                  </Button>
-                </Link>
-                {pendingParentRequest ? (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
-                    <Text className="font-medium text-amber-800 dark:text-amber-200">
-                      {tJoinParent('pendingRequestDescription', {
-                        parentName: pendingParentRequest.parentOrgName,
-                      })}
-                    </Text>
-                    <Text className="mt-1 text-sm text-amber-700 dark:text-amber-300">
-                      {tJoinParent('requestMessage')}:{' '}
-                      {pendingParentRequest.message}
-                    </Text>
-                    <div className="mt-3">
-                      <CancelJoinParentButton
-                        requestId={pendingParentRequest.id}
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  <Link href={`/organizations/${id}/join-parent`}>
-                    <Button color="brand-green">
-                      {tJoinParent('joinParentOrg')}
-                    </Button>
-                  </Link>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Boards Section - Visible to members and admins */}
-        {(isUserMember || isUserAdmin) && (
-          <>
-            <Divider />
-            <div>
-              <div className="mb-4 flex items-center justify-between">
-                <Heading level={2}>{t('boards')}</Heading>
-                {isUserAdmin && (
-                  <Link href={`/organizations/${id}/boards/manage`}>
-                    <Button color="zinc">{t('manageBoards')}</Button>
-                  </Link>
-                )}
-              </div>
-              {boards.length > 0 ? (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {boards.map((board) => (
-                    <div
-                      key={board.id}
-                      className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
-                    >
-                      <div className="space-y-3">
-                        <div className="flex items-start justify-between">
-                          <Heading level={3} className="text-lg font-semibold">
-                            {board.name}
-                          </Heading>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Badge color="zinc">
-                            {t('boardMemberCount', {
-                              count: board.memberCount,
-                            })}
-                          </Badge>
-                          {board.isUserMember && (
-                            <Badge color="green">{t('boardMember')}</Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-lg border-2 border-dashed border-zinc-300 p-12 text-center dark:border-zinc-700">
-                  <Text className="text-lg text-zinc-500 dark:text-zinc-400">
-                    {t('noBoards')}
-                  </Text>
-                </div>
-              )}
-            </div>
-          </>
+        {/* Boards Section - Visible to members, admins and superadmins */}
+        {(isUserMember || isUserAdmin || isSuperAdmin) && (
+          <BoardsSection
+            organizationId={id}
+            boards={boards}
+            showManageBoards={false}
+          />
         )}
 
         {/* Polls Section - Visible to members and admins */}

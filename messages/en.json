@@ -164,7 +164,12 @@
       "sameOrganization": "Cannot request to join the same organization",
       "childOrgNotFound": "Child organization not found",
       "childOrgArchived": "Child organization is archived",
-      "rejectionReasonRequired": "Rejection reason is required"
+      "rejectionReasonRequired": "Rejection reason is required",
+      "lastAdmin": "Cannot remove the last admin of an organization",
+      "alreadyAdmin": "User is already an admin of this organization",
+      "notOrgAdmin": "User is not an admin of this organization",
+      "cannotRemoveSelf": "You cannot remove yourself as admin",
+      "userNotFound": "User not found"
     },
     "create": {
       "title": "Create Organization",
@@ -261,7 +266,34 @@
       "collapseHierarchy": "Collapse",
       "expandHierarchy": "Expand",
       "memberCount": "{count, plural, =0 {No members} =1 {1 member} other {# members}}",
-      "youAreMember": "Member"
+      "youAreMember": "Member",
+      "modifyButton": "Manage"
+    },
+    "modify": {
+      "title": "Modify Organization",
+      "back": "Back to organization",
+      "editSection": "Organization Details",
+      "nameLabel": "Organization Name",
+      "namePlaceholder": "Enter organization name",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Describe the purpose and goals",
+      "save": "Save Changes",
+      "saving": "Saving...",
+      "updateSuccess": "Organization updated successfully",
+      "adminSection": "Administrators",
+      "addAdminFromMembers": "Add from members",
+      "addAdminFromNonMembers": "Add from non-members",
+      "searchPlaceholder": "Search by name or phone",
+      "searchMinChars": "Enter at least 2 characters to search",
+      "noResults": "No results found",
+      "addAdmin": "Add as Admin",
+      "adding": "Adding...",
+      "removeAdmin": "Remove",
+      "removing": "Removing...",
+      "removeAdminConfirm": "Are you sure you want to remove {name} as administrator?",
+      "confirmRemove": "Remove Admin",
+      "cancel": "Cancel",
+      "lastAdminWarning": "Cannot remove the last admin"
     },
     "pendingRequestsPage": {
       "title": "Pending Join Requests",
@@ -399,6 +431,7 @@
   },
   "common": {
     "back": "Back",
+    "backToOrganization": "\u2190 Back to organization",
     "loading": "Loading...",
     "creating": "Creating...",
     "error": "An error occurred",

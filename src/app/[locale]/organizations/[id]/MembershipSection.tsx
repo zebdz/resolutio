@@ -1,22 +1,24 @@
 import { getTranslations } from 'next-intl/server';
 import { Text } from '@/app/components/catalyst/text';
 import { Button } from '@/app/components/catalyst/button';
+import { Badge } from '@/app/components/catalyst/badge';
 import { Link } from '@/src/i18n/routing';
 import { JoinOrganizationButton } from './JoinOrganizationButton';
 
 type Props = {
   organizationId: string;
   isUserMember: boolean;
-  isUserAdmin: boolean;
+  showMemberRequests: boolean;
+  pendingMemberRequestCount?: number;
 };
 
 export async function MembershipSection({
   organizationId,
   isUserMember,
-  isUserAdmin,
+  showMemberRequests,
+  pendingMemberRequestCount = 0,
 }: Props) {
   const showJoinButton = !isUserMember;
-  const showMemberRequests = isUserAdmin;
 
   if (!showJoinButton && !showMemberRequests) {
     return null;
@@ -32,7 +34,14 @@ export async function MembershipSection({
       <div className="flex flex-wrap items-start gap-3">
         {showMemberRequests && (
           <Link href={`/organizations/${organizationId}/pending-requests`}>
-            <Button color="amber">{t('memberRequests')}</Button>
+            <Button color="amber">
+              {t('memberRequests')}
+              {pendingMemberRequestCount > 0 && (
+                <Badge color="red" className="ml-2">
+                  {pendingMemberRequestCount}
+                </Badge>
+              )}
+            </Button>
           </Link>
         )}
         {showJoinButton && (

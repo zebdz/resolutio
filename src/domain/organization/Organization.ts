@@ -108,6 +108,34 @@ export class Organization {
     return success(undefined);
   }
 
+  public updateName(name: string): Result<void, string> {
+    if (!name || name.trim().length === 0) {
+      return failure(OrganizationDomainCodes.ORGANIZATION_NAME_EMPTY);
+    }
+
+    if (name.length > 255) {
+      return failure(OrganizationDomainCodes.ORGANIZATION_NAME_TOO_LONG);
+    }
+
+    this.props.name = name.trim();
+
+    return success(undefined);
+  }
+
+  public updateDescription(description: string): Result<void, string> {
+    if (!description || description.trim().length === 0) {
+      return failure(OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_EMPTY);
+    }
+
+    if (description.length > 2000) {
+      return failure(OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_TOO_LONG);
+    }
+
+    this.props.description = description.trim();
+
+    return success(undefined);
+  }
+
   public toJSON(): OrganizationProps {
     return {
       ...this.props,

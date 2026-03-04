@@ -32,6 +32,13 @@ export const OrganizationErrors = {
   CHILD_ORG_NOT_FOUND: 'organization.errors.childOrgNotFound',
   CHILD_ORG_ARCHIVED: 'organization.errors.childOrgArchived',
   REJECTION_REASON_REQUIRED: 'organization.errors.rejectionReasonRequired',
+
+  // Admin management
+  LAST_ADMIN: 'organization.errors.lastAdmin',
+  ALREADY_ADMIN: 'organization.errors.alreadyAdmin',
+  NOT_ORG_ADMIN: 'organization.errors.notOrgAdmin',
+  CANNOT_REMOVE_SELF: 'organization.errors.cannotRemoveSelf',
+  USER_NOT_FOUND: 'organization.errors.userNotFound',
 } as const;
 
 export type OrganizationError =

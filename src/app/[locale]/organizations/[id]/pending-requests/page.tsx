@@ -4,7 +4,6 @@ import {
   getOrganizationPendingRequestsAction,
   getOrganizationDetailsAction,
 } from '@/web/actions/organization';
-import { Button } from '@/app/components/catalyst/button';
 import { Heading, Subheading } from '@/app/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
 import { OrgPendingRequestsList } from './OrgPendingRequestsList';
@@ -54,14 +53,12 @@ export default async function OrganizationPendingRequestsPage({
   return (
     <AuthenticatedLayout>
       <div className="mx-auto max-w-4xl px-4 py-8">
-        <div className="mb-8 flex items-center justify-between">
-          <Link
-            href={`/organizations/${organizationId}`}
-            className="text-sm text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
-          >
-            <Button color="zinc">{tCommon('back')}</Button>
-          </Link>
-        </div>
+        <Link
+          href={`/organizations/${organizationId}`}
+          className="mb-4 inline-block text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+        >
+          {tCommon('backToOrganization')}
+        </Link>
 
         <div className="mb-8">
           <Heading>{t('title')}</Heading>

@@ -2,7 +2,6 @@ import { notFound, redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { getOrganizationDetailsAction } from '@/web/actions/organization';
 import { getAllJoinParentRequestsAction } from '@/web/actions/joinParentRequest';
-import { Button } from '@/app/components/catalyst/button';
 import { Heading, Subheading } from '@/app/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
@@ -42,11 +41,12 @@ export default async function JoinParentRequestsPage({ params }: PageProps) {
   return (
     <AuthenticatedLayout>
       <div className="mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-8">
-          <Link href={`/organizations/${organizationId}`}>
-            <Button color="zinc">{tCommon('back')}</Button>
-          </Link>
-        </div>
+        <Link
+          href={`/organizations/${organizationId}`}
+          className="mb-4 inline-block text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+        >
+          {tCommon('backToOrganization')}
+        </Link>
 
         <div className="mb-8">
           <Heading>{t('managementTitle')}</Heading>

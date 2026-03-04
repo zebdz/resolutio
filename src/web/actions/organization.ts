@@ -20,6 +20,9 @@ import { GetOrganizationDetailsUseCase } from '@/application/organization/GetOrg
 import { GetOrganizationPendingRequestsUseCase } from '@/application/organization/GetOrganizationPendingRequestsUseCase';
 import { CancelJoinRequestUseCase } from '@/application/organization/CancelJoinRequestUseCase';
 import { CancelJoinRequestSchema } from '@/application/organization/CancelJoinRequestSchema';
+import { UpdateOrganizationUseCase } from '@/application/organization/UpdateOrganizationUseCase';
+import { AddOrgAdminUseCase } from '@/application/organization/AddOrgAdminUseCase';
+import { RemoveOrgAdminUseCase } from '@/application/organization/RemoveOrgAdminUseCase';
 import {
   prisma,
   PrismaOrganizationRepository,
@@ -104,6 +107,21 @@ const archiveOrganizationUseCase = new ArchiveOrganizationUseCase({
 const unarchiveOrganizationUseCase = new UnarchiveOrganizationUseCase({
   organizationRepository,
   notificationRepository,
+  userRepository,
+});
+
+const updateOrganizationUseCase = new UpdateOrganizationUseCase({
+  organizationRepository,
+  userRepository,
+});
+
+const addOrgAdminUseCase = new AddOrgAdminUseCase({
+  organizationRepository,
+  userRepository,
+});
+
+const removeOrgAdminUseCase = new RemoveOrgAdminUseCase({
+  organizationRepository,
   userRepository,
 });
 
@@ -1138,6 +1156,254 @@ export async function searchAllOrganizationsAction(
     };
   } catch (error) {
     console.error('Error searching all organizations:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+function translateErrorCode(errorCode: string, tOrg: any): string {
+  if (errorCode.startsWith('organization.errors.')) {
+    return tOrg(errorCode.replace('organization.', '') as any);
+  }
+
+  if (errorCode.startsWith('domain.organization.')) {
+    return tOrg(errorCode.replace('domain.organization.', 'errors.') as any);
+  }
+
+  return errorCode;
+}
+
+export async function updateOrganizationAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const t = await getTranslations('common.errors');
+  const tOrg = await getTranslations('organization');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const organizationId = formData.get('organizationId') as string;
+    const name = formData.get('name') as string;
+    const description = formData.get('description') as string;
+
+    if (!organizationId) {
+      return { success: false, error: t('validationFailed') };
+    }
+
+    const result = await updateOrganizationUseCase.execute({
+      organizationId,
+      userId: user.id,
+      name: name || '',
+      description: description || '',
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: translateErrorCode(result.error, tOrg),
+      };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error updating organization:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+export async function addOrgAdminAction(
+  organizationId: string,
+  targetUserId: string
+): Promise<ActionResult> {
+  const t = await getTranslations('common.errors');
+  const tOrg = await getTranslations('organization');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const result = await addOrgAdminUseCase.execute({
+      organizationId,
+      targetUserId,
+      actorUserId: user.id,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: translateErrorCode(result.error, tOrg),
+      };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error adding org admin:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+export async function removeOrgAdminAction(
+  organizationId: string,
+  targetUserId: string
+): Promise<ActionResult> {
+  const t = await getTranslations('common.errors');
+  const tOrg = await getTranslations('organization');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const result = await removeOrgAdminUseCase.execute({
+      organizationId,
+      targetUserId,
+      actorUserId: user.id,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: translateErrorCode(result.error, tOrg),
+      };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error removing org admin:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+export async function getOrgAdminsAction(organizationId: string): Promise<
+  ActionResult<
+    Array<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      middleName?: string;
+      phoneNumber: string;
+    }>
+  >
+> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const adminIds =
+      await organizationRepository.findAdminUserIds(organizationId);
+    const adminUsers = await userRepository.findByIds(adminIds);
+
+    return {
+      success: true,
+      data: adminUsers.map((u) => ({
+        id: u.id,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        middleName: u.middleName,
+        phoneNumber: u.phoneNumber.getValue(),
+      })),
+    };
+  } catch (error) {
+    console.error('Error getting org admins:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+export async function searchUsersForOrgAdminAction(
+  organizationId: string,
+  query: string,
+  scope: 'members' | 'non-members'
+): Promise<
+  ActionResult<
+    Array<{
+      id: string;
+      firstName: string;
+      lastName: string;
+      middleName?: string;
+      phoneNumber: string;
+    }>
+  >
+> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    if (!query || query.trim().length < 2) {
+      return { success: true, data: [] };
+    }
+
+    // Check authorization
+    const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
+    const isAdmin = await organizationRepository.isUserAdmin(
+      user.id,
+      organizationId
+    );
+
+    if (!isAdmin && !isSuperAdmin) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    // Search users
+    const users = await userRepository.searchUsers(query.trim());
+
+    // Get current admin IDs to exclude
+    const adminIds =
+      await organizationRepository.findAdminUserIds(organizationId);
+    const adminIdSet = new Set(adminIds);
+
+    // Get org member IDs
+    const orgMembers = await prisma.organizationUser.findMany({
+      where: {
+        organizationId,
+        status: 'accepted',
+      },
+      select: { userId: true },
+    });
+    const memberIdSet = new Set(orgMembers.map((m) => m.userId));
+
+    const filteredUsers = users
+      .filter((u) => !adminIdSet.has(u.id)) // exclude existing admins
+      .filter((u) => {
+        if (scope === 'members') {
+          return memberIdSet.has(u.id);
+        }
+
+        return !memberIdSet.has(u.id);
+      })
+      .map((u) => ({
+        id: u.id,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        middleName: u.middleName,
+        phoneNumber: u.phoneNumber.getValue(),
+      }));
+
+    return { success: true, data: filteredUsers };
+  } catch (error) {
+    console.error('Error searching users for org admin:', error);
 
     return { success: false, error: t('generic') };
   }

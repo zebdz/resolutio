@@ -71,7 +71,7 @@ class MockOrganizationRepository implements OrganizationRepository {
     return admins ? admins.has(userId) : false;
   }
 
-  addAdmin(organizationId: string, userId: string): void {
+  async addAdmin(organizationId: string, userId: string): Promise<void> {
     if (!this.admins.has(organizationId)) {
       this.admins.set(organizationId, new Set());
     }
@@ -149,6 +149,8 @@ class MockOrganizationRepository implements OrganizationRepository {
   async findAdminUserIds(): Promise<string[]> {
     return [];
   }
+
+  async removeAdmin(): Promise<void> {}
 }
 
 class MockUserRepository implements UserRepository {

@@ -164,7 +164,12 @@
       "sameOrganization": "Нельзя запросить присоединение к той же организации",
       "childOrgNotFound": "Дочерняя организация не найдена",
       "childOrgArchived": "Дочерняя организация архивирована",
-      "rejectionReasonRequired": "Причина отклонения обязательна"
+      "rejectionReasonRequired": "Причина отклонения обязательна",
+      "lastAdmin": "Нельзя удалить последнего администратора организации",
+      "alreadyAdmin": "Пользователь уже является администратором этой организации",
+      "notOrgAdmin": "Пользователь не является администратором этой организации",
+      "cannotRemoveSelf": "Вы не можете удалить себя из администраторов",
+      "userNotFound": "Пользователь не найден"
     },
     "create": {
       "title": "Создать организацию",
@@ -261,7 +266,34 @@
       "collapseHierarchy": "Свернуть",
       "expandHierarchy": "Развернуть",
       "memberCount": "{count, plural, =0 {Нет участников} =1 {1 участник} few {# участника} other {# участников}}",
-      "youAreMember": "Участник"
+      "youAreMember": "Участник",
+      "modifyButton": "Управление"
+    },
+    "modify": {
+      "title": "Редактирование организации",
+      "back": "Назад к организации",
+      "editSection": "Данные организации",
+      "nameLabel": "Название организации",
+      "namePlaceholder": "Введите название организации",
+      "descriptionLabel": "Описание",
+      "descriptionPlaceholder": "Опишите цель и задачи",
+      "save": "Сохранить изменения",
+      "saving": "Сохранение...",
+      "updateSuccess": "Организация успешно обновлена",
+      "adminSection": "Администраторы",
+      "addAdminFromMembers": "Добавить из участников",
+      "addAdminFromNonMembers": "Добавить не из участников",
+      "searchPlaceholder": "Поиск по имени или телефону",
+      "searchMinChars": "Введите минимум 2 символа для поиска",
+      "noResults": "Ничего не найдено",
+      "addAdmin": "Назначить администратором",
+      "adding": "Добавление...",
+      "removeAdmin": "Удалить",
+      "removing": "Удаление...",
+      "removeAdminConfirm": "Вы уверены, что хотите удалить {name} из администраторов?",
+      "confirmRemove": "Удалить администратора",
+      "cancel": "Отмена",
+      "lastAdminWarning": "Нельзя удалить последнего администратора"
     },
     "pendingRequestsPage": {
       "title": "Заявки на вступление",
@@ -399,6 +431,7 @@
   },
   "common": {
     "back": "Назад",
+    "backToOrganization": "\u2190 Назад к организации",
     "loading": "Загрузка...",
     "creating": "Создание...",
     "error": "Произошла ошибка",

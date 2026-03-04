@@ -189,6 +189,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   async findAdminUserIds(): Promise<string[]> {
     return [];
   }
+
+  async addAdmin(): Promise<void> {}
+  async removeAdmin(): Promise<void> {}
 }
 
 // Mock UserRepository
