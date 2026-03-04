@@ -123,19 +123,22 @@ const activatePollUseCase = new ActivatePollUseCase(
   organizationRepository,
   userRepository,
   notificationRepository,
-  participantRepository
+  participantRepository,
+  boardRepository
 );
 const deactivatePollUseCase = new DeactivatePollUseCase(
   pollRepository,
   organizationRepository,
-  userRepository
+  userRepository,
+  boardRepository
 );
 const discardSnapshotUseCase = new DiscardSnapshotUseCase(
   pollRepository,
   participantRepository,
   voteRepository,
   organizationRepository,
-  userRepository
+  userRepository,
+  boardRepository
 );
 const finishPollUseCase = new FinishPollUseCase(
   pollRepository,
@@ -143,7 +146,8 @@ const finishPollUseCase = new FinishPollUseCase(
   organizationRepository,
   userRepository,
   notificationRepository,
-  participantRepository
+  participantRepository,
+  boardRepository
 );
 
 export async function createPollAction(
@@ -1342,18 +1346,21 @@ export async function searchPollsAction(
         // Org + board names
         const org = await prisma.organization.findUnique({
           where: { id: poll.organizationId },
-          select: { name: true },
+          select: { name: true, archivedAt: true },
         });
         pollJson.organizationName = org?.name ?? '';
+        pollJson.isOrgArchived = !!org?.archivedAt;
 
         if (poll.boardId) {
           const board = await prisma.board.findUnique({
             where: { id: poll.boardId },
-            select: { name: true },
+            select: { name: true, archivedAt: true },
           });
           pollJson.boardName = board?.name ?? '';
+          pollJson.isBoardArchived = !!board?.archivedAt;
         } else {
           pollJson.boardName = '';
+          pollJson.isBoardArchived = false;
         }
 
         // canVote

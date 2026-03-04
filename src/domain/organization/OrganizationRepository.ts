@@ -4,6 +4,7 @@ export interface OrganizationSearchFilters {
   search?: string;
   page?: number;
   pageSize?: number;
+  includeArchived?: boolean;
 }
 
 export interface OrganizationWithStats {

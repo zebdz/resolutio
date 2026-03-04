@@ -570,7 +570,11 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     organizations: OrganizationWithStats[];
     totalCount: number;
   }> {
-    const where: any = { archivedAt: null };
+    const where: any = {};
+
+    if (!filters.includeArchived) {
+      where.archivedAt = null;
+    }
 
     if (excludeUserMemberships) {
       where.NOT = {

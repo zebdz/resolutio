@@ -92,11 +92,11 @@ export function MobileSidebar({
           </SidebarItem>
           {isSuperAdmin && (
             <SidebarItem
-              href="/admin"
-              current={isItemCurrent('/admin', pathname)}
+              href="/superadmin"
+              current={isItemCurrent('/superadmin', pathname)}
             >
               <ShieldCheckIcon data-slot="icon" />
-              <SidebarLabel>{t('admin')}</SidebarLabel>
+              <SidebarLabel>{t('superadmin')}</SidebarLabel>
             </SidebarItem>
           )}
         </SidebarSection>

@@ -4,6 +4,7 @@ import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { BoardRepository } from '../../domain/board/BoardRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { PollErrors } from './PollErrors';
 import { OrganizationErrors } from '../organization/OrganizationErrors';
@@ -22,7 +23,8 @@ export class UpdateParticipantWeightUseCase {
     private participantRepository: ParticipantRepository,
     private voteRepository: VoteRepository,
     private organizationRepository: OrganizationRepository,
-    private userRepository: UserRepository
+    private userRepository: UserRepository,
+    private boardRepository: BoardRepository
   ) {}
 
   async execute(
@@ -73,7 +75,25 @@ export class UpdateParticipantWeightUseCase {
       }
     }
 
-    // 4. Check if poll has votes (cannot modify weights if votes exist)
+    // 4. Check if organization is archived
+    const organization = await this.organizationRepository.findById(
+      poll.organizationId
+    );
+
+    if (organization?.isArchived()) {
+      return failure(PollErrors.ORGANIZATION_ARCHIVED);
+    }
+
+    // 5. Check if board is archived
+    if (poll.boardId) {
+      const board = await this.boardRepository.findById(poll.boardId);
+
+      if (board?.isArchived()) {
+        return failure(PollErrors.BOARD_ARCHIVED);
+      }
+    }
+
+    // 6. Check if poll has votes (cannot modify weights if votes exist)
     const hasVotesResult = await this.voteRepository.pollHasVotes(
       participant.pollId
     );

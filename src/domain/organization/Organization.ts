@@ -98,6 +98,16 @@ export class Organization {
     return success(undefined);
   }
 
+  public unarchive(): Result<void, string> {
+    if (!this.isArchived()) {
+      return failure(OrganizationDomainCodes.ORGANIZATION_NOT_ARCHIVED);
+    }
+
+    this.props.archivedAt = null;
+
+    return success(undefined);
+  }
+
   public toJSON(): OrganizationProps {
     return {
       ...this.props,

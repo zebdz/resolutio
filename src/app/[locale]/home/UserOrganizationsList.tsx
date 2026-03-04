@@ -19,6 +19,7 @@ interface UserOrganization {
   name: string;
   description: string;
   joinedAt?: Date;
+  archivedAt?: Date | null;
   requestedAt?: Date;
   rejectedAt?: Date;
   rejectionReason?: string | null;
@@ -34,6 +35,7 @@ interface AdminOrganization {
   id: string;
   name: string;
   description: string;
+  archivedAt?: Date | null;
   parentOrg?: { id: string; name: string } | null;
 }
 
@@ -65,6 +67,7 @@ export function UserOrganizationsList({
           result.data.member.map((org) => ({
             ...org,
             joinedAt: new Date(org.joinedAt),
+            archivedAt: org.archivedAt ? new Date(org.archivedAt) : null,
             parentOrg: org.parentOrg,
           }))
         );
@@ -185,7 +188,11 @@ export function UserOrganizationsList({
               <Link
                 key={org.id}
                 href={`/organizations/${org.id}`}
-                className="block rounded-lg border border-zinc-200 bg-white p-6 transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
+                className={`block rounded-lg border p-6 transition-shadow hover:shadow-md ${
+                  org.archivedAt
+                    ? 'border-pink-200 bg-pink-50 dark:border-pink-900 dark:bg-pink-950'
+                    : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900'
+                }`}
               >
                 {org.parentOrg && (
                   <Text className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">
@@ -197,6 +204,9 @@ export function UserOrganizationsList({
                     {org.name}
                   </Heading>
                   <div className="flex gap-1">
+                    {org.archivedAt && (
+                      <Badge color="pink">{t('archivedBadge')}</Badge>
+                    )}
                     {adminIdSet.has(org.id) && (
                       <Badge color="purple">{t('admin')}</Badge>
                     )}
@@ -230,7 +240,11 @@ export function UserOrganizationsList({
                 <Link
                   key={org.id}
                   href={`/organizations/${org.id}`}
-                  className="block rounded-lg border border-zinc-200 bg-white p-6 transition-shadow hover:shadow-md dark:border-zinc-800 dark:bg-zinc-900"
+                  className={`block rounded-lg border p-6 transition-shadow hover:shadow-md ${
+                    org.archivedAt
+                      ? 'border-pink-200 bg-pink-50 dark:border-pink-900 dark:bg-pink-950'
+                      : 'border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900'
+                  }`}
                 >
                   {org.parentOrg && (
                     <Text className="mb-1 text-xs text-zinc-500 dark:text-zinc-400">
@@ -241,7 +255,12 @@ export function UserOrganizationsList({
                     <Heading level={3} className="text-lg font-semibold">
                       {org.name}
                     </Heading>
-                    <Badge color="purple">{t('admin')}</Badge>
+                    <div className="flex gap-1">
+                      {org.archivedAt && (
+                        <Badge color="pink">{t('archivedBadge')}</Badge>
+                      )}
+                      <Badge color="purple">{t('admin')}</Badge>
+                    </div>
                   </div>
                   <Text className="mt-2 line-clamp-2 text-sm text-zinc-600 dark:text-zinc-400">
                     {org.description}

@@ -47,6 +47,9 @@ export function PollCard({
   const isUpcoming = isDraft || isReady;
   const isFinished = poll.state === 'FINISHED';
   const isCreator = poll.createdBy === userId;
+  const isOrgArchived = poll.isOrgArchived;
+  const isBoardArchived = poll.isBoardArchived;
+  const isParentArchived = isOrgArchived || isBoardArchived;
 
   const canEditPoll = isCreator;
   const canManageParticipants = canManage;
@@ -165,9 +168,13 @@ export function PollCard({
   };
 
   return (
-    <div className="relative p-6 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 transition-colors">
+    <div className={`relative p-6 rounded-lg border transition-colors ${
+      isParentArchived
+        ? 'border-pink-200 bg-pink-50 dark:border-pink-900 dark:bg-pink-950'
+        : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
+    }`}>
       {/* Edit button for creator if poll can be edited */}
-      {canEditPoll && !isActive && !isFinished && (
+      {!isParentArchived && canEditPoll && !isActive && !isFinished && (
         <Link
           href={`/polls/${poll.id}/edit`}
           className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
@@ -183,7 +190,7 @@ export function PollCard({
           <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 pr-8">
             {poll.title}
           </h3>
-          <div className="mt-1">
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {isActive && (
               <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20 rounded-full">
                 <ClockIcon className="w-3 h-3" />
@@ -201,7 +208,28 @@ export function PollCard({
                 {t('finished')}
               </span>
             )}
+            {isOrgArchived && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-pink-700 bg-pink-200 dark:text-pink-400 dark:bg-pink-900/40 rounded-full">
+                {t('orgArchived')}
+              </span>
+            )}
+            {isBoardArchived && !isOrgArchived && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-pink-700 bg-pink-200 dark:text-pink-400 dark:bg-pink-900/40 rounded-full">
+                {t('boardArchived')}
+              </span>
+            )}
           </div>
+        </div>
+
+        {/* Organization and board */}
+        <div className="text-xs text-zinc-500 dark:text-zinc-400">
+          {poll.organizationName}
+          {poll.boardName && (
+            <span>
+              {' '}
+              &rsaquo; {poll.boardName}
+            </span>
+          )}
         </div>
 
         {/* Description */}
@@ -224,7 +252,7 @@ export function PollCard({
         <div className="flex flex-col gap-2 pt-2">
           <div className="flex gap-2">
             {/* Vote button for participants on active polls */}
-            {isActive && poll.canVote && !poll.hasFinishedVoting && (
+            {!isParentArchived && isActive && poll.canVote && !poll.hasFinishedVoting && (
               <Link href={`/polls/${poll.id}/vote`} className="flex-1">
                 <Button color="brand-green" className="w-full">
                   {t('vote')}
@@ -252,7 +280,7 @@ export function PollCard({
           </div>
 
           {/* Take Snapshot button for DRAFT polls */}
-          {canActivateAndDeactivatePoll && isDraft && (
+          {!isParentArchived && canActivateAndDeactivatePoll && isDraft && (
             <Button
               color="brand-green"
               onClick={handleTakeSnapshot}
@@ -264,7 +292,7 @@ export function PollCard({
           )}
 
           {/* Activate and Discard Snapshot buttons for READY polls */}
-          {canActivateAndDeactivatePoll && isReady && (
+          {!isParentArchived && canActivateAndDeactivatePoll && isReady && (
             <>
               <Button
                 color="green"
@@ -288,7 +316,7 @@ export function PollCard({
           )}
 
           {/* Deactivate and Finish buttons for ACTIVE polls */}
-          {canActivateAndDeactivatePoll && isActive && (
+          {!isParentArchived && canActivateAndDeactivatePoll && isActive && (
             <>
               <Button
                 color="yellow"

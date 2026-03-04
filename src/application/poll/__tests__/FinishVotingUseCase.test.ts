@@ -8,6 +8,10 @@ import { PollRepository } from '../../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../../domain/poll/VoteRepository';
 import { DraftRepository } from '../../../domain/poll/DraftRepository';
+import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
+import { Organization } from '../../../domain/organization/Organization';
+import { BoardRepository } from '../../../domain/board/BoardRepository';
+import { Board } from '../../../domain/board/Board';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
@@ -240,11 +244,39 @@ class MockDraftRepository implements Pick<
   }
 }
 
+class MockOrganizationRepository
+  implements Pick<OrganizationRepository, 'findById'>
+{
+  private org: Organization | null = null;
+
+  setOrganization(org: Organization): void {
+    this.org = org;
+  }
+
+  async findById(id: string): Promise<Organization | null> {
+    return this.org;
+  }
+}
+
+class MockBoardRepository implements Pick<BoardRepository, 'findById'> {
+  private boards: Map<string, Board> = new Map();
+
+  setBoard(board: Board): void {
+    this.boards.set(board.id, board);
+  }
+
+  async findById(id: string): Promise<Board | null> {
+    return this.boards.get(id) || null;
+  }
+}
+
 describe('FinishVotingUseCase', () => {
   let pollRepository: MockPollRepository;
   let participantRepository: MockParticipantRepository;
   let voteRepository: MockVoteRepository;
   let draftRepository: MockDraftRepository;
+  let organizationRepository: MockOrganizationRepository;
+  let boardRepository: MockBoardRepository;
   let useCase: FinishVotingUseCase;
   let poll: Poll;
   let question1: Question;
@@ -257,6 +289,19 @@ describe('FinishVotingUseCase', () => {
     pollRepository = new MockPollRepository();
     participantRepository = new MockParticipantRepository();
     draftRepository = new MockDraftRepository();
+    organizationRepository = new MockOrganizationRepository();
+    organizationRepository.setOrganization(
+      Organization.reconstitute({
+        id: 'org-1',
+        name: 'Test Org',
+        description: 'desc',
+        parentId: null,
+        createdById: 'user-admin',
+        createdAt: new Date(),
+        archivedAt: null,
+      })
+    );
+    boardRepository = new MockBoardRepository();
 
     // Create a poll
     const pollResult = Poll.create(
@@ -356,7 +401,9 @@ describe('FinishVotingUseCase', () => {
       pollRepository as unknown as PollRepository,
       participantRepository as unknown as ParticipantRepository,
       voteRepository as unknown as VoteRepository,
-      draftRepository as unknown as DraftRepository
+      draftRepository as unknown as DraftRepository,
+      organizationRepository as unknown as OrganizationRepository,
+      boardRepository as unknown as BoardRepository
     );
   });
 
@@ -705,5 +752,49 @@ describe('FinishVotingUseCase', () => {
       participant.id
     );
     expect(savedParticipant?.willingToSignProtocol).toBe(false);
+  });
+
+  it('should fail if organization is archived', async () => {
+    organizationRepository.setOrganization(
+      Organization.reconstitute({
+        id: 'org-1',
+        name: 'Archived Org',
+        description: 'desc',
+        parentId: null,
+        createdById: 'user-admin',
+        createdAt: new Date(),
+        archivedAt: new Date(),
+      })
+    );
+
+    const result = await useCase.execute({
+      userId: 'user-1',
+      pollId: poll.id,
+      willingToSignProtocol: true,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollErrors.ORGANIZATION_ARCHIVED);
+  });
+
+  it('should fail if board is archived', async () => {
+    boardRepository.setBoard(
+      Board.reconstitute({
+        id: 'board-1',
+        name: 'Archived Board',
+        organizationId: 'org-1',
+        createdAt: new Date(),
+        archivedAt: new Date(),
+      })
+    );
+
+    const result = await useCase.execute({
+      userId: 'user-1',
+      pollId: poll.id,
+      willingToSignProtocol: true,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
   });
 });

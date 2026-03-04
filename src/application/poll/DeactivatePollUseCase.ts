@@ -1,6 +1,7 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { BoardRepository } from '../../domain/board/BoardRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { PollErrors } from './PollErrors';
 
@@ -13,7 +14,8 @@ export class DeactivatePollUseCase {
   constructor(
     private pollRepository: PollRepository,
     private organizationRepository: OrganizationRepository,
-    private userRepository: UserRepository
+    private userRepository: UserRepository,
+    private boardRepository: BoardRepository
   ) {}
 
   async execute(command: DeactivatePollCommand): Promise<Result<void, string>> {
@@ -41,6 +43,24 @@ export class DeactivatePollUseCase {
 
       if (!isAdmin) {
         return failure(PollErrors.NOT_AUTHORIZED);
+      }
+    }
+
+    // Check if organization is archived
+    const organization = await this.organizationRepository.findById(
+      poll.organizationId
+    );
+
+    if (organization?.isArchived()) {
+      return failure(PollErrors.ORGANIZATION_ARCHIVED);
+    }
+
+    // Check if board is archived (for board-specific polls)
+    if (poll.boardId) {
+      const board = await this.boardRepository.findById(poll.boardId);
+
+      if (board?.isArchived()) {
+        return failure(PollErrors.BOARD_ARCHIVED);
       }
     }
 

@@ -15,6 +15,9 @@ import { NotificationRepository } from '../../../domain/notification/Notificatio
 import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
 import { Notification } from '../../../domain/notification/Notification';
 import { PollParticipant } from '../../../domain/poll/PollParticipant';
+import { Organization } from '../../../domain/organization/Organization';
+import { Board } from '../../../domain/board/Board';
+import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
@@ -185,9 +188,14 @@ class MockPollRepository implements PollRepository {
 
 class MockOrganizationRepository implements OrganizationRepository {
   private admins: Set<string> = new Set();
+  private organizations: Map<string, Organization> = new Map();
 
   setAdmin(userId: string, organizationId: string): void {
     this.admins.add(`${organizationId}:${userId}`);
+  }
+
+  setOrganization(org: Organization): void {
+    this.organizations.set(org.id, org);
   }
 
   async save(organization: any): Promise<any> {
@@ -195,7 +203,7 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
 
   async findById(id: string): Promise<any> {
-    return null;
+    return this.organizations.get(id) || null;
   }
 
   async findByName(name: string): Promise<any> {
@@ -399,6 +407,18 @@ class MockParticipantRepository implements ParticipantRepository {
   }
 }
 
+class MockBoardRepository implements Pick<BoardRepository, 'findById'> {
+  private boards: Map<string, Board> = new Map();
+
+  setBoard(board: Board): void {
+    this.boards.set(board.id, board);
+  }
+
+  async findById(id: string): Promise<Board | null> {
+    return this.boards.get(id) || null;
+  }
+}
+
 // Helper to create a poll in READY state
 function createReadyPoll(id: string, boardId: string, createdBy: string): Poll {
   const pollResult = Poll.create(
@@ -439,6 +459,7 @@ describe('ActivatePollUseCase', () => {
   let userRepository: MockUserRepository;
   let notificationRepository: MockNotificationRepository;
   let participantRepository: MockParticipantRepository;
+  let boardRepository: MockBoardRepository;
   let useCase: ActivatePollUseCase;
 
   beforeEach(() => {
@@ -447,13 +468,15 @@ describe('ActivatePollUseCase', () => {
     userRepository = new MockUserRepository();
     notificationRepository = new MockNotificationRepository();
     participantRepository = new MockParticipantRepository();
+    boardRepository = new MockBoardRepository();
 
     useCase = new ActivatePollUseCase(
       pollRepository,
       organizationRepository,
       userRepository,
       notificationRepository,
-      participantRepository
+      participantRepository,
+      boardRepository as unknown as BoardRepository
     );
 
     // Set admin-1 as admin of org-1
@@ -632,5 +655,52 @@ describe('ActivatePollUseCase', () => {
 
       expect(notificationRepository.getSavedBatch()).toHaveLength(0);
     });
+  });
+
+  it('should fail if organization is archived', async () => {
+    const archivedOrg = Organization.reconstitute({
+      id: 'org-1',
+      name: 'Archived Org',
+      description: 'desc',
+      parentId: null,
+      createdById: 'user-1',
+      createdAt: new Date(),
+      archivedAt: new Date(),
+    });
+    organizationRepository.setOrganization(archivedOrg);
+
+    const poll = createReadyPoll('poll-1', 'board-1', 'admin-1');
+    await pollRepository.createPoll(poll);
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      userId: 'admin-1',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollErrors.ORGANIZATION_ARCHIVED);
+  });
+
+  it('should fail if board is archived', async () => {
+    boardRepository.setBoard(
+      Board.reconstitute({
+        id: 'board-1',
+        name: 'Archived Board',
+        organizationId: 'org-1',
+        createdAt: new Date(),
+        archivedAt: new Date(),
+      })
+    );
+
+    const poll = createReadyPoll('poll-1', 'board-1', 'admin-1');
+    await pollRepository.createPoll(poll);
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      userId: 'admin-1',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
   });
 });

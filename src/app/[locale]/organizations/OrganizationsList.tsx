@@ -1,6 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useTransition } from 'react';
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useTransition,
+  ReactNode,
+} from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/app/components/catalyst/input';
@@ -12,35 +19,55 @@ import { Link } from '@/src/i18n/routing';
 import {
   joinOrganizationAction,
   searchOrganizationsAction,
+  type ActionResult,
+  type SearchOrganizationsInput,
 } from '@/web/actions/organization';
 
 const PAGE_SIZE = 30;
 
-interface Organization {
+export interface OrganizationItem {
   id: string;
   name: string;
   description: string;
   memberCount: number;
   firstAdmin: { id: string; firstName: string; lastName: string } | null;
   parentOrg?: { id: string; name: string } | null;
+  archivedAt?: Date | null;
 }
 
 interface OrganizationsListProps {
-  initialOrganizations: Organization[];
+  initialOrganizations: OrganizationItem[];
   initialTotalCount: number;
   userId: string;
+  renderActions?: (
+    org: OrganizationItem,
+    onActionComplete: () => void
+  ) => ReactNode;
+  searchAction?: (input: SearchOrganizationsInput) => Promise<
+    ActionResult<{
+      organizations: OrganizationItem[];
+      totalCount: number;
+    }>
+  >;
+  showArchivedBadge?: boolean;
 }
 
 export function OrganizationsList({
   initialOrganizations,
   initialTotalCount,
+  renderActions,
+  searchAction,
+  showArchivedBadge,
 }: OrganizationsListProps) {
   const t = useTranslations('organization.list');
   const tOrg = useTranslations('organization');
+  const tSuperadmin = useTranslations('superadmin.organizations');
   const router = useRouter();
 
+  const effectiveSearchAction = searchAction ?? searchOrganizationsAction;
+
   const [organizations, setOrganizations] =
-    useState<Organization[]>(initialOrganizations);
+    useState<OrganizationItem[]>(initialOrganizations);
   const [totalCount, setTotalCount] = useState(initialTotalCount);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -57,6 +84,22 @@ export function OrganizationsList({
 
   const hasMore = organizations.length < totalCount;
 
+  // Re-fetch current view after an action (archive/unarchive)
+  const refetchList = useCallback(() => {
+    startTransition(async () => {
+      const result = await effectiveSearchAction({
+        search: searchRef.current || undefined,
+        page: 1,
+        pageSize: pageRef.current * PAGE_SIZE,
+      });
+
+      if (result.success) {
+        setOrganizations(result.data.organizations);
+        setTotalCount(result.data.totalCount);
+      }
+    });
+  }, [effectiveSearchAction]);
+
   // Debounced search: reset list, fetch page 1
   useEffect(() => {
     // Skip initial render (page already has SSR data)
@@ -66,7 +109,7 @@ export function OrganizationsList({
 
     const timer = setTimeout(() => {
       startTransition(async () => {
-        const result = await searchOrganizationsAction({
+        const result = await effectiveSearchAction({
           search: search || undefined,
           page: 1,
           pageSize: PAGE_SIZE,
@@ -94,7 +137,7 @@ export function OrganizationsList({
     setPage(nextPage);
 
     startTransition(async () => {
-      const result = await searchOrganizationsAction({
+      const result = await effectiveSearchAction({
         search: searchRef.current || undefined,
         page: nextPage,
         pageSize: PAGE_SIZE,
@@ -105,7 +148,7 @@ export function OrganizationsList({
         setTotalCount(result.data.totalCount);
       }
     });
-  }, [isPending]);
+  }, [isPending, effectiveSearchAction]);
 
   // IntersectionObserver for infinite scroll
   useEffect(() => {
@@ -201,14 +244,19 @@ export function OrganizationsList({
                   )}
                 </div>
 
-                <Link href={`/organizations/${org.id}`}>
-                  <Heading
-                    level={3}
-                    className="text-lg font-semibold hover:text-brand-green"
-                  >
-                    {org.name}
-                  </Heading>
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link href={`/organizations/${org.id}`}>
+                    <Heading
+                      level={3}
+                      className="text-lg font-semibold hover:text-brand-green"
+                    >
+                      {org.name}
+                    </Heading>
+                  </Link>
+                  {showArchivedBadge && org.archivedAt && (
+                    <Badge color="red">{tSuperadmin('archivedBadge')}</Badge>
+                  )}
+                </div>
 
                 <Text className="mt-2 line-clamp-3 flex-1 text-sm text-zinc-600 dark:text-zinc-400">
                   {org.description}
@@ -229,14 +277,18 @@ export function OrganizationsList({
                   )}
                 </div>
 
-                <Button
-                  color="brand-green"
-                  className="mt-4 w-full"
-                  onClick={() => handleJoin(org.id)}
-                  disabled={joiningOrgId === org.id}
-                >
-                  {joiningOrgId === org.id ? t('joining') : t('joinButton')}
-                </Button>
+                {renderActions ? (
+                  renderActions(org, refetchList)
+                ) : (
+                  <Button
+                    color="brand-green"
+                    className="mt-4 w-full"
+                    onClick={() => handleJoin(org.id)}
+                    disabled={joiningOrgId === org.id}
+                  >
+                    {joiningOrgId === org.id ? t('joining') : t('joinButton')}
+                  </Button>
+                )}
               </div>
             ))}
           </div>

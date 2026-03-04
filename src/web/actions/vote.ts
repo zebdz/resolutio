@@ -13,6 +13,7 @@ import {
   PrismaParticipantRepository,
   PrismaVoteRepository,
   PrismaDraftRepository,
+  PrismaBoardRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
 import { z } from 'zod';
@@ -28,6 +29,7 @@ const participantRepository = new PrismaParticipantRepository(prisma);
 const voteRepository = new PrismaVoteRepository(prisma);
 const draftRepository = new PrismaDraftRepository(prisma);
 const organizationRepository = new PrismaOrganizationRepository(prisma);
+const boardRepository = new PrismaBoardRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 
 // Use cases
@@ -35,13 +37,17 @@ const submitDraftUseCase = new SubmitDraftUseCase(
   pollRepository,
   participantRepository,
   voteRepository,
-  draftRepository
+  draftRepository,
+  organizationRepository,
+  boardRepository
 );
 const finishVotingUseCase = new FinishVotingUseCase(
   pollRepository,
   participantRepository,
   voteRepository,
-  draftRepository
+  draftRepository,
+  organizationRepository,
+  boardRepository
 );
 const getUserVotingProgressUseCase = new GetUserVotingProgressUseCase(
   pollRepository,

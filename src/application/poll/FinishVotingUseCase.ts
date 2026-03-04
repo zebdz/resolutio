@@ -4,6 +4,8 @@ import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { DraftRepository } from '../../domain/poll/DraftRepository';
+import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { BoardRepository } from '../../domain/board/BoardRepository';
 import { PollErrors } from './PollErrors';
 import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
 
@@ -18,7 +20,9 @@ export class FinishVotingUseCase {
     private pollRepository: PollRepository,
     private participantRepository: ParticipantRepository,
     private voteRepository: VoteRepository,
-    private draftRepository: DraftRepository
+    private draftRepository: DraftRepository,
+    private organizationRepository: OrganizationRepository,
+    private boardRepository: BoardRepository
   ) {}
 
   async execute(input: FinishVotingInput): Promise<Result<void, string>> {
@@ -37,7 +41,25 @@ export class FinishVotingUseCase {
       return failure(PollErrors.NOT_FOUND);
     }
 
-    // 2. Check if poll is active and not finished
+    // 2. Check if organization is archived
+    const organization = await this.organizationRepository.findById(
+      poll.organizationId
+    );
+
+    if (organization?.isArchived()) {
+      return failure(PollErrors.ORGANIZATION_ARCHIVED);
+    }
+
+    // 3. Check if board is archived (for board-specific polls)
+    if (poll.boardId) {
+      const board = await this.boardRepository.findById(poll.boardId);
+
+      if (board?.isArchived()) {
+        return failure(PollErrors.BOARD_ARCHIVED);
+      }
+    }
+
+    // 4. Check if poll is active and not finished
     if (poll.isFinished()) {
       return failure(PollDomainCodes.POLL_FINISHED);
     }

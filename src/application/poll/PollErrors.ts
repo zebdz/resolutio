@@ -11,6 +11,8 @@ export const PollErrors = {
   NOT_ORG_MEMBER: 'poll.errors.notOrgMember',
   BOARD_NOT_FOUND: 'poll.errors.boardNotFound',
   NOT_AUTHORIZED: 'poll.errors.notAuthorized',
+  ORGANIZATION_ARCHIVED: 'poll.errors.organizationArchived',
+  BOARD_ARCHIVED: 'poll.errors.boardArchived',
 
   // Question
   QUESTION_NOT_FOUND: 'poll.errors.questionNotFound',

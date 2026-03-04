@@ -10,6 +10,7 @@ export const OrganizationDomainCodes = {
     'domain.organization.organizationDescriptionTooLong',
   ORGANIZATION_ALREADY_ARCHIVED:
     'domain.organization.organizationAlreadyArchived',
+  ORGANIZATION_NOT_ARCHIVED: 'domain.organization.organizationNotArchived',
 } as const;
 
 export type OrganizationDomainCode =

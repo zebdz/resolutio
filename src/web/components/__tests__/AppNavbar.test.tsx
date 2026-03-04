@@ -8,7 +8,7 @@ function getNavbarItems(isSuperAdmin: boolean) {
   ];
 
   if (isSuperAdmin) {
-    items.push({ key: 'admin', href: '/admin' });
+    items.push({ key: 'superadmin', href: '/superadmin' });
   }
 
   return items;
@@ -30,15 +30,15 @@ describe('AppNavbar navigation logic', () => {
       expect(items).toHaveLength(2);
       expect(items.find((i) => i.key === 'organizations')).toBeDefined();
       expect(items.find((i) => i.key === 'polls')).toBeDefined();
-      expect(items.find((i) => i.key === 'admin')).toBeUndefined();
+      expect(items.find((i) => i.key === 'superadmin')).toBeUndefined();
     });
 
-    it('should include admin link for superadmins', () => {
+    it('should include superadmin link for superadmins', () => {
       const items = getNavbarItems(true);
 
       expect(items).toHaveLength(3);
-      expect(items.find((i) => i.key === 'admin')).toBeDefined();
-      expect(items.find((i) => i.key === 'admin')?.href).toBe('/admin');
+      expect(items.find((i) => i.key === 'superadmin')).toBeDefined();
+      expect(items.find((i) => i.key === 'superadmin')?.href).toBe('/superadmin');
     });
   });
 
@@ -62,9 +62,9 @@ describe('AppNavbar navigation logic', () => {
       expect(isItemCurrent('/polls', '/polls/123/edit')).toBe(true);
     });
 
-    it('should mark admin as current for /admin and subpaths', () => {
-      expect(isItemCurrent('/admin', '/admin')).toBe(true);
-      expect(isItemCurrent('/admin', '/admin/users')).toBe(true);
+    it('should mark superadmin as current for /superadmin and subpaths', () => {
+      expect(isItemCurrent('/superadmin', '/superadmin')).toBe(true);
+      expect(isItemCurrent('/superadmin', '/superadmin/users')).toBe(true);
     });
 
     it('should mark account as current for /account', () => {
@@ -74,7 +74,7 @@ describe('AppNavbar navigation logic', () => {
     it('should not mark items as current for unrelated paths', () => {
       expect(isItemCurrent('/organizations', '/polls')).toBe(false);
       expect(isItemCurrent('/polls', '/organizations')).toBe(false);
-      expect(isItemCurrent('/admin', '/polls')).toBe(false);
+      expect(isItemCurrent('/superadmin', '/polls')).toBe(false);
     });
   });
 });

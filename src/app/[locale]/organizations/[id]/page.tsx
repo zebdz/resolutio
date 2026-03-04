@@ -42,9 +42,6 @@ export default async function OrganizationDetailPage({
       <AuthenticatedLayout>
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950">
           <Text className="text-red-800 dark:text-red-200">{result.error}</Text>
-          <Link href="/organizations" className="mt-4 inline-block">
-            <Button color="zinc">{tCommon('back')}</Button>
-          </Link>
         </div>
       </AuthenticatedLayout>
     );

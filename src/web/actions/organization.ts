@@ -4,6 +4,10 @@ import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { CreateOrganizationUseCase } from '@/application/organization/CreateOrganizationUseCase';
 import { CreateOrganizationSchema } from '@/application/organization/CreateOrganizationSchema';
+import { ArchiveOrganizationUseCase } from '@/application/organization/ArchiveOrganizationUseCase';
+import { ArchiveOrganizationSchema } from '@/application/organization/ArchiveOrganizationSchema';
+import { UnarchiveOrganizationUseCase } from '@/application/organization/UnarchiveOrganizationUseCase';
+import { UnarchiveOrganizationSchema } from '@/application/organization/UnarchiveOrganizationSchema';
 import { ListOrganizationsUseCase } from '@/application/organization/ListOrganizationsUseCase';
 import { GetAdminOrganizationsUseCase } from '@/application/organization/GetAdminOrganizationsUseCase';
 import { GetUserOrganizationsUseCase } from '@/application/organization/GetUserOrganizationsUseCase';
@@ -90,6 +94,18 @@ const getOrganizationPendingRequestsUseCase =
     prisma,
     userRepository,
   });
+
+const archiveOrganizationUseCase = new ArchiveOrganizationUseCase({
+  organizationRepository,
+  notificationRepository,
+  userRepository,
+});
+
+const unarchiveOrganizationUseCase = new UnarchiveOrganizationUseCase({
+  organizationRepository,
+  notificationRepository,
+  userRepository,
+});
 
 export async function createOrganizationAction(
   formData: FormData
@@ -451,6 +467,7 @@ export async function getAdminOrganizationsAction(): Promise<
       id: string;
       name: string;
       description: string;
+      archivedAt: Date | null;
       parentOrg: { id: string; name: string } | null;
     }>;
   }>
@@ -494,6 +511,7 @@ export async function getAdminOrganizationsAction(): Promise<
           id: org.id,
           name: org.name,
           description: org.description,
+          archivedAt: org.archivedAt,
           parentOrg,
         };
       })
@@ -520,6 +538,7 @@ export async function getUserOrganizationsAction(): Promise<
       name: string;
       description: string;
       joinedAt: Date;
+      archivedAt: Date | null;
       parentOrg: { id: string; name: string } | null;
     }>;
     pending: Array<{
@@ -573,6 +592,7 @@ export async function getUserOrganizationsAction(): Promise<
           name: item.organization.name,
           description: item.organization.description,
           joinedAt: item.joinedAt,
+          archivedAt: item.organization.archivedAt,
           parentOrg: item.parentOrg,
         })),
         pending: result.value.pending.map((item) => ({
@@ -775,9 +795,12 @@ export async function getOrganizationDetailsAction(
     });
 
     if (!result.success) {
+      const errorParts = result.error.split('.');
+      const tError = await getTranslations(errorParts.shift());
+
       return {
         success: false,
-        error: result.error,
+        error: tError(errorParts.join('.')),
       };
     }
 
@@ -950,6 +973,8 @@ export async function getUserMemberOrganizationsAction(): Promise<
     const orgMap = new Map<string, string>();
 
     for (const org of memberships) {
+      if (org.isArchived()) continue;
+
       allOrgIds.add(org.id);
       orgMap.set(org.id, org.name);
 
@@ -975,6 +1000,142 @@ export async function getUserMemberOrganizationsAction(): Promise<
     return { success: true, data: orgs };
   } catch (error) {
     console.error('Error getting user member organizations:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+export async function archiveOrganizationAction(
+  organizationId: string
+): Promise<ActionResult> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const validation = ArchiveOrganizationSchema.safeParse({ organizationId });
+
+    if (!validation.success) {
+      return { success: false, error: t('validationFailed') };
+    }
+
+    const result = await archiveOrganizationUseCase.execute({
+      organizationId: validation.data.organizationId,
+      adminUserId: user.id,
+    });
+
+    if (!result.success) {
+      const errorParts = result.error.split('.');
+      const tError = await getTranslations(errorParts.shift());
+
+      return { success: false, error: tError(errorParts.join('.')) };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error archiving organization:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+export async function unarchiveOrganizationAction(
+  organizationId: string
+): Promise<ActionResult> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const validation = UnarchiveOrganizationSchema.safeParse({
+      organizationId,
+    });
+
+    if (!validation.success) {
+      return { success: false, error: t('validationFailed') };
+    }
+
+    const result = await unarchiveOrganizationUseCase.execute({
+      organizationId: validation.data.organizationId,
+      adminUserId: user.id,
+    });
+
+    if (!result.success) {
+      const errorParts = result.error.split('.');
+      const tError = await getTranslations(errorParts.shift());
+
+      return { success: false, error: tError(errorParts.join('.')) };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error unarchiving organization:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+export async function searchAllOrganizationsAction(
+  input: SearchOrganizationsInput
+): Promise<
+  ActionResult<{
+    organizations: Array<{
+      id: string;
+      name: string;
+      description: string;
+      memberCount: number;
+      firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      parentOrg: { id: string; name: string } | null;
+      archivedAt: Date | null;
+    }>;
+    totalCount: number;
+  }>
+> {
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
+
+    if (!isSuperAdmin) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const result = await organizationRepository.searchOrganizationsWithStats({
+      ...input,
+      includeArchived: true,
+    });
+
+    return {
+      success: true,
+      data: {
+        organizations: result.organizations.map((item) => ({
+          id: item.organization.id,
+          name: item.organization.name,
+          description: item.organization.description,
+          memberCount: item.memberCount,
+          firstAdmin: item.firstAdmin,
+          parentOrg: item.parentOrg,
+          archivedAt: item.organization.archivedAt,
+        })),
+        totalCount: result.totalCount,
+      },
+    };
+  } catch (error) {
+    console.error('Error searching all organizations:', error);
 
     return { success: false, error: t('generic') };
   }

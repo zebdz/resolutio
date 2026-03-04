@@ -8,7 +8,7 @@ function getSidebarItems(isSuperAdmin: boolean) {
   ];
 
   if (isSuperAdmin) {
-    items.push({ key: 'admin', href: '/admin' });
+    items.push({ key: 'superadmin', href: '/superadmin' });
   }
 
   return items;
@@ -30,15 +30,15 @@ describe('MobileSidebar navigation logic', () => {
       expect(items).toHaveLength(2);
       expect(items.find((i) => i.key === 'organizations')).toBeDefined();
       expect(items.find((i) => i.key === 'polls')).toBeDefined();
-      expect(items.find((i) => i.key === 'admin')).toBeUndefined();
+      expect(items.find((i) => i.key === 'superadmin')).toBeUndefined();
     });
 
-    it('should include admin link for superadmins', () => {
+    it('should include superadmin link for superadmins', () => {
       const items = getSidebarItems(true);
 
       expect(items).toHaveLength(3);
-      expect(items.find((i) => i.key === 'admin')).toBeDefined();
-      expect(items.find((i) => i.key === 'admin')?.href).toBe('/admin');
+      expect(items.find((i) => i.key === 'superadmin')).toBeDefined();
+      expect(items.find((i) => i.key === 'superadmin')?.href).toBe('/superadmin');
     });
   });
 
@@ -58,9 +58,9 @@ describe('MobileSidebar navigation logic', () => {
       expect(isItemCurrent('/polls', '/polls/create')).toBe(true);
     });
 
-    it('should mark admin as current for /admin and subpaths', () => {
-      expect(isItemCurrent('/admin', '/admin')).toBe(true);
-      expect(isItemCurrent('/admin', '/admin/users')).toBe(true);
+    it('should mark superadmin as current for /superadmin and subpaths', () => {
+      expect(isItemCurrent('/superadmin', '/superadmin')).toBe(true);
+      expect(isItemCurrent('/superadmin', '/superadmin/users')).toBe(true);
     });
 
     it('should mark account as current for /account', () => {

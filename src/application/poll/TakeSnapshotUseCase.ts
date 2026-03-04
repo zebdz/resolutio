@@ -54,6 +54,24 @@ export class TakeSnapshotUseCase {
       }
     }
 
+    // Check if organization is archived
+    const organization = await this.organizationRepository.findById(
+      poll.organizationId
+    );
+
+    if (organization?.isArchived()) {
+      return failure(PollErrors.ORGANIZATION_ARCHIVED);
+    }
+
+    // Check if board is archived (for board-specific polls)
+    if (poll.boardId) {
+      const board = await this.boardRepository.findById(poll.boardId);
+
+      if (board?.isArchived()) {
+        return failure(PollErrors.BOARD_ARCHIVED);
+      }
+    }
+
     // Transition to READY state (validates questions/answers)
     const snapshotResult = poll.takeSnapshot();
 

@@ -73,9 +73,9 @@ export function AppNavbar({
           <NavbarLabel>{t('polls')}</NavbarLabel>
         </NavbarItem>
         {isSuperAdmin && (
-          <NavbarItem href="/admin" current={isItemCurrent('/admin', pathname)}>
+          <NavbarItem href="/superadmin" current={isItemCurrent('/superadmin', pathname)}>
             <ShieldCheckIcon data-slot="icon" />
-            <NavbarLabel>{t('admin')}</NavbarLabel>
+            <NavbarLabel>{t('superadmin')}</NavbarLabel>
           </NavbarItem>
         )}
       </NavbarSection>

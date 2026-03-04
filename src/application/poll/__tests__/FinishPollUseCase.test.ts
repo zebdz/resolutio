@@ -4,6 +4,8 @@ import { Poll } from '../../../domain/poll/Poll';
 import { Question } from '../../../domain/poll/Question';
 import { Answer } from '../../../domain/poll/Answer';
 import { Organization } from '../../../domain/organization/Organization';
+import { Board } from '../../../domain/board/Board';
+import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { PollRepository } from '../../../domain/poll/PollRepository';
 import { DraftRepository } from '../../../domain/poll/DraftRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
@@ -20,6 +22,7 @@ describe('FinishPollUseCase', () => {
   let pollRepository: Partial<PollRepository>;
   let draftRepository: Partial<DraftRepository>;
   let organizationRepository: Partial<OrganizationRepository>;
+  let boardRepository: Partial<BoardRepository>;
   let userRepository: Partial<UserRepository>;
   let notificationRepository: Partial<NotificationRepository>;
   let participantRepository: Partial<ParticipantRepository>;
@@ -77,6 +80,17 @@ describe('FinishPollUseCase', () => {
 
     organizationRepository = {
       isUserAdmin: vi.fn().mockResolvedValue(true),
+      findById: vi.fn().mockResolvedValue(
+        Organization.reconstitute({
+          id: 'org-1',
+          name: 'Test Org',
+          description: 'desc',
+          parentId: null,
+          createdById: 'user-1',
+          createdAt: new Date(),
+          archivedAt: null,
+        })
+      ),
     };
 
     userRepository = {
@@ -106,13 +120,18 @@ describe('FinishPollUseCase', () => {
       ),
     };
 
+    boardRepository = {
+      findById: vi.fn().mockResolvedValue(null),
+    };
+
     useCase = new FinishPollUseCase(
       pollRepository as PollRepository,
       draftRepository as DraftRepository,
       organizationRepository as OrganizationRepository,
       userRepository as UserRepository,
       notificationRepository as NotificationRepository,
-      participantRepository as ParticipantRepository
+      participantRepository as ParticipantRepository,
+      boardRepository as BoardRepository
     );
   });
 
@@ -223,5 +242,46 @@ describe('FinishPollUseCase', () => {
 
       expect(savedNotifications).toHaveLength(0);
     });
+  });
+
+  it('should fail if organization is archived', async () => {
+    const archivedOrg = Organization.reconstitute({
+      id: 'org-1',
+      name: 'Archived Org',
+      description: 'desc',
+      parentId: null,
+      createdById: 'user-1',
+      createdAt: new Date(),
+      archivedAt: new Date(),
+    });
+    organizationRepository.findById = vi.fn().mockResolvedValue(archivedOrg);
+
+    const result = await useCase.execute({
+      pollId: poll.id,
+      userId: 'admin-1',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollErrors.ORGANIZATION_ARCHIVED);
+  });
+
+  it('should fail if board is archived', async () => {
+    boardRepository.findById = vi.fn().mockResolvedValue(
+      Board.reconstitute({
+        id: 'board-1',
+        name: 'Archived Board',
+        organizationId: 'org-1',
+        createdAt: new Date(),
+        archivedAt: new Date(),
+      })
+    );
+
+    const result = await useCase.execute({
+      pollId: poll.id,
+      userId: 'admin-1',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
   });
 });

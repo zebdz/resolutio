@@ -98,6 +98,7 @@
     "member": "Member",
     "joinedAt": "Joined",
     "logout": "Logout",
+    "archivedBadge": "Archived",
     "joinRequest": {
       "requested": "Requested",
       "pending": "Pending",
@@ -142,7 +143,7 @@
     "defaultBoardName": "General Board",
     "errors": {
       "notFound": "Organization not found",
-      "archived": "Cannot join an archived organization",
+      "archived": "This organization has been archived",
       "nameExists": "An organization with this name already exists",
       "alreadyMember": "You are already a member of this organization",
       "pendingRequest": "You already have a pending request to join this organization",
@@ -476,6 +477,8 @@
     "active": "Active",
     "upcoming": "Upcoming",
     "finished": "Finished",
+    "orgArchived": "Org archived",
+    "boardArchived": "Board archived",
     "questions": "Questions",
     "questionsNumber": "Questions #",
     "noQuestions": "No questions added yet",
@@ -543,6 +546,8 @@
       "notOrgMember": "You must be an organization member to create polls",
       "boardNotFound": "Board not found",
       "notAuthorized": "You are not authorized to perform this action",
+      "organizationArchived": "Cannot perform this action — the organization has been archived",
+      "boardArchived": "Cannot perform this action — the board has been archived",
       "noUpdates": "No updates provided",
       "titleRequired": "Poll title is required",
       "descriptionRequired": "Poll description is required",
@@ -705,6 +710,14 @@
       "someNotFound": "Some notifications were not found"
     },
     "types": {
+      "orgArchived": {
+        "title": "Organization archived",
+        "body": "{organizationName} has been archived"
+      },
+      "orgUnarchived": {
+        "title": "Organization unarchived",
+        "body": "{organizationName} has been unarchived"
+      },
       "orgJoinedParent": {
         "title": "Organization joined parent",
         "body": "{childOrgName} has joined {parentOrgName}"
@@ -764,7 +777,7 @@
     "home": "Home",
     "organizations": "Organizations",
     "polls": "Polls",
-    "admin": "Admin",
+    "superadmin": "Superadmin",
     "account": "Account",
     "notifications": "Notifications"
   },
@@ -774,7 +787,8 @@
       "organizationNameTooLong": "Organization name cannot exceed 255 characters",
       "organizationDescriptionEmpty": "Organization description cannot be empty",
       "organizationDescriptionTooLong": "Organization description cannot exceed 1000 characters",
-      "organizationAlreadyArchived": "Organization is already archived"
+      "organizationAlreadyArchived": "Organization is already archived",
+      "organizationNotArchived": "Organization is not archived"
     },
     "joinParentRequest": {
       "messageEmpty": "Message cannot be empty",
@@ -898,5 +912,22 @@
       "description": "We may update this Privacy Policy from time to time. We will notify you of any significant changes through the platform. Continued use of the service after changes constitutes acceptance of the updated policy."
     },
     "backToHome": "Back to home"
+  },
+  "superadmin": {
+    "title": "Superadmin Panel",
+    "organizations": {
+      "title": "Manage Organizations",
+      "subtitle": "All organizations in the system",
+      "archiveButton": "Archive",
+      "unarchiveButton": "Unarchive",
+      "archiving": "Archiving...",
+      "unarchiving": "Unarchiving...",
+      "archiveDialogTitle": "Archive Organization",
+      "archiveDialogDescription": "Are you sure you want to archive \"{name}\"? Members will no longer be able to access it.",
+      "unarchiveDialogTitle": "Unarchive Organization",
+      "unarchiveDialogDescription": "Are you sure you want to unarchive \"{name}\"? It will become active again.",
+      "cancel": "Cancel",
+      "archivedBadge": "Archived"
+    }
   }
 }

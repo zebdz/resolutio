@@ -4,6 +4,8 @@ import { Poll } from '../../../domain/poll/Poll';
 import { Question } from '../../../domain/poll/Question';
 import { Answer } from '../../../domain/poll/Answer';
 import { Organization } from '../../../domain/organization/Organization';
+import { Board } from '../../../domain/board/Board';
+import { BoardRepository } from '../../../domain/board/BoardRepository';
 import {
   PollRepository,
   UpdateQuestionOrderData,
@@ -229,9 +231,14 @@ class MockPollRepository implements PollRepository {
 
 class MockOrganizationRepository implements OrganizationRepository {
   private admins: Set<string> = new Set();
+  private organizations: Map<string, Organization> = new Map();
 
   setAdmin(userId: string, organizationId: string): void {
     this.admins.add(`${organizationId}:${userId}`);
+  }
+
+  setOrganization(org: Organization): void {
+    this.organizations.set(org.id, org);
   }
 
   async save(organization: Organization): Promise<Organization> {
@@ -239,7 +246,7 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
 
   async findById(id: string): Promise<Organization | null> {
-    return null;
+    return this.organizations.get(id) || null;
   }
 
   async findByName(name: string): Promise<Organization | null> {
@@ -372,10 +379,23 @@ class MockUserRepository implements UserRepository {
   }
 }
 
+class MockBoardRepository implements Pick<BoardRepository, 'findById'> {
+  private boards: Map<string, Board> = new Map();
+
+  setBoard(board: Board): void {
+    this.boards.set(board.id, board);
+  }
+
+  async findById(id: string): Promise<Board | null> {
+    return this.boards.get(id) || null;
+  }
+}
+
 describe('DeactivatePollUseCase', () => {
   let repository: MockPollRepository;
   let organizationRepository: MockOrganizationRepository;
   let userRepository: MockUserRepository;
+  let boardRepository: MockBoardRepository;
   let useCase: DeactivatePollUseCase;
   let poll: Poll;
 
@@ -383,11 +403,13 @@ describe('DeactivatePollUseCase', () => {
     repository = new MockPollRepository();
     organizationRepository = new MockOrganizationRepository();
     userRepository = new MockUserRepository();
+    boardRepository = new MockBoardRepository();
 
     useCase = new DeactivatePollUseCase(
       repository,
       organizationRepository,
-      userRepository
+      userRepository,
+      boardRepository as unknown as BoardRepository
     );
 
     // Set admin-1 as admin of org-1
@@ -527,5 +549,46 @@ describe('DeactivatePollUseCase', () => {
 
       expect(result.success).toBe(true);
     });
+  });
+
+  it('should fail if organization is archived', async () => {
+    const archivedOrg = Organization.reconstitute({
+      id: 'org-1',
+      name: 'Archived Org',
+      description: 'desc',
+      parentId: null,
+      createdById: 'user-1',
+      createdAt: new Date(),
+      archivedAt: new Date(),
+    });
+    organizationRepository.setOrganization(archivedOrg);
+
+    const result = await useCase.execute({
+      pollId: poll.id,
+      userId: 'admin-1',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollErrors.ORGANIZATION_ARCHIVED);
+  });
+
+  it('should fail if board is archived', async () => {
+    boardRepository.setBoard(
+      Board.reconstitute({
+        id: 'board-1',
+        name: 'Archived Board',
+        organizationId: 'org-1',
+        createdAt: new Date(),
+        archivedAt: new Date(),
+      })
+    );
+
+    const result = await useCase.execute({
+      pollId: poll.id,
+      userId: 'admin-1',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
   });
 });
