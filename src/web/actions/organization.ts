@@ -788,6 +788,12 @@ export async function getOrganizationDetailsAction(
       id: string;
       name: string;
       memberCount: number;
+      members: Array<{
+        id: string;
+        firstName: string;
+        lastName: string;
+        middleName: string | null;
+      }>;
       isUserMember: boolean;
     }>;
     isUserMember: boolean;
@@ -835,6 +841,7 @@ export async function getOrganizationDetailsAction(
           id: b.board.id,
           name: b.board.name,
           memberCount: b.memberCount,
+          members: b.members,
           isUserMember: b.isUserMember,
         })),
         isUserMember: result.value.isUserMember,

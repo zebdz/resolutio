@@ -225,10 +225,31 @@ class MockBoardRepository implements BoardRepository {
 
 // Mock Prisma
 class MockPrisma {
+  private boardUsers: Array<{
+    boardId: string;
+    userId: string;
+    removedAt: null | Date;
+    user: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      middleName: string | null;
+    };
+  }> = [];
+
   boardUser = {
     count: async ({ where }: any) => {
-      // Return a mock count
-      return 5;
+      return this.boardUsers.filter(
+        (bu) => bu.boardId === where.boardId && bu.removedAt === null
+      ).length;
+    },
+    findMany: async ({ where, include }: any) => {
+      return this.boardUsers
+        .filter((bu) => bu.boardId === where.boardId && bu.removedAt === null)
+        .map((bu) => ({
+          ...bu,
+          ...(include?.user ? { user: bu.user } : {}),
+        }));
     },
   };
 
@@ -243,6 +264,22 @@ class MockPrisma {
       };
     },
   };
+
+  // Helper for tests
+  addBoardUser(
+    boardId: string,
+    userId: string,
+    firstName: string,
+    lastName: string,
+    middleName: string | null = null
+  ) {
+    this.boardUsers.push({
+      boardId,
+      userId,
+      removedAt: null,
+      user: { id: userId, firstName, lastName, middleName },
+    });
+  }
 }
 
 // Mock UserRepository
@@ -396,6 +433,10 @@ describe('GetOrganizationDetailsUseCase', () => {
     });
 
     it('should include board member counts', async () => {
+      prisma.addBoardUser('board-1', 'u1', 'A', 'B');
+      prisma.addBoardUser('board-1', 'u2', 'C', 'D');
+      prisma.addBoardUser('board-2', 'u3', 'E', 'F');
+
       const result = await useCase.execute({
         organizationId: 'org-1',
       });
@@ -403,8 +444,10 @@ describe('GetOrganizationDetailsUseCase', () => {
       expect(result.success).toBe(true);
 
       if (result.success) {
-        expect(result.value.boards[0].memberCount).toBe(5);
-        expect(result.value.boards[1].memberCount).toBe(5);
+        const b1 = result.value.boards.find((b) => b.board.id === 'board-1');
+        const b2 = result.value.boards.find((b) => b.board.id === 'board-2');
+        expect(b1?.memberCount).toBe(2);
+        expect(b2?.memberCount).toBe(1);
       }
     });
 
@@ -476,6 +519,45 @@ describe('GetOrganizationDetailsUseCase', () => {
 
         expect(board1Details?.isUserMember).toBe(true);
         expect(board2Details?.isUserMember).toBe(false);
+      }
+    });
+
+    it('should include board members with names', async () => {
+      prisma.addBoardUser('board-1', 'user-1', 'Alice', 'Smith', 'Marie');
+      prisma.addBoardUser('board-1', 'user-2', 'Bob', 'Jones');
+      prisma.addBoardUser('board-2', 'user-3', 'Charlie', 'Brown');
+
+      const result = await useCase.execute({
+        organizationId: 'org-1',
+      });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        const b1 = result.value.boards.find((b) => b.board.id === 'board-1');
+        const b2 = result.value.boards.find((b) => b.board.id === 'board-2');
+
+        expect(b1?.members).toHaveLength(2);
+        expect(b1?.members[0]).toEqual({
+          id: 'user-1',
+          firstName: 'Alice',
+          lastName: 'Smith',
+          middleName: 'Marie',
+        });
+        expect(b1?.members[1]).toEqual({
+          id: 'user-2',
+          firstName: 'Bob',
+          lastName: 'Jones',
+          middleName: null,
+        });
+
+        expect(b2?.members).toHaveLength(1);
+        expect(b2?.members[0]).toEqual({
+          id: 'user-3',
+          firstName: 'Charlie',
+          lastName: 'Brown',
+          middleName: null,
+        });
       }
     });
 

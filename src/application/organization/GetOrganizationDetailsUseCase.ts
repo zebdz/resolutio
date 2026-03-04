@@ -15,9 +15,17 @@ export interface GetOrganizationDetailsInput {
   userId?: string; // Optional - for checking membership status
 }
 
+export interface BoardMember {
+  id: string;
+  firstName: string;
+  lastName: string;
+  middleName: string | null;
+}
+
 export interface BoardWithMemberCount {
   board: Board;
   memberCount: number;
+  members: BoardMember[];
   isUserMember: boolean;
 }
 
@@ -68,12 +76,38 @@ export class GetOrganizationDetailsUseCase {
       boards
         .filter((board) => !board.isArchived())
         .map(async (board) => {
-          const memberCount = await this.deps.prisma.boardUser.count({
+          const boardUsers = await this.deps.prisma.boardUser.findMany({
             where: {
               boardId: board.id,
-              removedAt: null, // Only count active members
+              removedAt: null,
+            },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  middleName: true,
+                },
+              },
             },
           });
+
+          const members: BoardMember[] = boardUsers.map(
+            (bu: {
+              user: {
+                id: string;
+                firstName: string;
+                lastName: string;
+                middleName: string | null;
+              };
+            }) => ({
+              id: bu.user.id,
+              firstName: bu.user.firstName,
+              lastName: bu.user.lastName,
+              middleName: bu.user.middleName,
+            })
+          );
 
           const isUserMember = userId
             ? await this.deps.boardRepository.isUserMember(userId, board.id)
@@ -81,7 +115,8 @@ export class GetOrganizationDetailsUseCase {
 
           return {
             board,
-            memberCount,
+            memberCount: members.length,
+            members,
             isUserMember,
           };
         })
