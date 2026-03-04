@@ -38,10 +38,10 @@ export default async function ManageBoardsPage({ params }: PageProps) {
     <AuthenticatedLayout>
       <div className="mx-auto max-w-6xl px-4 py-8">
         <Link
-          href={`/organizations/${organizationId}`}
+          href={`/organizations/${organizationId}/modify`}
           className="mb-4 inline-block text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
         >
-          {tCommon('backToOrganization')}
+          {tCommon('backToManagement')}
         </Link>
 
         {/* Header */}

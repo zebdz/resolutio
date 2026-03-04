@@ -45,7 +45,7 @@ export default async function IncomingParentRequestsPage({
     <AuthenticatedLayout>
       <div className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-8">
-          <Link href={`/organizations/${organizationId}`}>
+          <Link href={`/organizations/${organizationId}/modify`}>
             <Button color="zinc">{tCommon('back')}</Button>
           </Link>
         </div>
