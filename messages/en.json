@@ -73,7 +73,7 @@
     "signIn": "Sign In",
     "disclaimer": "Important: Only create organizations and polls that comply with the laws of your country!",
     "logoText": "Decision Making Platform",
-    "copyright": "© 2025 Resolutio",
+    "copyright": "© 2025 ROOO \"NOMOS (Law & Order)\"",
     "privacyPolicy": "Privacy Policy",
     "features": {
       "voting": "Voting",
@@ -772,7 +772,7 @@
     }
   },
   "navbar": {
-    "logo": "Resolutio",
+    "logo": "ROOO \"NOMOS (Law & Order)\"",
     "logoText": "Decision Making Platform",
     "home": "Home",
     "organizations": "Organizations",
@@ -865,7 +865,7 @@
   "privacy": {
     "title": "Privacy Policy",
     "lastUpdated": "Last updated: March 3, 2026",
-    "intro": "This Privacy Policy describes how Resolutio (\"we\", \"us\", \"our\") collects, uses, and protects your personal data in accordance with applicable data protection laws.",
+    "intro": "This Privacy Policy describes how ROOO \"NOMOS (Law & Order)\" (\"we\", \"us\", \"our\") collects, uses, and protects your personal data in accordance with applicable data protection laws.",
     "dataCollected": {
       "heading": "Data We Collect",
       "description": "We collect and process the following personal data:",

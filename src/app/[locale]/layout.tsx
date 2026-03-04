@@ -12,7 +12,7 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: 'Resolutio',
+  title: 'НОМОС',
   description: 'Unite in organizations, vote, and create legal decisions',
 };
 

@@ -50,7 +50,7 @@ export function AppNavbar({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/images/logo-icon.svg"
-            alt="Resolutio"
+            alt="Organization logo"
             className="h-10 w-auto"
           />
         </Link>

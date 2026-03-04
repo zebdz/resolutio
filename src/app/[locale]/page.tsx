@@ -25,7 +25,7 @@ export default async function HomePage() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/logo-icon.svg"
-                alt="Resolutio"
+                alt="Organization logo"
                 className="h-14 w-auto"
               />
               <span className="flex flex-col text-xs font-bold uppercase leading-relaxed tracking-wider text-white/90">

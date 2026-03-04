@@ -107,7 +107,7 @@ export default async function PrivacyPolicyPage() {
             <h2 className="mb-3 text-xl font-semibold text-zinc-900 dark:text-white">
               {t('contact.heading')}
             </h2>
-            <p>{t('contact.description', { email: 'privacy@resolutio.ru' })}</p>
+            <p>{t('contact.description', { email: 'rooonomos@mail.ru' })}</p>
           </section>
 
           {/* Updates */}
