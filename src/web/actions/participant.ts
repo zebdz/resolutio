@@ -15,6 +15,7 @@ import {
   PrismaBoardRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
+import { checkRateLimit } from '@/web/actions/rateLimit';
 import { z } from 'zod';
 
 // Action result type for client-side handling
@@ -76,6 +77,10 @@ const UpdateWeightSchema = z.object({
 export async function getParticipantsAction(
   pollId: string
 ): Promise<ActionResult<any>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -126,6 +131,10 @@ export async function updateParticipantWeightAction(data: {
   newWeight: number;
   reason?: string;
 }): Promise<ActionResult<void>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -195,6 +204,10 @@ export async function updateParticipantWeightAction(data: {
 export async function removeParticipantAction(
   participantId: string
 ): Promise<ActionResult<void>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -240,6 +253,10 @@ export async function removeParticipantAction(
 export async function getWeightHistoryAction(
   pollId: string
 ): Promise<ActionResult<any>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {

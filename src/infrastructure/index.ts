@@ -22,3 +22,11 @@ export { Argon2PasswordVerifier } from './auth/Argon2PasswordVerifier';
 export { OtpCodeHasherImpl } from './auth/OtpCodeHasherImpl';
 export { StubSmsOtpDeliveryChannel } from './auth/StubSmsOtpDeliveryChannel';
 export { TurnstileCaptchaVerifier } from './auth/TurnstileCaptchaVerifier';
+
+// Rate Limiting
+export {
+  rateLimiter,
+  InMemoryRateLimiter,
+  type RateLimitResult,
+  extractIpFromRequest,
+} from './rateLimit';

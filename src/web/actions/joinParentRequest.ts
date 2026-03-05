@@ -18,6 +18,7 @@ import {
   PrismaNotificationRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
+import { checkRateLimit } from '@/web/actions/rateLimit';
 import { ActionResult } from './organization';
 
 // Initialize dependencies
@@ -72,6 +73,10 @@ const getAllJoinParentRequestsUseCase = new GetAllJoinParentRequestsUseCase({
 export async function requestJoinParentAction(
   formData: FormData
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
 
@@ -127,6 +132,10 @@ export async function requestJoinParentAction(
 export async function cancelJoinParentRequestAction(
   requestId: string
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
 
@@ -169,6 +178,10 @@ export async function cancelJoinParentRequestAction(
 export async function handleJoinParentRequestAction(
   formData: FormData
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
 
@@ -236,6 +249,10 @@ export async function getChildOrgJoinParentRequestAction(
     } | null;
   }>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -296,6 +313,10 @@ export async function getIncomingJoinParentRequestsAction(
     }>;
   }>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -364,6 +385,10 @@ export async function getAllJoinParentRequestsAction(
     outgoing: EnrichedJoinParentRequest[];
   }>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {

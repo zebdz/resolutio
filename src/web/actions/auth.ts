@@ -28,6 +28,7 @@ import {
 } from '@/domain/shared/errors';
 import { OtpErrors } from '@/application/auth/OtpErrors';
 import { AuthErrors } from '@/application/auth/AuthErrors';
+import { checkRateLimit } from '@/web/actions/rateLimit';
 
 // Helper function to check if error is a Prisma connection error
 function isDatabaseConnectionError(error: unknown): boolean {
@@ -91,6 +92,10 @@ const logoutUserUseCase = new LogoutUserUseCase(sessionRepository);
 export async function registerAction(
   formData: FormData
 ): Promise<ActionResult<{ userId: string }>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -220,6 +225,10 @@ export async function registerAction(
 export async function loginAction(
   formData: FormData
 ): Promise<ActionResult<{ userId: string }>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {

@@ -32,6 +32,7 @@ import {
 } from '@/infrastructure/index';
 import { Notification } from '@/domain/notification/Notification';
 import { getCurrentUser } from '../lib/session';
+import { checkRateLimit } from '@/web/actions/rateLimit';
 
 // Action result type for client-side handling
 export type ActionResult<T = void> =
@@ -128,6 +129,10 @@ const removeOrgAdminUseCase = new RemoveOrgAdminUseCase({
 export async function createOrganizationAction(
   formData: FormData
 ): Promise<ActionResult<{ organizationId: string; autoJoinFailed?: boolean }>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
 
@@ -280,6 +285,7 @@ export async function createOrganizationAndRedirect(
   locale: string,
   formData: FormData
 ): Promise<void> {
+  // Rate limit handled by createOrganizationAction
   const result = await createOrganizationAction(formData);
 
   if (result.success) {
@@ -299,6 +305,10 @@ export async function listOrganizationsAction(): Promise<
     }>;
   }>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -358,6 +368,10 @@ export async function searchOrganizationsAction(
     totalCount: number;
   }>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -393,6 +407,10 @@ export async function searchOrganizationsAction(
 export async function joinOrganizationAction(
   formData: FormData
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
 
@@ -490,6 +508,10 @@ export async function getAdminOrganizationsAction(): Promise<
     }>;
   }>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -581,6 +603,10 @@ export async function getUserOrganizationsAction(): Promise<
     }>;
   }>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -660,6 +686,10 @@ export async function getPendingRequestsAction(
     totalCount: number;
   }>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -703,6 +733,10 @@ export async function getPendingRequestsAction(
 export async function handleJoinRequestAction(
   formData: FormData
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
 
@@ -808,6 +842,10 @@ export async function getOrganizationDetailsAction(
     };
   }>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -878,6 +916,10 @@ export async function getOrganizationPendingRequestsAction(
     totalCount: number;
   }>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -924,6 +966,10 @@ export async function getOrganizationPendingRequestsAction(
 export async function cancelJoinRequestAction(
   organizationId: string
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
 
@@ -979,6 +1025,10 @@ export async function cancelJoinRequestAction(
 export async function getUserMemberOrganizationsAction(): Promise<
   ActionResult<Array<{ id: string; name: string }>>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -1035,6 +1085,10 @@ export async function getUserMemberOrganizationsAction(): Promise<
 export async function archiveOrganizationAction(
   organizationId: string
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -1073,6 +1127,10 @@ export async function archiveOrganizationAction(
 export async function unarchiveOrganizationAction(
   organizationId: string
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -1126,6 +1184,10 @@ export async function searchAllOrganizationsAction(
     totalCount: number;
   }>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -1183,6 +1245,10 @@ function translateErrorCode(errorCode: string, tOrg: any): string {
 export async function updateOrganizationAction(
   formData: FormData
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
 
@@ -1227,6 +1293,10 @@ export async function addOrgAdminAction(
   organizationId: string,
   targetUserId: string
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
 
@@ -1262,6 +1332,10 @@ export async function removeOrgAdminAction(
   organizationId: string,
   targetUserId: string
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
 
@@ -1304,6 +1378,10 @@ export async function getOrgAdminsAction(organizationId: string): Promise<
     }>
   >
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -1349,6 +1427,10 @@ export async function searchUsersForOrgAdminAction(
     }>
   >
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {

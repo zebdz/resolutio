@@ -12,6 +12,7 @@ import {
   TurnstileCaptchaVerifier,
 } from '@/infrastructure/index';
 import { getClientIp } from '@/web/lib/clientIp';
+import { checkRateLimit } from '@/web/actions/rateLimit';
 import type { ActionResult } from './auth';
 
 // Initialize dependencies
@@ -42,6 +43,10 @@ export async function requestOtpAction(
 ): Promise<
   ActionResult<{ otpId: string; expiresAt: string; backdoorCode?: string }>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('otp.errors');
   const tCommon = await getTranslations('common.errors');
 
@@ -89,6 +94,10 @@ export async function requestOtpAction(
 export async function verifyOtpAction(
   formData: FormData
 ): Promise<ActionResult<{ verified: boolean }>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('otp.errors');
   const tCommon = await getTranslations('common.errors');
 

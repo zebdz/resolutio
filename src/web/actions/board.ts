@@ -17,6 +17,7 @@ import {
   PrismaUserRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
+import { checkRateLimit } from '@/web/actions/rateLimit';
 
 // Action result type for client-side handling
 export type ActionResult<T = void> =
@@ -56,6 +57,10 @@ const removeBoardMemberUseCase = new RemoveBoardMemberUseCase({
 export async function createBoardAction(
   formData: FormData
 ): Promise<ActionResult<{ boardId: string }>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -132,6 +137,10 @@ export async function createBoardAction(
 export async function archiveBoardAction(
   boardId: string
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -188,6 +197,10 @@ export async function archiveBoardAction(
 export async function addBoardMemberAction(
   formData: FormData
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -250,6 +263,10 @@ export async function addBoardMemberAction(
 export async function removeBoardMemberAction(
   formData: FormData
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -331,6 +348,10 @@ export async function getBoardDetailsAction(boardId: string): Promise<
     }>;
   }>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -460,6 +481,10 @@ export async function getUserBoardsAction(): Promise<
     }>
   >
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -530,6 +555,10 @@ export async function searchUsersForBoardAction(
     }>
   >
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -649,6 +678,10 @@ export async function searchUsersForBoardAction(
 export async function getBoardsByOrganizationAction(
   organizationId: string
 ): Promise<ActionResult<Array<{ id: string; name: string }>>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {

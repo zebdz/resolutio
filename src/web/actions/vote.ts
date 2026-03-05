@@ -16,6 +16,7 @@ import {
   PrismaBoardRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
+import { checkRateLimit } from '@/web/actions/rateLimit';
 import { z } from 'zod';
 
 // Action result type for client-side handling
@@ -83,6 +84,10 @@ export async function submitDraftAction(data: {
   isSingleChoice: boolean;
   shouldRemove?: boolean;
 }): Promise<ActionResult<void>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -150,6 +155,10 @@ export async function submitDraftAction(data: {
 export async function getUserVotingProgressAction(
   pollId: string
 ): Promise<ActionResult<any>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -199,6 +208,10 @@ export async function finishVotingAction(
   pollId: string,
   willingToSignProtocol: boolean
 ): Promise<ActionResult<void>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -245,6 +258,10 @@ export async function finishVotingAction(
 export async function getPollResultsAction(
   pollId: string
 ): Promise<ActionResult<any>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -293,6 +310,10 @@ export async function getPollResultsAction(
 export async function canUserVoteAction(
   pollId: string
 ): Promise<ActionResult<{ canVote: boolean; reason?: string }>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {

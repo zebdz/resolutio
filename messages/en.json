@@ -963,5 +963,12 @@
       "cancel": "Cancel",
       "archivedBadge": "Archived"
     }
+  },
+  "rateLimit": {
+    "title": "Too Many Requests",
+    "tooManyRequests": "Too many requests. Please wait and try again.",
+    "message": "You've made too many requests. Please wait before trying again.",
+    "waitMessage": "You can retry in {seconds} seconds.",
+    "retryButton": "Retry"
   }
 }

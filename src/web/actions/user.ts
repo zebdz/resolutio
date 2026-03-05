@@ -5,6 +5,7 @@ import { UpdateUserProfileUseCase } from '@/src/application/user/UpdateUserProfi
 import { prisma, PrismaUserRepository } from '@/infrastructure/index';
 import { UpdateUserProfileSchema } from '@/src/application/user/UpdateUserProfileSchema';
 import { getCurrentUser } from '../lib/session';
+import { checkRateLimit } from '@/web/actions/rateLimit';
 import { Locale } from '@/src/i18n/locales';
 import { revalidatePath } from 'next/cache';
 
@@ -19,6 +20,10 @@ const updateUserProfileUseCase = new UpdateUserProfileUseCase(userRepository);
 export async function updateProfileAction(
   formData: FormData
 ): Promise<ActionResult<{ message: string }>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {

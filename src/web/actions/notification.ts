@@ -8,6 +8,7 @@ import { GetUnreadNotificationCountUseCase } from '@/application/notification/Ge
 import { DeleteNotificationsUseCase } from '@/application/notification/DeleteNotificationsUseCase';
 import { prisma, PrismaNotificationRepository } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
+import { checkRateLimit } from '@/web/actions/rateLimit';
 import { ActionResult } from './organization';
 
 const notificationRepository = new PrismaNotificationRepository(prisma);
@@ -52,6 +53,10 @@ export async function getNotificationsAction(
     totalCount: number;
   }>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -97,6 +102,10 @@ export async function getNotificationsAction(
 export async function markNotificationReadAction(
   notificationId: string
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -124,6 +133,10 @@ export async function markNotificationReadAction(
 }
 
 export async function markAllNotificationsReadAction(): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -152,6 +165,10 @@ export async function markAllNotificationsReadAction(): Promise<ActionResult> {
 export async function getUnreadNotificationCountAction(): Promise<
   ActionResult<{ count: number }>
 > {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
@@ -180,6 +197,10 @@ export async function getUnreadNotificationCountAction(): Promise<
 export async function deleteNotificationsAction(
   notificationIds: string[]
 ): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {return rateLimited;}
+
   const t = await getTranslations('common.errors');
 
   try {
