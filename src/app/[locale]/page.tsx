@@ -123,7 +123,7 @@ export default async function HomePage() {
           {/* Government illustration */}
           <div className="min-w-0 flex-1">
             <Image
-              src="/images/government.png"
+              src="/images/government.svg"
               alt=""
               width={1150}
               height={661}
