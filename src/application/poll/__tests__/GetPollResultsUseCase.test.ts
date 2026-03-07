@@ -523,7 +523,6 @@ describe('GetPollResultsUseCase', () => {
       expect(willing?.willingToSignProtocol).toBe(true);
       expect(willing?.firstName).toBe('Alice');
       expect(willing?.middleName).toBe('M.');
-      expect(willing?.phoneNumber).toBe('+79001234567');
 
       const notWilling = result.value.protocolSignWillingness.find(
         (p) => p.userId === 'user-2'

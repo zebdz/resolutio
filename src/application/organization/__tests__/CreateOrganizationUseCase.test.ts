@@ -93,7 +93,12 @@ class MockOrganizationRepository implements OrganizationRepository {
     Array<{
       organization: Organization;
       memberCount: number;
-      firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      firstAdmin: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        middleName: string | null;
+      } | null;
     }>
   > {
     return this.organizations.map((org) => ({
@@ -180,6 +185,10 @@ class MockUserRepository implements UserRepository {
     return [];
   }
 
+  async searchUserByPhone(_phone: string): Promise<User | null> {
+    return null;
+  }
+
   async isSuperAdmin(userId: string): Promise<boolean> {
     return this.superAdmins.has(userId);
   }
@@ -187,6 +196,16 @@ class MockUserRepository implements UserRepository {
   addSuperAdmin(userId: string): void {
     this.superAdmins.add(userId);
   }
+
+  async findByNickname(): Promise<User | null> {
+    return null;
+  }
+
+  async isNicknameAvailable(): Promise<boolean> {
+    return true;
+  }
+
+  async updatePrivacySettings(): Promise<void> {}
 }
 
 describe('CreateOrganizationUseCase', () => {

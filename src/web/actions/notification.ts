@@ -55,7 +55,9 @@ export async function getNotificationsAction(
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -104,7 +106,9 @@ export async function markNotificationReadAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -135,7 +139,9 @@ export async function markNotificationReadAction(
 export async function markAllNotificationsReadAction(): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -167,7 +173,9 @@ export async function getUnreadNotificationCountAction(): Promise<
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -199,7 +207,9 @@ export async function deleteNotificationsAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 

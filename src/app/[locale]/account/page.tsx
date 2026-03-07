@@ -89,6 +89,9 @@ export default async function AccountPage() {
                 phoneNumber: user.phoneNumber.toString(),
                 language: user.language,
                 createdAt: user.createdAt,
+                nickname: user.nickname.getValue(),
+                allowFindByName: user.allowFindByName,
+                allowFindByPhone: user.allowFindByPhone,
               }}
             />
           </div>

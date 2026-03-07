@@ -101,7 +101,14 @@ export default async function OrganizationDetailPage({
           </div>
           {firstAdmin && (
             <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-              {t('firstAdmin')}: {firstAdmin.firstName} {firstAdmin.lastName}
+              {t('firstAdmin')}:{' '}
+              {[
+                firstAdmin.lastName,
+                firstAdmin.middleName,
+                firstAdmin.firstName,
+              ]
+                .filter(Boolean)
+                .join(' ')}
             </Text>
           )}
         </div>

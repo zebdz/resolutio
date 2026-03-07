@@ -150,6 +150,9 @@ class MockUserRepository implements UserRepository {
   async searchUsers(): Promise<User[]> {
     return [];
   }
+  async searchUserByPhone(_phone: string): Promise<User | null> {
+    return null;
+  }
   async isSuperAdmin(): Promise<boolean> {
     return false;
   }
@@ -158,6 +161,16 @@ class MockUserRepository implements UserRepository {
   addUser(user: User) {
     this.users.set(user.id, user);
   }
+
+  async findByNickname(): Promise<User | null> {
+    return null;
+  }
+
+  async isNicknameAvailable(): Promise<boolean> {
+    return true;
+  }
+
+  async updatePrivacySettings(): Promise<void> {}
 }
 
 function createOrg(id: string, name: string): Organization {
@@ -229,7 +242,7 @@ describe('NotifyJoinRequestReceivedUseCase', () => {
       expect(notification.data).toEqual({
         organizationId: 'org-1',
         organizationName: 'Test Org',
-        requesterName: 'Ivan Petrov',
+        requesterName: 'Petrov Ivan',
       });
     }
 

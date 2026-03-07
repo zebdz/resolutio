@@ -12,6 +12,7 @@ import { Text } from '@/app/components/catalyst/text';
 import { AlertBanner } from '@/app/components/catalyst/alert-banner';
 import { loginAction } from '@/web/actions/auth';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/16/solid';
+import { TurnstileWidget } from '@/web/components/auth/TurnstileWidget';
 
 export function LoginForm() {
   const t = useTranslations('auth');
@@ -21,6 +22,7 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [showPassword, setShowPassword] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   // Form field values
   const [formValues, setFormValues] = useState({
@@ -57,6 +59,10 @@ export function LoginForm() {
 
     // Override formatted phone with clean E.164 value from React state
     formData.set('phoneNumber', formValues.phoneNumber);
+
+    if (captchaToken) {
+      formData.set('captchaToken', captchaToken);
+    }
 
     startTransition(async () => {
       const result = await loginAction(formData);
@@ -159,11 +165,17 @@ export function LoginForm() {
         </Field>
       </FieldGroup>
 
+      <TurnstileWidget
+        onSuccess={setCaptchaToken}
+        onExpire={() => setCaptchaToken(null)}
+        onError={() => setCaptchaToken(null)}
+      />
+
       <Button
         type="submit"
         color="brand-green"
         className="w-full"
-        disabled={isPending}
+        disabled={isPending || !captchaToken}
       >
         {isPending ? t('login.signingIn') : t('login.submit')}
       </Button>

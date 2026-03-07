@@ -228,7 +228,6 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
         expect(result.value.requests[0].userId).toBe('user-1');
         expect(result.value.requests[0].firstName).toBe('John');
         expect(result.value.requests[0].lastName).toBe('Doe');
-        expect(result.value.requests[0].phoneNumber).toBe('+1234567890');
         expect(result.value.requests[0].middleName).toBeUndefined();
 
         expect(result.value.requests[1].userId).toBe('user-2');

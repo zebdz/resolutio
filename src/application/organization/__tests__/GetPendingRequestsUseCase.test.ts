@@ -150,9 +150,6 @@ describe('GetPendingRequestsUseCase', () => {
       expect(result.value.requests[0].requester.id).toBe('user-456');
       expect(result.value.requests[0].requester.firstName).toBe('John');
       expect(result.value.requests[0].requester.lastName).toBe('Doe');
-      expect(result.value.requests[0].requester.phoneNumber).toBe(
-        '+1234567890'
-      );
       expect(result.value.requests[0].requestedAt).toBeInstanceOf(Date);
     }
   });

@@ -18,8 +18,7 @@ import {
 } from '@/web/actions/poll';
 import { toast } from 'sonner';
 import { Link } from '@/src/i18n/routing';
-
-type PollState = 'DRAFT' | 'READY' | 'ACTIVE' | 'FINISHED';
+import { PollState } from '@/src/domain/poll/PollState';
 
 interface PollControlsProps {
   pollId: string;

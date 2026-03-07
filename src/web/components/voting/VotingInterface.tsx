@@ -11,6 +11,7 @@ import VotingQuestion from './VotingQuestion';
 import VotingProgress from './VotingProgress';
 import VotingControls from './VotingControls';
 import { toast } from 'sonner';
+import type { QuestionType } from '@/src/domain/poll/QuestionType';
 
 interface Question {
   id: string;
@@ -18,7 +19,7 @@ interface Question {
   details: string | null;
   page: number;
   order: number;
-  questionType: 'single-choice' | 'multiple-choice';
+  questionType: QuestionType;
   answers: Answer[];
 }
 

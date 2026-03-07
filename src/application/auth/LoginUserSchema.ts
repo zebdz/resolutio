@@ -1,9 +1,10 @@
 import { z } from 'zod';
+import { PHONE_NUMBER_REGEX } from '../../domain/user/PhoneNumber';
 
 export const LoginUserSchema = z.object({
   phoneNumber: z
     .string()
-    .regex(/^\+[1-9]\d{1,14}$/, 'Invalid phone number format'),
+    .regex(PHONE_NUMBER_REGEX, 'Invalid phone number format'),
   password: z.string().min(1, 'Password is required'),
 });
 

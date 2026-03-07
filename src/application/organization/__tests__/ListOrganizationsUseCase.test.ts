@@ -14,7 +14,12 @@ class MockOrganizationRepository implements OrganizationRepository {
     string,
     {
       memberCount: number;
-      firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      firstAdmin: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        middleName: string | null;
+      } | null;
     }
   > = new Map();
   private userMemberships: Map<string, Set<string>> = new Map(); // userId -> Set<orgId>
@@ -84,14 +89,24 @@ class MockOrganizationRepository implements OrganizationRepository {
     Array<{
       organization: Organization;
       memberCount: number;
-      firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      firstAdmin: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        middleName: string | null;
+      } | null;
       parentOrg: { id: string; name: string } | null;
     }>
   > {
     const result: Array<{
       organization: Organization;
       memberCount: number;
-      firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      firstAdmin: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        middleName: string | null;
+      } | null;
       parentOrg: { id: string; name: string } | null;
     }> = [];
 
@@ -207,7 +222,12 @@ class MockOrganizationRepository implements OrganizationRepository {
     orgId: string,
     stats: {
       memberCount: number;
-      firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      firstAdmin: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        middleName: string | null;
+      } | null;
     }
   ) {
     this.stats.set(orgId, stats);
@@ -439,12 +459,22 @@ describe('ListOrganizationsUseCase', () => {
 
       organizationRepository.setStats('org-1', {
         memberCount: 5,
-        firstAdmin: { id: 'admin-1', firstName: 'Alice', lastName: 'Smith' },
+        firstAdmin: {
+          id: 'admin-1',
+          firstName: 'Alice',
+          lastName: 'Smith',
+          middleName: null,
+        },
       });
 
       organizationRepository.setStats('org-2', {
         memberCount: 10,
-        firstAdmin: { id: 'admin-2', firstName: 'Bob', lastName: 'Johnson' },
+        firstAdmin: {
+          id: 'admin-2',
+          firstName: 'Bob',
+          lastName: 'Johnson',
+          middleName: null,
+        },
       });
 
       organizationRepository.setStats('org-3', {

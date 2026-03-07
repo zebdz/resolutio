@@ -1,6 +1,9 @@
 import { Result, success, failure } from '../shared/Result';
 import { OrganizationDomainCodes } from './OrganizationDomainCodes';
 
+export const ORGANIZATION_NAME_MAX_LENGTH = 255;
+export const ORGANIZATION_DESCRIPTION_MAX_LENGTH = 2000;
+
 export interface OrganizationProps {
   id: string;
   name: string;
@@ -25,7 +28,7 @@ export class Organization {
       return failure(OrganizationDomainCodes.ORGANIZATION_NAME_EMPTY);
     }
 
-    if (name.length > 255) {
+    if (name.length > ORGANIZATION_NAME_MAX_LENGTH) {
       return failure(OrganizationDomainCodes.ORGANIZATION_NAME_TOO_LONG);
     }
 
@@ -34,7 +37,7 @@ export class Organization {
       return failure(OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_EMPTY);
     }
 
-    if (description.length > 2000) {
+    if (description.length > ORGANIZATION_DESCRIPTION_MAX_LENGTH) {
       return failure(OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_TOO_LONG);
     }
 
@@ -113,7 +116,7 @@ export class Organization {
       return failure(OrganizationDomainCodes.ORGANIZATION_NAME_EMPTY);
     }
 
-    if (name.length > 255) {
+    if (name.length > ORGANIZATION_NAME_MAX_LENGTH) {
       return failure(OrganizationDomainCodes.ORGANIZATION_NAME_TOO_LONG);
     }
 
@@ -127,7 +130,7 @@ export class Organization {
       return failure(OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_EMPTY);
     }
 
-    if (description.length > 2000) {
+    if (description.length > ORGANIZATION_DESCRIPTION_MAX_LENGTH) {
       return failure(OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_TOO_LONG);
     }
 

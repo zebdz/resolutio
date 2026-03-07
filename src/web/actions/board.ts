@@ -59,7 +59,9 @@ export async function createBoardAction(
 ): Promise<ActionResult<{ boardId: string }>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -139,7 +141,9 @@ export async function archiveBoardAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -199,7 +203,9 @@ export async function addBoardMemberAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -265,7 +271,9 @@ export async function removeBoardMemberAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -338,19 +346,21 @@ export async function getBoardDetailsAction(boardId: string): Promise<
       id: string;
       firstName: string;
       lastName: string;
-      phoneNumber: string;
+      middleName: string | null;
     }>;
     organizationMembers: Array<{
       id: string;
       firstName: string;
       lastName: string;
-      phoneNumber: string;
+      middleName: string | null;
     }>;
   }>
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -403,7 +413,7 @@ export async function getBoardDetailsAction(boardId: string): Promise<
             id: true,
             firstName: true,
             lastName: true,
-            phoneNumber: true,
+            middleName: true,
           },
         },
       },
@@ -426,7 +436,7 @@ export async function getBoardDetailsAction(boardId: string): Promise<
             id: true,
             firstName: true,
             lastName: true,
-            phoneNumber: true,
+            middleName: true,
           },
         },
       },
@@ -444,7 +454,7 @@ export async function getBoardDetailsAction(boardId: string): Promise<
           id: bm.user.id,
           firstName: bm.user.firstName,
           lastName: bm.user.lastName,
-          phoneNumber: bm.user.phoneNumber,
+          middleName: bm.user.middleName,
         })),
         organizationMembers: [
           ...new Map(
@@ -454,7 +464,7 @@ export async function getBoardDetailsAction(boardId: string): Promise<
                 id: om.user.id,
                 firstName: om.user.firstName,
                 lastName: om.user.lastName,
-                phoneNumber: om.user.phoneNumber,
+                middleName: om.user.middleName,
               },
             ])
           ).values(),
@@ -483,7 +493,9 @@ export async function getUserBoardsAction(): Promise<
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -551,13 +563,15 @@ export async function searchUsersForBoardAction(
       firstName: string;
       lastName: string;
       middleName?: string;
-      phoneNumber: string;
+      nickname: string;
     }>
   >
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -596,21 +610,24 @@ export async function searchUsersForBoardAction(
       };
     }
 
-    // Check if user is admin
+    // Check if user is admin or superadmin
+    const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
     const isAdmin = await organizationRepository.isUserAdmin(
       user.id,
       board.organizationId
     );
 
-    if (!isAdmin) {
+    if (!isAdmin && !isSuperAdmin) {
       return {
         success: false,
         error: t('unauthorized'),
       };
     }
 
-    // Search for users
-    const users = await userRepository.searchUsers(query.trim());
+    // Search for users — non-members, respect privacy
+    const users = await userRepository.searchUsers(query.trim(), {
+      respectPrivacy: true,
+    });
 
     // Get current board members
     const boardMemberIds = await prisma.boardUser.findMany({
@@ -658,7 +675,7 @@ export async function searchUsersForBoardAction(
         firstName: u.firstName,
         lastName: u.lastName,
         middleName: u.middleName,
-        phoneNumber: u.phoneNumber.getValue(),
+        nickname: u.nickname.getValue(),
       }));
 
     return {
@@ -680,7 +697,9 @@ export async function getBoardsByOrganizationAction(
 ): Promise<ActionResult<Array<{ id: string; name: string }>>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 

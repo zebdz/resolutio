@@ -1,7 +1,24 @@
 import type { UserRepository } from '@/domain/user/UserRepository';
 import { User, type Language } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
+import { Nickname } from '@/domain/user/Nickname';
 import type { PrismaClient } from '@/generated/prisma/client';
+
+const USER_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  middleName: true,
+  phoneNumber: true,
+  password: true,
+  language: true,
+  consentGivenAt: true,
+  createdAt: true,
+  nickname: true,
+  allowFindByName: true,
+  allowFindByPhone: true,
+  privacySetupCompleted: true,
+} as const;
 
 export class PrismaUserRepository implements UserRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -9,17 +26,7 @@ export class PrismaUserRepository implements UserRepository {
   async findById(id: string): Promise<User | null> {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        middleName: true,
-        phoneNumber: true,
-        password: true,
-        language: true,
-        consentGivenAt: true,
-        createdAt: true,
-      },
+      select: USER_SELECT,
     });
 
     if (!user) {
@@ -32,17 +39,7 @@ export class PrismaUserRepository implements UserRepository {
   async findByIds(ids: string[]): Promise<User[]> {
     const users = await this.prisma.user.findMany({
       where: { id: { in: ids } },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        middleName: true,
-        phoneNumber: true,
-        password: true,
-        language: true,
-        consentGivenAt: true,
-        createdAt: true,
-      },
+      select: USER_SELECT,
     });
 
     return users.map((user) => this.toDomain(user));
@@ -51,17 +48,7 @@ export class PrismaUserRepository implements UserRepository {
   async findByPhoneNumber(phoneNumber: PhoneNumber): Promise<User | null> {
     const user = await this.prisma.user.findUnique({
       where: { phoneNumber: phoneNumber.getValue() },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        middleName: true,
-        phoneNumber: true,
-        password: true,
-        language: true,
-        consentGivenAt: true,
-        createdAt: true,
-      },
+      select: USER_SELECT,
     });
 
     if (!user) {
@@ -69,6 +56,27 @@ export class PrismaUserRepository implements UserRepository {
     }
 
     return this.toDomain(user);
+  }
+
+  async findByNickname(nickname: string): Promise<User | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { nickname },
+      select: USER_SELECT,
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    return this.toDomain(user);
+  }
+
+  async isNicknameAvailable(nickname: string): Promise<boolean> {
+    const count = await this.prisma.user.count({
+      where: { nickname },
+    });
+
+    return count === 0;
   }
 
   async save(user: User): Promise<User> {
@@ -84,6 +92,10 @@ export class PrismaUserRepository implements UserRepository {
         language: user.language,
         consentGivenAt: user.consentGivenAt,
         createdAt: user.createdAt,
+        nickname: user.nickname.getValue(),
+        allowFindByName: user.allowFindByName,
+        allowFindByPhone: user.allowFindByPhone,
+        privacySetupCompleted: user.privacySetupCompleted,
       },
       update: {
         firstName: user.firstName,
@@ -92,22 +104,34 @@ export class PrismaUserRepository implements UserRepository {
         phoneNumber: user.phoneNumber.getValue(),
         password: user.password,
         language: user.language,
+        nickname: user.nickname.getValue(),
       },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        middleName: true,
-        phoneNumber: true,
-        password: true,
-        language: true,
-        consentGivenAt: true,
-        createdAt: true,
-      },
+      select: USER_SELECT,
     });
 
     // Return the reconstituted user with the actual ID from database
     return this.toDomain(savedUser);
+  }
+
+  async updatePrivacySettings(user: User): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          allowFindByName: user.allowFindByName,
+          allowFindByPhone: user.allowFindByPhone,
+          privacySetupCompleted: user.privacySetupCompleted,
+          nickname: user.nickname.getValue(),
+        },
+      }),
+      this.prisma.userPrivacyAuditLog.create({
+        data: {
+          userId: user.id,
+          allowFindByName: user.allowFindByName,
+          allowFindByPhone: user.allowFindByPhone,
+        },
+      }),
+    ]);
   }
 
   async exists(phoneNumber: PhoneNumber): Promise<boolean> {
@@ -118,31 +142,66 @@ export class PrismaUserRepository implements UserRepository {
     return count > 0;
   }
 
-  async searchUsers(query: string): Promise<User[]> {
-    const users = await this.prisma.user.findMany({
-      where: {
+  async searchUsers(
+    query: string,
+    options?: { respectPrivacy?: boolean }
+  ): Promise<User[]> {
+    const respectPrivacy = options?.respectPrivacy ?? false;
+
+    // Name-based search conditions (respects allowFindByName when privacy is on)
+    const nameConditions = [
+      { firstName: { contains: query, mode: 'insensitive' as const } },
+      { lastName: { contains: query, mode: 'insensitive' as const } },
+      { middleName: { contains: query, mode: 'insensitive' as const } },
+    ];
+
+    // Nickname is always searchable regardless of privacy settings
+    const nicknameCondition = {
+      nickname: { contains: query, mode: 'insensitive' as const },
+    };
+
+    let where;
+
+    if (respectPrivacy) {
+      // Users findable by name (opted in) OR by nickname (always)
+      where = {
         OR: [
-          { firstName: { contains: query, mode: 'insensitive' } },
-          { lastName: { contains: query, mode: 'insensitive' } },
-          { middleName: { contains: query, mode: 'insensitive' } },
-          { phoneNumber: { contains: query } },
+          {
+            AND: [{ allowFindByName: true }, { OR: nameConditions }],
+          },
+          nicknameCondition,
         ],
-      },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        middleName: true,
-        phoneNumber: true,
-        password: true,
-        language: true,
-        consentGivenAt: true,
-        createdAt: true,
-      },
-      take: 20, // Limit results to 20 users
+      };
+    } else {
+      // No privacy filter — search all by name or nickname
+      where = {
+        OR: [...nameConditions, nicknameCondition],
+      };
+    }
+
+    const users = await this.prisma.user.findMany({
+      where,
+      select: USER_SELECT,
+      take: 20,
     });
 
     return users.map((user) => this.toDomain(user));
+  }
+
+  async searchUserByPhone(phone: string): Promise<User | null> {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        phoneNumber: phone,
+        allowFindByPhone: true,
+      },
+      select: USER_SELECT,
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    return this.toDomain(user);
   }
 
   async isSuperAdmin(userId: string): Promise<boolean> {
@@ -163,6 +222,10 @@ export class PrismaUserRepository implements UserRepository {
     language: string;
     consentGivenAt: Date | null;
     createdAt: Date;
+    nickname: string;
+    allowFindByName: boolean;
+    allowFindByPhone: boolean;
+    privacySetupCompleted: boolean;
   }): User {
     // PhoneNumber.create throws if invalid, which is correct here
     // because database should always have valid phone numbers
@@ -178,6 +241,10 @@ export class PrismaUserRepository implements UserRepository {
       language: (user.language as Language) || 'ru',
       consentGivenAt: user.consentGivenAt ?? undefined,
       createdAt: user.createdAt,
+      nickname: Nickname.create(user.nickname),
+      allowFindByName: user.allowFindByName,
+      allowFindByPhone: user.allowFindByPhone,
+      privacySetupCompleted: user.privacySetupCompleted,
     });
   }
 }

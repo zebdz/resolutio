@@ -13,14 +13,17 @@ import {
   removeOrgAdminAction,
   searchUsersForOrgAdminAction,
 } from '@/web/actions/organization';
+import { searchUserByPhoneAction } from '@/web/actions/user';
+import { PhoneInput } from '@/web/components/phone';
 
 type Admin = {
   id: string;
   firstName: string;
   lastName: string;
   middleName?: string;
-  phoneNumber: string;
 };
+
+type SearchResult = Admin & { nickname: string };
 
 type Props = {
   organizationId: string;
@@ -41,7 +44,7 @@ export function AdminManagementSection({
 
   // Member search
   const [memberQuery, setMemberQuery] = useState('');
-  const [memberResults, setMemberResults] = useState<Admin[]>([]);
+  const [memberResults, setMemberResults] = useState<SearchResult[]>([]);
   const [isMemberSearching, setIsMemberSearching] = useState(false);
   const [memberSearchError, setMemberSearchError] = useState<string | null>(
     null
@@ -49,7 +52,7 @@ export function AdminManagementSection({
 
   // Non-member search
   const [nonMemberQuery, setNonMemberQuery] = useState('');
-  const [nonMemberResults, setNonMemberResults] = useState<Admin[]>([]);
+  const [nonMemberResults, setNonMemberResults] = useState<SearchResult[]>([]);
   const [isNonMemberSearching, setIsNonMemberSearching] = useState(false);
   const [nonMemberSearchError, setNonMemberSearchError] = useState<
     string | null
@@ -171,7 +174,7 @@ export function AdminManagementSection({
   };
 
   function formatName(user: Admin) {
-    return [user.firstName, user.middleName, user.lastName]
+    return [user.lastName, user.middleName, user.firstName]
       .filter(Boolean)
       .join(' ');
   }
@@ -192,9 +195,6 @@ export function AdminManagementSection({
             <div>
               <p className="font-medium text-zinc-900 dark:text-zinc-100">
                 {formatName(admin)}
-              </p>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                {admin.phoneNumber}
               </p>
             </div>
             {admin.id !== currentUserId && (
@@ -248,6 +248,7 @@ export function AdminManagementSection({
         searchError={memberSearchError}
         addingId={addingId}
         onAdd={handleAddAdmin}
+        showPhoneSearch={false}
         t={t}
       />
 
@@ -261,6 +262,7 @@ export function AdminManagementSection({
         searchError={nonMemberSearchError}
         addingId={addingId}
         onAdd={handleAddAdmin}
+        showPhoneSearch={true}
         t={t}
       />
     </div>
@@ -276,22 +278,54 @@ function SearchSection({
   searchError,
   addingId,
   onAdd,
+  showPhoneSearch,
   t,
 }: {
   title: string;
   query: string;
   onQueryChange: (q: string) => void;
-  results: Admin[];
+  results: SearchResult[];
   isSearching: boolean;
   searchError: string | null;
   addingId: string | null;
   onAdd: (userId: string) => void;
+  showPhoneSearch: boolean;
   t: ReturnType<typeof useTranslations>;
 }) {
-  function formatName(user: Admin) {
-    return [user.firstName, user.middleName, user.lastName]
+  const [phoneQuery, setPhoneQuery] = useState('');
+  const [phoneResult, setPhoneResult] = useState<SearchResult | null>(null);
+  const [isPhoneSearching, setIsPhoneSearching] = useState(false);
+  const [phoneSearchError, setPhoneSearchError] = useState<string | null>(null);
+  const [phoneSearchDone, setPhoneSearchDone] = useState(false);
+
+  const handlePhoneSearch = async () => {
+    if (!phoneQuery.trim()) {
+      return;
+    }
+
+    setIsPhoneSearching(true);
+    setPhoneSearchError(null);
+    setPhoneResult(null);
+    setPhoneSearchDone(false);
+
+    const result = await searchUserByPhoneAction(phoneQuery.trim());
+
+    if (result.success) {
+      setPhoneResult(result.data);
+      setPhoneSearchDone(true);
+    } else {
+      setPhoneSearchError(result.error);
+    }
+
+    setIsPhoneSearching(false);
+  };
+
+  function formatName(user: SearchResult) {
+    const name = [user.lastName, user.middleName, user.firstName]
       .filter(Boolean)
       .join(' ');
+
+    return `${name} (@${user.nickname})`;
   }
 
   return (
@@ -300,6 +334,7 @@ function SearchSection({
         {title}
       </h3>
 
+      {/* Name/nickname search */}
       <Field>
         <Label>{t('searchPlaceholder')}</Label>
         <Input
@@ -344,9 +379,6 @@ function SearchSection({
                 <p className="font-medium text-zinc-900 dark:text-zinc-100">
                   {formatName(user)}
                 </p>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {user.phoneNumber}
-                </p>
               </div>
               <Button
                 color="brand-green"
@@ -357,6 +389,72 @@ function SearchSection({
               </Button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Phone search — separate section, only for non-members */}
+      {showPhoneSearch && (
+        <div className="mt-6 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+          <Field>
+            <Label>{t('phoneSearchLabel')}</Label>
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <PhoneInput
+                  name="phoneSearch"
+                  value={phoneQuery}
+                  onChange={(e164) => {
+                    setPhoneQuery(e164);
+                    setPhoneSearchDone(false);
+                    setPhoneResult(null);
+                    setPhoneSearchError(null);
+                  }}
+                  disabled={addingId !== null || isPhoneSearching}
+                />
+              </div>
+              <Button
+                color="zinc"
+                onClick={handlePhoneSearch}
+                disabled={
+                  addingId !== null || isPhoneSearching || phoneQuery.length < 5
+                }
+              >
+                {isPhoneSearching
+                  ? t('phoneSearchSearching')
+                  : t('phoneSearchButton')}
+              </Button>
+            </div>
+          </Field>
+
+          {phoneSearchError && (
+            <div className="mt-2 text-sm text-red-600 dark:text-red-400">
+              {phoneSearchError}
+            </div>
+          )}
+
+          {phoneSearchDone && !phoneResult && (
+            <div className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+              {t('phoneSearchNotFound')}
+            </div>
+          )}
+
+          {phoneResult && (
+            <div className="mt-4">
+              <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
+                <div>
+                  <p className="font-medium text-zinc-900 dark:text-zinc-100">
+                    {formatName(phoneResult)}
+                  </p>
+                </div>
+                <Button
+                  color="brand-green"
+                  onClick={() => onAdd(phoneResult.id)}
+                  disabled={addingId !== null}
+                >
+                  {addingId === phoneResult.id ? t('adding') : t('addAdmin')}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

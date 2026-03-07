@@ -10,7 +10,12 @@ export interface OrganizationSearchFilters {
 export interface OrganizationWithStats {
   organization: Organization;
   memberCount: number;
-  firstAdmin: { id: string; firstName: string; lastName: string } | null;
+  firstAdmin: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    middleName: string | null;
+  } | null;
   parentOrg: { id: string; name: string } | null;
 }
 

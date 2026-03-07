@@ -4,6 +4,9 @@ import { Answer } from './Answer';
 import { PollDomainCodes } from './PollDomainCodes';
 import { PollState } from './PollState';
 
+export const POLL_TITLE_MAX_LENGTH = 500;
+export const POLL_DESCRIPTION_MAX_LENGTH = 500;
+
 export interface PollProps {
   id: string;
   title: string;
@@ -37,7 +40,7 @@ export class Poll {
       return failure(PollDomainCodes.POLL_TITLE_EMPTY);
     }
 
-    if (title.length > 500) {
+    if (title.length > POLL_TITLE_MAX_LENGTH) {
       return failure(PollDomainCodes.POLL_TITLE_TOO_LONG);
     }
 
@@ -46,7 +49,7 @@ export class Poll {
       return failure(PollDomainCodes.POLL_DESCRIPTION_EMPTY);
     }
 
-    if (description.length > 5000) {
+    if (description.length > POLL_DESCRIPTION_MAX_LENGTH) {
       return failure(PollDomainCodes.POLL_DESCRIPTION_TOO_LONG);
     }
 

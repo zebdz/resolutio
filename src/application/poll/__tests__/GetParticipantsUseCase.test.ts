@@ -91,7 +91,6 @@ describe('GetParticipantsUseCase', () => {
           id: 'user-1',
           firstName: 'John',
           lastName: 'Doe',
-          phoneNumber: '+1234567890',
         }),
       },
     };

@@ -18,7 +18,7 @@ type Member = {
   id: string;
   firstName: string;
   lastName: string;
-  phoneNumber: string;
+  middleName: string | null;
 };
 
 type MembersListProps = {
@@ -91,11 +91,10 @@ export default function MembersList({ boardId, members }: MembersListProps) {
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <h4 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                  {member.firstName} {member.lastName}
+                  {[member.lastName, member.middleName, member.firstName]
+                    .filter(Boolean)
+                    .join(' ')}
                 </h4>
-                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-                  {member.phoneNumber}
-                </p>
               </div>
               <div>
                 <Button color="red" onClick={() => handleRemoveClick(member)}>
@@ -113,7 +112,13 @@ export default function MembersList({ boardId, members }: MembersListProps) {
         <DialogDescription>
           {selectedMember &&
             t('removeDialogDescription', {
-              name: `${selectedMember.firstName} ${selectedMember.lastName}`,
+              name: [
+                selectedMember.lastName,
+                selectedMember.middleName,
+                selectedMember.firstName,
+              ]
+                .filter(Boolean)
+                .join(' '),
             })}
         </DialogDescription>
         <DialogBody>

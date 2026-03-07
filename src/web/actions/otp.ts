@@ -45,7 +45,9 @@ export async function requestOtpAction(
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('otp.errors');
   const tCommon = await getTranslations('common.errors');
@@ -96,7 +98,9 @@ export async function verifyOtpAction(
 ): Promise<ActionResult<{ verified: boolean }>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('otp.errors');
   const tCommon = await getTranslations('common.errors');

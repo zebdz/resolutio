@@ -17,7 +17,9 @@ export default function RateLimitedPage() {
   const [secondsLeft, setSecondsLeft] = useState(initialSeconds);
 
   useEffect(() => {
-    if (secondsLeft <= 0) {return;}
+    if (secondsLeft <= 0) {
+      return;
+    }
 
     const timer = setTimeout(() => {
       setSecondsLeft((s) => s - 1);

@@ -5,8 +5,15 @@ export interface UserRepository {
   findById(id: string): Promise<User | null>;
   findByIds(ids: string[]): Promise<User[]>;
   findByPhoneNumber(phoneNumber: PhoneNumber): Promise<User | null>;
+  findByNickname(nickname: string): Promise<User | null>;
+  isNicknameAvailable(nickname: string): Promise<boolean>;
   save(user: User): Promise<User>;
+  updatePrivacySettings(user: User): Promise<void>;
   exists(phoneNumber: PhoneNumber): Promise<boolean>;
-  searchUsers(query: string): Promise<User[]>;
+  searchUsers(
+    query: string,
+    options?: { respectPrivacy?: boolean }
+  ): Promise<User[]>;
+  searchUserByPhone(phone: string): Promise<User | null>;
   isSuperAdmin(userId: string): Promise<boolean>;
 }

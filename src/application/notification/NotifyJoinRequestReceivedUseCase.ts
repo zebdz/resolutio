@@ -1,6 +1,7 @@
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
+import { User } from '../../domain/user/User';
 import { Notification } from '../../domain/notification/Notification';
 
 export interface NotifyJoinRequestReceivedDependencies {
@@ -34,7 +35,11 @@ export class NotifyJoinRequestReceivedUseCase {
       return;
     }
 
-    const requesterName = `${requester.firstName} ${requester.lastName}`;
+    const requesterName = User.formatFullName(
+      requester.firstName,
+      requester.lastName,
+      requester.middleName
+    );
 
     const notifications = adminUserIds
       .map((userId) =>

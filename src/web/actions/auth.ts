@@ -6,6 +6,7 @@ import { RegisterUserUseCase } from '@/application/auth/RegisterUserUseCase';
 import { LoginUserUseCase } from '@/application/auth/LoginUserUseCase';
 import { LogoutUserUseCase } from '@/application/auth/LogoutUserUseCase';
 import { Locale, defaultLocale } from '@/src/i18n/locales';
+import { NAME_MIN_LENGTH, NAME_MAX_LENGTH } from '@/domain/user/User';
 import {
   prisma,
   PrismaUserRepository,
@@ -13,6 +14,7 @@ import {
   PrismaOtpRepository,
   Argon2PasswordHasher,
   Argon2PasswordVerifier,
+  TurnstileCaptchaVerifier,
 } from '@/infrastructure/index';
 import {
   setSessionCookie,
@@ -28,7 +30,14 @@ import {
 } from '@/domain/shared/errors';
 import { OtpErrors } from '@/application/auth/OtpErrors';
 import { AuthErrors } from '@/application/auth/AuthErrors';
-import { checkRateLimit } from '@/web/actions/rateLimit';
+import {
+  checkRateLimit,
+  checkLoginRateLimit,
+  checkRegistrationRateLimit,
+  recordFailedLogin,
+  resetLoginRateLimit,
+} from '@/web/actions/rateLimit';
+import { getClientIp } from '@/web/lib/clientIp';
 
 // Helper function to check if error is a Prisma connection error
 function isDatabaseConnectionError(error: unknown): boolean {
@@ -76,6 +85,10 @@ const otpRepository = new PrismaOtpRepository(prisma);
 const passwordHasher = new Argon2PasswordHasher();
 const passwordVerifier = new Argon2PasswordVerifier();
 
+const captchaVerifier = new TurnstileCaptchaVerifier(
+  process.env.TURNSTILE_SECRET_KEY || ''
+);
+
 // Use cases
 const registerUserUseCase = new RegisterUserUseCase(
   userRepository,
@@ -94,7 +107,16 @@ export async function registerAction(
 ): Promise<ActionResult<{ userId: string }>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const clientIp = await getClientIp();
+  const regRateLimited = await checkRegistrationRateLimit(clientIp);
+
+  if (regRateLimited) {
+    return regRateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -116,6 +138,7 @@ export async function registerAction(
     const validation = RegisterUserSchema.safeParse(input);
 
     if (!validation.success) {
+      const tDomain = await getTranslations('domain');
       const fieldErrors: Record<string, string[]> = {};
       validation.error.issues.forEach((err) => {
         const path = err.path.join('.');
@@ -124,7 +147,14 @@ export async function registerAction(
           fieldErrors[path] = [];
         }
 
-        fieldErrors[path].push(err.message);
+        // Translate domain codes (e.g. "domain.user.firstNameInvalid")
+        const msg = err.message.startsWith('domain.')
+          ? tDomain(err.message.replace('domain.', '') as any, {
+              minLength: NAME_MIN_LENGTH,
+              maxLength: NAME_MAX_LENGTH,
+            })
+          : err.message;
+        fieldErrors[path].push(msg);
       });
 
       return {
@@ -227,7 +257,9 @@ export async function loginAction(
 ): Promise<ActionResult<{ userId: string }>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -260,6 +292,28 @@ export async function loginAction(
       };
     }
 
+    // Verify CAPTCHA
+    const clientIp = await getClientIp();
+    const captchaToken = formData.get('captchaToken') as string;
+
+    if (captchaToken) {
+      const captchaValid = await captchaVerifier.verify(captchaToken, clientIp);
+
+      if (!captchaValid) {
+        return { success: false, error: t('captchaFailed') };
+      }
+    }
+
+    // Check login rate limit (per IP+phone)
+    const loginRateLimited = await checkLoginRateLimit(
+      validation.data.phoneNumber,
+      clientIp
+    );
+
+    if (loginRateLimited) {
+      return loginRateLimited;
+    }
+
     // Execute use case
     let result;
 
@@ -288,6 +342,8 @@ export async function loginAction(
 
       // Handle specific error types
       if (result.error instanceof UnauthorizedError) {
+        await recordFailedLogin(validation.data.phoneNumber, clientIp);
+
         return {
           success: false,
           error: t('invalidCredentials'),
@@ -299,6 +355,9 @@ export async function loginAction(
         error: result.error.message,
       };
     }
+
+    // Reset login rate limit on success
+    await resetLoginRateLimit(validation.data.phoneNumber, clientIp);
 
     // Set session cookie
     await setSessionCookie(result.value.session.id);
@@ -345,61 +404,4 @@ export async function logoutAction(): Promise<void> {
 
   // Redirect to home page
   redirect('/');
-}
-
-// Helper function to get current user from session
-export async function getCurrentUser(): Promise<{
-  id: string;
-  firstName: string;
-  lastName: string;
-  phoneNumber: string;
-} | null> {
-  try {
-    const sessionId = await getSessionCookie();
-
-    if (!sessionId) {
-      return null;
-    }
-
-    // Find session
-    const session = await sessionRepository.findById(sessionId);
-
-    if (!session) {
-      // Invalid session, clean up cookie
-      await deleteSessionCookie();
-
-      return null;
-    }
-
-    // Check if session expired
-    if (session.expiresAt < new Date()) {
-      // Expired session, clean up
-      await sessionRepository.delete(sessionId);
-      await deleteSessionCookie();
-
-      return null;
-    }
-
-    // Get user
-    const user = await userRepository.findById(session.userId);
-
-    if (!user) {
-      // User not found, clean up session
-      await sessionRepository.delete(sessionId);
-      await deleteSessionCookie();
-
-      return null;
-    }
-
-    return {
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      phoneNumber: user.phoneNumber.getValue(),
-    };
-  } catch (error) {
-    console.error('Get current user error:', error);
-
-    return null;
-  }
 }

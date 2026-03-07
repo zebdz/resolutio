@@ -86,7 +86,9 @@ export async function submitDraftAction(data: {
 }): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -157,7 +159,9 @@ export async function getUserVotingProgressAction(
 ): Promise<ActionResult<any>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -210,7 +214,9 @@ export async function finishVotingAction(
 ): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -260,7 +266,9 @@ export async function getPollResultsAction(
 ): Promise<ActionResult<any>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -312,7 +320,9 @@ export async function canUserVoteAction(
 ): Promise<ActionResult<{ canVote: boolean; reason?: string }>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 

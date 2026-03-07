@@ -131,7 +131,9 @@ export async function createOrganizationAction(
 ): Promise<ActionResult<{ organizationId: string; autoJoinFailed?: boolean }>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
@@ -300,14 +302,21 @@ export async function listOrganizationsAction(): Promise<
       name: string;
       description: string;
       memberCount: number;
-      firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      firstAdmin: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        middleName: string | null;
+      } | null;
       parentOrg: { id: string; name: string } | null;
     }>;
   }>
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -362,7 +371,12 @@ export async function searchOrganizationsAction(
       name: string;
       description: string;
       memberCount: number;
-      firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      firstAdmin: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        middleName: string | null;
+      } | null;
       parentOrg: { id: string; name: string } | null;
     }>;
     totalCount: number;
@@ -370,7 +384,9 @@ export async function searchOrganizationsAction(
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -409,7 +425,9 @@ export async function joinOrganizationAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
@@ -510,7 +528,9 @@ export async function getAdminOrganizationsAction(): Promise<
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -605,7 +625,9 @@ export async function getUserOrganizationsAction(): Promise<
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -679,7 +701,7 @@ export async function getPendingRequestsAction(
         id: string;
         firstName: string;
         lastName: string;
-        phoneNumber: string;
+        middleName: string | null;
       };
       requestedAt: Date;
     }>;
@@ -688,7 +710,9 @@ export async function getPendingRequestsAction(
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -735,7 +759,9 @@ export async function handleJoinRequestAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
@@ -832,7 +858,12 @@ export async function getOrganizationDetailsAction(
     }>;
     isUserMember: boolean;
     isUserAdmin: boolean;
-    firstAdmin: { id: string; firstName: string; lastName: string } | null;
+    firstAdmin: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      middleName: string | null;
+    } | null;
     ancestors: Array<{ id: string; name: string; memberCount: number }>;
     hierarchyTree: {
       id: string;
@@ -844,7 +875,9 @@ export async function getOrganizationDetailsAction(
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -910,7 +943,6 @@ export async function getOrganizationPendingRequestsAction(
       firstName: string;
       lastName: string;
       middleName?: string;
-      phoneNumber: string;
       requestedAt: Date;
     }>;
     totalCount: number;
@@ -918,7 +950,9 @@ export async function getOrganizationPendingRequestsAction(
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -968,7 +1002,9 @@ export async function cancelJoinRequestAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
@@ -1027,7 +1063,9 @@ export async function getUserMemberOrganizationsAction(): Promise<
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -1087,7 +1125,9 @@ export async function archiveOrganizationAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -1129,7 +1169,9 @@ export async function unarchiveOrganizationAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -1177,7 +1219,12 @@ export async function searchAllOrganizationsAction(
       name: string;
       description: string;
       memberCount: number;
-      firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      firstAdmin: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        middleName: string | null;
+      } | null;
       parentOrg: { id: string; name: string } | null;
       archivedAt: Date | null;
     }>;
@@ -1186,7 +1233,9 @@ export async function searchAllOrganizationsAction(
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -1247,7 +1296,9 @@ export async function updateOrganizationAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
@@ -1295,7 +1346,9 @@ export async function addOrgAdminAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
@@ -1334,7 +1387,9 @@ export async function removeOrgAdminAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
@@ -1374,13 +1429,14 @@ export async function getOrgAdminsAction(organizationId: string): Promise<
       firstName: string;
       lastName: string;
       middleName?: string;
-      phoneNumber: string;
     }>
   >
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -1402,7 +1458,6 @@ export async function getOrgAdminsAction(organizationId: string): Promise<
         firstName: u.firstName,
         lastName: u.lastName,
         middleName: u.middleName,
-        phoneNumber: u.phoneNumber.getValue(),
       })),
     };
   } catch (error) {
@@ -1423,13 +1478,15 @@ export async function searchUsersForOrgAdminAction(
       firstName: string;
       lastName: string;
       middleName?: string;
-      phoneNumber: string;
+      nickname: string;
     }>
   >
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -1455,8 +1512,11 @@ export async function searchUsersForOrgAdminAction(
       return { success: false, error: t('unauthorized') };
     }
 
-    // Search users
-    const users = await userRepository.searchUsers(query.trim());
+    // Search users: members are visible to each other, non-members respect privacy
+    const respectPrivacy = scope === 'non-members';
+    const users = await userRepository.searchUsers(query.trim(), {
+      respectPrivacy,
+    });
 
     // Get current admin IDs to exclude
     const adminIds =
@@ -1487,7 +1547,7 @@ export async function searchUsersForOrgAdminAction(
         firstName: u.firstName,
         lastName: u.lastName,
         middleName: u.middleName,
-        phoneNumber: u.phoneNumber.getValue(),
+        nickname: u.nickname.getValue(),
       }));
 
     return { success: true, data: filteredUsers };

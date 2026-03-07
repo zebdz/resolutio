@@ -156,7 +156,9 @@ export async function createPollAction(
 ): Promise<ActionResult<{ pollId: string }>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -241,7 +243,9 @@ export async function addQuestionAction(
 ): Promise<ActionResult<{ questionId: string }>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -342,7 +346,9 @@ export async function updateQuestionOrderAction(input: {
 }): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -412,7 +418,9 @@ export async function updateQuestionOrderAction(input: {
 export async function getUserPollsAction(): Promise<ActionResult<any[]>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -495,7 +503,9 @@ export async function getPollsByBoardIdAction(
 ): Promise<ActionResult<any[]>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -555,7 +565,9 @@ export async function getPollByIdAction(
 ): Promise<ActionResult<any>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -638,7 +650,9 @@ export async function updatePollAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -719,7 +733,9 @@ export async function canEditPollAction(
 ): Promise<ActionResult<{ canEdit: boolean; reason?: string }>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -832,7 +848,9 @@ export async function updateQuestionAction(data: {
 }): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -877,7 +895,9 @@ export async function deleteQuestionAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -921,7 +941,9 @@ export async function updateAnswerAction(data: {
 }): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -967,7 +989,9 @@ export async function createAnswerAction(data: {
 }): Promise<ActionResult<{ answerId: string }>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -1014,7 +1038,9 @@ export async function deleteAnswerAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -1059,7 +1085,9 @@ export async function activatePollAction(
 ): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -1106,7 +1134,9 @@ export async function deactivatePollAction(
 ): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -1153,7 +1183,9 @@ export async function finishPollAction(
 ): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -1200,7 +1232,9 @@ export async function takeSnapshotAction(
 ): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -1248,7 +1282,9 @@ export async function discardSnapshotAction(
 ): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -1295,7 +1331,9 @@ export async function canManagePollAction(
 ): Promise<ActionResult<boolean>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -1370,7 +1408,9 @@ export async function searchPollsAction(
 ): Promise<ActionResult<{ polls: any[]; totalCount: number }>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 

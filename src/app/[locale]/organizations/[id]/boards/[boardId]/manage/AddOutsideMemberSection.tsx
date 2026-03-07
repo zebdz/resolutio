@@ -10,13 +10,15 @@ import {
   addBoardMemberAction,
   searchUsersForBoardAction,
 } from '@/web/actions/board';
+import { searchUserByPhoneAction } from '@/web/actions/user';
+import { PhoneInput } from '@/web/components/phone';
 
 type User = {
   id: string;
   firstName: string;
   lastName: string;
   middleName?: string;
-  phoneNumber: string;
+  nickname: string;
 };
 
 type AddOutsideMemberSectionProps = {
@@ -35,7 +37,14 @@ export default function AddOutsideMemberSection({
   const [error, setError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
 
-  // Debounced search
+  // Phone search state
+  const [phoneQuery, setPhoneQuery] = useState('');
+  const [phoneResult, setPhoneResult] = useState<User | null>(null);
+  const [isPhoneSearching, setIsPhoneSearching] = useState(false);
+  const [phoneSearchError, setPhoneSearchError] = useState<string | null>(null);
+  const [phoneSearchDone, setPhoneSearchDone] = useState(false);
+
+  // Debounced name/nickname search
   const performSearch = useCallback(
     async (query: string) => {
       if (!query || query.trim().length < 2) {
@@ -65,7 +74,7 @@ export default function AddOutsideMemberSection({
   useEffect(() => {
     const timer = setTimeout(() => {
       performSearch(searchQuery);
-    }, 500); // 500ms debounce
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [searchQuery, performSearch]);
@@ -83,6 +92,9 @@ export default function AddOutsideMemberSection({
     if (result.success) {
       setSearchQuery('');
       setSearchResults([]);
+      setPhoneQuery('');
+      setPhoneResult(null);
+      setPhoneSearchDone(false);
       setIsAdding(false);
       router.refresh();
     } else {
@@ -91,12 +103,43 @@ export default function AddOutsideMemberSection({
     }
   };
 
+  const handlePhoneSearch = async () => {
+    if (!phoneQuery.trim()) {
+      return;
+    }
+
+    setIsPhoneSearching(true);
+    setPhoneSearchError(null);
+    setPhoneResult(null);
+    setPhoneSearchDone(false);
+
+    const result = await searchUserByPhoneAction(phoneQuery.trim());
+
+    if (result.success) {
+      setPhoneResult(result.data);
+      setPhoneSearchDone(true);
+    } else {
+      setPhoneSearchError(result.error);
+    }
+
+    setIsPhoneSearching(false);
+  };
+
+  function formatName(user: User) {
+    const name = [user.lastName, user.middleName, user.firstName]
+      .filter(Boolean)
+      .join(' ');
+
+    return `${name} (@${user.nickname})`;
+  }
+
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
       <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
         {t('addOutsideMember')}
       </h3>
 
+      {/* Name/nickname search */}
       <Field>
         <Label>{t('searchPlaceholder')}</Label>
         <Input
@@ -143,11 +186,7 @@ export default function AddOutsideMemberSection({
             >
               <div>
                 <p className="font-medium text-zinc-900 dark:text-zinc-100">
-                  {user.firstName} {user.middleName && `${user.middleName} `}
-                  {user.lastName}
-                </p>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {user.phoneNumber}
+                  {formatName(user)}
                 </p>
               </div>
               <Button
@@ -161,6 +200,68 @@ export default function AddOutsideMemberSection({
           ))}
         </div>
       )}
+
+      {/* Phone search — separate section */}
+      <div className="mt-6 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+        <Field>
+          <Label>{t('phoneSearchLabel')}</Label>
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <PhoneInput
+                name="phoneSearch"
+                value={phoneQuery}
+                onChange={(e164) => {
+                  setPhoneQuery(e164);
+                  setPhoneSearchDone(false);
+                  setPhoneResult(null);
+                  setPhoneSearchError(null);
+                }}
+                disabled={isAdding || isPhoneSearching}
+              />
+            </div>
+            <Button
+              color="zinc"
+              onClick={handlePhoneSearch}
+              disabled={isAdding || isPhoneSearching || phoneQuery.length < 5}
+            >
+              {isPhoneSearching
+                ? t('phoneSearchSearching')
+                : t('phoneSearchButton')}
+            </Button>
+          </div>
+        </Field>
+
+        {phoneSearchError && (
+          <div className="mt-2 text-sm text-red-600 dark:text-red-400">
+            {phoneSearchError}
+          </div>
+        )}
+
+        {phoneSearchDone && !phoneResult && (
+          <div className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+            {t('phoneSearchNotFound')}
+          </div>
+        )}
+
+        {phoneResult && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
+              <div>
+                <p className="font-medium text-zinc-900 dark:text-zinc-100">
+                  {formatName(phoneResult)}
+                </p>
+              </div>
+              <Button
+                color="brand-green"
+                onClick={() => handleAdd(phoneResult.id)}
+                disabled={isAdding}
+              >
+                {isAdding ? t('adding') : t('add')}
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {error && (
         <div className="mt-4 text-sm text-red-600 dark:text-red-400">

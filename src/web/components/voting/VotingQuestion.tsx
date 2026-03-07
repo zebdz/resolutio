@@ -3,6 +3,7 @@
 import { Radio, RadioGroup, RadioField } from '@/app/components/catalyst/radio';
 import { Checkbox, CheckboxField } from '@/app/components/catalyst/checkbox';
 import { Label } from '@/app/components/catalyst/fieldset';
+import type { QuestionType } from '@/src/domain/poll/QuestionType';
 
 interface Answer {
   id: string;
@@ -14,7 +15,7 @@ interface Question {
   id: string;
   text: string;
   details: string | null;
-  questionType: 'single-choice' | 'multiple-choice';
+  questionType: QuestionType;
   answers: Answer[];
 }
 

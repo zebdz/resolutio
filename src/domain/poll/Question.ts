@@ -3,6 +3,9 @@ import { QuestionType, isValidQuestionType } from './QuestionType';
 import { Answer, AnswerProps } from './Answer';
 import { PollDomainCodes } from './PollDomainCodes';
 
+export const QUESTION_TEXT_MAX_LENGTH = 500;
+export const QUESTION_DETAILS_MAX_LENGTH = 500;
+
 export interface QuestionProps {
   id: string;
   text: string;
@@ -31,11 +34,11 @@ export class Question {
       return failure(PollDomainCodes.QUESTION_TEXT_EMPTY);
     }
 
-    if (text.length > 1000) {
+    if (text.length > QUESTION_TEXT_MAX_LENGTH) {
       return failure(PollDomainCodes.QUESTION_TEXT_TOO_LONG);
     }
 
-    if (details && details.length > 5000) {
+    if (details && details.length > QUESTION_DETAILS_MAX_LENGTH) {
       return failure(PollDomainCodes.QUESTION_DETAILS_TOO_LONG);
     }
 

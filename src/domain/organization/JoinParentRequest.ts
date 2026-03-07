@@ -1,6 +1,9 @@
 import { Result, success, failure } from '../shared/Result';
 import { JoinParentRequestDomainCodes } from './JoinParentRequestDomainCodes';
 
+export const JOIN_PARENT_REQUEST_MESSAGE_MAX_LENGTH = 500;
+export const REJECTION_REASON_MAX_LENGTH = 500;
+
 export interface JoinParentRequestProps {
   id: string;
   childOrgId: string;
@@ -27,7 +30,7 @@ export class JoinParentRequest {
       return failure(JoinParentRequestDomainCodes.MESSAGE_EMPTY);
     }
 
-    if (message.length > 2000) {
+    if (message.length > JOIN_PARENT_REQUEST_MESSAGE_MAX_LENGTH) {
       return failure(JoinParentRequestDomainCodes.MESSAGE_TOO_LONG);
     }
 

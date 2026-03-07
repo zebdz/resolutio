@@ -4,7 +4,6 @@ export interface ProtocolSignerEntry {
   firstName: string;
   lastName: string;
   middleName: string | null;
-  phoneNumber: string;
   willingToSignProtocol: boolean;
 }
 
@@ -24,19 +23,14 @@ export interface ProtocolSignersPdfTranslations {
   notWillingSection: string;
   columnNumber: string;
   columnFullName: string;
-  columnPhone: string;
   pageOf: string;
   generatedOn: string;
 }
 
 function formatFullName(entry: ProtocolSignerEntry): string {
-  const parts = [entry.lastName, entry.firstName];
-
-  if (entry.middleName) {
-    parts.push(entry.middleName);
-  }
-
-  return parts.join(' ');
+  return [entry.lastName, entry.middleName, entry.firstName]
+    .filter(Boolean)
+    .join(' ');
 }
 
 function buildSignersTable(
@@ -55,13 +49,11 @@ function buildSignersTable(
       alignment: 'center' as const,
     },
     { text: t.columnFullName, style: 'tableHeader' },
-    { text: t.columnPhone, style: 'tableHeader', alignment: 'center' as const },
   ];
 
   const tableRows = entries.map((entry, i) => [
     { text: String(i + 1), alignment: 'center' as const },
     { text: formatFullName(entry) },
-    { text: entry.phoneNumber, alignment: 'center' as const },
   ]);
 
   return {
@@ -74,7 +66,7 @@ function buildSignersTable(
       {
         table: {
           headerRows: 1,
-          widths: [30, '*', 120],
+          widths: [30, '*'],
           body: [tableHeader, ...tableRows],
         },
         layout: 'lightHorizontalLines',

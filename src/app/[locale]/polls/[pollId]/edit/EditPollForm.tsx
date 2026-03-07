@@ -23,6 +23,7 @@ import {
 } from '@/web/actions/poll';
 import { Link } from '@/src/i18n/routing';
 import { QuestionType } from '@/domain/poll/QuestionType';
+import { PollState } from '@/src/domain/poll/PollState';
 import { PollSidebar } from '@/web/components/PollSidebar';
 import { QuestionForm } from '@/web/components/QuestionForm';
 import PollControls from '@/web/components/PollControls';
@@ -45,8 +46,6 @@ interface Question {
   answers?: Answer[];
 }
 
-type PollState = 'DRAFT' | 'READY' | 'ACTIVE' | 'FINISHED';
-
 interface PollData {
   title: string;
   description: string;
@@ -67,7 +66,7 @@ export function EditPollForm() {
     description: '',
     startDate: '',
     endDate: '',
-    state: 'DRAFT',
+    state: PollState.DRAFT,
   });
 
   const [questions, setQuestions] = useState<Question[]>([]);

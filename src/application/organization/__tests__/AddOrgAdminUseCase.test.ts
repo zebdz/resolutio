@@ -126,6 +126,9 @@ class MockUserRepository implements UserRepository {
   async searchUsers(): Promise<User[]> {
     return [];
   }
+  async searchUserByPhone(_phone: string): Promise<User | null> {
+    return null;
+  }
   async isSuperAdmin(userId: string): Promise<boolean> {
     return this.superAdmins.has(userId);
   }
@@ -136,6 +139,16 @@ class MockUserRepository implements UserRepository {
   addUser(user: User): void {
     this.users.set(user.id, user);
   }
+
+  async findByNickname(): Promise<User | null> {
+    return null;
+  }
+
+  async isNicknameAvailable(): Promise<boolean> {
+    return true;
+  }
+
+  async updatePrivacySettings(): Promise<void> {}
 }
 
 function makeOrg(id: string): Organization {

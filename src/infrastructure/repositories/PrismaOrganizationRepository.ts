@@ -505,7 +505,12 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     Array<{
       organization: Organization;
       memberCount: number;
-      firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      firstAdmin: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        middleName: string | null;
+      } | null;
       parentOrg: { id: string; name: string } | null;
     }>
   > {
@@ -547,6 +552,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
                 id: true,
                 firstName: true,
                 lastName: true,
+                middleName: true,
               },
             },
           },
@@ -577,6 +583,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
               id: org.admins[0].user.id,
               firstName: org.admins[0].user.firstName,
               lastName: org.admins[0].user.lastName,
+              middleName: org.admins[0].user.middleName,
             }
           : null,
       parentOrg: org.parent
@@ -633,7 +640,12 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           take: 1,
           include: {
             user: {
-              select: { id: true, firstName: true, lastName: true },
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                middleName: true,
+              },
             },
           },
         },
@@ -670,6 +682,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
                 id: org.admins[0].user.id,
                 firstName: org.admins[0].user.firstName,
                 lastName: org.admins[0].user.lastName,
+                middleName: org.admins[0].user.middleName,
               }
             : null,
         parentOrg: org.parent

@@ -7,6 +7,8 @@ import VoterBreakdownDialog from './VoterBreakdownDialog';
 import ExportPdfButton from './ExportPdfButton';
 import ExportProtocolPdfButton from './ExportProtocolPdfButton';
 import { Button } from '@/app/components/catalyst/button';
+import { PollState } from '@/src/domain/poll/PollState';
+import type { QuestionType } from '@/src/domain/poll/QuestionType';
 
 interface AnswerResult {
   answerId: string;
@@ -24,7 +26,7 @@ interface AnswerResult {
 interface QuestionResult {
   questionId: string;
   questionText: string;
-  questionType: 'single-choice' | 'multiple-choice';
+  questionType: QuestionType;
   totalVotes: number;
   totalWeight: number;
   answers: AnswerResult[];
@@ -35,7 +37,6 @@ interface ProtocolSignWillingnessEntry {
   firstName: string;
   lastName: string;
   middleName: string | null;
-  phoneNumber: string;
   willingToSignProtocol: boolean;
 }
 
@@ -50,7 +51,7 @@ interface PollResultsData {
 
 interface PollResultsProps {
   results: PollResultsData;
-  pollState: string;
+  pollState: PollState;
   isPollCreator: boolean;
   canViewVoters: boolean;
 }
@@ -302,8 +303,9 @@ export default function PollResults({
                             key={p.userId}
                             className="text-sm text-zinc-700 dark:text-zinc-300"
                           >
-                            {p.lastName} {p.firstName}
-                            {p.middleName ? ` ${p.middleName}` : ''}
+                            {[p.lastName, p.middleName, p.firstName]
+                              .filter(Boolean)
+                              .join(' ')}
                           </li>
                         ))}
                     </ul>
@@ -326,8 +328,9 @@ export default function PollResults({
                             key={p.userId}
                             className="text-sm text-zinc-700 dark:text-zinc-300"
                           >
-                            {p.lastName} {p.firstName}
-                            {p.middleName ? ` ${p.middleName}` : ''}
+                            {[p.lastName, p.middleName, p.firstName]
+                              .filter(Boolean)
+                              .join(' ')}
                           </li>
                         ))}
                     </ul>

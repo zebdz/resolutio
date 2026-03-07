@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
-import { rateLimiter } from './infrastructure/rateLimit';
+import { rateLimiter, MIDDLEWARE_RATE_LIMIT } from './infrastructure/rateLimit';
 import { extractIpFromRequest } from './infrastructure/rateLimit/extractIp';
 
 const intlMiddleware = createMiddleware(routing);
@@ -59,7 +59,7 @@ export default function middleware(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         'Retry-After': String(result.retryAfterSeconds),
-        'X-RateLimit-Limit': '60',
+        'X-RateLimit-Limit': String(MIDDLEWARE_RATE_LIMIT),
         'X-RateLimit-Remaining': '0',
       },
     });

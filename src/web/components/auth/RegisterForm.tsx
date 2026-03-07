@@ -10,12 +10,20 @@ import { Checkbox, CheckboxField } from '@/app/components/catalyst/checkbox';
 import { PhoneInput } from '@/web/components/phone';
 import { Text, TextLink } from '@/app/components/catalyst/text';
 import { AlertBanner } from '@/app/components/catalyst/alert-banner';
+import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import { TurnstileWidget } from './TurnstileWidget';
 import { OtpInput } from './OtpInput';
 import { registerAction } from '@/web/actions/auth';
 import { requestOtpAction, verifyOtpAction } from '@/web/actions/otp';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/16/solid';
 import { Locale } from '@/src/i18n/locales';
+import {
+  NAME_REGEX,
+  NAME_MIN_LENGTH,
+  NAME_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  passwordMatchesPersonalInfo,
+} from '@/domain/user/User';
 
 type Props = {
   locale: Locale;
@@ -81,11 +89,144 @@ export function RegisterForm({ locale }: Props) {
       });
     }
 
+    // Re-validate password against personal info when name/phone changes
+    if (
+      ['firstName', 'lastName', 'middleName', 'phoneNumber'].includes(name) &&
+      formValues.password
+    ) {
+      const updatedInfo = {
+        firstName: name === 'firstName' ? value : formValues.firstName,
+        lastName: name === 'lastName' ? value : formValues.lastName,
+        middleName: name === 'middleName' ? value : formValues.middleName,
+        phoneNumber: name === 'phoneNumber' ? value : formValues.phoneNumber,
+      };
+
+      if (passwordMatchesPersonalInfo(formValues.password, updatedInfo)) {
+        setFieldErrors((prev) => ({
+          ...prev,
+          password: [t('register.errors.passwordMatchesPersonalInfo')],
+        }));
+      } else if (fieldErrors.password) {
+        setFieldErrors((prev) => {
+          const newErrors = { ...prev };
+          delete newErrors.password;
+
+          return newErrors;
+        });
+      }
+    }
+
+    // Re-validate confirmPassword mismatch when password changes
+    if (
+      name === 'password' &&
+      formValues.confirmPassword &&
+      value !== formValues.confirmPassword
+    ) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        confirmPassword: [t('register.errors.passwordMismatch')],
+      }));
+    } else if (
+      name === 'password' &&
+      value === formValues.confirmPassword &&
+      fieldErrors.confirmPassword
+    ) {
+      setFieldErrors((prev) => {
+        const newErrors = { ...prev };
+        delete newErrors.confirmPassword;
+
+        return newErrors;
+      });
+    }
+
     // Clear general error if user is fixing issues
     if (error) {
       setError(null);
     }
   }
+
+  const nameParams = { minLength: NAME_MIN_LENGTH, maxLength: NAME_MAX_LENGTH };
+
+  function handleBlur(e: React.FocusEvent<HTMLInputElement>) {
+    const { name, value } = e.target;
+
+    if (name === 'firstName' && value && !isNameValid(value)) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        firstName: [t('register.errors.firstNameInvalid', nameParams)],
+      }));
+    }
+
+    if (name === 'lastName' && value && !isNameValid(value)) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        lastName: [t('register.errors.lastNameInvalid', nameParams)],
+      }));
+    }
+
+    if (name === 'middleName' && value && !isNameValid(value)) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        middleName: [t('register.errors.middleNameInvalid', nameParams)],
+      }));
+    }
+
+    if (name === 'password' && value && value.length < PASSWORD_MIN_LENGTH) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        password: [
+          t('register.errors.passwordTooShort', {
+            minLength: PASSWORD_MIN_LENGTH,
+          }),
+        ],
+      }));
+    } else if (
+      name === 'password' &&
+      value &&
+      passwordMatchesPersonalInfo(value, {
+        firstName: formValues.firstName,
+        lastName: formValues.lastName,
+        middleName: formValues.middleName || undefined,
+        phoneNumber: formValues.phoneNumber,
+      })
+    ) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        password: [t('register.errors.passwordMatchesPersonalInfo')],
+      }));
+    }
+
+    if (
+      name === 'confirmPassword' &&
+      value &&
+      formValues.password &&
+      value !== formValues.password
+    ) {
+      setFieldErrors((prev) => ({
+        ...prev,
+        confirmPassword: [t('register.errors.passwordMismatch')],
+      }));
+    }
+  }
+
+  function isNameValid(name: string): boolean {
+    return name.length <= NAME_MAX_LENGTH && NAME_REGEX.test(name);
+  }
+
+  const isFormValid =
+    isNameValid(formValues.firstName) &&
+    isNameValid(formValues.lastName) &&
+    (!formValues.middleName || isNameValid(formValues.middleName)) &&
+    !!formValues.phoneNumber &&
+    formValues.password.length >= PASSWORD_MIN_LENGTH &&
+    !passwordMatchesPersonalInfo(formValues.password, {
+      firstName: formValues.firstName,
+      lastName: formValues.lastName,
+      middleName: formValues.middleName || undefined,
+      phoneNumber: formValues.phoneNumber,
+    }) &&
+    formValues.password === formValues.confirmPassword &&
+    formValues.consentGiven;
 
   const handleRequestOtp = useCallback(() => {
     setError(null);
@@ -117,9 +258,48 @@ export function RegisterForm({ locale }: Props) {
         return;
       }
 
+      if (!isNameValid(formValues.firstName)) {
+        setFieldErrors({
+          firstName: [
+            t('register.errors.firstNameInvalid', {
+              minLength: NAME_MIN_LENGTH,
+              maxLength: NAME_MAX_LENGTH,
+            }),
+          ],
+        });
+
+        return;
+      }
+
       if (!formValues.lastName.trim()) {
         setFieldErrors({
           lastName: [t('register.errors.lastNameRequired') || 'Required'],
+        });
+
+        return;
+      }
+
+      if (!isNameValid(formValues.lastName)) {
+        setFieldErrors({
+          lastName: [
+            t('register.errors.lastNameInvalid', {
+              minLength: NAME_MIN_LENGTH,
+              maxLength: NAME_MAX_LENGTH,
+            }),
+          ],
+        });
+
+        return;
+      }
+
+      if (formValues.middleName && !isNameValid(formValues.middleName)) {
+        setFieldErrors({
+          middleName: [
+            t('register.errors.middleNameInvalid', {
+              minLength: NAME_MIN_LENGTH,
+              maxLength: NAME_MAX_LENGTH,
+            }),
+          ],
         });
 
         return;
@@ -131,11 +311,28 @@ export function RegisterForm({ locale }: Props) {
         return;
       }
 
-      if (formValues.password.length < 8) {
+      if (formValues.password.length < PASSWORD_MIN_LENGTH) {
         setFieldErrors({
           password: [
-            t('register.errors.passwordTooShort') || 'Min 8 characters',
+            t('register.errors.passwordTooShort', {
+              minLength: PASSWORD_MIN_LENGTH,
+            }),
           ],
+        });
+
+        return;
+      }
+
+      if (
+        passwordMatchesPersonalInfo(formValues.password, {
+          firstName: formValues.firstName,
+          lastName: formValues.lastName,
+          middleName: formValues.middleName || undefined,
+          phoneNumber: formValues.phoneNumber,
+        })
+      ) {
+        setFieldErrors({
+          password: [t('register.errors.passwordMatchesPersonalInfo')],
         });
 
         return;
@@ -333,6 +530,7 @@ export function RegisterForm({ locale }: Props) {
             autoComplete="given-name"
             value={formValues.firstName}
             onChange={handleInputChange}
+            onBlur={handleBlur}
             required
             disabled={isPending}
             invalid={!!fieldErrors.firstName}
@@ -352,6 +550,7 @@ export function RegisterForm({ locale }: Props) {
             autoComplete="family-name"
             value={formValues.lastName}
             onChange={handleInputChange}
+            onBlur={handleBlur}
             required
             disabled={isPending}
             invalid={!!fieldErrors.lastName}
@@ -371,6 +570,7 @@ export function RegisterForm({ locale }: Props) {
             autoComplete="additional-name"
             value={formValues.middleName}
             onChange={handleInputChange}
+            onBlur={handleBlur}
             disabled={isPending}
             invalid={!!fieldErrors.middleName}
           />
@@ -425,6 +625,7 @@ export function RegisterForm({ locale }: Props) {
               autoComplete="new-password"
               value={formValues.password}
               onChange={handleInputChange}
+              onBlur={handleBlur}
               required
               disabled={isPending}
               invalid={!!fieldErrors.password}
@@ -448,6 +649,7 @@ export function RegisterForm({ locale }: Props) {
               {fieldErrors.password[0]}
             </Text>
           )}
+          <PasswordStrengthMeter password={formValues.password} />
         </Field>
 
         <Field>
@@ -459,6 +661,7 @@ export function RegisterForm({ locale }: Props) {
               autoComplete="new-password"
               value={formValues.confirmPassword}
               onChange={handleInputChange}
+              onBlur={handleBlur}
               required
               disabled={isPending}
               invalid={!!fieldErrors.confirmPassword}
@@ -520,7 +723,7 @@ export function RegisterForm({ locale }: Props) {
         type="submit"
         color="brand-green"
         className="w-full"
-        disabled={isPending || !captchaToken || !formValues.consentGiven}
+        disabled={isPending || !captchaToken || !isFormValid}
       >
         {isPending ? t('register.registering') : t('register.submit')}
       </Button>

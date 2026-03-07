@@ -1,4 +1,5 @@
 import type { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
+import type { QuestionType } from '@/src/domain/poll/QuestionType';
 
 export interface PdfAnswerData {
   answerText: string;
@@ -10,7 +11,7 @@ export interface PdfAnswerData {
 export interface PdfQuestionData {
   questionText: string;
   questionDetails: string | null;
-  questionType: string;
+  questionType: QuestionType;
   totalVotes: number;
   totalWeight: number;
   answers: PdfAnswerData[];
@@ -43,7 +44,7 @@ export interface PdfTranslations {
   totalWeight: string;
   weightOfVoted: string;
   questionNumber: string;
-  questionType: string;
+  questionType: QuestionType;
   questionDetails: string;
   votedOnQuestion: string;
   weightOfVotedOnQuestion: string;

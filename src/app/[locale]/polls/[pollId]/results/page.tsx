@@ -100,7 +100,13 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
         voters: canViewVoters
           ? a.voters.map((v: any) => ({
               userId: v.userId,
-              userName: `${v.userName.firstName} ${v.userName.lastName}`,
+              userName: [
+                v.userName.lastName,
+                v.userName.middleName,
+                v.userName.firstName,
+              ]
+                .filter(Boolean)
+                .join(' '),
               weight:
                 typeof v.weight === 'object' ? Number(v.weight) : v.weight,
             }))
@@ -115,7 +121,6 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
             firstName: entry.firstName,
             lastName: entry.lastName,
             middleName: entry.middleName,
-            phoneNumber: entry.phoneNumber,
             willingToSignProtocol: entry.willingToSignProtocol,
           })
         )

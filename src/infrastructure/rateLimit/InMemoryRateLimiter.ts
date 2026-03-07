@@ -47,6 +47,35 @@ export class InMemoryRateLimiter {
     };
   }
 
+  /** Check if key would be rate-limited WITHOUT recording a new attempt. */
+  peek(key: string): RateLimitResult {
+    const now = Date.now();
+    const windowStart = now - this.windowMs;
+    const timestamps = this.store.get(key) ?? [];
+    const recent = timestamps.filter((t) => t > windowStart);
+
+    if (recent.length >= this.maxRequests) {
+      const oldestInWindow = recent[0];
+      const retryAfterMs = oldestInWindow + this.windowMs - now;
+
+      return {
+        allowed: false,
+        retryAfterSeconds: Math.max(Math.ceil(retryAfterMs / 1000), 1),
+        remaining: 0,
+      };
+    }
+
+    return {
+      allowed: true,
+      retryAfterSeconds: 0,
+      remaining: this.maxRequests - recent.length,
+    };
+  }
+
+  reset(key: string): void {
+    this.store.delete(key);
+  }
+
   cleanup(): void {
     const now = Date.now();
     const windowStart = now - this.windowMs;

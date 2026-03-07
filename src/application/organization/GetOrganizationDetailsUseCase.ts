@@ -34,7 +34,12 @@ export interface OrganizationDetailsResult {
   boards: BoardWithMemberCount[];
   isUserMember: boolean;
   isUserAdmin: boolean;
-  firstAdmin: { id: string; firstName: string; lastName: string } | null;
+  firstAdmin: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    middleName: string | null;
+  } | null;
   ancestors: OrganizationAncestor[];
   hierarchyTree: OrganizationTreeNode;
 }
@@ -155,6 +160,7 @@ export class GetOrganizationDetailsUseCase {
             id: true,
             firstName: true,
             lastName: true,
+            middleName: true,
           },
         },
       },
@@ -170,6 +176,7 @@ export class GetOrganizationDetailsUseCase {
             id: firstAdmin.user.id,
             firstName: firstAdmin.user.firstName,
             lastName: firstAdmin.user.lastName,
+            middleName: firstAdmin.user.middleName,
           }
         : null,
       ancestors: hierarchy.ancestors,

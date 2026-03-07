@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RegisterUserUseCase } from '../RegisterUserUseCase';
+import { RegisterUserSchema } from '../RegisterUserSchema';
 import { OtpErrors } from '../OtpErrors';
 import { AuthErrors } from '../AuthErrors';
 import { UserRepository } from '@/domain/user/UserRepository';
@@ -9,11 +10,14 @@ import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { OtpVerification, OtpChannel } from '@/domain/otp/OtpVerification';
 import { PasswordHasher } from '../RegisterUserUseCase';
 import { DuplicateError } from '@/domain/shared/errors';
+import { UserDomainCodes } from '@/domain/user/UserDomainCodes';
 
 // Mock UserRepository
 class MockUserRepository implements UserRepository {
   private users: Map<string, User> = new Map();
   private nextId = 1;
+  nicknameAvailableResponses: boolean[] = [];
+  isNicknameAvailableCalls: string[] = [];
 
   async findById(id: string): Promise<User | null> {
     return this.users.get(id) || null;
@@ -49,9 +53,29 @@ class MockUserRepository implements UserRepository {
     return [];
   }
 
+  async searchUserByPhone(_phone: string): Promise<User | null> {
+    return null;
+  }
+
   async isSuperAdmin(): Promise<boolean> {
     return false;
   }
+
+  async findByNickname(): Promise<User | null> {
+    return null;
+  }
+
+  async isNicknameAvailable(nickname: string): Promise<boolean> {
+    this.isNicknameAvailableCalls.push(nickname);
+
+    if (this.nicknameAvailableResponses.length > 0) {
+      return this.nicknameAvailableResponses.shift()!;
+    }
+
+    return true;
+  }
+
+  async updatePrivacySettings(): Promise<void> {}
 }
 
 // Mock OtpRepository
@@ -270,5 +294,157 @@ describe('RegisterUserUseCase', () => {
     if (!result.success) {
       expect(result.error).toBeInstanceOf(DuplicateError);
     }
+  });
+
+  it('should create user with a random nickname', async () => {
+    const otp = OtpVerification.reconstitute({
+      id: 'otp-1',
+      identifier: '+79161234567',
+      channel: 'sms',
+      code: 'hashed-code',
+      clientIp: '127.0.0.1',
+      attempts: 1,
+      maxAttempts: 5,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      verifiedAt: new Date(),
+      createdAt: new Date(),
+    });
+    otpRepository.addOtp(otp);
+
+    const result = await useCase.execute(validInput);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      const nickname = result.value.nickname.getValue();
+      expect(nickname).toMatch(/^user_[a-f0-9]{8}$/);
+    }
+
+    expect(userRepository.isNicknameAvailableCalls.length).toBe(1);
+  });
+
+  it('should retry nickname generation when taken', async () => {
+    const otp = OtpVerification.reconstitute({
+      id: 'otp-1',
+      identifier: '+79161234567',
+      channel: 'sms',
+      code: 'hashed-code',
+      clientIp: '127.0.0.1',
+      attempts: 1,
+      maxAttempts: 5,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      verifiedAt: new Date(),
+      createdAt: new Date(),
+    });
+    otpRepository.addOtp(otp);
+
+    // First 2 nicknames taken, third available
+    userRepository.nicknameAvailableResponses = [false, false, true];
+
+    const result = await useCase.execute(validInput);
+
+    expect(result.success).toBe(true);
+    // Should have checked 3 times (2 taken + 1 available)
+    expect(userRepository.isNicknameAvailableCalls.length).toBe(3);
+  });
+
+  it('should create user with privacy defaults set to false', async () => {
+    const otp = OtpVerification.reconstitute({
+      id: 'otp-1',
+      identifier: '+79161234567',
+      channel: 'sms',
+      code: 'hashed-code',
+      clientIp: '127.0.0.1',
+      attempts: 1,
+      maxAttempts: 5,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      verifiedAt: new Date(),
+      createdAt: new Date(),
+    });
+    otpRepository.addOtp(otp);
+
+    const result = await useCase.execute(validInput);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.allowFindByName).toBe(false);
+      expect(result.value.allowFindByPhone).toBe(false);
+      expect(result.value.privacySetupCompleted).toBe(false);
+    }
+  });
+});
+
+describe('RegisterUserSchema', () => {
+  const validSchemaInput = {
+    firstName: 'John',
+    lastName: 'Doe',
+    phoneNumber: '+79161234567',
+    password: 'securepass',
+    confirmPassword: 'securepass',
+    language: 'ru' as const,
+    otpId: 'otp-1',
+    consentGiven: true as const,
+  };
+
+  it('should reject password matching firstName (case-insensitive)', () => {
+    const result = RegisterUserSchema.safeParse({
+      ...validSchemaInput,
+      firstName: 'Johnjohn',
+      password: 'johnjohn',
+      confirmPassword: 'johnjohn',
+    });
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      const pwError = result.error.issues.find((i) =>
+        i.path.includes('password')
+      );
+      expect(pwError?.message).toBe(
+        UserDomainCodes.PASSWORD_MATCHES_PERSONAL_INFO
+      );
+    }
+  });
+
+  it('should reject password matching lastName', () => {
+    const result = RegisterUserSchema.safeParse({
+      ...validSchemaInput,
+      lastName: 'Doe',
+      password: 'Doe12345',
+      confirmPassword: 'Doe12345',
+    });
+    // This should pass — "Doe12345" != "Doe"
+    expect(result.success).toBe(true);
+
+    const result2 = RegisterUserSchema.safeParse({
+      ...validSchemaInput,
+      lastName: 'Doeville',
+      password: 'doeville',
+      confirmPassword: 'doeville',
+    });
+    expect(result2.success).toBe(false);
+  });
+
+  it('should reject password matching phoneNumber', () => {
+    const result = RegisterUserSchema.safeParse({
+      ...validSchemaInput,
+      password: '+79161234567',
+      confirmPassword: '+79161234567',
+    });
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      const pwError = result.error.issues.find((i) =>
+        i.path.includes('password')
+      );
+      expect(pwError?.message).toBe(
+        UserDomainCodes.PASSWORD_MATCHES_PERSONAL_INFO
+      );
+    }
+  });
+
+  it('should accept valid password not matching personal info', () => {
+    const result = RegisterUserSchema.safeParse(validSchemaInput);
+    expect(result.success).toBe(true);
   });
 });

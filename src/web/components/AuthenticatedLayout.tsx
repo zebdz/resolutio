@@ -25,6 +25,11 @@ export async function AuthenticatedLayout({
     redirect('/login');
   }
 
+  // Force privacy gate for users who haven't completed setup
+  if (!user.privacySetupCompleted) {
+    redirect('/privacy-setup');
+  }
+
   const [isSuperAdmin, unreadNotificationCount] = await Promise.all([
     userRepository.isSuperAdmin(user.id),
     notificationRepository.getUnreadCount(user.id),

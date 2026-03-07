@@ -36,6 +36,8 @@
     "@prisma/client": "^7.1.0",
     "@tanstack/react-virtual": "^3.13.18",
     "@types/pdfmake": "^0.3.1",
+    "@zxcvbn-ts/core": "^3.0.4",
+    "@zxcvbn-ts/language-common": "^3.0.4",
     "arctic": "^3.7.0",
     "clsx": "^2.1.1",
     "d3-hierarchy": "^3.1.2",

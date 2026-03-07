@@ -79,7 +79,9 @@ export async function getParticipantsAction(
 ): Promise<ActionResult<any>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -133,7 +135,9 @@ export async function updateParticipantWeightAction(data: {
 }): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -206,7 +210,9 @@ export async function removeParticipantAction(
 ): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -255,7 +261,9 @@ export async function getWeightHistoryAction(
 ): Promise<ActionResult<any>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 

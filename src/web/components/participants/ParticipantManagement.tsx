@@ -20,12 +20,12 @@ import EditWeightDialog from './EditWeightDialog';
 import WeightHistoryDialog from './WeightHistoryDialog';
 import RemoveParticipantDialog from './RemoveParticipantDialog';
 import { toast } from 'sonner';
+import { PollState } from '@/src/domain/poll/PollState';
 
 interface Participant {
   id: string;
   userId: string;
   userName: string;
-  userPhone: string;
   weight: number;
   updatedAt: string; // ISO date string
 }
@@ -33,7 +33,7 @@ interface Participant {
 interface ParticipantManagementProps {
   pollId: string;
   participantsData: { participants: Participant[]; canModify: boolean };
-  pollState: string;
+  pollState: PollState;
 }
 
 export default function ParticipantManagement({
@@ -147,7 +147,6 @@ export default function ParticipantManagement({
             <TableHead>
               <TableRow>
                 <TableHeader>{t('name')}</TableHeader>
-                <TableHeader>{t('phone')}</TableHeader>
                 <TableHeader>{t('weight')}</TableHeader>
                 <TableHeader>{t('lastChanged')}</TableHeader>
                 <TableHeader>{t('actions')}</TableHeader>
@@ -157,7 +156,6 @@ export default function ParticipantManagement({
               {participants.map((participant) => (
                 <TableRow key={participant.id}>
                   <TableCell>{participant.userName}</TableCell>
-                  <TableCell>{participant.userPhone}</TableCell>
                   <TableCell>{participant.weight.toFixed(2)}</TableCell>
                   <TableCell>
                     {new Date(participant.updatedAt).toLocaleDateString()}

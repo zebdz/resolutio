@@ -1,5 +1,6 @@
 import { User } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
+import { Nickname } from '@/domain/user/Nickname';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { DuplicateError, ValidationError } from '@/domain/shared/errors';
@@ -61,6 +62,22 @@ export class RegisterUserUseCase {
       // Hash password
       const hashedPassword = await this.passwordHasher.hash(input.password);
 
+      // Generate unique nickname
+      let nickname = Nickname.generate();
+      const MAX_NICKNAME_RETRIES = 5;
+
+      for (let i = 0; i < MAX_NICKNAME_RETRIES; i++) {
+        const available = await this.userRepository.isNicknameAvailable(
+          nickname.getValue()
+        );
+
+        if (available) {
+          break;
+        }
+
+        nickname = Nickname.generate();
+      }
+
       // Create user entity
       const user = User.create({
         firstName: input.firstName,
@@ -70,6 +87,7 @@ export class RegisterUserUseCase {
         password: hashedPassword,
         language: input.language || 'ru',
         consentGivenAt: new Date(),
+        nickname,
       });
 
       // Save user

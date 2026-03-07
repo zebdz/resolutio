@@ -55,7 +55,12 @@ class MockOrganizationRepository implements OrganizationRepository {
     Array<{
       organization: Organization;
       memberCount: number;
-      firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      firstAdmin: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        middleName: string | null;
+      } | null;
     }>
   > {
     return [];

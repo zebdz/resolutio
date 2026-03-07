@@ -291,7 +291,12 @@ class MockOrganizationRepository implements OrganizationRepository {
     Array<{
       organization: Organization;
       memberCount: number;
-      firstAdmin: { id: string; firstName: string; lastName: string } | null;
+      firstAdmin: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        middleName: string | null;
+      } | null;
     }>
   > {
     return [];
@@ -377,9 +382,23 @@ class MockUserRepository implements UserRepository {
     return [];
   }
 
+  async searchUserByPhone(_phone: string): Promise<User | null> {
+    return null;
+  }
+
   async isSuperAdmin(userId: string): Promise<boolean> {
     return this.superAdmins.has(userId);
   }
+
+  async findByNickname(): Promise<User | null> {
+    return null;
+  }
+
+  async isNicknameAvailable(): Promise<boolean> {
+    return true;
+  }
+
+  async updatePrivacySettings(): Promise<void> {}
 }
 
 class MockBoardRepository implements Pick<BoardRepository, 'findById'> {

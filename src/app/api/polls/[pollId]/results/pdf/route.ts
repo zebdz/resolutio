@@ -3,6 +3,7 @@ import path from 'path';
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { GetPollResultsUseCase } from '@/application/poll/GetPollResultsUseCase';
+import type { QuestionType } from '@/src/domain/poll/QuestionType';
 import {
   prisma,
   PrismaPollRepository,
@@ -139,7 +140,7 @@ export async function GET(
       questions: results.map((q) => ({
         questionText: q.questionText ?? '',
         questionDetails: q.questionDetails,
-        questionType: q.questionType ?? 'single-choice',
+        questionType: (q.questionType ?? 'single-choice') as QuestionType,
         totalVotes: q.totalVotes ?? 0,
         totalWeight: q.answers.reduce(
           (sum, a) => sum + (Number(a.totalWeight) || 0),

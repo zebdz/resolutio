@@ -114,7 +114,6 @@ export async function GET(
           firstName: entry.firstName,
           lastName: entry.lastName,
           middleName: entry.middleName,
-          phoneNumber: entry.phoneNumber,
           willingToSignProtocol: entry.willingToSignProtocol,
         })),
       },

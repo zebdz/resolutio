@@ -375,6 +375,7 @@ async function main() {
     password: pw,
     language: i % 10 === 0 ? ('en' as const) : ('ru' as const),
     consentGivenAt: new Date('2026-03-03'),
+    nickname: `user_${String(i).padStart(4, '0')}`,
   }));
 
   await prisma.user.createMany({ data: usersInput });

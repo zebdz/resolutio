@@ -19,7 +19,7 @@ export interface ParticipantWithUser {
     id: string;
     firstName: string;
     lastName: string;
-    phoneNumber: string;
+    middleName: string | null;
   };
 }
 
@@ -90,7 +90,7 @@ export class GetParticipantsUseCase {
           id: true,
           firstName: true,
           lastName: true,
-          phoneNumber: true,
+          middleName: true,
         },
       });
 

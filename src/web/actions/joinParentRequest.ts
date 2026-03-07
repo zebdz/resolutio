@@ -75,7 +75,9 @@ export async function requestJoinParentAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
@@ -134,7 +136,9 @@ export async function cancelJoinParentRequestAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
@@ -180,7 +184,9 @@ export async function handleJoinParentRequestAction(
 ): Promise<ActionResult> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
   const tOrg = await getTranslations('organization');
@@ -251,7 +257,9 @@ export async function getChildOrgJoinParentRequestAction(
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -315,7 +323,9 @@ export async function getIncomingJoinParentRequestsAction(
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 
@@ -387,7 +397,9 @@ export async function getAllJoinParentRequestsAction(
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const t = await getTranslations('common.errors');
 

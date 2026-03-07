@@ -36,7 +36,7 @@ interface PendingRequest {
     id: string;
     firstName: string;
     lastName: string;
-    phoneNumber: string;
+    middleName: string | null;
   };
   requestedAt: Date;
 }
@@ -288,9 +288,6 @@ export function PendingRequestsList({
               <TableHeader>{t('columnOrganization')}</TableHeader>
               <TableHeader>{t('columnRequester')}</TableHeader>
               <TableHeader className="hidden md:table-cell">
-                {t('columnPhone')}
-              </TableHeader>
-              <TableHeader className="hidden md:table-cell">
                 {t('columnRequestedOn')}
               </TableHeader>
             </TableRow>
@@ -306,10 +303,13 @@ export function PendingRequestsList({
                 </TableCell>
                 <TableCell>{request.organizationName}</TableCell>
                 <TableCell>
-                  {request.requester.firstName} {request.requester.lastName}
-                </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  {request.requester.phoneNumber}
+                  {[
+                    request.requester.lastName,
+                    request.requester.middleName,
+                    request.requester.firstName,
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   {new Date(request.requestedAt).toLocaleDateString()}
@@ -341,14 +341,16 @@ export function PendingRequestsList({
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-3">
                           <Heading level={3} className="text-lg font-semibold">
-                            {request.requester.firstName}{' '}
-                            {request.requester.lastName}
+                            {[
+                              request.requester.lastName,
+                              request.requester.middleName,
+                              request.requester.firstName,
+                            ]
+                              .filter(Boolean)
+                              .join(' ')}
                           </Heading>
                           <Badge color="yellow">{t('statusPending')}</Badge>
                         </div>
-                        <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                          {request.requester.phoneNumber}
-                        </Text>
                         <Text className="text-xs text-zinc-500 dark:text-zinc-500">
                           {t('requestedOn')}{' '}
                           {new Date(request.requestedAt).toLocaleDateString()}
@@ -379,7 +381,13 @@ export function PendingRequestsList({
         <DialogDescription>
           {selectedRequest &&
             t('rejectDialogDescription', {
-              name: `${selectedRequest.requester.firstName} ${selectedRequest.requester.lastName}`,
+              name: [
+                selectedRequest.requester.lastName,
+                selectedRequest.requester.middleName,
+                selectedRequest.requester.firstName,
+              ]
+                .filter(Boolean)
+                .join(' '),
               organization: selectedRequest.organizationName,
             })}
         </DialogDescription>

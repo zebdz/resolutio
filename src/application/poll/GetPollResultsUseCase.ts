@@ -22,7 +22,11 @@ export interface AnswerResult {
   percentage: number;
   voters: Array<{
     userId: string;
-    userName: { firstName: string; lastName: string };
+    userName: {
+      firstName: string;
+      lastName: string;
+      middleName: string | null;
+    };
     weight: number;
   }>;
 }
@@ -41,7 +45,6 @@ export interface ProtocolSignWillingnessEntry {
   firstName: string;
   lastName: string;
   middleName: string | null;
-  phoneNumber: string;
   willingToSignProtocol: boolean;
 }
 
@@ -151,7 +154,7 @@ export class GetPollResultsUseCase {
     // 8. Fetch users so that we can show voter names if needed
     const usersInfo = new Map<
       string,
-      { firstName: string; lastName: string }
+      { firstName: string; lastName: string; middleName: string | null }
     >();
     const users = await this.userRepository.findByIds(
       participants.map((p) => p.userId)
@@ -162,6 +165,7 @@ export class GetPollResultsUseCase {
         usersInfo.set(user.id, {
           firstName: user.firstName,
           lastName: user.lastName,
+          middleName: user.middleName ?? null,
         });
       }
     }
@@ -213,6 +217,7 @@ export class GetPollResultsUseCase {
             userName: usersInfo.get(v.userId) || {
               firstName: 'Unknown',
               lastName: 'Unknown',
+              middleName: null,
             },
             weight: v.userWeight,
           })),
@@ -245,7 +250,6 @@ export class GetPollResultsUseCase {
           firstName: user?.firstName ?? 'Unknown',
           lastName: user?.lastName ?? 'Unknown',
           middleName: user?.middleName ?? null,
-          phoneNumber: user?.phoneNumber?.getValue() ?? '',
           willingToSignProtocol: p.willingToSignProtocol!,
         };
       });

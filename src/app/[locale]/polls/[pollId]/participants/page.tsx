@@ -84,8 +84,9 @@ export default async function ParticipantsPage({
     (p: ParticipantWithUser) => ({
       id: p.participant.id,
       userId: p.participant.userId,
-      userName: `${p.user.firstName} ${p.user.lastName}`,
-      userPhone: p.user.phoneNumber,
+      userName: [p.user.lastName, p.user.middleName, p.user.firstName]
+        .filter(Boolean)
+        .join(' '),
       weight: p.participant.userWeight,
       updatedAt: p.participant.snapshotAt.toISOString(),
     })

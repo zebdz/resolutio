@@ -218,6 +218,10 @@ class MockUserRepository implements UserRepository {
     return [];
   }
 
+  async searchUserByPhone(_phone: string): Promise<User | null> {
+    return null;
+  }
+
   async isSuperAdmin(userId: string): Promise<boolean> {
     return this.superAdmins.has(userId);
   }
@@ -229,6 +233,16 @@ class MockUserRepository implements UserRepository {
   clear(): void {
     this.superAdmins.clear();
   }
+
+  async findByNickname(): Promise<User | null> {
+    return null;
+  }
+
+  async isNicknameAvailable(): Promise<boolean> {
+    return true;
+  }
+
+  async updatePrivacySettings(): Promise<void> {}
 }
 
 describe('ArchiveBoardUseCase', () => {

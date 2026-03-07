@@ -8,7 +8,7 @@ export interface PendingRequest {
     id: string;
     firstName: string;
     lastName: string;
-    phoneNumber: string;
+    middleName: string | null;
   };
   requestedAt: Date;
 }
@@ -71,7 +71,7 @@ export class GetPendingRequestsUseCase {
             id: true,
             firstName: true,
             lastName: true,
-            phoneNumber: true,
+            middleName: true,
           },
         },
         organization: {
@@ -102,7 +102,7 @@ export class GetPendingRequestsUseCase {
         id: req.user.id,
         firstName: req.user.firstName,
         lastName: req.user.lastName,
-        phoneNumber: req.user.phoneNumber,
+        middleName: req.user.middleName,
       },
       requestedAt: req.createdAt,
     }));

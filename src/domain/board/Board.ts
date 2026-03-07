@@ -1,6 +1,8 @@
 import { Result, success, failure } from '../shared/Result';
 import { BoardDomainCodes } from './BoardDomainCodes';
 
+export const BOARD_NAME_MAX_LENGTH = 255;
+
 export interface BoardProps {
   id: string;
   name: string;
@@ -21,7 +23,7 @@ export class Board {
       return failure(BoardDomainCodes.BOARD_NAME_EMPTY);
     }
 
-    if (name.length > 255) {
+    if (name.length > BOARD_NAME_MAX_LENGTH) {
       return failure(BoardDomainCodes.BOARD_NAME_TOO_LONG);
     }
 

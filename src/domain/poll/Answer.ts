@@ -1,6 +1,8 @@
 import { Result, success, failure } from '../shared/Result';
 import { PollDomainCodes } from './PollDomainCodes';
 
+export const ANSWER_TEXT_MAX_LENGTH = 500;
+
 export interface AnswerProps {
   id: string;
   text: string;
@@ -22,7 +24,7 @@ export class Answer {
       return failure(PollDomainCodes.ANSWER_TEXT_EMPTY);
     }
 
-    if (text.length > 1000) {
+    if (text.length > ANSWER_TEXT_MAX_LENGTH) {
       return failure(PollDomainCodes.ANSWER_TEXT_TOO_LONG);
     }
 

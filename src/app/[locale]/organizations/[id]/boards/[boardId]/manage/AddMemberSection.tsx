@@ -14,7 +14,7 @@ type AddMemberSectionProps = {
     id: string;
     firstName: string;
     lastName: string;
-    phoneNumber: string;
+    middleName: string | null;
   }>;
 };
 
@@ -69,7 +69,9 @@ export default function AddMemberSection({
             <option value="">{t('selectUser')}</option>
             {availableUsers.map((user) => (
               <option key={user.id} value={user.id}>
-                {user.firstName} {user.lastName} ({user.phoneNumber})
+                {[user.lastName, user.middleName, user.firstName]
+                  .filter(Boolean)
+                  .join(' ')}
               </option>
             ))}
           </Select>

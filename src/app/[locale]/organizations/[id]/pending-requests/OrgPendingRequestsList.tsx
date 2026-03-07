@@ -33,7 +33,6 @@ interface OrgPendingRequest {
   firstName: string;
   lastName: string;
   middleName?: string;
-  phoneNumber: string;
   requestedAt: Date;
 }
 
@@ -265,9 +264,6 @@ export function OrgPendingRequestsList({
               <TableHeader>{tCommon('actions')}</TableHeader>
               <TableHeader>{t('requesterName')}</TableHeader>
               <TableHeader className="hidden md:table-cell">
-                {t('phoneNumber')}
-              </TableHeader>
-              <TableHeader className="hidden md:table-cell">
                 {t('requestedAt')}
               </TableHeader>
             </TableRow>
@@ -277,11 +273,9 @@ export function OrgPendingRequestsList({
               <TableRow key={request.userId}>
                 <TableCell>{actionButtons(request)}</TableCell>
                 <TableCell>
-                  {request.firstName} {request.lastName}
-                  {request.middleName ? ` ${request.middleName}` : ''}
-                </TableCell>
-                <TableCell className="hidden md:table-cell">
-                  {request.phoneNumber}
+                  {request.lastName}
+                  {request.middleName ? ` ${request.middleName}` : ''}{' '}
+                  {request.firstName}
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   {new Date(request.requestedAt).toLocaleDateString()}
@@ -302,12 +296,10 @@ export function OrgPendingRequestsList({
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 space-y-2">
                 <Heading level={3} className="text-lg font-semibold">
-                  {request.firstName} {request.lastName}
-                  {request.middleName ? ` ${request.middleName}` : ''}
+                  {request.lastName}
+                  {request.middleName ? ` ${request.middleName}` : ''}{' '}
+                  {request.firstName}
                 </Heading>
-                <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                  {request.phoneNumber}
-                </Text>
                 <Text className="text-xs text-zinc-500 dark:text-zinc-500">
                   {t('requestedAt')}{' '}
                   {new Date(request.requestedAt).toLocaleDateString()}
@@ -332,7 +324,13 @@ export function OrgPendingRequestsList({
         <DialogDescription>
           {selectedRequest &&
             t('rejectDialogDescription', {
-              name: `${selectedRequest.firstName} ${selectedRequest.lastName}`,
+              name: [
+                selectedRequest.lastName,
+                selectedRequest.middleName,
+                selectedRequest.firstName,
+              ]
+                .filter(Boolean)
+                .join(' '),
               organization: organizationName,
             })}
         </DialogDescription>

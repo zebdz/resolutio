@@ -87,8 +87,11 @@ export async function BoardsSection({
                           key={member.id}
                           className="py-1.5 text-sm text-zinc-700 dark:text-zinc-300"
                         >
-                          {member.lastName} {member.firstName}
-                          {member.middleName ? ` ${member.middleName}` : ''}
+                          {member.lastName}
+                          {member.middleName
+                            ? ` ${member.middleName}`
+                            : ''}{' '}
+                          {member.firstName}
                         </li>
                       ))}
                     </ul>

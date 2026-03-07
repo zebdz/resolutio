@@ -28,9 +28,13 @@ model User {
   middleName  String?  @map("middle_name")
   phoneNumber String   @unique @map("phone_number")
   password    String
-  language       String    @default("ru")
-  consentGivenAt DateTime? @map("consent_given_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
+  language              String    @default("ru")
+  consentGivenAt        DateTime? @map("consent_given_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  nickname              String    @unique
+  allowFindByName       Boolean   @default(false) @map("allow_find_by_name")
+  allowFindByPhone      Boolean   @default(false) @map("allow_find_by_phone")
+  privacySetupCompleted Boolean   @default(false) @map("privacy_setup_completed")
 
   // Relations
   sessions           Session[]
@@ -51,6 +55,7 @@ model User {
   requestedParentJoinRequests OrganizationJoinParentRequest[] @relation("RequestingAdmin")
   handledParentJoinRequests   OrganizationJoinParentRequest[] @relation("HandlingAdmin")
   notifications              Notification[]
+  privacyAuditLogs           UserPrivacyAuditLog[]
 
   @@map("users")
 }
@@ -385,5 +390,19 @@ model Notification {
   @@index([userId])
   @@index([userId, readAt])
   @@map("notifications")
+}
+
+// Privacy Audit Log
+model UserPrivacyAuditLog {
+  id               String   @id @default(cuid())
+  userId           String   @map("user_id")
+  allowFindByName  Boolean  @map("allow_find_by_name")
+  allowFindByPhone Boolean  @map("allow_find_by_phone")
+  changedAt        DateTime @default(now()) @map("changed_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_privacy_audit_log")
 }
 

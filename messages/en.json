@@ -35,7 +35,18 @@
         "consentNotGiven": "You must consent to the processing of your personal data",
         "firstNameRequired": "First name is required",
         "lastNameRequired": "Last name is required",
-        "passwordTooShort": "Password must be at least 8 characters"
+        "passwordTooShort": "Password must be at least {minLength} characters",
+        "firstNameInvalid": "First name must start with an uppercase letter, contain only letters, apostrophes, or hyphens, and be {minLength}-{maxLength} characters",
+        "lastNameInvalid": "Last name must start with an uppercase letter, contain only letters, apostrophes, or hyphens, and be {minLength}-{maxLength} characters",
+        "middleNameInvalid": "Middle name must start with an uppercase letter, contain only letters, apostrophes, or hyphens, and be {minLength}-{maxLength} characters",
+        "passwordMatchesPersonalInfo": "Password must not match your name or phone number"
+      },
+      "passwordStrength": {
+        "veryWeak": "Very weak",
+        "weak": "Weak",
+        "fair": "Fair",
+        "strong": "Strong",
+        "veryStrong": "Very strong"
       }
     },
     "logout": "Logout"
@@ -130,6 +141,16 @@
     "save": "Save Changes",
     "saving": "Saving...",
     "updateSuccess": "Profile updated successfully",
+    "nicknameLabel": "Nickname",
+    "nicknameHint": "Your nickname is always publicly visible and searchable. Others can send you invites using this nickname.",
+    "privacySection": "Privacy Settings",
+    "allowFindByNameLabel": "Allow others to find me by name",
+    "allowFindByNameDescription": "Others will be able to find you by your first, middle, or last name to invite you to organizations.",
+    "allowFindByPhoneLabel": "Allow others to find me by phone number",
+    "allowFindByPhoneDescription": "Others will be able to find you by your phone number to invite you to organizations.",
+    "privacySave": "Save Privacy Settings",
+    "privacySaving": "Saving...",
+    "privacySuccess": "Privacy settings updated successfully",
     "logout": "Logout"
   },
   "organization": {
@@ -232,7 +253,6 @@
       "rejecting": "Rejecting...",
       "columnOrganization": "Organization",
       "columnRequester": "Requester",
-      "columnPhone": "Phone",
       "columnStatus": "Status",
       "columnRequestedOn": "Requested On"
     },
@@ -283,9 +303,14 @@
       "adminSection": "Administrators",
       "addAdminFromMembers": "Add from members",
       "addAdminFromNonMembers": "Add from non-members",
-      "searchPlaceholder": "Search by name or phone",
+      "searchPlaceholder": "Search by name or nickname",
       "searchMinChars": "Enter at least 2 characters to search",
       "noResults": "No results found",
+      "phoneSearchLabel": "Find by phone number",
+      "phoneSearchPlaceholder": "Enter phone number",
+      "phoneSearchButton": "Find",
+      "phoneSearchNotFound": "No user found with this phone number",
+      "phoneSearchSearching": "Searching...",
       "addAdmin": "Add as Admin",
       "adding": "Adding...",
       "removeAdmin": "Remove",
@@ -391,11 +416,16 @@
         "members": "Board Members",
         "addMember": "Add Member",
         "addOutsideMember": "Add an Outside Member",
-        "searchPlaceholder": "Search users by name or phone...",
+        "searchPlaceholder": "Search users by name or nickname...",
         "noMembers": "No members yet",
         "noResults": "No users found",
         "searching": "Searching...",
         "minSearchLength": "Enter at least 2 characters to search",
+        "phoneSearchLabel": "Find by phone number",
+        "phoneSearchPlaceholder": "Enter phone number",
+        "phoneSearchButton": "Find",
+        "phoneSearchNotFound": "No user found with this phone number",
+        "phoneSearchSearching": "Searching...",
         "removeMember": "Remove",
         "removing": "Removing...",
         "removeDialogTitle": "Remove Board Member",
@@ -458,7 +488,8 @@
       "unauthorized": "Unauthorized",
       "databaseConnection": "Unable to connect to the database. Please try again later.",
       "generic": "Something went wrong. Please try again.",
-      "duplicate_name": "An organization with this name already exists"
+      "duplicate_name": "An organization with this name already exists",
+      "captchaFailed": "CAPTCHA verification failed. Please try again."
     }
   },
   "board": {
@@ -730,7 +761,6 @@
         "notWillingSection": "NOT WILLING TO SIGN",
         "columnNumber": "#",
         "columnFullName": "Full Name",
-        "columnPhone": "Phone Number",
         "pageOf": "Page {current} of {total}",
         "generatedOn": "Generated: {date}"
       }
@@ -890,6 +920,16 @@
       "questionCannotRemoveAnswerArchived": "Cannot remove answer from an archived question",
       "questionAnswerNotFound": "Answer not found in question",
       "answerInvalidOrder": "Invalid answer order"
+    },
+    "user": {
+      "userNotFound": "User not found",
+      "nicknameTaken": "This nickname is already taken",
+      "nicknameInvalid": "Nickname must be 3-30 characters: letters, numbers, underscores, dots",
+      "privacySetupRequired": "Please complete your privacy settings",
+      "firstNameInvalid": "First name must start with an uppercase letter, contain only letters, apostrophes, or hyphens, and be {minLength}-{maxLength} characters",
+      "lastNameInvalid": "Last name must start with an uppercase letter, contain only letters, apostrophes, or hyphens, and be {minLength}-{maxLength} characters",
+      "middleNameInvalid": "Middle name must start with an uppercase letter, contain only letters, apostrophes, or hyphens, and be {minLength}-{maxLength} characters",
+      "passwordMatchesPersonalInfo": "Password must not match your name or phone number"
     }
   },
   "phone": {
@@ -964,11 +1004,28 @@
       "archivedBadge": "Archived"
     }
   },
+  "privacySetup": {
+    "title": "Privacy Settings",
+    "subtitle": "Before you continue, please configure how others can find you on the platform.",
+    "nicknameLabel": "Nickname",
+    "nicknameHint": "Your nickname is always publicly visible and searchable. Others can send you invites using this nickname.",
+    "nicknamePlaceholder": "e.g. john_doe",
+    "allowFindByNameLabel": "Allow others to find me by name",
+    "allowFindByNameDescription": "Others will be able to find you by your first, middle, or last name to invite you to organizations.",
+    "allowFindByPhoneLabel": "Allow others to find me by phone number",
+    "allowFindByPhoneDescription": "Others will be able to find you by your phone number to invite you to organizations.",
+    "submit": "Save & Continue",
+    "submitting": "Saving...",
+    "success": "Privacy settings saved successfully"
+  },
   "rateLimit": {
     "title": "Too Many Requests",
     "tooManyRequests": "Too many requests. Please wait and try again.",
     "message": "You've made too many requests. Please wait before trying again.",
     "waitMessage": "You can retry in {seconds} seconds.",
-    "retryButton": "Retry"
+    "retryButton": "Retry",
+    "tooManyPhoneSearches": "Too many phone search attempts. Please wait and try again.",
+    "tooManyLoginAttempts": "Too many failed login attempts. Please wait {minutes} minutes and try again.",
+    "tooManyRegistrations": "Too many registration attempts. Please wait {minutes} minutes and try again."
   }
 }
