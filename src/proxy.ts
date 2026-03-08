@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
-import { rateLimiter, MIDDLEWARE_RATE_LIMIT } from './infrastructure/rateLimit';
+import {
+  middlewareLimiter,
+  getLimiterByLabel,
+} from './infrastructure/rateLimit';
 import { extractIpFromRequest } from './infrastructure/rateLimit/extractIp';
+import { isIpBlocked } from './infrastructure/rateLimit/ipBlockCheck';
 
 const intlMiddleware = createMiddleware(routing);
 
-// Matches /{locale}/rate-limited to skip rate limiting on the error page itself
+// Matches /{locale}/rate-limited or /{locale}/ip-blocked to skip checks on error pages
 const RATE_LIMITED_PATH = /^\/[a-z]{2}\/rate-limited/;
+const IP_BLOCKED_PATH = /^\/[a-z]{2}\/ip-blocked/;
 
 function isBrowserRequest(request: NextRequest): boolean {
   const accept = request.headers.get('accept') ?? '';
@@ -27,8 +32,11 @@ function extractLocale(request: NextRequest): string {
 }
 
 export default function middleware(request: NextRequest) {
-  // Don't rate-limit the error page itself
-  if (RATE_LIMITED_PATH.test(request.nextUrl.pathname)) {
+  // Don't rate-limit or IP-block the error pages themselves
+  if (
+    RATE_LIMITED_PATH.test(request.nextUrl.pathname) ||
+    IP_BLOCKED_PATH.test(request.nextUrl.pathname)
+  ) {
     return intlMiddleware(request);
   }
 
@@ -39,7 +47,24 @@ export default function middleware(request: NextRequest) {
   }
 
   const ip = extractIpFromRequest(request);
-  const result = rateLimiter.check(ip);
+
+  // Check if IP is blocked (synchronous — uses in-memory cache)
+  if (isIpBlocked(ip)) {
+    if (isBrowserRequest(request)) {
+      const locale = extractLocale(request);
+      const url = request.nextUrl.clone();
+      url.pathname = `/${locale}/ip-blocked`;
+
+      return NextResponse.redirect(url, { status: 302 });
+    }
+
+    return new NextResponse(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  const result = middlewareLimiter.check(ip);
 
   if (!result.allowed) {
     // Browsers: redirect to error page
@@ -59,7 +84,9 @@ export default function middleware(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         'Retry-After': String(result.retryAfterSeconds),
-        'X-RateLimit-Limit': String(MIDDLEWARE_RATE_LIMIT),
+        'X-RateLimit-Limit': String(
+          getLimiterByLabel('middleware')!.maxRequests
+        ),
         'X-RateLimit-Remaining': '0',
       },
     });

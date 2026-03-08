@@ -171,6 +171,14 @@ class MockUserRepository implements UserRepository {
   }
 
   async updatePrivacySettings(): Promise<void> {}
+  async isUserBlocked(): Promise<boolean> {
+    return false;
+  }
+  async blockUser(): Promise<void> {}
+  async unblockUser(): Promise<void> {}
+  async getBlockStatus(): Promise<null> {
+    return null;
+  }
 }
 
 function createOrg(id: string, name: string): Organization {

@@ -7,14 +7,23 @@ export function extractIpFromRequest(request: Request): string {
   const forwarded = request.headers.get('x-forwarded-for');
 
   if (forwarded) {
-    return forwarded.split(',')[0].trim();
+    return normalizeIp(forwarded.split(',')[0].trim());
   }
 
   const realIp = request.headers.get('x-real-ip');
 
   if (realIp) {
-    return realIp.trim();
+    return normalizeIp(realIp.trim());
   }
 
   return '127.0.0.1';
+}
+
+/** Normalize IPv6 loopback variants to 127.0.0.1 */
+function normalizeIp(ip: string): string {
+  if (ip === '::1' || ip === '::ffff:127.0.0.1') {
+    return '127.0.0.1';
+  }
+
+  return ip;
 }

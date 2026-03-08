@@ -15,9 +15,13 @@ export function getStrengthConfig(
   password: string,
   score?: number | null
 ): { color: string; labelKey: string; percentage: number } | null {
-  if (!password) {return null;}
+  if (!password) {
+    return null;
+  }
 
-  if (score === null || score === undefined) {return null;}
+  if (score === null || score === undefined) {
+    return null;
+  }
 
   const level = STRENGTH_LEVELS[score];
 

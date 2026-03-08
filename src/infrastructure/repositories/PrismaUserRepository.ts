@@ -212,6 +212,70 @@ export class PrismaUserRepository implements UserRepository {
     return superAdmin !== null;
   }
 
+  async isUserBlocked(userId: string): Promise<boolean> {
+    const latest = await this.prisma.userBlockStatus.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: { status: true },
+    });
+
+    return latest?.status === 'blocked';
+  }
+
+  async blockUser(
+    userId: string,
+    superadminId: string,
+    reason: string
+  ): Promise<void> {
+    await this.prisma.userBlockStatus.create({
+      data: {
+        userId,
+        status: 'blocked',
+        statusChangedBySuperadminId: superadminId,
+        reason,
+      },
+    });
+  }
+
+  async unblockUser(
+    userId: string,
+    superadminId: string,
+    reason: string
+  ): Promise<void> {
+    await this.prisma.userBlockStatus.create({
+      data: {
+        userId,
+        status: 'unblocked',
+        statusChangedBySuperadminId: superadminId,
+        reason,
+      },
+    });
+  }
+
+  async getBlockStatus(
+    userId: string
+  ): Promise<{ blocked: boolean; reason?: string; blockedAt?: Date } | null> {
+    const latest = await this.prisma.userBlockStatus.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: { status: true, reason: true, createdAt: true },
+    });
+
+    if (!latest) {
+      return null;
+    }
+
+    if (latest.status === 'blocked') {
+      return {
+        blocked: true,
+        reason: latest.reason ?? undefined,
+        blockedAt: latest.createdAt,
+      };
+    }
+
+    return { blocked: false };
+  }
+
   private toDomain(user: {
     id: string;
     firstName: string;

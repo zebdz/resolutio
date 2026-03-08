@@ -1,63 +1,59 @@
-import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { getCurrentUser } from '@/web/lib/session';
-import { prisma, PrismaUserRepository } from '@/infrastructure/index';
 import { Heading } from '@/app/components/catalyst/heading';
 import { Text } from '@/app/components/catalyst/text';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
-import { SuperadminOrganizationsList } from './SuperadminOrganizationsList';
-import { searchAllOrganizationsAction } from '@/web/actions/organization';
+import { Link } from '@/src/i18n/routing';
 
-const PAGE_SIZE = 30;
-const userRepository = new PrismaUserRepository(prisma);
+const hubLinks = [
+  {
+    href: '/superadmin/organizations' as const,
+    labelKey: 'organizationsLink' as const,
+    descKey: 'organizationsDescription' as const,
+  },
+  {
+    href: '/superadmin/rate-limits' as const,
+    labelKey: 'rateLimitsLink' as const,
+    descKey: 'rateLimitsDescription' as const,
+  },
+  {
+    href: '/superadmin/suspicious-activity' as const,
+    labelKey: 'suspiciousActivityLink' as const,
+    descKey: 'suspiciousActivityDescription' as const,
+  },
+  {
+    href: '/superadmin/users' as const,
+    labelKey: 'usersLink' as const,
+    descKey: 'usersDescription' as const,
+  },
+  {
+    href: '/superadmin/blocked-ips' as const,
+    labelKey: 'blockedIpsLink' as const,
+    descKey: 'blockedIpsDescription' as const,
+  },
+];
 
 export default async function SuperadminPage() {
-  const t = await getTranslations('superadmin');
-  const tOrgs = await getTranslations('superadmin.organizations');
-  const user = await getCurrentUser();
-
-  if (!user) {
-    redirect('/login');
-  }
-
-  const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
-
-  if (!isSuperAdmin) {
-    redirect('/home');
-  }
-
-  const result = await searchAllOrganizationsAction({
-    page: 1,
-    pageSize: PAGE_SIZE,
-  });
-
-  const organizations = result.success ? result.data.organizations : [];
-  const totalCount = result.success ? result.data.totalCount : 0;
+  const t = await getTranslations('superadmin.hub');
 
   return (
-    <AuthenticatedLayout>
-      <div className="space-y-8">
-        <div className="space-y-2">
-          <Heading className="text-3xl font-bold">{t('title')}</Heading>
-        </div>
+    <div className="space-y-8">
+      <Heading className="text-3xl font-bold">{t('title')}</Heading>
 
-        <div className="space-y-4">
-          <div className="space-y-1">
-            <Heading level={2} className="text-xl font-semibold">
-              {tOrgs('title')}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {hubLinks.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            className="rounded-lg border border-zinc-200 p-6 transition-colors hover:border-zinc-400 hover:bg-zinc-50 dark:border-zinc-700 dark:hover:border-zinc-500 dark:hover:bg-zinc-800/50"
+          >
+            <Heading level={3} className="text-lg font-semibold">
+              {t(link.labelKey)}
             </Heading>
-            <Text className="text-zinc-600 dark:text-zinc-400">
-              {tOrgs('subtitle')}
+            <Text className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+              {t(link.descKey)}
             </Text>
-          </div>
-
-          <SuperadminOrganizationsList
-            initialOrganizations={organizations}
-            initialTotalCount={totalCount}
-            userId={user.id}
-          />
-        </div>
+          </Link>
+        ))}
       </div>
-    </AuthenticatedLayout>
+    </div>
   );
 }

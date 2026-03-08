@@ -35,6 +35,10 @@ describe('CompletePrivacySetupUseCase', () => {
       searchUsers: vi.fn(),
       searchUserByPhone: vi.fn(),
       isSuperAdmin: vi.fn(),
+      isUserBlocked: vi.fn().mockResolvedValue(false),
+      blockUser: vi.fn(),
+      unblockUser: vi.fn(),
+      getBlockStatus: vi.fn().mockResolvedValue(null),
     };
     useCase = new CompletePrivacySetupUseCase(userRepository);
   });

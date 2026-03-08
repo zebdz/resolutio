@@ -4,35 +4,16 @@ import { cookies } from 'next/headers';
 import { getTranslations } from 'next-intl/server';
 import { getClientIp } from '@/web/lib/clientIp';
 import { getSessionCookie } from '@/web/lib/session';
-import { InMemoryRateLimiter } from '@/infrastructure/rateLimit/InMemoryRateLimiter';
+import {
+  serverActionLimiter as limiter,
+  phoneSearchLimiter,
+  loginLimiter,
+  registrationIpLimiter,
+  registrationDeviceLimiter,
+} from '@/infrastructure/rateLimit/registry';
 
-const SERVER_ACTION_RATE_LIMIT = 200;
-const SERVER_ACTION_WINDOW_MS = 60_000; // 1 minute
-const PHONE_SEARCH_RATE_LIMIT = 5;
-const PHONE_SEARCH_WINDOW_MS = 30 * 60_000; // 30 minutes
-const LOGIN_RATE_LIMIT = 5;
 const LOGIN_WINDOW_MS = 15 * 60_000; // 15 minutes
-const REGISTRATION_IP_RATE_LIMIT = 50;
-const REGISTRATION_DEVICE_RATE_LIMIT = 3;
 const REGISTRATION_WINDOW_MS = 60 * 60_000; // 1 hour
-
-const limiter = new InMemoryRateLimiter(
-  SERVER_ACTION_RATE_LIMIT,
-  SERVER_ACTION_WINDOW_MS
-);
-const phoneSearchLimiter = new InMemoryRateLimiter(
-  PHONE_SEARCH_RATE_LIMIT,
-  PHONE_SEARCH_WINDOW_MS
-);
-const loginLimiter = new InMemoryRateLimiter(LOGIN_RATE_LIMIT, LOGIN_WINDOW_MS);
-const registrationIpLimiter = new InMemoryRateLimiter(
-  REGISTRATION_IP_RATE_LIMIT,
-  REGISTRATION_WINDOW_MS
-);
-const registrationDeviceLimiter = new InMemoryRateLimiter(
-  REGISTRATION_DEVICE_RATE_LIMIT,
-  REGISTRATION_WINDOW_MS
-);
 
 /**
  * Check rate limit for the current request using dual keys: IP + session.
@@ -145,7 +126,9 @@ async function getOrCreateDeviceId(): Promise<string> {
   const cookieStore = await cookies();
   const existing = cookieStore.get(DEVICE_COOKIE_NAME)?.value;
 
-  if (existing) {return existing;}
+  if (existing) {
+    return existing;
+  }
 
   const id = crypto.randomUUID();
   cookieStore.set(DEVICE_COOKIE_NAME, id, {

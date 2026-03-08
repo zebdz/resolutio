@@ -56,6 +56,10 @@ model User {
   handledParentJoinRequests   OrganizationJoinParentRequest[] @relation("HandlingAdmin")
   notifications              Notification[]
   privacyAuditLogs           UserPrivacyAuditLog[]
+  rateLimitEvents            RateLimitEvent[]
+  blockStatuses              UserBlockStatus[] @relation("BlockedUser")
+  changedUserBlockStatuses   UserBlockStatus[] @relation("StatusChangedBySuperadmin")
+  changedIpBlockStatuses     IpBlockStatus[]   @relation("IpBlockStatusChangedBy")
 
   @@map("users")
 }
@@ -404,5 +408,55 @@ model UserPrivacyAuditLog {
 
   @@index([userId])
   @@map("user_privacy_audit_log")
+}
+
+// Rate Limit Events (suspicious activity tracking)
+model RateLimitEvent {
+  id           String   @id @default(cuid())
+  key          String
+  limiterLabel String   @map("limiter_label")
+  userId       String?  @map("user_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([key])
+  @@index([userId])
+  @@index([limiterLabel])
+  @@index([createdAt])
+  @@map("rate_limit_events")
+}
+
+// User Block Status (append-only log)
+model UserBlockStatus {
+  id                    String   @id @default(cuid())
+  userId                String   @map("user_id")
+  status                String   // "blocked" | "unblocked"
+  statusChangedBySuperadminId String   @map("status_changed_by_superadmin_id")
+  reason                      String?
+  createdAt                   DateTime @default(now()) @map("created_at")
+
+  user            User @relation("BlockedUser", fields: [userId], references: [id], onDelete: Cascade)
+  statusChangedBy User @relation("StatusChangedBySuperadmin", fields: [statusChangedBySuperadminId], references: [id])
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@map("user_block_statuses")
+}
+
+// IP Block Status (append-only log)
+model IpBlockStatus {
+  id                          String   @id @default(cuid())
+  ipAddress                   String   @map("ip_address")
+  status                      String   // "blocked" | "unblocked"
+  statusChangedBySuperadminId String   @map("status_changed_by_superadmin_id")
+  reason                      String?
+  createdAt                   DateTime @default(now()) @map("created_at")
+
+  statusChangedBy User @relation("IpBlockStatusChangedBy", fields: [statusChangedBySuperadminId], references: [id])
+
+  @@index([ipAddress])
+  @@index([ipAddress, createdAt])
+  @@map("ip_block_statuses")
 }
 

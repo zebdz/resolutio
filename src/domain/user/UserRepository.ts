@@ -16,4 +16,18 @@ export interface UserRepository {
   ): Promise<User[]>;
   searchUserByPhone(phone: string): Promise<User | null>;
   isSuperAdmin(userId: string): Promise<boolean>;
+  isUserBlocked(userId: string): Promise<boolean>;
+  blockUser(
+    userId: string,
+    superadminId: string,
+    reason: string
+  ): Promise<void>;
+  unblockUser(
+    userId: string,
+    superadminId: string,
+    reason: string
+  ): Promise<void>;
+  getBlockStatus(
+    userId: string
+  ): Promise<{ blocked: boolean; reason?: string; blockedAt?: Date } | null>;
 }

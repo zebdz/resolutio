@@ -360,7 +360,10 @@ export async function loginAction(
     await resetLoginRateLimit(validation.data.phoneNumber, clientIp);
 
     // Set session cookie
-    await setSessionCookie(result.value.session.id);
+    await setSessionCookie(
+      result.value.session.id,
+      result.value.expiresInSeconds
+    );
 
     return {
       success: true,

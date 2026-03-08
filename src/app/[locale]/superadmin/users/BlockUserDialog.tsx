@@ -1,0 +1,93 @@
+'use client';
+
+import { useState } from 'react';
+import { useTranslations } from 'next-intl';
+import { Button } from '@/app/components/catalyst/button';
+import { Textarea } from '@/app/components/catalyst/textarea';
+import {
+  Dialog,
+  DialogActions,
+  DialogBody,
+  DialogDescription,
+  DialogTitle,
+} from '@/app/components/catalyst/dialog';
+
+interface BlockUserDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  userName: string;
+  initialReason?: string;
+  onConfirm: (reason: string) => Promise<void>;
+}
+
+export function BlockUserDialog({
+  isOpen,
+  onClose,
+  userName,
+  initialReason = '',
+  onConfirm,
+}: BlockUserDialogProps) {
+  const t = useTranslations('superadmin.users');
+  const [reason, setReason] = useState(initialReason);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleConfirm = async () => {
+    if (!reason.trim()) {
+      setError(t('reasonRequired'));
+
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      await onConfirm(reason);
+      setReason('');
+    } catch {
+      setError('Failed to block user');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClose = () => {
+    setReason(initialReason);
+    setError(null);
+    onClose();
+  };
+
+  return (
+    <Dialog open={isOpen} onClose={handleClose}>
+      <DialogTitle>{t('blockConfirmTitle')}</DialogTitle>
+      <DialogDescription>
+        {t('blockConfirmDescription', { name: userName })}
+      </DialogDescription>
+      <DialogBody>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">{t('reasonLabel')}</label>
+          <Textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder={t('reasonPlaceholder')}
+            rows={3}
+          />
+          {error && (
+            <div className="text-sm text-red-600 dark:text-red-400">
+              {error}
+            </div>
+          )}
+        </div>
+      </DialogBody>
+      <DialogActions>
+        <Button plain onClick={handleClose} disabled={isLoading}>
+          {t('cancel')}
+        </Button>
+        <Button color="red" onClick={handleConfirm} disabled={isLoading}>
+          {t('confirm')}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}

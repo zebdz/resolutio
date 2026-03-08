@@ -4,14 +4,14 @@
 
 Three-layer rate limiting using IP, session, and userId keys:
 
-| Layer                 | Key        | File                                    | Limit    | Covers                                       |
-| --------------------- | ---------- | --------------------------------------- | -------- | -------------------------------------------- |
-| Middleware            | IP         | `src/infrastructure/rateLimit/index.ts` | 60/min   | Page loads, API routes (`/api/*`), curl/bots |
-| Server actions        | IP+session | `src/web/actions/rateLimit.ts`          | 200/min  | All Next.js server actions                   |
-| Phone search          | userId     | `src/web/actions/rateLimit.ts`          | 5/30min  | `searchUserByPhoneAction` only               |
-| Login                 | IP+phone   | `src/web/actions/rateLimit.ts`          | 5/15min  | `loginAction` — failed attempts only         |
-| Registration (IP)     | IP         | `src/web/actions/rateLimit.ts`          | 50/60min | `registerAction` — all attempts              |
-| Registration (device) | device_id  | `src/web/actions/rateLimit.ts`          | 3/60min  | `registerAction` — all attempts              |
+| Layer                 | Key        | File                                       | Limit    | Covers                                       |
+| --------------------- | ---------- | ------------------------------------------ | -------- | -------------------------------------------- |
+| Middleware            | IP         | `src/infrastructure/rateLimit/registry.ts` | 60/min   | Page loads, API routes (`/api/*`), curl/bots |
+| Server actions        | IP+session | `src/web/actions/rateLimit.ts`             | 200/min  | All Next.js server actions                   |
+| Phone search          | userId     | `src/web/actions/rateLimit.ts`             | 5/30min  | `searchUserByPhoneAction` only               |
+| Login                 | IP+phone   | `src/web/actions/rateLimit.ts`             | 5/15min  | `loginAction` — failed attempts only         |
+| Registration (IP)     | IP         | `src/web/actions/rateLimit.ts`             | 50/60min | `registerAction` — all attempts              |
+| Registration (device) | device_id  | `src/web/actions/rateLimit.ts`             | 3/60min  | `registerAction` — all attempts              |
 
 ### Why three layers?
 
@@ -81,19 +81,21 @@ A single page load triggers 4-6 data-fetching server actions (e.g. `getOrganizat
 
 - Algorithm: sliding window counter (`Map<string, number[]>` — key to timestamps, where key is IP, `session:<id>`, or `user:<id>`)
 - Auto-cleanup: stale entries pruned every 60s via `setInterval`
-- Edge Runtime compatible (middleware) and Node.js compatible (server actions)
+- Node.js runtime (Next.js 16 `proxy.ts` runs in Node.js, not Edge)
+- `globalThis` singleton pattern ensures middleware and server actions share the same limiter instances across separate module bundles (same pattern as Prisma client in `src/infrastructure/database/prisma.ts`)
 - Resets on app restart (acceptable for rate limiting — ephemeral by nature)
 - Single-instance only: if scaled to multiple instances, each has its own counters
 
 ## Key files
 
-| File                                                  | Purpose                                     |
-| ----------------------------------------------------- | ------------------------------------------- |
-| `src/infrastructure/rateLimit/InMemoryRateLimiter.ts` | Rate limiter class (sliding window)         |
-| `src/infrastructure/rateLimit/extractIp.ts`           | IP extraction for Edge Runtime (middleware) |
-| `src/infrastructure/rateLimit/index.ts`               | Middleware rate limiter singleton (60/min)  |
-| `src/web/actions/rateLimit.ts`                        | Server action rate limit helper (200/min)   |
-| `src/web/lib/clientIp.ts`                             | IP extraction for Node.js (server actions)  |
-| `src/proxy.ts`                                        | Middleware integration                      |
-| `src/app/[locale]/rate-limited/page.tsx`              | Error page with countdown + retry           |
-| `messages/en.json` / `messages/ru.json`               | Localized messages (`rateLimit` key)        |
+| File                                                  | Purpose                                    |
+| ----------------------------------------------------- | ------------------------------------------ |
+| `src/infrastructure/rateLimit/InMemoryRateLimiter.ts` | Rate limiter class (sliding window)        |
+| `src/infrastructure/rateLimit/extractIp.ts`           | IP extraction for middleware               |
+| `src/infrastructure/rateLimit/registry.ts`            | All limiter singletons via globalThis      |
+| `src/infrastructure/rateLimit/index.ts`               | Re-exports from registry                   |
+| `src/web/actions/rateLimit.ts`                        | Server action rate limit helper (200/min)  |
+| `src/web/lib/clientIp.ts`                             | IP extraction for Node.js (server actions) |
+| `src/proxy.ts`                                        | Middleware integration                     |
+| `src/app/[locale]/rate-limited/page.tsx`              | Error page with countdown + retry          |
+| `messages/en.json` / `messages/ru.json`               | Localized messages (`rateLimit` key)       |

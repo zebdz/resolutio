@@ -40,4 +40,22 @@ describe('extractIpFromRequest', () => {
 
     expect(extractIpFromRequest(req)).toBe('203.0.113.50');
   });
+
+  it('normalizes IPv6 loopback ::1 to 127.0.0.1', () => {
+    const req = makeRequest({ 'x-forwarded-for': '::1' });
+
+    expect(extractIpFromRequest(req)).toBe('127.0.0.1');
+  });
+
+  it('normalizes IPv4-mapped IPv6 loopback ::ffff:127.0.0.1 to 127.0.0.1', () => {
+    const req = makeRequest({ 'x-forwarded-for': '::ffff:127.0.0.1' });
+
+    expect(extractIpFromRequest(req)).toBe('127.0.0.1');
+  });
+
+  it('normalizes IPv6 loopback in x-real-ip', () => {
+    const req = makeRequest({ 'x-real-ip': '::1' });
+
+    expect(extractIpFromRequest(req)).toBe('127.0.0.1');
+  });
 });

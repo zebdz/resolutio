@@ -3,7 +3,7 @@
 import {
   OrganizationsList,
   type OrganizationItem,
-} from '../organizations/OrganizationsList';
+} from '../../organizations/OrganizationsList';
 import { SuperadminOrgActions } from '@/web/components/superadmin/SuperadminOrgActions';
 import { searchAllOrganizationsAction } from '@/web/actions/organization';
 

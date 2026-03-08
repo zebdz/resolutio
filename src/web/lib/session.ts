@@ -7,16 +7,18 @@ import {
 import type { User } from '@/domain/user/User';
 
 const SESSION_COOKIE_NAME = 'session';
-const SESSION_COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days in seconds
 
-export async function setSessionCookie(sessionId: string): Promise<void> {
+export async function setSessionCookie(
+  sessionId: string,
+  maxAgeSeconds: number
+): Promise<void> {
   const cookieStore = await cookies();
 
   cookieStore.set(SESSION_COOKIE_NAME, sessionId, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: SESSION_COOKIE_MAX_AGE,
+    maxAge: maxAgeSeconds,
     path: '/',
   });
 }

@@ -14,9 +14,13 @@ export interface LoginUserInput {
   password: string;
 }
 
+export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+export const SUPERADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+
 export interface LoginResult {
   user: User;
   session: Session;
+  expiresInSeconds: number;
 }
 
 export class LoginUserUseCase {
@@ -52,13 +56,18 @@ export class LoginUserUseCase {
         );
       }
 
-      // Create session (expires in 30 days)
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30);
+      // Superadmins get shorter session TTL
+      const isSuperAdmin = await this.userRepository.isSuperAdmin(user.id);
+      const ttlMs = isSuperAdmin ? SUPERADMIN_SESSION_TTL_MS : SESSION_TTL_MS;
+      const expiresAt = new Date(Date.now() + ttlMs);
 
       const session = await this.sessionRepository.create(user.id, expiresAt);
 
-      return success({ user, session });
+      return success({
+        user,
+        session,
+        expiresInSeconds: Math.floor(ttlMs / 1000),
+      });
     } catch (error) {
       return failure(error as Error);
     }

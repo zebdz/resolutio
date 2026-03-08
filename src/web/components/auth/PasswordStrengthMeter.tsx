@@ -47,7 +47,9 @@ export function PasswordStrengthMeter({ password }: Props) {
 
   const config = getStrengthConfig(password, score);
 
-  if (!config) {return null;}
+  if (!config) {
+    return null;
+  }
 
   return (
     <div className="mt-1 space-y-1">

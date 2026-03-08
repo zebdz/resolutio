@@ -30,10 +30,15 @@ export async function AuthenticatedLayout({
     redirect('/privacy-setup');
   }
 
-  const [isSuperAdmin, unreadNotificationCount] = await Promise.all([
+  const [isSuperAdmin, isBlocked, unreadNotificationCount] = await Promise.all([
     userRepository.isSuperAdmin(user.id),
+    userRepository.isUserBlocked(user.id),
     notificationRepository.getUnreadCount(user.id),
   ]);
+
+  if (isBlocked) {
+    redirect('/blocked');
+  }
 
   return (
     <StackedLayout

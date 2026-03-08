@@ -42,7 +42,9 @@ export function passwordMatchesPersonalInfo(
   password: string,
   info: PersonalInfoForPasswordCheck
 ): boolean {
-  if (!password) {return false;}
+  if (!password) {
+    return false;
+  }
 
   const lower = password.toLowerCase();
   const names = [info.firstName, info.lastName, info.middleName].filter(
@@ -50,7 +52,9 @@ export function passwordMatchesPersonalInfo(
   );
 
   for (const name of names) {
-    if (lower === name.toLowerCase()) {return true;}
+    if (lower === name.toLowerCase()) {
+      return true;
+    }
   }
 
   // Fuzzy phone match: users often copy-paste the phone number as password,
