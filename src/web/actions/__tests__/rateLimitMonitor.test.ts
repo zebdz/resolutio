@@ -36,24 +36,38 @@ vi.mock('@/infrastructure/index', () => ({
 vi.mock('@/infrastructure/rateLimit/registry', async () => {
   const { InMemoryRateLimiter } =
     await import('@/infrastructure/rateLimit/InMemoryRateLimiter');
-  const middleware = new InMemoryRateLimiter(60, 60_000);
-  const serverAction = new InMemoryRateLimiter(200, 60_000);
+  const middlewareSession = new InMemoryRateLimiter(60, 60_000);
+  const middlewareIp = new InMemoryRateLimiter(50_000, 60_000);
+  const serverActionSession = new InMemoryRateLimiter(200, 60_000);
+  const serverActionIp = new InMemoryRateLimiter(200_000, 60_000);
   const phoneSearch = new InMemoryRateLimiter(5, 30 * 60_000);
   const login = new InMemoryRateLimiter(5, 15 * 60_000);
-  const regIp = new InMemoryRateLimiter(50, 60 * 60_000);
+  const regIp = new InMemoryRateLimiter(5_000, 60 * 60_000);
   const regDevice = new InMemoryRateLimiter(3, 60 * 60_000);
 
   const registry = [
     {
-      label: 'middleware',
-      limiter: middleware,
+      label: 'middlewareSession',
+      limiter: middlewareSession,
       maxRequests: 60,
       windowMs: 60_000,
     },
     {
-      label: 'serverAction',
-      limiter: serverAction,
+      label: 'middlewareIp',
+      limiter: middlewareIp,
+      maxRequests: 50_000,
+      windowMs: 60_000,
+    },
+    {
+      label: 'serverActionSession',
+      limiter: serverActionSession,
       maxRequests: 200,
+      windowMs: 60_000,
+    },
+    {
+      label: 'serverActionIp',
+      limiter: serverActionIp,
+      maxRequests: 200_000,
       windowMs: 60_000,
     },
     {
@@ -71,7 +85,7 @@ vi.mock('@/infrastructure/rateLimit/registry', async () => {
     {
       label: 'registrationIp',
       limiter: regIp,
-      maxRequests: 50,
+      maxRequests: 5_000,
       windowMs: 60 * 60_000,
     },
     {
@@ -200,13 +214,13 @@ describe('rateLimitMonitor actions', () => {
       limiterRegistry[1].limiter.check('192.168.1.1'); // serverAction
 
       const result = await getRateLimitMonitorSnapshotAction({
-        label: 'middleware',
+        label: 'middlewareSession',
       });
       expect(result.success).toBe(true);
 
       if (result.success) {
         expect(result.data.length).toBe(1);
-        expect(result.data[0].limiterLabel).toBe('middleware');
+        expect(result.data[0].limiterLabel).toBe('middlewareSession');
       }
     });
 
@@ -238,7 +252,7 @@ describe('rateLimitMonitor actions', () => {
       if (result.success) {
         // Only middleware has activity — zero-count limiters are excluded
         expect(result.data.length).toBe(1);
-        expect(result.data[0].limiterLabel).toBe('middleware');
+        expect(result.data[0].limiterLabel).toBe('middlewareSession');
         expect(result.data[0].count).toBe(1);
         expect(result.data[0].maxRequests).toBe(60);
       }
@@ -258,7 +272,7 @@ describe('rateLimitMonitor actions', () => {
       if (result.success) {
         // Only middleware should be returned (has activity)
         expect(result.data.length).toBe(1);
-        expect(result.data[0].limiterLabel).toBe('middleware');
+        expect(result.data[0].limiterLabel).toBe('middlewareSession');
         expect(result.data[0].blocked).toBe(true);
         expect(result.data[0].remaining).toBe(0);
       }

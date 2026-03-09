@@ -64,6 +64,11 @@ async function getBlockStatusForUser(
 export async function getSuspiciousActivitySummaryAction(input: {
   page?: number;
   pageSize?: number;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  minBlocked?: number;
+  maxBlocked?: number;
 }): Promise<
   ActionResult<{ items: SuspiciousKeySummary[]; totalCount: number }>
 > {
@@ -82,6 +87,68 @@ export async function getSuspiciousActivitySummaryAction(input: {
   const page = input.page ?? 1;
   const pageSize = input.pageSize ?? 20;
 
+  // Build where clause from filters
+   
+  const whereAnd: any[] = [];
+
+  if (input.search?.trim()) {
+    const search = input.search.trim();
+    // Find matching users by name/phone/nickname
+    const matchingUsers = await prisma.user.findMany({
+      where: {
+        OR: [
+          { firstName: { contains: search, mode: 'insensitive' } },
+          { lastName: { contains: search, mode: 'insensitive' } },
+          { nickname: { contains: search, mode: 'insensitive' } },
+          { phoneNumber: { contains: search, mode: 'insensitive' } },
+        ],
+      },
+      select: { id: true },
+    });
+    const userIds = matchingUsers.map((u) => u.id);
+     
+    const orConditions: any[] = [
+      { key: { contains: search, mode: 'insensitive' } },
+    ];
+
+    if (userIds.length > 0) {
+      orConditions.unshift({ userId: { in: userIds } });
+    }
+
+    whereAnd.push({ OR: orConditions });
+  }
+
+  if (input.dateFrom) {
+    whereAnd.push({ createdAt: { gte: new Date(input.dateFrom) } });
+  }
+
+  if (input.dateTo) {
+    whereAnd.push({
+      createdAt: { lte: new Date(input.dateTo + 'T23:59:59.999Z') },
+    });
+  }
+
+  const where = whereAnd.length > 0 ? { AND: whereAnd } : {};
+
+  // Build having clause from min/max blocked
+   
+  let having: any = undefined;
+
+  if (input.minBlocked || input.maxBlocked) {
+     
+    const countFilter: any = {};
+
+    if (input.minBlocked) {
+      countFilter.gte = input.minBlocked;
+    }
+
+    if (input.maxBlocked) {
+      countFilter.lte = input.maxBlocked;
+    }
+
+    having = { id: { _count: countFilter } };
+  }
+
   const [groupedEvents, totalCount] = await Promise.all([
     prisma.rateLimitEvent.groupBy({
       by: ['key', 'limiterLabel', 'userId'],
@@ -89,11 +156,13 @@ export async function getSuspiciousActivitySummaryAction(input: {
       _min: { createdAt: true },
       _max: { createdAt: true },
       orderBy: { _max: { createdAt: 'desc' } },
+      ...(Object.keys(where).length > 0 ? { where } : {}),
+      ...(having ? { having } : {}),
       skip: (page - 1) * pageSize,
       take: pageSize,
     }),
     prisma.rateLimitEvent.count({
-      // Count distinct key+limiterLabel combos (approximate via raw count)
+      ...(Object.keys(where).length > 0 ? { where } : {}),
     }),
   ]);
 

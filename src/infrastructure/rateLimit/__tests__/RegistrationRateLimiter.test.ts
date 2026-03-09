@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { InMemoryRateLimiter } from '../InMemoryRateLimiter';
 
-describe('Registration Rate Limiter — IP (50/hr)', () => {
+describe('Registration Rate Limiter — IP (sliding window behavior)', () => {
+  const TEST_LIMIT = 50;
   let limiter: InMemoryRateLimiter;
 
   beforeEach(() => {
-    limiter = new InMemoryRateLimiter(50, 3_600_000, 999_999_999);
+    limiter = new InMemoryRateLimiter(TEST_LIMIT, 3_600_000, 999_999_999);
   });
 
   afterEach(() => {
@@ -15,18 +16,18 @@ describe('Registration Rate Limiter — IP (50/hr)', () => {
   it('should allow first attempt', () => {
     const result = limiter.check('register:192.168.1.1');
     expect(result.allowed).toBe(true);
-    expect(result.remaining).toBe(49);
+    expect(result.remaining).toBe(TEST_LIMIT - 1);
   });
 
-  it('should allow up to 50 attempts', () => {
-    for (let i = 0; i < 50; i++) {
+  it('should allow up to limit', () => {
+    for (let i = 0; i < TEST_LIMIT; i++) {
       const result = limiter.check('register:192.168.1.1');
       expect(result.allowed).toBe(true);
     }
   });
 
-  it('should block 51st attempt', () => {
-    for (let i = 0; i < 50; i++) {
+  it('should block at limit + 1', () => {
+    for (let i = 0; i < TEST_LIMIT; i++) {
       limiter.check('register:192.168.1.1');
     }
 
@@ -36,7 +37,7 @@ describe('Registration Rate Limiter — IP (50/hr)', () => {
   });
 
   it('should track different IPs independently', () => {
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < TEST_LIMIT; i++) {
       limiter.check('register:192.168.1.1');
     }
 
@@ -47,7 +48,7 @@ describe('Registration Rate Limiter — IP (50/hr)', () => {
   it('should allow after window expires', () => {
     vi.useFakeTimers();
 
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < TEST_LIMIT; i++) {
       limiter.check('register:192.168.1.1');
     }
 

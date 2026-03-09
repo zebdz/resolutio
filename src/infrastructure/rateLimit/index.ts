@@ -4,7 +4,8 @@ export {
 } from './InMemoryRateLimiter';
 export { extractIpFromRequest } from './extractIp';
 export {
-  middlewareLimiter,
+  middlewareSessionLimiter,
+  middlewareIpLimiter,
   limiterRegistry,
   getLimiterByLabel,
   type LimiterEntry,

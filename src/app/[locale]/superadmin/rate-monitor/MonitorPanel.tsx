@@ -14,8 +14,10 @@ import { KeyDetailView } from './KeyDetailView';
 const POLL_INTERVAL_MS = 2000;
 
 const LIMITER_LABELS = [
-  'middleware',
-  'serverAction',
+  'middlewareSession',
+  'middlewareIp',
+  'serverActionSession',
+  'serverActionIp',
   'phoneSearch',
   'login',
   'registrationIp',
@@ -23,8 +25,10 @@ const LIMITER_LABELS = [
 ] as const;
 
 const LIMITER_DISPLAY: Record<string, string> = {
-  middleware: 'Middleware',
-  serverAction: 'Server Actions',
+  middlewareSession: 'MW (Session)',
+  middlewareIp: 'MW (IP)',
+  serverActionSession: 'SA (Session)',
+  serverActionIp: 'SA (IP)',
   phoneSearch: 'Phone Search',
   login: 'Login',
   registrationIp: 'Reg (IP)',

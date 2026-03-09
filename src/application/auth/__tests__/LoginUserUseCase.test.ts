@@ -152,7 +152,9 @@ class MockOtpDeliveryChannel implements OtpDeliveryChannel {
     code: string,
     _locale: string
   ): Promise<OtpDeliveryResult> {
-    if (!this.shouldSucceed) {return { success: false };}
+    if (!this.shouldSucceed) {
+      return { success: false };
+    }
 
     return { success: true, backdoorCode: code };
   }

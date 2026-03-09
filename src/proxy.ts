@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
 import {
-  middlewareLimiter,
+  middlewareSessionLimiter,
+  middlewareIpLimiter,
   getLimiterByLabel,
 } from './infrastructure/rateLimit';
 import { extractIpFromRequest } from './infrastructure/rateLimit/extractIp';
@@ -78,14 +79,14 @@ export default function middleware(request: NextRequest) {
 
   if (sessionCookie) {
     // Authenticated: rate limit by session only — don't pollute IP counter
-    const sessionResult = middlewareLimiter.check(
+    const sessionResult = middlewareSessionLimiter.check(
       `mw-session:${sessionCookie}`
     );
     blocked = !sessionResult.allowed;
     retryAfterSeconds = sessionResult.retryAfterSeconds;
   } else {
     // Unauthenticated: rate limit by IP
-    const ipResult = middlewareLimiter.check(ip);
+    const ipResult = middlewareIpLimiter.check(ip);
     blocked = !ipResult.allowed;
     retryAfterSeconds = ipResult.retryAfterSeconds;
   }
@@ -114,7 +115,7 @@ export default function middleware(request: NextRequest) {
         'Content-Type': 'application/json',
         'Retry-After': String(retryAfterSeconds),
         'X-RateLimit-Limit': String(
-          getLimiterByLabel('middleware')!.maxRequests
+          getLimiterByLabel('middlewareIp')!.maxRequests
         ),
         'X-RateLimit-Remaining': '0',
       },

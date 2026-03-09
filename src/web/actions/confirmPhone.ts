@@ -62,7 +62,9 @@ export async function confirmPhoneAction(
 ): Promise<ActionResult<{ confirmed: true }>> {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const tCommon = await getTranslations('common.errors');
 
@@ -119,7 +121,9 @@ export async function requestConfirmationOtpAction(
 > {
   const rateLimited = await checkRateLimit();
 
-  if (rateLimited) {return rateLimited;}
+  if (rateLimited) {
+    return rateLimited;
+  }
 
   const tCommon = await getTranslations('common.errors');
 

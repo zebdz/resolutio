@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/app/components/catalyst/button';
 import { Text } from '@/app/components/catalyst/text';
@@ -49,7 +49,7 @@ export function SuspiciousActivityPanel() {
   const tLabels = useTranslations('superadmin.rateLimits.labels');
   const [items, setItems] = useState<SuspiciousKeySummary[]>([]);
   const [totalCount, setTotalCount] = useState(0);
-  const [page, setPage] = useState(1);
+  const pageRef = useRef(1);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [events, setEvents] = useState<Array<{ id: string; createdAt: Date }>>(
     []
@@ -71,22 +71,50 @@ export function SuspiciousActivityPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchSummary = useCallback(async (p: number) => {
-    const result = await getSuspiciousActivitySummaryAction({
-      page: p,
-      pageSize: PAGE_SIZE,
-    });
+  // Filter state
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [minBlocked, setMinBlocked] = useState('');
+  const [maxBlocked, setMaxBlocked] = useState('');
 
-    if (result.success) {
-      if (p === 1) {
-        setItems(result.data.items);
-      } else {
-        setItems((prev) => [...prev, ...result.data.items]);
+  const fetchSummary = useCallback(
+    async (
+      p: number,
+      filters?: {
+        search?: string;
+        dateFrom?: string;
+        dateTo?: string;
+        minBlocked?: string;
+        maxBlocked?: string;
       }
+    ) => {
+      const result = await getSuspiciousActivitySummaryAction({
+        page: p,
+        pageSize: PAGE_SIZE,
+        search: filters?.search || undefined,
+        dateFrom: filters?.dateFrom || undefined,
+        dateTo: filters?.dateTo || undefined,
+        minBlocked: filters?.minBlocked
+          ? Number(filters.minBlocked)
+          : undefined,
+        maxBlocked: filters?.maxBlocked
+          ? Number(filters.maxBlocked)
+          : undefined,
+      });
 
-      setTotalCount(result.data.totalCount);
-    }
-  }, []);
+      if (result.success) {
+        if (p === 1) {
+          setItems(result.data.items);
+        } else {
+          setItems((prev) => [...prev, ...result.data.items]);
+        }
+
+        setTotalCount(result.data.totalCount);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -105,10 +133,16 @@ export function SuspiciousActivityPanel() {
     };
   }, []);
 
+  // Re-fetch when filters change
+  useEffect(() => {
+    pageRef.current = 1;
+    fetchSummary(1, { search, dateFrom, dateTo, minBlocked, maxBlocked });
+  }, [search, dateFrom, dateTo, minBlocked, maxBlocked, fetchSummary]);
+
   const handleLoadMore = () => {
-    const next = page + 1;
-    setPage(next);
-    fetchSummary(next);
+    const next = pageRef.current + 1;
+    pageRef.current = next;
+    fetchSummary(next, { search, dateFrom, dateTo, minBlocked, maxBlocked });
   };
 
   const handleExpandKey = async (key: string) => {
@@ -165,8 +199,14 @@ export function SuspiciousActivityPanel() {
         `[SuspiciousActivity] Blocked user ${blockTarget.userId}: ${blockTarget.reason}`
       );
       setBlockTarget(null);
-      await fetchSummary(1);
-      setPage(1);
+      await fetchSummary(1, {
+        search,
+        dateFrom,
+        dateTo,
+        minBlocked,
+        maxBlocked,
+      });
+      pageRef.current = 1;
     } else {
       setError(result.error);
     }
@@ -206,8 +246,14 @@ export function SuspiciousActivityPanel() {
         `[SuspiciousActivity] Unblocked user ${unblockTarget.userId}`
       );
       setUnblockTarget(null);
-      await fetchSummary(1);
-      setPage(1);
+      await fetchSummary(1, {
+        search,
+        dateFrom,
+        dateTo,
+        minBlocked,
+        maxBlocked,
+      });
+      pageRef.current = 1;
     } else {
       setError(result.error);
     }
@@ -249,8 +295,14 @@ export function SuspiciousActivityPanel() {
 
     if (result.success) {
       setBlockIpTarget(null);
-      await fetchSummary(1);
-      setPage(1);
+      await fetchSummary(1, {
+        search,
+        dateFrom,
+        dateTo,
+        minBlocked,
+        maxBlocked,
+      });
+      pageRef.current = 1;
     } else {
       setError(result.error);
     }
@@ -258,20 +310,70 @@ export function SuspiciousActivityPanel() {
     setIsLoading(false);
   };
 
-  if (items.length === 0) {
-    return <Text className="text-zinc-500">{t('noEvents')}</Text>;
-  }
-
   return (
     <div className="space-y-2">
-      {/* Header - hidden on mobile */}
-      <div className="hidden grid-cols-[1fr_7rem_5rem_5rem_5rem] gap-4 px-4 text-xs font-medium text-zinc-500 sm:grid">
-        <span>{t('key')}</span>
-        <span>{t('limiter')}</span>
-        <span>{t('timesBlocked')}</span>
-        <span>{t('firstEvent')}</span>
-        <span>{t('lastEvent')}</span>
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 rounded-lg border border-zinc-200 p-3 dark:border-zinc-700">
+        <Input
+          className="min-w-[12rem] flex-1"
+          placeholder={t('searchPlaceholder')}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <div className="flex items-center gap-1">
+          <label className="text-xs text-zinc-500">{t('dateFrom')}</label>
+          <input
+            type="date"
+            className="rounded border border-zinc-300 bg-transparent px-2 py-1 text-sm dark:border-zinc-600"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          <label className="text-xs text-zinc-500">{t('dateTo')}</label>
+          <input
+            type="date"
+            className="rounded border border-zinc-300 bg-transparent px-2 py-1 text-sm dark:border-zinc-600"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          <label className="text-xs text-zinc-500">{t('minBlocked')}</label>
+          <input
+            type="number"
+            min={1}
+            className="w-16 rounded border border-zinc-300 bg-transparent px-2 py-1 text-sm dark:border-zinc-600"
+            value={minBlocked}
+            onChange={(e) => setMinBlocked(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          <label className="text-xs text-zinc-500">{t('maxBlocked')}</label>
+          <input
+            type="number"
+            min={1}
+            className="w-16 rounded border border-zinc-300 bg-transparent px-2 py-1 text-sm dark:border-zinc-600"
+            value={maxBlocked}
+            onChange={(e) => setMaxBlocked(e.target.value)}
+          />
+        </div>
       </div>
+
+      {items.length === 0 && (
+        <Text className="text-zinc-500">{t('noEvents')}</Text>
+      )}
+
+      {/* Header - hidden on mobile */}
+      {items.length > 0 && (
+        <div className="hidden grid-cols-[1fr_10rem_5rem_5rem_5rem] gap-4 px-4 text-xs font-medium text-zinc-500 sm:grid">
+          <span>{t('key')}</span>
+          <span>{t('limiter')}</span>
+          <span>{t('timesBlocked')}</span>
+          <span>{t('firstEvent')}</span>
+          <span>{t('lastEvent')}</span>
+        </div>
+      )}
 
       {items.map((item) => (
         <div
@@ -283,7 +385,7 @@ export function SuspiciousActivityPanel() {
             onClick={() => handleExpandKey(item.key)}
             className="w-full cursor-pointer p-3 text-left"
           >
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_7rem_5rem_5rem_5rem] sm:items-center sm:gap-4">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_10rem_5rem_5rem_5rem] sm:items-center sm:gap-4">
               <div className="min-w-0">
                 <div className="truncate font-mono text-sm">{item.key}</div>
                 {item.resolvedUser && (
@@ -293,7 +395,7 @@ export function SuspiciousActivityPanel() {
                   </div>
                 )}
               </div>
-              <span className="text-xs text-zinc-500">
+              <span className="break-words text-xs text-zinc-500">
                 {tLabels(item.limiterLabel)}
               </span>
               <span className="font-mono text-sm font-medium">

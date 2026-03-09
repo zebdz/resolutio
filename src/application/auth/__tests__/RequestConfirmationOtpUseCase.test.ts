@@ -35,7 +35,9 @@ class MockOtpRepository implements OtpRepository {
       (o) => o.identifier === identifier && o.channel === channel
     );
 
-    if (all.length === 0) {return null;}
+    if (all.length === 0) {
+      return null;
+    }
 
     return all.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
   }

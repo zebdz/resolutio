@@ -1071,8 +1071,10 @@
       "windowMinutes": "{count}m",
       "windowSeconds": "{count}s",
       "labels": {
-        "middleware": "Middleware (IP+Session)",
-        "serverAction": "Server Actions (IP+Session)",
+        "middlewareSession": "Middleware (Session)",
+        "middlewareIp": "Middleware (IP)",
+        "serverActionSession": "Server Actions (Session)",
+        "serverActionIp": "Server Actions (IP)",
         "phoneSearch": "Phone Search (userId)",
         "login": "Login (IP+Phone)",
         "registrationIp": "Registration (IP)",
@@ -1107,7 +1109,12 @@
       "blockIp": "Block IP",
       "blockIpConfirmTitle": "Block IP",
       "blockIpConfirmDescription": "Block IP {ip} from accessing the platform?",
-      "ipAddressLabel": "IP Address"
+      "ipAddressLabel": "IP Address",
+      "searchPlaceholder": "Name, phone, nickname...",
+      "dateFrom": "From",
+      "dateTo": "To",
+      "minBlocked": "Min blocked",
+      "maxBlocked": "Max blocked"
     },
     "users": {
       "title": "User Management",

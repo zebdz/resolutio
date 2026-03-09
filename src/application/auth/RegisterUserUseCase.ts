@@ -127,7 +127,9 @@ export class RegisterUserUseCase {
             nickname.getValue()
           );
 
-          if (available) {break;}
+          if (available) {
+            break;
+          }
 
           nickname = Nickname.generate();
         }

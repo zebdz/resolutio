@@ -26,7 +26,7 @@ vi.mock('../infrastructure/rateLimit/superadminWhitelist', () => ({
 }));
 
 // Use real limiter for testing — vi.hoisted ensures it's available in vi.mock factory
-const { testLimiter } = vi.hoisted(() => {
+const { testSessionLimiter, testIpLimiter } = vi.hoisted(() => {
   // Inline the limiter logic to avoid import hoisting issues
   class SimpleLimiter {
     private store: Map<string, number[]> = new Map();
@@ -82,11 +82,15 @@ const { testLimiter } = vi.hoisted(() => {
     }
   }
 
-  return { testLimiter: new SimpleLimiter(3, 60_000) };
+  return {
+    testSessionLimiter: new SimpleLimiter(3, 60_000),
+    testIpLimiter: new SimpleLimiter(3, 60_000),
+  };
 });
 
 vi.mock('../infrastructure/rateLimit', () => ({
-  middlewareLimiter: testLimiter,
+  middlewareSessionLimiter: testSessionLimiter,
+  middlewareIpLimiter: testIpLimiter,
   getLimiterByLabel: () => ({ maxRequests: 3 }),
 }));
 
@@ -113,11 +117,13 @@ function makeRequest(
 
 describe('proxy middleware dual-key rate limiting', () => {
   beforeEach(() => {
-    testLimiter.clearAll();
+    testSessionLimiter.clearAll();
+    testIpLimiter.clearAll();
   });
 
   afterEach(() => {
-    testLimiter.clearAll();
+    testSessionLimiter.clearAll();
+    testIpLimiter.clearAll();
   });
 
   it('unauthenticated: blocks when IP exceeds limit', () => {
@@ -193,7 +199,7 @@ describe('proxy middleware dual-key rate limiting', () => {
     }
 
     // IP key should have NO recorded hits
-    const ipResult = testLimiter.peek('1.2.3.4');
+    const ipResult = testIpLimiter.peek('1.2.3.4');
     expect(ipResult.remaining).toBe(3);
   });
 

@@ -195,7 +195,10 @@ export async function searchRateLimitEntriesAction(input: {
         additionalKeys.add(k);
       }
     }
-  } else if (input.label === 'middleware' || input.label === 'serverAction') {
+  } else if (
+    input.label === 'middlewareSession' ||
+    input.label === 'serverActionSession'
+  ) {
     const users = await searchUsersByQuery(input.query);
     const userIds = users.map((u) => u.id);
 
@@ -204,7 +207,8 @@ export async function searchRateLimitEntriesAction(input: {
         where: { userId: { in: userIds }, expiresAt: { gt: new Date() } },
         select: { id: true },
       });
-      const prefix = input.label === 'middleware' ? 'mw-session:' : 'session:';
+      const prefix =
+        input.label === 'middlewareSession' ? 'mw-session:' : 'session:';
 
       for (const s of sessions) {
         additionalKeys.add(`${prefix}${s.id}`);

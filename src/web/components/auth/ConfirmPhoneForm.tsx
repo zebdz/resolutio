@@ -39,7 +39,9 @@ export function ConfirmPhoneForm({ maskedPhone }: Props) {
 
   // Load initial OTP data from sessionStorage (set by register/login)
   useEffect(() => {
-    if (typeof window === 'undefined') {return;}
+    if (typeof window === 'undefined') {
+      return;
+    }
 
     const raw = sessionStorage.getItem('confirmPhoneData');
 
@@ -60,7 +62,9 @@ export function ConfirmPhoneForm({ maskedPhone }: Props) {
 
   // Resend countdown timer
   useEffect(() => {
-    if (resendCountdown <= 0) {return;}
+    if (resendCountdown <= 0) {
+      return;
+    }
 
     const timer = setInterval(() => {
       setResendCountdown((prev) => prev - 1);
@@ -70,7 +74,9 @@ export function ConfirmPhoneForm({ maskedPhone }: Props) {
   }, [resendCountdown]);
 
   function handleVerify() {
-    if (!otpId || otpCode.length < 6) {return;}
+    if (!otpId || otpCode.length < 6) {
+      return;
+    }
 
     setError(null);
 
@@ -91,7 +97,9 @@ export function ConfirmPhoneForm({ maskedPhone }: Props) {
 
   const handleResend = useCallback(
     (token?: string | null) => {
-      if (resendCountdown > 0) {return;}
+      if (resendCountdown > 0) {
+        return;
+      }
 
       setError(null);
 

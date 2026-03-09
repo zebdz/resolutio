@@ -5,7 +5,8 @@ import { getTranslations } from 'next-intl/server';
 import { getClientIp } from '@/web/lib/clientIp';
 import { getSessionCookie } from '@/web/lib/session';
 import {
-  serverActionLimiter as limiter,
+  serverActionSessionLimiter,
+  serverActionIpLimiter,
   phoneSearchLimiter,
   loginLimiter,
   registrationIpLimiter,
@@ -36,7 +37,9 @@ export async function checkRateLimit(): Promise<{
 
   if (sessionId) {
     // Authenticated: rate limit by session only — don't pollute IP counter
-    const sessionResult = limiter.check(`session:${sessionId}`);
+    const sessionResult = serverActionSessionLimiter.check(
+      `session:${sessionId}`
+    );
 
     // Session-based superadmin check — IP alone is not enough (shared network)
     if (!sessionResult.allowed && !isSuperadminSession(sessionId)) {
@@ -46,7 +49,7 @@ export async function checkRateLimit(): Promise<{
     }
   } else {
     // Unauthenticated: rate limit by IP (fallback to IP-based superadmin check)
-    const ipResult = limiter.check(ip);
+    const ipResult = serverActionIpLimiter.check(ip);
 
     if (!ipResult.allowed && !isSuperadminIp(ip)) {
       const t = await getTranslations('rateLimit');
@@ -155,7 +158,7 @@ async function getOrCreateDeviceId(): Promise<string> {
 }
 
 /**
- * Check registration rate limit using dual keys: IP (50/hr) + device UUID (3/hr).
+ * Check registration rate limit using dual keys: IP (5,000/hr) + device UUID (3/hr).
  * Every call counts as an attempt (uses check(), not peek()).
  */
 export async function checkRegistrationRateLimit(ip: string): Promise<{

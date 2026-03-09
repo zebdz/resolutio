@@ -14,8 +14,10 @@ interface KeyDetailViewProps {
 }
 
 const LIMITER_LABELS: Record<string, string> = {
-  middleware: 'Middleware',
-  serverAction: 'Server Actions',
+  middlewareSession: 'MW (Session)',
+  middlewareIp: 'MW (IP)',
+  serverActionSession: 'SA (Session)',
+  serverActionIp: 'SA (IP)',
   phoneSearch: 'Phone Search',
   login: 'Login',
   registrationIp: 'Registration (IP)',

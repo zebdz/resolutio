@@ -5,7 +5,8 @@ const {
   mockGetSessionCookie,
   mockIsSuperadminIp,
   mockIsSuperadminSession,
-  serverActionLimiter,
+  serverActionSessionLimiter,
+  serverActionIpLimiter,
 } = vi.hoisted(() => {
   // Must inline since vi.hoisted runs before imports
   class SimpleLimiter {
@@ -72,7 +73,8 @@ const {
     mockGetSessionCookie: vi.fn(),
     mockIsSuperadminIp: vi.fn(),
     mockIsSuperadminSession: vi.fn(),
-    serverActionLimiter: new SimpleLimiter(3, 60_000),
+    serverActionSessionLimiter: new SimpleLimiter(3, 60_000),
+    serverActionIpLimiter: new SimpleLimiter(3, 60_000),
   };
 });
 
@@ -90,7 +92,8 @@ vi.mock('@/infrastructure/rateLimit/superadminWhitelist', () => ({
 }));
 
 vi.mock('@/infrastructure/rateLimit/registry', () => ({
-  serverActionLimiter,
+  serverActionSessionLimiter,
+  serverActionIpLimiter,
   phoneSearchLimiter: { check: vi.fn(), peek: vi.fn() },
   loginLimiter: { check: vi.fn(), peek: vi.fn(), reset: vi.fn() },
   registrationIpLimiter: { check: vi.fn() },
@@ -112,7 +115,8 @@ import { checkRateLimit } from '../rateLimit';
 
 describe('checkRateLimit', () => {
   beforeEach(() => {
-    serverActionLimiter.clearAll();
+    serverActionSessionLimiter.clearAll();
+    serverActionIpLimiter.clearAll();
     mockIsSuperadminIp.mockReturnValue(false);
     mockIsSuperadminSession.mockReturnValue(false);
     mockGetClientIp.mockResolvedValue('127.0.0.1');
@@ -126,18 +130,18 @@ describe('checkRateLimit', () => {
 
   it('returns error when IP exceeds limit (unauthenticated)', async () => {
     mockGetSessionCookie.mockResolvedValue(null);
-    serverActionLimiter.check('127.0.0.1');
-    serverActionLimiter.check('127.0.0.1');
-    serverActionLimiter.check('127.0.0.1');
+    serverActionIpLimiter.check('127.0.0.1');
+    serverActionIpLimiter.check('127.0.0.1');
+    serverActionIpLimiter.check('127.0.0.1');
 
     const result = await checkRateLimit();
     expect(result).toEqual({ success: false, error: 'tooManyRequests' });
   });
 
   it('returns error when session exceeds limit', async () => {
-    serverActionLimiter.check('session:session-123');
-    serverActionLimiter.check('session:session-123');
-    serverActionLimiter.check('session:session-123');
+    serverActionSessionLimiter.check('session:session-123');
+    serverActionSessionLimiter.check('session:session-123');
+    serverActionSessionLimiter.check('session:session-123');
 
     const result = await checkRateLimit();
     expect(result).toEqual({ success: false, error: 'tooManyRequests' });
@@ -147,11 +151,14 @@ describe('checkRateLimit', () => {
     await checkRateLimit();
     await checkRateLimit();
 
-    const entries = serverActionLimiter.getEntries();
-    const ipEntry = entries.find((e: { key: string }) => e.key === '127.0.0.1');
+    const ipEntries = serverActionIpLimiter.getEntries();
+    const ipEntry = ipEntries.find(
+      (e: { key: string }) => e.key === '127.0.0.1'
+    );
     expect(ipEntry).toBeUndefined();
 
-    const sessionEntry = entries.find(
+    const sessionEntries = serverActionSessionLimiter.getEntries();
+    const sessionEntry = sessionEntries.find(
       (e: { key: string }) => e.key === 'session:session-123'
     );
     expect(sessionEntry).toBeDefined();
@@ -162,16 +169,16 @@ describe('checkRateLimit', () => {
     mockIsSuperadminSession.mockReturnValue(true);
 
     // Exhaust the session limiter
-    serverActionLimiter.check('session:session-123');
-    serverActionLimiter.check('session:session-123');
-    serverActionLimiter.check('session:session-123');
+    serverActionSessionLimiter.check('session:session-123');
+    serverActionSessionLimiter.check('session:session-123');
+    serverActionSessionLimiter.check('session:session-123');
 
     // Superadmin should NOT be blocked
     const result = await checkRateLimit();
     expect(result).toBeNull();
 
     // Session hits are still recorded
-    const entries = serverActionLimiter.getEntries();
+    const entries = serverActionSessionLimiter.getEntries();
     const sessionEntry = entries.find(
       (e: { key: string }) => e.key === 'session:session-123'
     );
@@ -185,9 +192,9 @@ describe('checkRateLimit', () => {
     mockIsSuperadminSession.mockReturnValue(false);
 
     // Exhaust the session limiter
-    serverActionLimiter.check('session:session-123');
-    serverActionLimiter.check('session:session-123');
-    serverActionLimiter.check('session:session-123');
+    serverActionSessionLimiter.check('session:session-123');
+    serverActionSessionLimiter.check('session:session-123');
+    serverActionSessionLimiter.check('session:session-123');
 
     // Non-superadmin session on superadmin IP should still be blocked
     const result = await checkRateLimit();

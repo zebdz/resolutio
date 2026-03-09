@@ -46,24 +46,38 @@ vi.mock('@/infrastructure/index', () => ({
 vi.mock('@/infrastructure/rateLimit/registry', async () => {
   const { InMemoryRateLimiter } =
     await import('@/infrastructure/rateLimit/InMemoryRateLimiter');
-  const middleware = new InMemoryRateLimiter(60, 60_000);
-  const serverAction = new InMemoryRateLimiter(200, 60_000);
+  const middlewareSession = new InMemoryRateLimiter(60, 60_000);
+  const middlewareIp = new InMemoryRateLimiter(50_000, 60_000);
+  const serverActionSession = new InMemoryRateLimiter(200, 60_000);
+  const serverActionIp = new InMemoryRateLimiter(200_000, 60_000);
   const phoneSearch = new InMemoryRateLimiter(5, 30 * 60_000);
   const login = new InMemoryRateLimiter(5, 15 * 60_000);
-  const regIp = new InMemoryRateLimiter(50, 60 * 60_000);
+  const regIp = new InMemoryRateLimiter(5_000, 60 * 60_000);
   const regDevice = new InMemoryRateLimiter(3, 60 * 60_000);
 
   const registry = [
     {
-      label: 'middleware',
-      limiter: middleware,
+      label: 'middlewareSession',
+      limiter: middlewareSession,
       maxRequests: 60,
       windowMs: 60_000,
     },
     {
-      label: 'serverAction',
-      limiter: serverAction,
+      label: 'middlewareIp',
+      limiter: middlewareIp,
+      maxRequests: 50_000,
+      windowMs: 60_000,
+    },
+    {
+      label: 'serverActionSession',
+      limiter: serverActionSession,
       maxRequests: 200,
+      windowMs: 60_000,
+    },
+    {
+      label: 'serverActionIp',
+      limiter: serverActionIp,
+      maxRequests: 200_000,
       windowMs: 60_000,
     },
     {
@@ -76,7 +90,7 @@ vi.mock('@/infrastructure/rateLimit/registry', async () => {
     {
       label: 'registrationIp',
       limiter: regIp,
-      maxRequests: 50,
+      maxRequests: 5_000,
       windowMs: 60 * 60_000,
     },
     {
@@ -91,8 +105,10 @@ vi.mock('@/infrastructure/rateLimit/registry', async () => {
     limiterRegistry: registry,
     getLimiterByLabel: (label: string) =>
       registry.find((e) => e.label === label),
-    middlewareLimiter: middleware,
-    serverActionLimiter: serverAction,
+    middlewareSessionLimiter: middlewareSession,
+    middlewareIpLimiter: middlewareIp,
+    serverActionSessionLimiter: serverActionSession,
+    serverActionIpLimiter: serverActionIp,
     phoneSearchLimiter: phoneSearch,
     loginLimiter: login,
     registrationIpLimiter: regIp,
@@ -172,17 +188,17 @@ describe('rateLimitAdmin actions', () => {
   });
 
   describe('getRateLimitOverviewAction', () => {
-    it('returns 6 limiters with counts', async () => {
-      const middleware = getLimiterByLabel('middleware')!;
-      middleware.limiter.check('1.2.3.4');
-      middleware.limiter.check('5.6.7.8');
+    it('returns 8 limiters with counts', async () => {
+      const middlewareIp = getLimiterByLabel('middlewareIp')!;
+      middlewareIp.limiter.check('1.2.3.4');
+      middlewareIp.limiter.check('5.6.7.8');
 
       const result = await getRateLimitOverviewAction();
       expect(result.success).toBe(true);
 
       if (result.success) {
-        expect(result.data).toHaveLength(6);
-        const mw = result.data.find((e) => e.label === 'middleware');
+        expect(result.data).toHaveLength(8);
+        const mw = result.data.find((e) => e.label === 'middlewareIp');
         expect(mw).toBeDefined();
         expect(mw!.entryCount).toBe(2);
         expect(mw!.blockedCount).toBe(0);
@@ -192,7 +208,7 @@ describe('rateLimitAdmin actions', () => {
 
   describe('resetAllRateLimitsAction', () => {
     it('clears all limiters', async () => {
-      getLimiterByLabel('middleware')!.limiter.check('1.2.3.4');
+      getLimiterByLabel('middlewareSession')!.limiter.check('1.2.3.4');
       getLimiterByLabel('login')!.limiter.check('login:1.2.3.4:+7123');
 
       const result = await resetAllRateLimitsAction();
@@ -206,12 +222,12 @@ describe('rateLimitAdmin actions', () => {
 
   describe('resetLimiterAction', () => {
     it('clears entries for specified limiter', async () => {
-      getLimiterByLabel('middleware')!.limiter.check('1.2.3.4');
+      getLimiterByLabel('middlewareSession')!.limiter.check('1.2.3.4');
       getLimiterByLabel('login')!.limiter.check('login:x');
 
-      const result = await resetLimiterAction({ label: 'middleware' });
+      const result = await resetLimiterAction({ label: 'middlewareSession' });
       expect(result.success).toBe(true);
-      expect(getLimiterByLabel('middleware')!.limiter.size).toBe(0);
+      expect(getLimiterByLabel('middlewareSession')!.limiter.size).toBe(0);
       expect(getLimiterByLabel('login')!.limiter.size).toBe(1);
     });
 
@@ -223,7 +239,7 @@ describe('rateLimitAdmin actions', () => {
 
   describe('clearBlockedKeysAction', () => {
     it('resets only blocked keys', async () => {
-      const mw = getLimiterByLabel('middleware')!;
+      const mw = getLimiterByLabel('middlewareSession')!;
 
       for (let i = 0; i < 60; i++) {
         mw.limiter.check('blocked-ip');
@@ -231,7 +247,9 @@ describe('rateLimitAdmin actions', () => {
 
       mw.limiter.check('ok-ip');
 
-      const result = await clearBlockedKeysAction({ label: 'middleware' });
+      const result = await clearBlockedKeysAction({
+        label: 'middlewareSession',
+      });
       expect(result.success).toBe(true);
       expect(mw.limiter.getBlockedKeys()).toHaveLength(0);
       expect(mw.limiter.size).toBe(1);
@@ -240,12 +258,12 @@ describe('rateLimitAdmin actions', () => {
 
   describe('searchRateLimitEntriesAction', () => {
     it('returns matching entries', async () => {
-      const mw = getLimiterByLabel('middleware')!;
+      const mw = getLimiterByLabel('middlewareSession')!;
       mw.limiter.check('192.168.1.1');
       mw.limiter.check('10.0.0.1');
 
       const result = await searchRateLimitEntriesAction({
-        label: 'middleware',
+        label: 'middlewareSession',
         query: '192',
       });
       expect(result.success).toBe(true);
@@ -258,7 +276,7 @@ describe('rateLimitAdmin actions', () => {
 
     it('returns error for query < 3 chars', async () => {
       const result = await searchRateLimitEntriesAction({
-        label: 'middleware',
+        label: 'middlewareSession',
         query: 'ab',
       });
       expect(result.success).toBe(false);
@@ -267,13 +285,13 @@ describe('rateLimitAdmin actions', () => {
 
   describe('resetRateLimitKeysAction', () => {
     it('resets specified keys', async () => {
-      const mw = getLimiterByLabel('middleware')!;
+      const mw = getLimiterByLabel('middlewareSession')!;
       mw.limiter.check('a');
       mw.limiter.check('b');
       mw.limiter.check('c');
 
       const result = await resetRateLimitKeysAction({
-        label: 'middleware',
+        label: 'middlewareSession',
         keys: ['a', 'b'],
       });
       expect(result.success).toBe(true);
@@ -283,10 +301,10 @@ describe('rateLimitAdmin actions', () => {
 
   describe('lockRateLimitKeyAction', () => {
     it('locks specified key', async () => {
-      const mw = getLimiterByLabel('middleware')!;
+      const mw = getLimiterByLabel('middlewareSession')!;
 
       const result = await lockRateLimitKeyAction({
-        label: 'middleware',
+        label: 'middlewareSession',
         key: '1.2.3.4',
       });
       expect(result.success).toBe(true);
@@ -304,12 +322,12 @@ describe('rateLimitAdmin actions', () => {
 
   describe('unlockRateLimitKeyAction', () => {
     it('unlocks a blocked key', async () => {
-      const mw = getLimiterByLabel('middleware')!;
+      const mw = getLimiterByLabel('middlewareSession')!;
       mw.limiter.lockKey('1.2.3.4');
       expect(mw.limiter.peek('1.2.3.4').allowed).toBe(false);
 
       const result = await unlockRateLimitKeyAction({
-        label: 'middleware',
+        label: 'middlewareSession',
         key: '1.2.3.4',
       });
       expect(result.success).toBe(true);
@@ -327,7 +345,7 @@ describe('rateLimitAdmin actions', () => {
 
   describe('session-keyed search', () => {
     it('finds middleware entries by phone via session lookup', async () => {
-      const mw = getLimiterByLabel('middleware')!;
+      const mw = getLimiterByLabel('middlewareSession')!;
       mw.limiter.check('mw-session:sess-abc');
 
       (prisma.user.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -343,7 +361,7 @@ describe('rateLimitAdmin actions', () => {
       ]);
 
       const result = await searchRateLimitEntriesAction({
-        label: 'middleware',
+        label: 'middlewareSession',
         query: '+7900',
       });
 
@@ -356,7 +374,7 @@ describe('rateLimitAdmin actions', () => {
     });
 
     it('finds serverAction entries by phone via session lookup', async () => {
-      const sa = getLimiterByLabel('serverAction')!;
+      const sa = getLimiterByLabel('serverActionSession')!;
       sa.limiter.check('session:sess-xyz');
 
       (prisma.user.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -372,7 +390,7 @@ describe('rateLimitAdmin actions', () => {
       ]);
 
       const result = await searchRateLimitEntriesAction({
-        label: 'serverAction',
+        label: 'serverActionSession',
         query: '+7900',
       });
 
@@ -385,7 +403,7 @@ describe('rateLimitAdmin actions', () => {
     });
 
     it('enriches session-keyed entries with resolvedUser', async () => {
-      const mw = getLimiterByLabel('middleware')!;
+      const mw = getLimiterByLabel('middlewareSession')!;
       mw.limiter.check('mw-session:sess-enrich');
 
       // First call: searchUsersByQuery for session lookup
@@ -403,7 +421,7 @@ describe('rateLimitAdmin actions', () => {
       ]);
 
       const result = await searchRateLimitEntriesAction({
-        label: 'middleware',
+        label: 'middlewareSession',
         query: '+7900',
       });
 

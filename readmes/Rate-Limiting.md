@@ -4,15 +4,17 @@
 
 Three-layer rate limiting using IP, session, and userId keys:
 
-| Layer                 | Key                          | File                                       | Limit             | Covers                                              |
-| --------------------- | ---------------------------- | ------------------------------------------ | ----------------- | --------------------------------------------------- |
-| Middleware            | session (auth) / IP (unauth) | `src/infrastructure/rateLimit/registry.ts` | 60/min            | Page loads, API routes (`/api/*`), curl/bots        |
-| Server actions        | session (auth) / IP (unauth) | `src/web/actions/rateLimit.ts`             | 200/min           | All Next.js server actions                          |
-| Phone search          | userId                       | `src/web/actions/rateLimit.ts`             | 5/30min           | `searchUserByPhoneAction` only                      |
-| Login                 | IP+phone                     | `src/web/actions/rateLimit.ts`             | 5/15min           | `loginAction` — failed attempts only                |
-| Registration (IP)     | IP                           | `src/web/actions/rateLimit.ts`             | 50/60min          | `registerAction` — all attempts                     |
-| Registration (device) | device_id                    | `src/web/actions/rateLimit.ts`             | 3/60min           | `registerAction` — all attempts                     |
-| Confirmation OTP      | phone (per-identifier)       | `RequestConfirmationOtpUseCase`            | escalating delays | `requestConfirmationOtpAction` — per-phone throttle |
+| Layer                    | Key                    | File                                       | Limit             | Covers                                               |
+| ------------------------ | ---------------------- | ------------------------------------------ | ----------------- | ---------------------------------------------------- |
+| Middleware (session)     | session (auth)         | `src/infrastructure/rateLimit/registry.ts` | 60/min            | Page loads, API routes — authenticated users         |
+| Middleware (IP)          | IP (unauth)            | `src/infrastructure/rateLimit/registry.ts` | 50,000/min        | Page loads, API routes — unauthenticated traffic     |
+| Server actions (session) | session (auth)         | `src/web/actions/rateLimit.ts`             | 200/min           | All Next.js server actions — authenticated users     |
+| Server actions (IP)      | IP (unauth)            | `src/web/actions/rateLimit.ts`             | 200,000/min       | All Next.js server actions — unauthenticated traffic |
+| Phone search             | userId                 | `src/web/actions/rateLimit.ts`             | 5/30min           | `searchUserByPhoneAction` only                       |
+| Login                    | IP+phone               | `src/web/actions/rateLimit.ts`             | 5/15min           | `loginAction` — failed attempts only                 |
+| Registration (IP)        | IP                     | `src/web/actions/rateLimit.ts`             | 5,000/60min       | `registerAction` — all attempts                      |
+| Registration (device)    | device_id              | `src/web/actions/rateLimit.ts`             | 3/60min           | `registerAction` — all attempts                      |
+| Confirmation OTP         | phone (per-identifier) | `RequestConfirmationOtpUseCase`            | escalating delays | `requestConfirmationOtpAction` — per-phone throttle  |
 
 ### Why three layers?
 
@@ -24,13 +26,17 @@ Three-layer rate limiting using IP, session, and userId keys:
 
 Next.js server actions use an internal RSC protocol. Middleware can't return a response that server actions understand — returning 429 JSON or a 302 redirect causes "An unexpected response was received from the server" on the client. So server actions are skipped in middleware and rate-limited at the application level instead.
 
-### Why 60/min for middleware?
+### Why split session/IP limiters?
 
-Standard rate for web apps. Covers page loads, API routes, and direct HTTP requests (curl, bots, scripts). This is the primary abuse gate.
+Authed and unauthed traffic have fundamentally different trust levels. Session-keyed limits (60/min middleware, 200/min server actions) are tight — each session is a single user. IP-keyed limits must be very high because CGNAT (mobile carriers, universities, corporate networks) funnels thousands of legitimate users through a single IP. Sharing one limiter instance would force a compromise — too high for sessions, too low for IPs.
 
-### Why 200/min for server actions?
+### Why 50,000/min for middleware IP?
 
-A single page load triggers 4-6 data-fetching server actions (e.g. `getOrganizationDetailsAction`, `getBoardsByOrganizationAction`, `getOrgAdminsAction`, etc.). Heavy legitimate usage — navigation + search + voting — can reach 100+/min. The 200/min limit gives headroom for power users while still blocking scripted abuse. The middleware's 60/min on page loads is the real abuse gate; the server action limiter is a safety net against direct POST scripting.
+IP-only rate limiting is an anomaly detector, not the primary abuse gate. Real abuse defenses (Turnstile CAPTCHA, OTP, device_id cookie, session-based limiting) are already strong. The high IP limit catches only extreme outliers while avoiding CGNAT collateral damage.
+
+### Why 200,000/min for server actions IP?
+
+Same CGNAT reasoning as middleware. A single page load triggers 4-6 data-fetching server actions, so the server action limit is proportionally higher. Authenticated users are already tracked by session — this IP limit only affects unauthenticated traffic and exists as an extreme-anomaly safety net.
 
 ## How it works
 
@@ -71,9 +77,9 @@ A single page load triggers 4-6 data-fetching server actions (e.g. `getOrganizat
 
 ### Registration (`registerAction`)
 
-- Dual-key rate limiter: IP (50/hr) + device UUID cookie (3/hr)
+- Dual-key rate limiter: IP (5,000/hr) + device UUID cookie (3/hr)
 - OTP + Turnstile CAPTCHA do the heavy lifting against bots; this is a safety net against CAPTCHA-solving services creating mass accounts
-- IP limit is generous (50/hr) to accommodate shared networks (offices, universities) where many legitimate users register from the same IP
+- IP limit is very high (5,000/hr) because CGNAT can funnel thousands of legitimate users through a single IP; the device_id limit (3/hr) is the real per-browser gate
 - Device limit is tighter (3/hr) per browser — a `device_id` httpOnly cookie (1-year TTL) is set on first registration attempt
 - Both limiters use `check()` — every call counts as an attempt, regardless of outcome
 
@@ -83,7 +89,7 @@ A single page load triggers 4-6 data-fetching server actions (e.g. `getOrganizat
 - Escalating delays via `OtpThrottleCalculator.getRetryAfter()`: each subsequent request within the window increases the wait time
 - This prevents SMS bombing a single phone number regardless of how many IPs the attacker uses
 - Registration and login both send an initial OTP; the confirmation page allows resending via this action
-- The general server action rate limit (`checkRateLimit()` — 200/min) also applies on top
+- The general server action rate limit (`checkRateLimit()` — 200/min session, 200,000/min IP) also applies on top
 
 ### Rate-limited error page (`src/app/[locale]/rate-limited/page.tsx`)
 
@@ -128,7 +134,7 @@ The `/superadmin/rate-monitor` page shows real-time rate limit entries across al
 | `src/infrastructure/rateLimit/registry.ts`            | All limiter singletons via globalThis               |
 | `src/infrastructure/rateLimit/index.ts`               | Re-exports from registry                            |
 | `src/infrastructure/rateLimit/superadminWhitelist.ts` | Superadmin IP/userId whitelist (globalThis)         |
-| `src/web/actions/rateLimit.ts`                        | Server action rate limit helper (200/min)           |
+| `src/web/actions/rateLimit.ts`                        | Server action rate limit helper (session+IP)        |
 | `src/web/actions/superadminAuth.ts`                   | Shared requireSuperadmin() + whitelist registration |
 | `src/web/actions/rateLimitMonitor.ts`                 | Live monitor snapshot/detail actions                |
 | `src/web/lib/clientIp.ts`                             | IP extraction for Node.js (server actions)          |

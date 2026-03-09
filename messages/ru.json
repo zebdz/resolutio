@@ -1071,8 +1071,10 @@
       "windowMinutes": "{count} мин",
       "windowSeconds": "{count} сек",
       "labels": {
-        "middleware": "Middleware (IP+Сессия)",
-        "serverAction": "Серверные действия (IP+Сессия)",
+        "middlewareSession": "Middleware (Сессия)",
+        "middlewareIp": "Middleware (IP)",
+        "serverActionSession": "Серверные действия (Сессия)",
+        "serverActionIp": "Серверные действия (IP)",
         "phoneSearch": "Поиск по телефону (userId)",
         "login": "Вход (IP+Телефон)",
         "registrationIp": "Регистрация (IP)",
@@ -1107,7 +1109,12 @@
       "blockIp": "Заблокировать IP",
       "blockIpConfirmTitle": "Заблокировать IP",
       "blockIpConfirmDescription": "Заблокировать IP {ip} для доступа к платформе?",
-      "ipAddressLabel": "IP адрес"
+      "ipAddressLabel": "IP адрес",
+      "searchPlaceholder": "Имя, телефон, никнейм...",
+      "dateFrom": "С",
+      "dateTo": "По",
+      "minBlocked": "Мин. блокир.",
+      "maxBlocked": "Макс. блокир."
     },
     "users": {
       "title": "Управление пользователями",
