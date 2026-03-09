@@ -29,6 +29,7 @@ export interface UserProps {
   allowFindByName: boolean;
   allowFindByPhone: boolean;
   privacySetupCompleted: boolean;
+  confirmedAt?: Date;
 }
 
 export interface PersonalInfoForPasswordCheck {
@@ -234,6 +235,21 @@ export class User {
 
   get privacySetupCompleted(): boolean {
     return this.props.privacySetupCompleted;
+  }
+
+  get confirmedAt(): Date | undefined {
+    return this.props.confirmedAt;
+  }
+
+  isConfirmed(): boolean {
+    return this.props.confirmedAt !== undefined;
+  }
+
+  confirm(): User {
+    return new User({
+      ...this.props,
+      confirmedAt: new Date(),
+    });
   }
 
   getFullName(): string {

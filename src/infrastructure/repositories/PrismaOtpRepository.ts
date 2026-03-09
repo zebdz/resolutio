@@ -12,6 +12,7 @@ export class PrismaOtpRepository implements OtpRepository {
         channel: otp.channel,
         code: otp.code,
         clientIp: otp.clientIp,
+        userId: otp.userId,
         attempts: otp.attempts,
         maxAttempts: otp.maxAttempts,
         expiresAt: otp.expiresAt,
@@ -104,6 +105,7 @@ export class PrismaOtpRepository implements OtpRepository {
     channel: string;
     code: string;
     clientIp: string;
+    userId: string;
     attempts: number;
     maxAttempts: number;
     expiresAt: Date;
@@ -121,6 +123,7 @@ export class PrismaOtpRepository implements OtpRepository {
       expiresAt: record.expiresAt,
       verifiedAt: record.verifiedAt,
       createdAt: record.createdAt,
+      userId: record.userId,
     });
   }
 }

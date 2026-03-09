@@ -9,7 +9,6 @@
       "signingIn": "Signing in...",
       "noAccount": "Don't have an account?",
       "signUp": "Sign up",
-      "registrationSuccess": "Registration successful! Please sign in.",
       "error": "Invalid phone number or password"
     },
     "register": {
@@ -49,7 +48,17 @@
         "veryStrong": "Very strong"
       }
     },
-    "logout": "Logout"
+    "logout": "Logout",
+    "confirmPhone": {
+      "title": "Confirm Your Phone",
+      "subtitle": "We sent a verification code to {phone}",
+      "verify": "Confirm",
+      "verifying": "Confirming...",
+      "logout": "Log out",
+      "errors": {
+        "alreadyConfirmed": "Your phone is already confirmed."
+      }
+    }
   },
   "otp": {
     "title": "Verify Your Phone",

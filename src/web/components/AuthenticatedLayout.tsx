@@ -25,6 +25,11 @@ export async function AuthenticatedLayout({
     redirect('/login');
   }
 
+  // Force confirmation gate for unconfirmed users
+  if (!user.isConfirmed()) {
+    redirect('/confirm-phone');
+  }
+
   // Force privacy gate for users who haven't completed setup
   if (!user.privacySetupCompleted) {
     redirect('/privacy-setup');

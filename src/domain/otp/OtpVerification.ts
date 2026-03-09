@@ -11,6 +11,7 @@ export interface OtpVerificationProps {
   expiresAt: Date;
   verifiedAt: Date | null;
   createdAt: Date;
+  userId: string;
 }
 
 export class OtpVerification {
@@ -23,6 +24,7 @@ export class OtpVerification {
     clientIp: string;
     expiresAt: Date;
     maxAttempts?: number;
+    userId: string;
   }): OtpVerification {
     return new OtpVerification({
       id: '',
@@ -35,6 +37,7 @@ export class OtpVerification {
       expiresAt: input.expiresAt,
       verifiedAt: null,
       createdAt: new Date(),
+      userId: input.userId,
     });
   }
 
@@ -71,6 +74,9 @@ export class OtpVerification {
   }
   get createdAt(): Date {
     return this.props.createdAt;
+  }
+  get userId(): string {
+    return this.props.userId;
   }
 
   isExpired(): boolean {

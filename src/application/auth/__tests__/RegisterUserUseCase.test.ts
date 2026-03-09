@@ -1,14 +1,18 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { RegisterUserUseCase } from '../RegisterUserUseCase';
 import { RegisterUserSchema } from '../RegisterUserSchema';
-import { OtpErrors } from '../OtpErrors';
 import { AuthErrors } from '../AuthErrors';
+import { OtpErrors } from '../OtpErrors';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { User } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
+import { Nickname } from '@/domain/user/Nickname';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { OtpVerification, OtpChannel } from '@/domain/otp/OtpVerification';
 import { PasswordHasher } from '../RegisterUserUseCase';
+import { SessionRepository, Session } from '@/domain/user/SessionRepository';
+import { OtpCodeHasher } from '../OtpCodeHasher';
+import { OtpDeliveryChannel, OtpDeliveryResult } from '../OtpDeliveryChannel';
 import { DuplicateError } from '@/domain/shared/errors';
 import { UserDomainCodes } from '@/domain/user/UserDomainCodes';
 
@@ -18,6 +22,10 @@ class MockUserRepository implements UserRepository {
   private nextId = 1;
   nicknameAvailableResponses: boolean[] = [];
   isNicknameAvailableCalls: string[] = [];
+
+  addUser(user: User): void {
+    this.users.set(user.id, user);
+  }
 
   async findById(id: string): Promise<User | null> {
     return this.users.get(id) || null;
@@ -36,12 +44,17 @@ class MockUserRepository implements UserRepository {
   }
 
   async save(user: User): Promise<User> {
-    const id = `user-${this.nextId++}`;
-    (user as any).props.id = id;
-    this.users.set(id, user);
+    if (!user.id) {
+      const id = `user-${this.nextId++}`;
+      (user as any).props.id = id;
+    }
+
+    this.users.set(user.id, user);
 
     return user;
   }
+
+  async confirmUser(): Promise<void> {}
 
   async exists(phoneNumber: PhoneNumber): Promise<boolean> {
     return Array.from(this.users.values()).some((u) =>
@@ -53,7 +66,7 @@ class MockUserRepository implements UserRepository {
     return [];
   }
 
-  async searchUserByPhone(_phone: string): Promise<User | null> {
+  async searchUserByPhone(): Promise<User | null> {
     return null;
   }
 
@@ -89,9 +102,12 @@ class MockUserRepository implements UserRepository {
 // Mock OtpRepository
 class MockOtpRepository implements OtpRepository {
   private otps: Map<string, OtpVerification> = new Map();
+  private nextId = 1;
 
   async save(otp: OtpVerification): Promise<OtpVerification> {
-    this.otps.set(otp.id, otp);
+    const id = `otp-${this.nextId++}`;
+    (otp as any).props.id = id;
+    this.otps.set(id, otp);
 
     return otp;
   }
@@ -119,9 +135,49 @@ class MockOtpRepository implements OtpRepository {
   }
 
   async deleteExpired(): Promise<void> {}
+}
 
-  addOtp(otp: OtpVerification): void {
-    this.otps.set(otp.id, otp);
+// Mock SessionRepository
+class MockSessionRepository implements SessionRepository {
+  private sessions: Map<string, Session> = new Map();
+  private nextId = 1;
+  deletedUserSessions: string[] = [];
+
+  async create(
+    userId: string,
+    expiresAt: Date,
+    ipAddress?: string,
+    userAgent?: string
+  ): Promise<Session> {
+    const session: Session = {
+      id: `session-${this.nextId++}`,
+      userId,
+      expiresAt,
+      createdAt: new Date(),
+      ipAddress: ipAddress ?? null,
+      userAgent: userAgent ?? null,
+    };
+    this.sessions.set(session.id, session);
+
+    return session;
+  }
+
+  async findById(id: string): Promise<Session | null> {
+    return this.sessions.get(id) || null;
+  }
+
+  async delete(id: string): Promise<void> {
+    this.sessions.delete(id);
+  }
+
+  async deleteAllForUser(userId: string): Promise<void> {
+    this.deletedUserSessions.push(userId);
+
+    for (const [id, session] of this.sessions) {
+      if (session.userId === userId) {
+        this.sessions.delete(id);
+      }
+    }
   }
 }
 
@@ -132,22 +188,63 @@ class MockPasswordHasher implements PasswordHasher {
   }
 }
 
+// Mock OtpCodeHasher
+class MockOtpCodeHasher implements OtpCodeHasher {
+  hash(code: string): string {
+    return `hashed-${code}`;
+  }
+
+  verify(code: string, hash: string): boolean {
+    return `hashed-${code}` === hash;
+  }
+}
+
+// Mock OtpDeliveryChannel
+class MockOtpDeliveryChannel implements OtpDeliveryChannel {
+  channel: OtpChannel = 'sms';
+  shouldSucceed = true;
+  lastSentCode: string | null = null;
+
+  async send(
+    _recipient: string,
+    code: string,
+    _locale: string
+  ): Promise<OtpDeliveryResult> {
+    this.lastSentCode = code;
+
+    if (!this.shouldSucceed) {
+      return { success: false };
+    }
+
+    return { success: true, backdoorCode: code };
+  }
+}
+
 describe('RegisterUserUseCase', () => {
   let useCase: RegisterUserUseCase;
   let userRepository: MockUserRepository;
   let otpRepository: MockOtpRepository;
+  let sessionRepository: MockSessionRepository;
   let passwordHasher: MockPasswordHasher;
+  let otpCodeHasher: MockOtpCodeHasher;
+  let deliveryChannel: MockOtpDeliveryChannel;
 
   beforeEach(() => {
     userRepository = new MockUserRepository();
     otpRepository = new MockOtpRepository();
+    sessionRepository = new MockSessionRepository();
     passwordHasher = new MockPasswordHasher();
+    otpCodeHasher = new MockOtpCodeHasher();
+    deliveryChannel = new MockOtpDeliveryChannel();
 
-    useCase = new RegisterUserUseCase(
+    useCase = new RegisterUserUseCase({
       userRepository,
       passwordHasher,
-      otpRepository
-    );
+      otpRepository,
+      sessionRepository,
+      otpCodeHasher,
+      deliveryChannel,
+    });
   });
 
   const validInput = {
@@ -155,9 +252,9 @@ describe('RegisterUserUseCase', () => {
     lastName: 'Doe',
     phoneNumber: '+79161234567',
     password: 'securepass',
-    otpId: 'otp-1',
     language: 'ru' as const,
     consentGiven: true,
+    clientIp: '127.0.0.1',
   };
 
   it('should fail when consentGiven is false', async () => {
@@ -173,129 +270,41 @@ describe('RegisterUserUseCase', () => {
     }
   });
 
-  it('should fail when OTP not found', async () => {
-    const result = await useCase.execute(validInput);
-
-    expect(result.success).toBe(false);
-
-    if (!result.success) {
-      expect(result.error.message).toBe(OtpErrors.NOT_VERIFIED);
-    }
-  });
-
-  it('should fail when OTP not verified', async () => {
-    const otp = OtpVerification.reconstitute({
-      id: 'otp-1',
-      identifier: '+79161234567',
-      channel: 'sms',
-      code: 'hashed-code',
-      clientIp: '127.0.0.1',
-      attempts: 0,
-      maxAttempts: 5,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-      verifiedAt: null,
-      createdAt: new Date(),
-    });
-    otpRepository.addOtp(otp);
-
-    const result = await useCase.execute(validInput);
-
-    expect(result.success).toBe(false);
-
-    if (!result.success) {
-      expect(result.error.message).toBe(OtpErrors.NOT_VERIFIED);
-    }
-  });
-
-  it('should fail when OTP phone does not match registration phone', async () => {
-    const otp = OtpVerification.reconstitute({
-      id: 'otp-1',
-      identifier: '+79169999999', // different phone
-      channel: 'sms',
-      code: 'hashed-code',
-      clientIp: '127.0.0.1',
-      attempts: 1,
-      maxAttempts: 5,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-      verifiedAt: new Date(),
-      createdAt: new Date(),
-    });
-    otpRepository.addOtp(otp);
-
-    const result = await useCase.execute(validInput);
-
-    expect(result.success).toBe(false);
-
-    if (!result.success) {
-      expect(result.error.message).toBe(OtpErrors.PHONE_MISMATCH);
-    }
-  });
-
-  it('should create user when OTP is verified and phone matches', async () => {
-    const otp = OtpVerification.reconstitute({
-      id: 'otp-1',
-      identifier: '+79161234567',
-      channel: 'sms',
-      code: 'hashed-code',
-      clientIp: '127.0.0.1',
-      attempts: 1,
-      maxAttempts: 5,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-      verifiedAt: new Date(),
-      createdAt: new Date(),
-    });
-    otpRepository.addOtp(otp);
-
+  it('should create unconfirmed user + session + send OTP', async () => {
     const result = await useCase.execute(validInput);
 
     expect(result.success).toBe(true);
 
     if (result.success) {
-      expect(result.value.firstName).toBe('John');
-      expect(result.value.lastName).toBe('Doe');
-      expect(result.value.phoneNumber.getValue()).toBe('+79161234567');
-      expect(result.value.consentGivenAt).toBeInstanceOf(Date);
+      expect(result.value.user.firstName).toBe('John');
+      expect(result.value.user.lastName).toBe('Doe');
+      expect(result.value.user.phoneNumber.getValue()).toBe('+79161234567');
+      expect(result.value.user.isConfirmed()).toBe(false);
+      expect(result.value.user.consentGivenAt).toBeInstanceOf(Date);
+      expect(result.value.session).toBeDefined();
+      expect(result.value.session.userId).toBe(result.value.user.id);
+      expect(result.value.otpId).toBeTruthy();
+      expect(result.value.expiresAt).toBeInstanceOf(Date);
+      expect(result.value.backdoorCode).toBeTruthy();
+      expect(result.value.expiresInSeconds).toBeGreaterThan(0);
     }
   });
 
-  it('should fail when user with phone already exists', async () => {
-    // Add verified OTP
-    const otp = OtpVerification.reconstitute({
-      id: 'otp-1',
-      identifier: '+79161234567',
-      channel: 'sms',
-      code: 'hashed-code',
-      clientIp: '127.0.0.1',
-      attempts: 1,
-      maxAttempts: 5,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-      verifiedAt: new Date(),
-      createdAt: new Date(),
+  it('should fail when confirmed user with phone already exists', async () => {
+    const existing = User.reconstitute({
+      id: 'existing-user',
+      firstName: 'Jane',
+      lastName: 'Doe',
+      phoneNumber: PhoneNumber.create('+79161234567'),
+      password: 'hashed-oldpass',
+      language: 'ru',
+      createdAt: new Date('2024-01-01'),
+      nickname: Nickname.create('jane_doe'),
+      confirmedAt: new Date('2024-01-01'),
     });
-    otpRepository.addOtp(otp);
+    userRepository.addUser(existing);
 
-    // Create user first time
-    await useCase.execute(validInput);
-
-    // Try again with new OTP for same phone
-    const otp2 = OtpVerification.reconstitute({
-      id: 'otp-2',
-      identifier: '+79161234567',
-      channel: 'sms',
-      code: 'hashed-code',
-      clientIp: '127.0.0.1',
-      attempts: 1,
-      maxAttempts: 5,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-      verifiedAt: new Date(),
-      createdAt: new Date(),
-    });
-    otpRepository.addOtp(otp2);
-
-    const result = await useCase.execute({
-      ...validInput,
-      otpId: 'otp-2',
-    });
+    const result = await useCase.execute(validInput);
 
     expect(result.success).toBe(false);
 
@@ -304,27 +313,45 @@ describe('RegisterUserUseCase', () => {
     }
   });
 
-  it('should create user with a random nickname', async () => {
-    const otp = OtpVerification.reconstitute({
-      id: 'otp-1',
-      identifier: '+79161234567',
-      channel: 'sms',
-      code: 'hashed-code',
-      clientIp: '127.0.0.1',
-      attempts: 1,
-      maxAttempts: 5,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-      verifiedAt: new Date(),
-      createdAt: new Date(),
+  it('should re-register unconfirmed user: invalidate sessions + update data + send OTP', async () => {
+    const existing = User.reconstitute({
+      id: 'existing-user',
+      firstName: 'Jane',
+      lastName: 'Smith',
+      phoneNumber: PhoneNumber.create('+79161234567'),
+      password: 'hashed-oldpass',
+      language: 'ru',
+      createdAt: new Date('2024-01-01'),
+      nickname: Nickname.create('jane_smith'),
+      // no confirmedAt → unconfirmed
     });
-    otpRepository.addOtp(otp);
+    userRepository.addUser(existing);
 
     const result = await useCase.execute(validInput);
 
     expect(result.success).toBe(true);
 
     if (result.success) {
-      const nickname = result.value.nickname.getValue();
+      // Old sessions invalidated
+      expect(sessionRepository.deletedUserSessions).toContain('existing-user');
+      // User data updated
+      expect(result.value.user.firstName).toBe('John');
+      expect(result.value.user.lastName).toBe('Doe');
+      expect(result.value.user.id).toBe('existing-user');
+      // Session created
+      expect(result.value.session.userId).toBe('existing-user');
+      // OTP sent
+      expect(result.value.otpId).toBeTruthy();
+    }
+  });
+
+  it('should create user with a random nickname', async () => {
+    const result = await useCase.execute(validInput);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      const nickname = result.value.user.nickname.getValue();
       expect(nickname).toMatch(/^user_[a-f0-9]{8}$/);
     }
 
@@ -332,53 +359,47 @@ describe('RegisterUserUseCase', () => {
   });
 
   it('should retry nickname generation when taken', async () => {
-    const otp = OtpVerification.reconstitute({
-      id: 'otp-1',
-      identifier: '+79161234567',
-      channel: 'sms',
-      code: 'hashed-code',
-      clientIp: '127.0.0.1',
-      attempts: 1,
-      maxAttempts: 5,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-      verifiedAt: new Date(),
-      createdAt: new Date(),
-    });
-    otpRepository.addOtp(otp);
-
-    // First 2 nicknames taken, third available
     userRepository.nicknameAvailableResponses = [false, false, true];
 
     const result = await useCase.execute(validInput);
 
     expect(result.success).toBe(true);
-    // Should have checked 3 times (2 taken + 1 available)
     expect(userRepository.isNicknameAvailableCalls.length).toBe(3);
   });
 
   it('should create user with privacy defaults set to false', async () => {
-    const otp = OtpVerification.reconstitute({
-      id: 'otp-1',
-      identifier: '+79161234567',
-      channel: 'sms',
-      code: 'hashed-code',
-      clientIp: '127.0.0.1',
-      attempts: 1,
-      maxAttempts: 5,
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
-      verifiedAt: new Date(),
-      createdAt: new Date(),
-    });
-    otpRepository.addOtp(otp);
-
     const result = await useCase.execute(validInput);
 
     expect(result.success).toBe(true);
 
     if (result.success) {
-      expect(result.value.allowFindByName).toBe(false);
-      expect(result.value.allowFindByPhone).toBe(false);
-      expect(result.value.privacySetupCompleted).toBe(false);
+      expect(result.value.user.allowFindByName).toBe(false);
+      expect(result.value.user.allowFindByPhone).toBe(false);
+      expect(result.value.user.privacySetupCompleted).toBe(false);
+    }
+  });
+
+  it('should fail when OTP delivery fails', async () => {
+    deliveryChannel.shouldSucceed = false;
+
+    const result = await useCase.execute(validInput);
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error.message).toBe(OtpErrors.SEND_FAILED);
+    }
+  });
+
+  it('should hash the OTP code before saving', async () => {
+    const result = await useCase.execute(validInput);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      const savedOtp = await otpRepository.findById(result.value.otpId);
+      expect(savedOtp!.code).toMatch(/^hashed-/);
+      expect(savedOtp!.userId).toBe(result.value.user.id);
     }
   });
 });
@@ -391,7 +412,6 @@ describe('RegisterUserSchema', () => {
     password: 'securepass',
     confirmPassword: 'securepass',
     language: 'ru' as const,
-    otpId: 'otp-1',
     consentGiven: true as const,
   };
 

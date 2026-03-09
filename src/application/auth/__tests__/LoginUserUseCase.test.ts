@@ -7,6 +7,10 @@ import {
 } from '../LoginUserUseCase';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { SessionRepository, Session } from '@/domain/user/SessionRepository';
+import { OtpRepository } from '@/domain/otp/OtpRepository';
+import { OtpVerification, OtpChannel } from '@/domain/otp/OtpVerification';
+import { OtpCodeHasher } from '../OtpCodeHasher';
+import { OtpDeliveryChannel, OtpDeliveryResult } from '../OtpDeliveryChannel';
 import { User } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
 import { UnauthorizedError } from '@/domain/shared/errors';
@@ -74,6 +78,8 @@ class MockUserRepository implements UserRepository {
   async blockUser(): Promise<void> {}
   async unblockUser(): Promise<void> {}
 
+  async confirmUser(): Promise<void> {}
+
   async getBlockStatus(): Promise<null> {
     return null;
   }
@@ -84,6 +90,71 @@ class MockUserRepository implements UserRepository {
 
   setSuperAdmin(userId: string): void {
     this.superAdminIds.add(userId);
+  }
+}
+
+// Mock OtpRepository
+class MockOtpRepository implements OtpRepository {
+  private otps: Map<string, OtpVerification> = new Map();
+  private nextId = 1;
+
+  async save(otp: OtpVerification): Promise<OtpVerification> {
+    const id = `otp-${this.nextId++}`;
+    (otp as any).props.id = id;
+    this.otps.set(id, otp);
+
+    return otp;
+  }
+
+  async findById(id: string): Promise<OtpVerification | null> {
+    return this.otps.get(id) || null;
+  }
+
+  async findLatestByIdentifier(): Promise<OtpVerification | null> {
+    return null;
+  }
+
+  async update(otp: OtpVerification): Promise<OtpVerification> {
+    this.otps.set(otp.id, otp);
+
+    return otp;
+  }
+
+  async countRecentByClientIp(): Promise<number> {
+    return 0;
+  }
+
+  async countRecentByIdentifier(): Promise<number> {
+    return 0;
+  }
+
+  async deleteExpired(): Promise<void> {}
+}
+
+// Mock OtpCodeHasher
+class MockOtpCodeHasher implements OtpCodeHasher {
+  hash(code: string): string {
+    return `hashed-${code}`;
+  }
+
+  verify(code: string, hash: string): boolean {
+    return `hashed-${code}` === hash;
+  }
+}
+
+// Mock OtpDeliveryChannel
+class MockOtpDeliveryChannel implements OtpDeliveryChannel {
+  channel: OtpChannel = 'sms';
+  shouldSucceed = true;
+
+  async send(
+    _recipient: string,
+    code: string,
+    _locale: string
+  ): Promise<OtpDeliveryResult> {
+    if (!this.shouldSucceed) {return { success: false };}
+
+    return { success: true, backdoorCode: code };
   }
 }
 
@@ -140,7 +211,9 @@ class MockPasswordVerifier implements PasswordVerifier {
   }
 }
 
-function createTestUser(overrides: Partial<{ id: string }> = {}): User {
+function createTestUser(
+  overrides: Partial<{ id: string; confirmedAt: Date }> = {}
+): User {
   return User.reconstitute({
     id: overrides.id || 'user-1',
     firstName: 'John',
@@ -154,6 +227,7 @@ function createTestUser(overrides: Partial<{ id: string }> = {}): User {
     privacySetupCompleted: false,
     consentGivenAt: new Date(),
     createdAt: new Date(),
+    confirmedAt: overrides.confirmedAt,
   });
 }
 
@@ -162,16 +236,25 @@ describe('LoginUserUseCase', () => {
   let userRepository: MockUserRepository;
   let sessionRepository: MockSessionRepository;
   let passwordVerifier: MockPasswordVerifier;
+  let otpRepository: MockOtpRepository;
+  let otpCodeHasher: MockOtpCodeHasher;
+  let deliveryChannel: MockOtpDeliveryChannel;
 
   beforeEach(() => {
     userRepository = new MockUserRepository();
     sessionRepository = new MockSessionRepository();
     passwordVerifier = new MockPasswordVerifier();
-    useCase = new LoginUserUseCase(
+    otpRepository = new MockOtpRepository();
+    otpCodeHasher = new MockOtpCodeHasher();
+    deliveryChannel = new MockOtpDeliveryChannel();
+    useCase = new LoginUserUseCase({
       userRepository,
       sessionRepository,
-      passwordVerifier
-    );
+      passwordVerifier,
+      otpRepository,
+      otpCodeHasher,
+      deliveryChannel,
+    });
   });
 
   it('should reject invalid credentials (user not found)', async () => {
@@ -204,7 +287,7 @@ describe('LoginUserUseCase', () => {
   });
 
   it('should give regular user a 1-day session', async () => {
-    const user = createTestUser();
+    const user = createTestUser({ confirmedAt: new Date() });
     userRepository.addUser(user);
 
     const before = Date.now();
@@ -229,7 +312,7 @@ describe('LoginUserUseCase', () => {
   });
 
   it('should give superadmin a 4-hour session', async () => {
-    const user = createTestUser();
+    const user = createTestUser({ confirmedAt: new Date() });
     userRepository.addUser(user);
     userRepository.setSuperAdmin(user.id);
 
@@ -255,7 +338,7 @@ describe('LoginUserUseCase', () => {
   });
 
   it('should forward IP address and user-agent to session repository', async () => {
-    const user = createTestUser();
+    const user = createTestUser({ confirmedAt: new Date() });
     userRepository.addUser(user);
 
     const result = await useCase.execute({
@@ -268,5 +351,43 @@ describe('LoginUserUseCase', () => {
     expect(result.success).toBe(true);
     expect(sessionRepository.lastCreatedIpAddress).toBe('192.168.1.1');
     expect(sessionRepository.lastCreatedUserAgent).toBe('Mozilla/5.0');
+  });
+
+  it('should return needsConfirmation for unconfirmed user', async () => {
+    const user = createTestUser(); // no confirmedAt
+    userRepository.addUser(user);
+
+    const result = await useCase.execute({
+      phoneNumber: '+79161234567',
+      password: 'securepass',
+      ipAddress: '127.0.0.1',
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.needsConfirmation).toBe(true);
+      expect(result.value.session).toBeDefined();
+      expect(result.value.otpId).toBeTruthy();
+      expect(result.value.expiresAt).toBeInstanceOf(Date);
+      expect(result.value.backdoorCode).toBeTruthy();
+    }
+  });
+
+  it('should not set needsConfirmation for confirmed user', async () => {
+    const user = createTestUser({ confirmedAt: new Date() });
+    userRepository.addUser(user);
+
+    const result = await useCase.execute({
+      phoneNumber: '+79161234567',
+      password: 'securepass',
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.needsConfirmation).toBeUndefined();
+      expect(result.value.otpId).toBeUndefined();
+    }
   });
 });

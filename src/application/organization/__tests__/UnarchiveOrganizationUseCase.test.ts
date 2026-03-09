@@ -238,6 +238,7 @@ class MockUserRepository implements UserRepository {
   }
   async blockUser(): Promise<void> {}
   async unblockUser(): Promise<void> {}
+  async confirmUser(): Promise<void> {}
   async getBlockStatus(): Promise<null> {
     return null;
   }

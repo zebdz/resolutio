@@ -35,6 +35,7 @@ model User {
   allowFindByName       Boolean   @default(false) @map("allow_find_by_name")
   allowFindByPhone      Boolean   @default(false) @map("allow_find_by_phone")
   privacySetupCompleted Boolean   @default(false) @map("privacy_setup_completed")
+  confirmedAt           DateTime? @map("confirmed_at")
 
   // Relations
   sessions           Session[]
@@ -60,6 +61,7 @@ model User {
   blockStatuses              UserBlockStatus[] @relation("BlockedUser")
   changedUserBlockStatuses   UserBlockStatus[] @relation("StatusChangedBySuperadmin")
   changedIpBlockStatuses     IpBlockStatus[]   @relation("IpBlockStatusChangedBy")
+  otpVerifications           OtpVerification[]
 
   @@map("users")
 }
@@ -368,15 +370,19 @@ model OtpVerification {
   channel     String    @default("sms") // "sms" | "email"
   code        String    // hashed code
   clientIp    String    @map("client_ip")
+  userId      String    @map("user_id")
   attempts    Int       @default(0)
   maxAttempts Int       @default(5) @map("max_attempts")
   expiresAt   DateTime  @map("expires_at")
   verifiedAt  DateTime? @map("verified_at")
   createdAt   DateTime  @default(now()) @map("created_at")
 
+  user User @relation(fields: [userId], references: [id])
+
   @@index([identifier, channel])
   @@index([clientIp])
   @@index([expiresAt])
+  @@index([userId])
   @@map("otp_verifications")
 }
 

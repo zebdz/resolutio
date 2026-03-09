@@ -348,6 +348,51 @@ describe('User', () => {
     });
   });
 
+  describe('isConfirmed', () => {
+    it('should return false when confirmedAt is not set', () => {
+      const user = User.create(validProps);
+      expect(user.isConfirmed()).toBe(false);
+    });
+
+    it('should return true when confirmedAt is set', () => {
+      const user = User.reconstitute({
+        id: 'user-123',
+        firstName: 'John',
+        lastName: 'Doe',
+        phoneNumber: PhoneNumber.create('+79161234567'),
+        password: 'hashedpassword123',
+        language: 'ru' as const,
+        createdAt: new Date('2024-01-01'),
+        confirmedAt: new Date('2024-01-02'),
+      });
+      expect(user.isConfirmed()).toBe(true);
+    });
+  });
+
+  describe('confirm', () => {
+    it('should return new user with confirmedAt set', () => {
+      const user = User.create(validProps);
+      expect(user.isConfirmed()).toBe(false);
+
+      const confirmed = user.confirm();
+      expect(confirmed.isConfirmed()).toBe(true);
+      expect(confirmed.confirmedAt).toBeInstanceOf(Date);
+      // Original unchanged
+      expect(user.isConfirmed()).toBe(false);
+    });
+
+    it('should preserve all other props', () => {
+      const user = User.create(validProps);
+      const confirmed = user.confirm();
+
+      expect(confirmed.firstName).toBe(user.firstName);
+      expect(confirmed.lastName).toBe(user.lastName);
+      expect(confirmed.phoneNumber.getValue()).toBe(
+        user.phoneNumber.getValue()
+      );
+    });
+  });
+
   describe('passwordMatchesPersonalInfo', () => {
     it('should return true when password equals firstName (case-insensitive)', () => {
       expect(passwordMatchesPersonalInfo('John', { firstName: 'john' })).toBe(

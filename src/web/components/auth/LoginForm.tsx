@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/app/components/catalyst/button';
 import { Input } from '@/app/components/catalyst/input';
@@ -17,7 +17,6 @@ import { TurnstileWidget } from '@/web/components/auth/TurnstileWidget';
 export function LoginForm() {
   const t = useTranslations('auth');
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
@@ -29,9 +28,6 @@ export function LoginForm() {
     phoneNumber: '',
     password: '',
   });
-
-  const registered = searchParams.get('registered') === 'true';
-  const redirect = searchParams.get('redirect');
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
@@ -73,9 +69,21 @@ export function LoginForm() {
         if (result.fieldErrors) {
           setFieldErrors(result.fieldErrors);
         }
+      } else if (result.data.needsConfirmation) {
+        // Store OTP data for confirm-phone page
+        if (typeof window !== 'undefined' && result.data.otpId) {
+          sessionStorage.setItem(
+            'confirmPhoneData',
+            JSON.stringify({
+              otpId: result.data.otpId,
+              backdoorCode: result.data.backdoorCode, // TODO: remove backdoorCord after real SMS-send implementation
+            })
+          );
+        }
+
+        router.push('/confirm-phone');
       } else {
-        // Login successful, redirect to home or specified redirect
-        router.push(redirect || '/home');
+        router.push('/home');
       }
     });
   }
@@ -88,12 +96,6 @@ export function LoginForm() {
         </h1>
         <Text>{t('login.subtitle')}</Text>
       </div>
-
-      {registered && (
-        <AlertBanner color="green">
-          {t('login.registrationSuccess')}
-        </AlertBanner>
-      )}
 
       {error && <AlertBanner color="red">{error}</AlertBanner>}
 

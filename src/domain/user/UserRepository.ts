@@ -8,6 +8,7 @@ export interface UserRepository {
   findByNickname(nickname: string): Promise<User | null>;
   isNicknameAvailable(nickname: string): Promise<boolean>;
   save(user: User): Promise<User>;
+  confirmUser(userId: string): Promise<void>;
   updatePrivacySettings(user: User): Promise<void>;
   exists(phoneNumber: PhoneNumber): Promise<boolean>;
   searchUsers(

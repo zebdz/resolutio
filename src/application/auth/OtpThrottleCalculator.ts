@@ -2,6 +2,7 @@
 // Beyond index 5: double previous, cap at 86400 (24h)
 const BASE_DELAYS = [0, 60, 300, 1800, 3600, 7200];
 const MAX_DELAY = 86400; // 24 hours
+export const THROTTLE_WINDOW_HOURS = 24;
 
 /**
  * Calculate throttle delay in seconds based on number of recent OTPs

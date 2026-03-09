@@ -18,6 +18,7 @@ const USER_SELECT = {
   allowFindByName: true,
   allowFindByPhone: true,
   privacySetupCompleted: true,
+  confirmedAt: true,
 } as const;
 
 export class PrismaUserRepository implements UserRepository {
@@ -96,6 +97,7 @@ export class PrismaUserRepository implements UserRepository {
         allowFindByName: user.allowFindByName,
         allowFindByPhone: user.allowFindByPhone,
         privacySetupCompleted: user.privacySetupCompleted,
+        confirmedAt: user.confirmedAt,
       },
       update: {
         firstName: user.firstName,
@@ -212,6 +214,13 @@ export class PrismaUserRepository implements UserRepository {
     return superAdmin !== null;
   }
 
+  async confirmUser(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { confirmedAt: new Date() },
+    });
+  }
+
   async isUserBlocked(userId: string): Promise<boolean> {
     const latest = await this.prisma.userBlockStatus.findFirst({
       where: { userId },
@@ -290,6 +299,7 @@ export class PrismaUserRepository implements UserRepository {
     allowFindByName: boolean;
     allowFindByPhone: boolean;
     privacySetupCompleted: boolean;
+    confirmedAt: Date | null;
   }): User {
     // PhoneNumber.create throws if invalid, which is correct here
     // because database should always have valid phone numbers
@@ -309,6 +319,7 @@ export class PrismaUserRepository implements UserRepository {
       allowFindByName: user.allowFindByName,
       allowFindByPhone: user.allowFindByPhone,
       privacySetupCompleted: user.privacySetupCompleted,
+      confirmedAt: user.confirmedAt ?? undefined,
     });
   }
 }

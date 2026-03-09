@@ -21,6 +21,11 @@ export default async function PrivacySetupPage() {
     redirect('/login');
   }
 
+  // Unconfirmed users must confirm phone first
+  if (!user.isConfirmed()) {
+    redirect('/confirm-phone');
+  }
+
   // Already completed — go home
   if (user.privacySetupCompleted) {
     redirect('/home');

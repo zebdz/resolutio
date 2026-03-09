@@ -15,6 +15,8 @@ import {
   PrismaOtpRepository,
   Argon2PasswordHasher,
   Argon2PasswordVerifier,
+  OtpCodeHasherImpl,
+  StubSmsOtpDeliveryChannel,
   TurnstileCaptchaVerifier,
 } from '@/infrastructure/index';
 import {
@@ -85,27 +87,47 @@ const sessionRepository = new PrismaSessionRepository(prisma);
 const otpRepository = new PrismaOtpRepository(prisma);
 const passwordHasher = new Argon2PasswordHasher();
 const passwordVerifier = new Argon2PasswordVerifier();
+const otpCodeHasher = new OtpCodeHasherImpl(
+  process.env.OTP_CODE_SECRET || 'dev-otp-secret'
+);
+const deliveryChannel = new StubSmsOtpDeliveryChannel();
 
 const captchaVerifier = new TurnstileCaptchaVerifier(
   process.env.TURNSTILE_SECRET_KEY || ''
 );
 
 // Use cases
-const registerUserUseCase = new RegisterUserUseCase(
+const registerUserUseCase = new RegisterUserUseCase({
   userRepository,
   passwordHasher,
-  otpRepository
-);
-const loginUserUseCase = new LoginUserUseCase(
+  otpRepository,
+  sessionRepository,
+  otpCodeHasher,
+  deliveryChannel,
+  expiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '10', 10),
+});
+const loginUserUseCase = new LoginUserUseCase({
   userRepository,
   sessionRepository,
-  passwordVerifier
-);
+  passwordVerifier,
+  otpRepository,
+  otpCodeHasher,
+  deliveryChannel,
+  otpExpiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '10', 10),
+});
 const logoutUserUseCase = new LogoutUserUseCase(sessionRepository);
+
+export interface RegisterActionData {
+  userId: string;
+  otpId: string;
+  expiresAt: string;
+  backdoorCode?: string;
+  expiresInSeconds: number;
+}
 
 export async function registerAction(
   formData: FormData
-): Promise<ActionResult<{ userId: string }>> {
+): Promise<ActionResult<RegisterActionData>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -131,7 +153,6 @@ export async function registerAction(
       password: formData.get('password') as string,
       confirmPassword: formData.get('confirmPassword') as string,
       language: (formData.get('language') as Locale) || defaultLocale,
-      otpId: formData.get('otpId') as string,
       consentGiven: formData.get('consentGiven') === 'true',
     };
 
@@ -166,13 +187,18 @@ export async function registerAction(
     }
 
     // Execute use case (remove confirmPassword as it's not in the use case input)
-
     const { confirmPassword, ...registerInput } = validation.data;
+    const userAgent = (await headers()).get('user-agent') ?? undefined;
 
     let result;
 
     try {
-      result = await registerUserUseCase.execute(registerInput);
+      result = await registerUserUseCase.execute({
+        ...registerInput,
+        clientIp,
+        ipAddress: clientIp,
+        userAgent,
+      });
     } catch (useCaseError) {
       // Check if it's a database connection error
       if (isDatabaseConnectionError(useCaseError)) {
@@ -207,21 +233,13 @@ export async function registerAction(
         };
       }
 
-      // Handle OTP verification errors
-      if (
-        result.error instanceof ValidationError &&
-        (result.error.message === OtpErrors.NOT_VERIFIED ||
-          result.error.message === OtpErrors.PHONE_MISMATCH)
-      ) {
+      // Handle OTP send failure
+      if (result.error.message === OtpErrors.SEND_FAILED) {
         const tOtp = await getTranslations('otp.errors');
-        const key =
-          result.error.message === OtpErrors.NOT_VERIFIED
-            ? 'notVerified'
-            : 'phoneMismatch';
 
         return {
           success: false,
-          error: tOtp(key),
+          error: tOtp('sendFailed'),
         };
       }
 
@@ -231,9 +249,21 @@ export async function registerAction(
       };
     }
 
+    // Set session cookie
+    await setSessionCookie(
+      result.value.session.id,
+      result.value.expiresInSeconds
+    );
+
     return {
       success: true,
-      data: { userId: result.value.id },
+      data: {
+        userId: result.value.user.id,
+        otpId: result.value.otpId,
+        expiresAt: result.value.expiresAt.toISOString(),
+        backdoorCode: result.value.backdoorCode,
+        expiresInSeconds: result.value.expiresInSeconds,
+      },
     };
   } catch (error) {
     console.error('Register action error:', error);
@@ -253,9 +283,17 @@ export async function registerAction(
   }
 }
 
+export interface LoginActionData {
+  userId: string;
+  needsConfirmation?: true;
+  otpId?: string;
+  expiresAt?: string;
+  backdoorCode?: string;
+}
+
 export async function loginAction(
   formData: FormData
-): Promise<ActionResult<{ userId: string }>> {
+): Promise<ActionResult<LoginActionData>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -356,6 +394,16 @@ export async function loginAction(
         };
       }
 
+      // Handle OTP send failure
+      if (result.error.message === OtpErrors.SEND_FAILED) {
+        const tOtp = await getTranslations('otp.errors');
+
+        return {
+          success: false,
+          error: tOtp('sendFailed'),
+        };
+      }
+
       return {
         success: false,
         error: result.error.message,
@@ -371,9 +419,21 @@ export async function loginAction(
       result.value.expiresInSeconds
     );
 
+    // Build response data
+    const data: LoginActionData = {
+      userId: result.value.user.id,
+    };
+
+    if (result.value.needsConfirmation) {
+      data.needsConfirmation = true;
+      data.otpId = result.value.otpId;
+      data.expiresAt = result.value.expiresAt?.toISOString();
+      data.backdoorCode = result.value.backdoorCode;
+    }
+
     return {
       success: true,
-      data: { userId: result.value.user.id },
+      data,
     };
   } catch (error) {
     console.error('Login action error:', error);

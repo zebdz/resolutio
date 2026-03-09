@@ -41,6 +41,7 @@ describe('UpdateUserProfileUseCase', () => {
       isUserBlocked: vi.fn().mockResolvedValue(false),
       blockUser: vi.fn(),
       unblockUser: vi.fn(),
+      confirmUser: vi.fn(),
       getBlockStatus: vi.fn().mockResolvedValue(null),
     };
     useCase = new UpdateUserProfileUseCase(userRepository);

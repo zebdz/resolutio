@@ -4,14 +4,15 @@
 
 Three-layer rate limiting using IP, session, and userId keys:
 
-| Layer                 | Key                          | File                                       | Limit    | Covers                                       |
-| --------------------- | ---------------------------- | ------------------------------------------ | -------- | -------------------------------------------- |
-| Middleware            | session (auth) / IP (unauth) | `src/infrastructure/rateLimit/registry.ts` | 60/min   | Page loads, API routes (`/api/*`), curl/bots |
-| Server actions        | session (auth) / IP (unauth) | `src/web/actions/rateLimit.ts`             | 200/min  | All Next.js server actions                   |
-| Phone search          | userId                       | `src/web/actions/rateLimit.ts`             | 5/30min  | `searchUserByPhoneAction` only               |
-| Login                 | IP+phone                     | `src/web/actions/rateLimit.ts`             | 5/15min  | `loginAction` — failed attempts only         |
-| Registration (IP)     | IP                           | `src/web/actions/rateLimit.ts`             | 50/60min | `registerAction` — all attempts              |
-| Registration (device) | device_id                    | `src/web/actions/rateLimit.ts`             | 3/60min  | `registerAction` — all attempts              |
+| Layer                 | Key                          | File                                       | Limit             | Covers                                              |
+| --------------------- | ---------------------------- | ------------------------------------------ | ----------------- | --------------------------------------------------- |
+| Middleware            | session (auth) / IP (unauth) | `src/infrastructure/rateLimit/registry.ts` | 60/min            | Page loads, API routes (`/api/*`), curl/bots        |
+| Server actions        | session (auth) / IP (unauth) | `src/web/actions/rateLimit.ts`             | 200/min           | All Next.js server actions                          |
+| Phone search          | userId                       | `src/web/actions/rateLimit.ts`             | 5/30min           | `searchUserByPhoneAction` only                      |
+| Login                 | IP+phone                     | `src/web/actions/rateLimit.ts`             | 5/15min           | `loginAction` — failed attempts only                |
+| Registration (IP)     | IP                           | `src/web/actions/rateLimit.ts`             | 50/60min          | `registerAction` — all attempts                     |
+| Registration (device) | device_id                    | `src/web/actions/rateLimit.ts`             | 3/60min           | `registerAction` — all attempts                     |
+| Confirmation OTP      | phone (per-identifier)       | `RequestConfirmationOtpUseCase`            | escalating delays | `requestConfirmationOtpAction` — per-phone throttle |
 
 ### Why three layers?
 
@@ -75,6 +76,14 @@ A single page load triggers 4-6 data-fetching server actions (e.g. `getOrganizat
 - IP limit is generous (50/hr) to accommodate shared networks (offices, universities) where many legitimate users register from the same IP
 - Device limit is tighter (3/hr) per browser — a `device_id` httpOnly cookie (1-year TTL) is set on first registration attempt
 - Both limiters use `check()` — every call counts as an attempt, regardless of outcome
+
+### Confirmation OTP (`requestConfirmationOtpAction`)
+
+- Throttle is **per-phone**, not per-IP — uses `OtpRepository.countRecentByIdentifier()` to count recent OTPs sent to the same phone number
+- Escalating delays via `OtpThrottleCalculator.getRetryAfter()`: each subsequent request within the window increases the wait time
+- This prevents SMS bombing a single phone number regardless of how many IPs the attacker uses
+- Registration and login both send an initial OTP; the confirmation page allows resending via this action
+- The general server action rate limit (`checkRateLimit()` — 200/min) also applies on top
 
 ### Rate-limited error page (`src/app/[locale]/rate-limited/page.tsx`)
 

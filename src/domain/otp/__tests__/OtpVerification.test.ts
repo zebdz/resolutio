@@ -13,6 +13,7 @@ describe('OtpVerification', () => {
     expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 min from now
     verifiedAt: null,
     createdAt: new Date(),
+    userId: 'user-1',
   };
 
   describe('create', () => {
@@ -23,6 +24,7 @@ describe('OtpVerification', () => {
         code: 'hashed-code',
         clientIp: '127.0.0.1',
         expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+        userId: 'user-1',
       });
 
       expect(otp.identifier).toBe('+79161234567');

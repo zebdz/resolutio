@@ -1,76 +1,70 @@
-import { PhoneNumber } from '@/domain/user/PhoneNumber';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { OtpVerification } from '@/domain/otp/OtpVerification';
 import { OtpCode } from '@/domain/otp/OtpCode';
+import { UserRepository } from '@/domain/user/UserRepository';
 import { Result, success, failure } from '@/domain/shared/Result';
-import { CaptchaVerifier } from './CaptchaVerifier';
 import { OtpCodeHasher } from './OtpCodeHasher';
 import { OtpDeliveryChannel } from './OtpDeliveryChannel';
 import { OtpErrors } from './OtpErrors';
-import { getRetryAfter } from './OtpThrottleCalculator';
+import { getRetryAfter, THROTTLE_WINDOW_HOURS } from './OtpThrottleCalculator';
 
-export interface RequestOtpInput {
-  phoneNumber: string;
-  captchaToken: string;
+export interface RequestConfirmationOtpInput {
+  userId: string;
   clientIp: string;
-  locale: string;
 }
 
-export interface RequestOtpResult {
+export interface RequestConfirmationOtpResult {
   otpId: string;
   expiresAt: Date;
   backdoorCode?: string;
-  retryAfter?: number;
+  expiresInSeconds: number;
 }
 
 interface Dependencies {
   otpRepository: OtpRepository;
-  captchaVerifier: CaptchaVerifier;
   otpCodeHasher: OtpCodeHasher;
   deliveryChannel: OtpDeliveryChannel;
+  userRepository: UserRepository;
   expiryMinutes?: number;
 }
 
-export class RequestOtpUseCase {
+export class RequestConfirmationOtpUseCase {
   private readonly otpRepository: OtpRepository;
-  private readonly captchaVerifier: CaptchaVerifier;
   private readonly otpCodeHasher: OtpCodeHasher;
   private readonly deliveryChannel: OtpDeliveryChannel;
+  private readonly userRepository: UserRepository;
   private readonly expiryMinutes: number;
 
   constructor(deps: Dependencies) {
     this.otpRepository = deps.otpRepository;
-    this.captchaVerifier = deps.captchaVerifier;
     this.otpCodeHasher = deps.otpCodeHasher;
     this.deliveryChannel = deps.deliveryChannel;
+    this.userRepository = deps.userRepository;
     this.expiryMinutes = deps.expiryMinutes ?? 10;
   }
 
   async execute(
-    input: RequestOtpInput
-  ): Promise<Result<RequestOtpResult, string>> {
+    input: RequestConfirmationOtpInput
+  ): Promise<Result<RequestConfirmationOtpResult, string>> {
     try {
-      // 1. Verify CAPTCHA
-      const captchaValid = await this.captchaVerifier.verify(
-        input.captchaToken,
-        input.clientIp
-      );
+      // 1. Find user
+      const user = await this.userRepository.findById(input.userId);
 
-      if (!captchaValid) {
-        return failure(OtpErrors.CAPTCHA_FAILED);
+      if (!user) {
+        return failure(OtpErrors.NOT_FOUND);
       }
 
-      // 2. Validate phone
-      const phoneNumber = PhoneNumber.create(input.phoneNumber);
+      const phone = user.phoneNumber.getValue();
 
-      // 3. Check throttle (count recent OTPs for IP in 24h)
-      const recentCount = await this.otpRepository.countRecentByClientIp(
-        input.clientIp,
-        24
+      // 2. Per-phone throttle (not per-IP!)
+      const recentCount = await this.otpRepository.countRecentByIdentifier(
+        phone,
+        this.deliveryChannel.channel,
+        THROTTLE_WINDOW_HOURS
       );
 
       const lastOtp = await this.otpRepository.findLatestByIdentifier(
-        phoneNumber.getValue(),
+        phone,
         this.deliveryChannel.channel
       );
 
@@ -80,39 +74,40 @@ export class RequestOtpUseCase {
         return failure(OtpErrors.THROTTLED);
       }
 
-      // 4. Generate code, hash it
+      // 3. Generate code, hash it
       const code = OtpCode.generate();
       const hashedCode = this.otpCodeHasher.hash(code.getValue());
 
-      // 5. Save OtpVerification entity
+      // 4. Save OtpVerification with userId
       const expiresAt = new Date(Date.now() + this.expiryMinutes * 60 * 1000);
 
       const otpVerification = OtpVerification.create({
-        identifier: phoneNumber.getValue(),
+        identifier: phone,
         channel: this.deliveryChannel.channel,
         code: hashedCode,
         clientIp: input.clientIp,
         expiresAt,
+        userId: user.id,
       });
 
       const saved = await this.otpRepository.save(otpVerification);
 
-      // 6. Send via delivery channel
+      // 5. Send via delivery channel
       const deliveryResult = await this.deliveryChannel.send(
-        phoneNumber.getValue(),
+        phone,
         code.getValue(),
-        input.locale
+        user.language
       );
 
       if (!deliveryResult.success) {
         return failure(OtpErrors.SEND_FAILED);
       }
 
-      // 7. Return result
       return success({
         otpId: saved.id,
         expiresAt,
         backdoorCode: deliveryResult.backdoorCode,
+        expiresInSeconds: this.expiryMinutes * 60,
       });
     } catch (error) {
       return failure(
