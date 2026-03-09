@@ -65,7 +65,7 @@
       "expired": "Срок действия кода истёк. Запросите новый.",
       "invalid": "Неверный код. Попробуйте ещё раз.",
       "maxAttempts": "Слишком много попыток. Запросите новый код.",
-      "throttled": "Слишком много запросов. Подождите перед повторной попыткой.",
+      "throttled": "Слишком много запросов кодов подтверждения. Подождите перед повторной попыткой.",
       "alreadyVerified": "Этот код уже был подтверждён.",
       "notFound": "Проверка не найдена. Запросите новый код.",
       "sendFailed": "Не удалось отправить код. Попробуйте ещё раз.",
@@ -1001,7 +1001,9 @@
       "usersLink": "Управление пользователями",
       "usersDescription": "Поиск пользователей и управление блокировками",
       "blockedIpsLink": "Заблокированные IP",
-      "blockedIpsDescription": "Просмотр и управление заблокированными IP-адресами"
+      "blockedIpsDescription": "Просмотр и управление заблокированными IP-адресами",
+      "monitorLink": "Монитор лимитов",
+      "monitorDescription": "Мониторинг лимитов запросов в реальном времени"
     },
     "organizations": {
       "title": "Управление организациями",
@@ -1032,6 +1034,9 @@
       "lockKey": "Заблокировать",
       "lockKeyConfirmTitle": "Заблокировать ключ",
       "lockKeyConfirmDescription": "Запретить этому ключу выполнять запросы?",
+      "unlockKey": "Разблокировать",
+      "unlockKeyConfirmTitle": "Разблокировать ключ",
+      "unlockKeyConfirmDescription": "Разблокировать этот ключ и разрешить запросы?",
       "resetKey": "Сбросить",
       "resetSelected": "Сбросить выбранные ({count})",
       "searchPlaceholder": "Поиск по ключу (IP, пользователь, орг., телефон...)",
@@ -1057,7 +1062,7 @@
       "windowMinutes": "{count} мин",
       "windowSeconds": "{count} сек",
       "labels": {
-        "middleware": "Middleware (IP)",
+        "middleware": "Middleware (IP+Сессия)",
         "serverAction": "Серверные действия (IP+Сессия)",
         "phoneSearch": "Поиск по телефону (userId)",
         "login": "Вход (IP+Телефон)",
@@ -1089,7 +1094,11 @@
       "cancel": "Отмена",
       "confirm": "Подтвердить",
       "events": "События",
-      "eventTime": "Время"
+      "eventTime": "Время",
+      "blockIp": "Заблокировать IP",
+      "blockIpConfirmTitle": "Заблокировать IP",
+      "blockIpConfirmDescription": "Заблокировать IP {ip} для доступа к платформе?",
+      "ipAddressLabel": "IP адрес"
     },
     "users": {
       "title": "Управление пользователями",
@@ -1159,6 +1168,23 @@
       "statusBlocked": "Заблокирован",
       "statusUnblocked": "Разблокирован",
       "changedBy": "{name}"
+    },
+    "monitor": {
+      "title": "Монитор лимитов",
+      "subtitle": "Мониторинг лимитов запросов в реальном времени по всем ограничителям",
+      "searchPlaceholder": "Фильтр по ключу (IP, сессия...)",
+      "pause": "Пауза",
+      "resume": "Продолжить",
+      "all": "Все",
+      "key": "Ключ",
+      "limiter": "Ограничитель",
+      "hits": "Хиты",
+      "status": "Статус",
+      "blocked": "ЗАБЛОК.",
+      "ok": "OK",
+      "noEntries": "Нет активных записей",
+      "unlock": "Разблокировать",
+      "noData": "Нет данных для этого ключа"
     }
   },
   "privacySetup": {

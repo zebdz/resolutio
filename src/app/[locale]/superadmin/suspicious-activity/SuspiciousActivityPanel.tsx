@@ -24,6 +24,18 @@ import { blockIpAction } from '@/web/actions/ipBlockAdmin';
 
 const PAGE_SIZE = 20;
 
+const NON_IP_PREFIXES = [
+  'session:',
+  'mw-session:',
+  'user:',
+  'login:',
+  'register:',
+];
+
+function isIpLikeKey(key: string): boolean {
+  return !NON_IP_PREFIXES.some((prefix) => key.startsWith(prefix));
+}
+
 function formatDate(date: Date): string {
   return new Date(date).toLocaleDateString();
 }
@@ -340,7 +352,7 @@ export function SuspiciousActivityPanel() {
                 </div>
               )}
 
-              {!item.userId && (
+              {!item.userId && isIpLikeKey(item.key) && (
                 <div className="mb-3 flex gap-2">
                   <Button
                     color="red"
@@ -350,7 +362,7 @@ export function SuspiciousActivityPanel() {
                     }}
                     className="text-xs"
                   >
-                    Block IP
+                    {t('blockIp')}
                   </Button>
                 </div>
               )}
@@ -422,14 +434,16 @@ export function SuspiciousActivityPanel() {
 
       {/* Block IP dialog */}
       <Dialog open={!!blockIpTarget} onClose={() => setBlockIpTarget(null)}>
-        <DialogTitle>Block IP</DialogTitle>
+        <DialogTitle>{t('blockIpConfirmTitle')}</DialogTitle>
         <DialogDescription>
-          Block IP {blockIpTarget?.ip ?? ''} from accessing the platform?
+          {t('blockIpConfirmDescription', { ip: blockIpTarget?.ip ?? '' })}
         </DialogDescription>
         <DialogBody>
           <div className="space-y-3">
             <div>
-              <label className="text-sm font-medium">IP Address</label>
+              <label className="text-sm font-medium">
+                {t('ipAddressLabel')}
+              </label>
               <Input
                 value={blockIpTarget?.ip ?? ''}
                 onChange={(e) =>

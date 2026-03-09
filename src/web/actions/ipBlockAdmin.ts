@@ -1,11 +1,12 @@
 'use server';
 
 import { getTranslations } from 'next-intl/server';
-import { getCurrentUser } from '@/web/lib/session';
-import { prisma, PrismaUserRepository } from '@/infrastructure/index';
+import { prisma } from '@/infrastructure/index';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { IpBlockRepository } from '@/infrastructure/repositories/IpBlockRepository';
 import { invalidateIpBlockCache } from '@/infrastructure/rateLimit/ipBlockCheck';
+import { requireSuperadmin } from '@/web/actions/superadminAuth';
+import { isError } from '@/web/actions/superadminAuthUtils';
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
@@ -28,33 +29,7 @@ export interface IpBlockHistoryEntry {
   statusChangedBy: { firstName: string; lastName: string };
 }
 
-const userRepository = new PrismaUserRepository(prisma);
 const ipBlockRepo = new IpBlockRepository(prisma);
-
-async function requireSuperadmin(): Promise<
-  { userId: string } | { success: false; error: string }
-> {
-  const t = await getTranslations('common.errors');
-  const user = await getCurrentUser();
-
-  if (!user) {
-    return { success: false, error: t('unauthorized') };
-  }
-
-  const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
-
-  if (!isSuperAdmin) {
-    return { success: false, error: t('unauthorized') };
-  }
-
-  return { userId: user.id };
-}
-
-function isError(
-  result: { userId: string } | { success: false; error: string }
-): result is { success: false; error: string } {
-  return 'success' in result && result.success === false;
-}
 
 export async function blockIpAction(input: {
   ipAddress: string;

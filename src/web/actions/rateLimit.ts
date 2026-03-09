@@ -11,12 +11,16 @@ import {
   registrationIpLimiter,
   registrationDeviceLimiter,
 } from '@/infrastructure/rateLimit/registry';
+import {
+  isSuperadminIp,
+  isSuperadminSession,
+} from '@/infrastructure/rateLimit/superadminWhitelist';
 
 const LOGIN_WINDOW_MS = 15 * 60_000; // 15 minutes
 const REGISTRATION_WINDOW_MS = 60 * 60_000; // 1 hour
 
 /**
- * Check rate limit for the current request using dual keys: IP + session.
+ * Check rate limit: session key (authenticated) or IP (unauthenticated).
  * Returns a failed ActionResult if rate-limited, null otherwise.
  *
  * Usage (at the top of every server action):
@@ -28,19 +32,27 @@ export async function checkRateLimit(): Promise<{
   error: string;
 } | null> {
   const ip = await getClientIp();
-
-  if (!limiter.check(ip).allowed) {
-    const t = await getTranslations('rateLimit');
-
-    return { success: false, error: t('tooManyRequests') };
-  }
-
   const sessionId = await getSessionCookie();
 
-  if (sessionId && !limiter.check(`session:${sessionId}`).allowed) {
-    const t = await getTranslations('rateLimit');
+  if (sessionId) {
+    // Authenticated: rate limit by session only — don't pollute IP counter
+    const sessionResult = limiter.check(`session:${sessionId}`);
 
-    return { success: false, error: t('tooManyRequests') };
+    // Session-based superadmin check — IP alone is not enough (shared network)
+    if (!sessionResult.allowed && !isSuperadminSession(sessionId)) {
+      const t = await getTranslations('rateLimit');
+
+      return { success: false, error: t('tooManyRequests') };
+    }
+  } else {
+    // Unauthenticated: rate limit by IP (fallback to IP-based superadmin check)
+    const ipResult = limiter.check(ip);
+
+    if (!ipResult.allowed && !isSuperadminIp(ip)) {
+      const t = await getTranslations('rateLimit');
+
+      return { success: false, error: t('tooManyRequests') };
+    }
   }
 
   return null;

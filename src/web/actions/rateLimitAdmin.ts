@@ -1,13 +1,13 @@
 'use server';
 
-import { getTranslations } from 'next-intl/server';
-import { getCurrentUser } from '@/web/lib/session';
-import { prisma, PrismaUserRepository } from '@/infrastructure/index';
+import { prisma } from '@/infrastructure/index';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import {
   limiterRegistry,
   getLimiterByLabel,
 } from '@/infrastructure/rateLimit/registry';
+import { requireSuperadmin } from '@/web/actions/superadminAuth';
+import { isError } from '@/web/actions/superadminAuthUtils';
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
@@ -33,33 +33,6 @@ export interface EnrichedEntry {
     lastName: string;
     phoneNumber: string;
   };
-}
-
-const userRepository = new PrismaUserRepository(prisma);
-
-async function requireSuperadmin(): Promise<
-  { userId: string } | { success: false; error: string }
-> {
-  const t = await getTranslations('common.errors');
-  const user = await getCurrentUser();
-
-  if (!user) {
-    return { success: false, error: t('unauthorized') };
-  }
-
-  const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
-
-  if (!isSuperAdmin) {
-    return { success: false, error: t('unauthorized') };
-  }
-
-  return { userId: user.id };
-}
-
-function isError(
-  result: { userId: string } | { success: false; error: string }
-): result is { success: false; error: string } {
-  return 'success' in result && result.success === false;
 }
 
 export async function getRateLimitOverviewAction(): Promise<
@@ -222,6 +195,21 @@ export async function searchRateLimitEntriesAction(input: {
         additionalKeys.add(k);
       }
     }
+  } else if (input.label === 'middleware' || input.label === 'serverAction') {
+    const users = await searchUsersByQuery(input.query);
+    const userIds = users.map((u) => u.id);
+
+    if (userIds.length > 0) {
+      const sessions = await prisma.session.findMany({
+        where: { userId: { in: userIds }, expiresAt: { gt: new Date() } },
+        select: { id: true },
+      });
+      const prefix = input.label === 'middleware' ? 'mw-session:' : 'session:';
+
+      for (const s of sessions) {
+        additionalKeys.add(`${prefix}${s.id}`);
+      }
+    }
   }
 
   // Merge and deduplicate
@@ -233,13 +221,37 @@ export async function searchRateLimitEntriesAction(input: {
   // Enrich user-keyed entries
   const enriched: EnrichedEntry[] = [];
 
+  // Batch-resolve session-keyed entries to users
+  const sessionKeyPattern = /^(?:mw-session|session):(.+)$/;
+  const sessionIds = filtered
+    .map((e) => e.key.match(sessionKeyPattern)?.[1])
+    .filter((id): id is string => !!id);
+
+  const sessionUserMap = new Map<string, string>();
+
+  if (sessionIds.length > 0) {
+    const sessions = await prisma.session.findMany({
+      where: { id: { in: sessionIds } },
+      select: { id: true, userId: true },
+    });
+
+    for (const s of sessions) {
+      sessionUserMap.set(s.id, s.userId);
+    }
+  }
+
   for (const e of filtered) {
     const enrichedEntry: EnrichedEntry = { ...e };
     const userIdMatch = e.key.match(/^user:(.+)$/);
+    const sessionMatch = e.key.match(sessionKeyPattern);
 
-    if (userIdMatch) {
+    const resolveUserId =
+      userIdMatch?.[1] ??
+      (sessionMatch ? sessionUserMap.get(sessionMatch[1]) : undefined);
+
+    if (resolveUserId) {
       const users = await prisma.user.findMany({
-        where: { id: userIdMatch[1] },
+        where: { id: resolveUserId },
         select: {
           id: true,
           firstName: true,
@@ -317,6 +329,37 @@ export async function lockRateLimitKeyAction(input: {
 
   console.log(
     `[RateLimitAdmin] ${new Date().toISOString()} lockKey label=${input.label} key=${input.key} by user=${auth.userId}`
+  );
+
+  return { success: true, data: undefined };
+}
+
+export async function unlockRateLimitKeyAction(input: {
+  label: string;
+  key: string;
+}): Promise<ActionResult<void>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const auth = await requireSuperadmin();
+
+  if (isError(auth)) {
+    return auth;
+  }
+
+  const entry = getLimiterByLabel(input.label);
+
+  if (!entry) {
+    return { success: false, error: 'Invalid limiter label' };
+  }
+
+  entry.limiter.resetKeys([input.key]);
+
+  console.log(
+    `[RateLimitAdmin] ${new Date().toISOString()} unlockKey label=${input.label} key=${input.key} by user=${auth.userId}`
   );
 
   return { success: true, data: undefined };

@@ -34,6 +34,16 @@ vi.mock('@/web/actions/rateLimit', () => ({
 
 vi.mock('@/web/lib/session', () => ({
   getCurrentUser: vi.fn(),
+  getSessionCookie: vi.fn().mockResolvedValue('mock-session'),
+}));
+
+vi.mock('@/web/lib/clientIp', () => ({
+  getClientIp: vi.fn().mockResolvedValue('127.0.0.1'),
+}));
+
+vi.mock('@/infrastructure/rateLimit/superadminWhitelist', () => ({
+  registerSuperadminAccess: vi.fn(),
+  isSuperadminIp: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock('@/infrastructure/database/prisma', () => ({

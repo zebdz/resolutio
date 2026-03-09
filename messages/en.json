@@ -65,7 +65,7 @@
       "expired": "Code has expired. Please request a new one.",
       "invalid": "Invalid code. Please try again.",
       "maxAttempts": "Too many attempts. Please request a new code.",
-      "throttled": "Too many requests. Please wait before trying again.",
+      "throttled": "Too many verification code requests. Please wait before trying again.",
       "alreadyVerified": "This code has already been verified.",
       "notFound": "Verification not found. Please request a new code.",
       "sendFailed": "Failed to send verification code. Please try again.",
@@ -1001,7 +1001,9 @@
       "usersLink": "User Management",
       "usersDescription": "Search users and manage account blocks",
       "blockedIpsLink": "Blocked IPs",
-      "blockedIpsDescription": "View and manage blocked IP addresses"
+      "blockedIpsDescription": "View and manage blocked IP addresses",
+      "monitorLink": "Rate Limit Monitor",
+      "monitorDescription": "Live monitoring of rate limit entries"
     },
     "organizations": {
       "title": "Manage Organizations",
@@ -1032,6 +1034,9 @@
       "lockKey": "Lock",
       "lockKeyConfirmTitle": "Lock Key",
       "lockKeyConfirmDescription": "Block this key from making requests?",
+      "unlockKey": "Unlock",
+      "unlockKeyConfirmTitle": "Unlock Key",
+      "unlockKeyConfirmDescription": "Unblock this key and allow requests again?",
       "resetKey": "Reset",
       "resetSelected": "Reset Selected ({count})",
       "searchPlaceholder": "Search by key (IP, user, org, phone...)",
@@ -1057,7 +1062,7 @@
       "windowMinutes": "{count}m",
       "windowSeconds": "{count}s",
       "labels": {
-        "middleware": "Middleware (IP)",
+        "middleware": "Middleware (IP+Session)",
         "serverAction": "Server Actions (IP+Session)",
         "phoneSearch": "Phone Search (userId)",
         "login": "Login (IP+Phone)",
@@ -1089,7 +1094,11 @@
       "cancel": "Cancel",
       "confirm": "Confirm",
       "events": "Events",
-      "eventTime": "Time"
+      "eventTime": "Time",
+      "blockIp": "Block IP",
+      "blockIpConfirmTitle": "Block IP",
+      "blockIpConfirmDescription": "Block IP {ip} from accessing the platform?",
+      "ipAddressLabel": "IP Address"
     },
     "users": {
       "title": "User Management",
@@ -1159,6 +1168,23 @@
       "statusBlocked": "Blocked",
       "statusUnblocked": "Unblocked",
       "changedBy": "by {name}"
+    },
+    "monitor": {
+      "title": "Rate Limit Monitor",
+      "subtitle": "Live monitoring of rate limit entries across all limiters",
+      "searchPlaceholder": "Filter by key (IP, session...)",
+      "pause": "Pause",
+      "resume": "Resume",
+      "all": "All",
+      "key": "Key",
+      "limiter": "Limiter",
+      "hits": "Hits",
+      "status": "Status",
+      "blocked": "BLOCKED",
+      "ok": "OK",
+      "noEntries": "No active entries",
+      "unlock": "Unlock",
+      "noData": "No data for this key"
     }
   },
   "privacySetup": {

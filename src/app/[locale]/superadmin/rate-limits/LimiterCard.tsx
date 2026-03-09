@@ -12,6 +12,7 @@ import {
   searchRateLimitEntriesAction,
   resetRateLimitKeysAction,
   lockRateLimitKeyAction,
+  unlockRateLimitKeyAction,
   type LimiterOverview,
   type EnrichedEntry,
 } from '@/web/actions/rateLimitAdmin';
@@ -133,6 +134,22 @@ export function LimiterCard({ overview, onMutate }: LimiterCardProps) {
       description: t('lockKeyConfirmDescription'),
       action: async () => {
         await lockRateLimitKeyAction({ label: overview.label, key });
+
+        if (query.length >= 3) {
+          await doSearch(query);
+        }
+
+        onMutate();
+      },
+    });
+  };
+
+  const handleUnlockKey = (key: string) => {
+    setConfirmAction({
+      title: t('unlockKeyConfirmTitle'),
+      description: t('unlockKeyConfirmDescription'),
+      action: async () => {
+        await unlockRateLimitKeyAction({ label: overview.label, key });
 
         if (query.length >= 3) {
           await doSearch(query);
@@ -325,14 +342,23 @@ export function LimiterCard({ overview, onMutate }: LimiterCardProps) {
                       >
                         {entry.blocked ? t('locked') : t('ok')}
                       </span>
-                      <Button
-                        plain
-                        onClick={() => handleLockKey(entry.key)}
-                        className="text-xs"
-                        disabled={entry.blocked}
-                      >
-                        {t('lockKey')}
-                      </Button>
+                      {entry.blocked ? (
+                        <Button
+                          plain
+                          onClick={() => handleUnlockKey(entry.key)}
+                          className="text-xs"
+                        >
+                          {t('unlockKey')}
+                        </Button>
+                      ) : (
+                        <Button
+                          plain
+                          onClick={() => handleLockKey(entry.key)}
+                          className="text-xs"
+                        >
+                          {t('lockKey')}
+                        </Button>
+                      )}
                     </div>
                   ))}
 

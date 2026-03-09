@@ -29,6 +29,11 @@ const hubLinks = [
     labelKey: 'blockedIpsLink' as const,
     descKey: 'blockedIpsDescription' as const,
   },
+  {
+    href: '/superadmin/rate-monitor' as const,
+    labelKey: 'monitorLink' as const,
+    descKey: 'monitorDescription' as const,
+  },
 ];
 
 export default async function SuperadminPage() {

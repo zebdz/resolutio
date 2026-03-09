@@ -4,14 +4,14 @@
 
 Three-layer rate limiting using IP, session, and userId keys:
 
-| Layer                 | Key        | File                                       | Limit    | Covers                                       |
-| --------------------- | ---------- | ------------------------------------------ | -------- | -------------------------------------------- |
-| Middleware            | IP         | `src/infrastructure/rateLimit/registry.ts` | 60/min   | Page loads, API routes (`/api/*`), curl/bots |
-| Server actions        | IP+session | `src/web/actions/rateLimit.ts`             | 200/min  | All Next.js server actions                   |
-| Phone search          | userId     | `src/web/actions/rateLimit.ts`             | 5/30min  | `searchUserByPhoneAction` only               |
-| Login                 | IP+phone   | `src/web/actions/rateLimit.ts`             | 5/15min  | `loginAction` — failed attempts only         |
-| Registration (IP)     | IP         | `src/web/actions/rateLimit.ts`             | 50/60min | `registerAction` — all attempts              |
-| Registration (device) | device_id  | `src/web/actions/rateLimit.ts`             | 3/60min  | `registerAction` — all attempts              |
+| Layer                 | Key                          | File                                       | Limit    | Covers                                       |
+| --------------------- | ---------------------------- | ------------------------------------------ | -------- | -------------------------------------------- |
+| Middleware            | session (auth) / IP (unauth) | `src/infrastructure/rateLimit/registry.ts` | 60/min   | Page loads, API routes (`/api/*`), curl/bots |
+| Server actions        | session (auth) / IP (unauth) | `src/web/actions/rateLimit.ts`             | 200/min  | All Next.js server actions                   |
+| Phone search          | userId                       | `src/web/actions/rateLimit.ts`             | 5/30min  | `searchUserByPhoneAction` only               |
+| Login                 | IP+phone                     | `src/web/actions/rateLimit.ts`             | 5/15min  | `loginAction` — failed attempts only         |
+| Registration (IP)     | IP                           | `src/web/actions/rateLimit.ts`             | 50/60min | `registerAction` — all attempts              |
+| Registration (device) | device_id                    | `src/web/actions/rateLimit.ts`             | 3/60min  | `registerAction` — all attempts              |
 
 ### Why three layers?
 
@@ -37,6 +37,11 @@ A single page load triggers 4-6 data-fetching server actions (e.g. `getOrganizat
 
 - Extracts client IP from `x-forwarded-for` / `x-real-ip` headers
 - Skips rate limiting for: static assets, the `/rate-limited` error page, server actions (`Next-Action` header)
+- **Single-key per request**: authenticated and unauthenticated use separate keys (no dual recording):
+  - Has `session` cookie → `mw-session:<cookie>` only (IP counter untouched)
+  - No `session` cookie → IP only
+- This prevents shared-IP issues (NAT/VPN/office) — authenticated traffic doesn't inflate the IP counter
+- Uses `mw-session:` prefix to avoid collision with server action `session:` keys in the monitor
 - When rate-limited:
   - **Browser requests** (`Accept: text/html`): 302 redirect to `/{locale}/rate-limited?retryAfter=N&from=/original/path`
   - **Everything else** (API, curl, bots): 429 JSON with `Retry-After`, `X-RateLimit-Limit`, `X-RateLimit-Remaining` headers
@@ -44,8 +49,8 @@ A single page load triggers 4-6 data-fetching server actions (e.g. `getOrganizat
 ### Server actions (`src/web/actions/rateLimit.ts`)
 
 - Every server action calls `checkRateLimit()` at the top
-- `checkRateLimit()` checks two keys independently: IP and `session:<sessionId>` (same 200/min limiter instance)
-- No session cookie → IP-only check (unauthenticated actions like login/register are unaffected)
+- `checkRateLimit()` checks a single key per request: `session:<sessionId>` (authenticated) or IP (unauthenticated)
+- Authenticated traffic doesn't inflate the IP counter — same fix as middleware
 - When rate-limited: returns `{ success: false, error: '<localized message>' }`
 - Existing client-side error handling displays the message — no special handling needed
 
@@ -77,6 +82,25 @@ A single page load triggers 4-6 data-fetching server actions (e.g. `getOrganizat
 - Live countdown timer (seconds until retry)
 - Retry button (disabled until countdown reaches 0), navigates back to the original page
 
+## Superadmin whitelist
+
+Superadmins are automatically whitelisted from all rate limiting and IP blocking. This prevents superadmins from getting 429s while managing the platform.
+
+- **How it works**: When `requireSuperadmin()` succeeds, it calls `registerSuperadminAccess(ip, userId, sessionId)` which adds IP, session (both with 1hr TTL), and userId to an in-memory whitelist
+- **Session-based bypass (authenticated)**: Middleware and `checkRateLimit()` use `isSuperadminSession(sessionId)` for authenticated requests — prevents regular users on the same IP/network from inheriting superadmin's rate limit bypass
+- **IP-based bypass (unauthenticated)**: Falls back to `isSuperadminIp(ip)` for unauthenticated requests (theoretical)
+- **IP block bypass**: `isSuperadminIp(ip)` still used for IP block check (line 56 in proxy.ts) — correct, IP blocks target IPs
+- **TTL**: IP and session entries expire after 1 hour; re-registered on every superadmin action call
+- **UserIds**: Stored in a `Set` (no expiry) — used for potential future checks
+
+### Live monitoring
+
+The `/superadmin/rate-monitor` page shows real-time rate limit entries across all limiters with 2s polling. Features:
+
+- Filter by key (IP/session) or limiter label
+- Progress bars per limiter showing usage ratio (green/yellow/red)
+- Unlock blocked keys directly from the monitor
+
 ## In-memory store details
 
 - Algorithm: sliding window counter (`Map<string, number[]>` — key to timestamps, where key is IP, `session:<id>`, or `user:<id>`)
@@ -88,14 +112,18 @@ A single page load triggers 4-6 data-fetching server actions (e.g. `getOrganizat
 
 ## Key files
 
-| File                                                  | Purpose                                    |
-| ----------------------------------------------------- | ------------------------------------------ |
-| `src/infrastructure/rateLimit/InMemoryRateLimiter.ts` | Rate limiter class (sliding window)        |
-| `src/infrastructure/rateLimit/extractIp.ts`           | IP extraction for middleware               |
-| `src/infrastructure/rateLimit/registry.ts`            | All limiter singletons via globalThis      |
-| `src/infrastructure/rateLimit/index.ts`               | Re-exports from registry                   |
-| `src/web/actions/rateLimit.ts`                        | Server action rate limit helper (200/min)  |
-| `src/web/lib/clientIp.ts`                             | IP extraction for Node.js (server actions) |
-| `src/proxy.ts`                                        | Middleware integration                     |
-| `src/app/[locale]/rate-limited/page.tsx`              | Error page with countdown + retry          |
-| `messages/en.json` / `messages/ru.json`               | Localized messages (`rateLimit` key)       |
+| File                                                  | Purpose                                             |
+| ----------------------------------------------------- | --------------------------------------------------- |
+| `src/infrastructure/rateLimit/InMemoryRateLimiter.ts` | Rate limiter class (sliding window)                 |
+| `src/infrastructure/rateLimit/extractIp.ts`           | IP extraction for middleware                        |
+| `src/infrastructure/rateLimit/registry.ts`            | All limiter singletons via globalThis               |
+| `src/infrastructure/rateLimit/index.ts`               | Re-exports from registry                            |
+| `src/infrastructure/rateLimit/superadminWhitelist.ts` | Superadmin IP/userId whitelist (globalThis)         |
+| `src/web/actions/rateLimit.ts`                        | Server action rate limit helper (200/min)           |
+| `src/web/actions/superadminAuth.ts`                   | Shared requireSuperadmin() + whitelist registration |
+| `src/web/actions/rateLimitMonitor.ts`                 | Live monitor snapshot/detail actions                |
+| `src/web/lib/clientIp.ts`                             | IP extraction for Node.js (server actions)          |
+| `src/proxy.ts`                                        | Middleware integration                              |
+| `src/app/[locale]/rate-limited/page.tsx`              | Error page with countdown + retry                   |
+| `src/app/[locale]/superadmin/rate-monitor/`           | Live rate limit monitoring page                     |
+| `messages/en.json` / `messages/ru.json`               | Localized messages (`rateLimit` key)                |

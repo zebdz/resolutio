@@ -7,6 +7,10 @@ import {
 } from './infrastructure/rateLimit';
 import { extractIpFromRequest } from './infrastructure/rateLimit/extractIp';
 import { isIpBlocked } from './infrastructure/rateLimit/ipBlockCheck';
+import {
+  isSuperadminIp,
+  isSuperadminSession,
+} from './infrastructure/rateLimit/superadminWhitelist';
 
 const intlMiddleware = createMiddleware(routing);
 
@@ -48,8 +52,11 @@ export default function middleware(request: NextRequest) {
 
   const ip = extractIpFromRequest(request);
 
+  const isSuperadmin = isSuperadminIp(ip);
+
   // Check if IP is blocked (synchronous — uses in-memory cache)
-  if (isIpBlocked(ip)) {
+  // Superadmin IPs skip IP block checks
+  if (!isSuperadmin && isIpBlocked(ip)) {
     if (isBrowserRequest(request)) {
       const locale = extractLocale(request);
       const url = request.nextUrl.clone();
@@ -64,15 +71,37 @@ export default function middleware(request: NextRequest) {
     });
   }
 
-  const result = middlewareLimiter.check(ip);
+  const sessionCookie = request.cookies.get('session')?.value;
 
-  if (!result.allowed) {
+  let blocked = false;
+  let retryAfterSeconds = 0;
+
+  if (sessionCookie) {
+    // Authenticated: rate limit by session only — don't pollute IP counter
+    const sessionResult = middlewareLimiter.check(
+      `mw-session:${sessionCookie}`
+    );
+    blocked = !sessionResult.allowed;
+    retryAfterSeconds = sessionResult.retryAfterSeconds;
+  } else {
+    // Unauthenticated: rate limit by IP
+    const ipResult = middlewareLimiter.check(ip);
+    blocked = !ipResult.allowed;
+    retryAfterSeconds = ipResult.retryAfterSeconds;
+  }
+
+  // Session-based superadmin check for rate limit bypass (IP alone not enough — shared network)
+  const isSuperadminForRateLimit = sessionCookie
+    ? isSuperadminSession(sessionCookie)
+    : isSuperadminIp(ip);
+
+  if (blocked && !isSuperadminForRateLimit) {
     // Browsers: redirect to error page
     if (isBrowserRequest(request)) {
       const locale = extractLocale(request);
       const url = request.nextUrl.clone();
       url.pathname = `/${locale}/rate-limited`;
-      url.searchParams.set('retryAfter', String(result.retryAfterSeconds));
+      url.searchParams.set('retryAfter', String(retryAfterSeconds));
       url.searchParams.set('from', request.nextUrl.pathname);
 
       return NextResponse.redirect(url, { status: 302 });
@@ -83,7 +112,7 @@ export default function middleware(request: NextRequest) {
       status: 429,
       headers: {
         'Content-Type': 'application/json',
-        'Retry-After': String(result.retryAfterSeconds),
+        'Retry-After': String(retryAfterSeconds),
         'X-RateLimit-Limit': String(
           getLimiterByLabel('middleware')!.maxRequests
         ),
