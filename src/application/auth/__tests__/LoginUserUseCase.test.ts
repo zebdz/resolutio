@@ -91,16 +91,27 @@ class MockUserRepository implements UserRepository {
 class MockSessionRepository implements SessionRepository {
   private sessions: Map<string, Session> = new Map();
   lastCreatedExpiresAt: Date | null = null;
+  lastCreatedIpAddress: string | null = null;
+  lastCreatedUserAgent: string | null = null;
 
-  async create(userId: string, expiresAt: Date): Promise<Session> {
+  async create(
+    userId: string,
+    expiresAt: Date,
+    ipAddress?: string,
+    userAgent?: string
+  ): Promise<Session> {
     const session: Session = {
       id: `session-${Date.now()}`,
       userId,
       expiresAt,
       createdAt: new Date(),
+      ipAddress: ipAddress ?? null,
+      userAgent: userAgent ?? null,
     };
     this.sessions.set(session.id, session);
     this.lastCreatedExpiresAt = expiresAt;
+    this.lastCreatedIpAddress = ipAddress ?? null;
+    this.lastCreatedUserAgent = userAgent ?? null;
 
     return session;
   }
@@ -192,7 +203,7 @@ describe('LoginUserUseCase', () => {
     }
   });
 
-  it('should give regular user a 30-day session', async () => {
+  it('should give regular user a 1-day session', async () => {
     const user = createTestUser();
     userRepository.addUser(user);
 
@@ -217,7 +228,7 @@ describe('LoginUserUseCase', () => {
     }
   });
 
-  it('should give superadmin an 8-hour session', async () => {
+  it('should give superadmin a 4-hour session', async () => {
     const user = createTestUser();
     userRepository.addUser(user);
     userRepository.setSuperAdmin(user.id);
@@ -241,5 +252,21 @@ describe('LoginUserUseCase', () => {
         -1
       );
     }
+  });
+
+  it('should forward IP address and user-agent to session repository', async () => {
+    const user = createTestUser();
+    userRepository.addUser(user);
+
+    const result = await useCase.execute({
+      phoneNumber: '+79161234567',
+      password: 'securepass',
+      ipAddress: '192.168.1.1',
+      userAgent: 'Mozilla/5.0',
+    });
+
+    expect(result.success).toBe(true);
+    expect(sessionRepository.lastCreatedIpAddress).toBe('192.168.1.1');
+    expect(sessionRepository.lastCreatedUserAgent).toBe('Mozilla/5.0');
   });
 });

@@ -12,10 +12,12 @@ export interface PasswordVerifier {
 export interface LoginUserInput {
   phoneNumber: string;
   password: string;
+  ipAddress?: string;
+  userAgent?: string;
 }
 
-export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-export const SUPERADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
+export const SESSION_TTL_MS = 1 * 24 * 60 * 60 * 1000; // 1 day
+export const SUPERADMIN_SESSION_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 
 export interface LoginResult {
   user: User;
@@ -61,7 +63,12 @@ export class LoginUserUseCase {
       const ttlMs = isSuperAdmin ? SUPERADMIN_SESSION_TTL_MS : SESSION_TTL_MS;
       const expiresAt = new Date(Date.now() + ttlMs);
 
-      const session = await this.sessionRepository.create(user.id, expiresAt);
+      const session = await this.sessionRepository.create(
+        user.id,
+        expiresAt,
+        input.ipAddress,
+        input.userAgent
+      );
 
       return success({
         user,

@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { getTranslations } from 'next-intl/server';
 import { RegisterUserUseCase } from '@/application/auth/RegisterUserUseCase';
 import { LoginUserUseCase } from '@/application/auth/LoginUserUseCase';
@@ -315,10 +316,15 @@ export async function loginAction(
     }
 
     // Execute use case
+    const userAgent = (await headers()).get('user-agent') ?? undefined;
     let result;
 
     try {
-      result = await loginUserUseCase.execute(validation.data);
+      result = await loginUserUseCase.execute({
+        ...validation.data,
+        ipAddress: clientIp,
+        userAgent,
+      });
     } catch (useCaseError) {
       // Check if it's a database connection error
       if (isDatabaseConnectionError(useCaseError)) {

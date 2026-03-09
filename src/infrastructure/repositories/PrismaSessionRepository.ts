@@ -1,17 +1,30 @@
+import { randomBytes } from 'crypto';
 import type {
   SessionRepository,
   Session,
 } from '@/domain/user/SessionRepository';
 import { PrismaClient } from '@/generated/prisma/client';
 
+export function generateSessionId(): string {
+  return randomBytes(32).toString('hex');
+}
+
 export class PrismaSessionRepository implements SessionRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async create(userId: string, expiresAt: Date): Promise<Session> {
+  async create(
+    userId: string,
+    expiresAt: Date,
+    ipAddress?: string,
+    userAgent?: string
+  ): Promise<Session> {
     const session = await this.prisma.session.create({
       data: {
+        id: generateSessionId(),
         userId,
         expiresAt,
+        ipAddress: ipAddress ?? null,
+        userAgent: userAgent ?? null,
       },
     });
 
@@ -20,6 +33,8 @@ export class PrismaSessionRepository implements SessionRepository {
       userId: session.userId,
       expiresAt: session.expiresAt,
       createdAt: session.createdAt,
+      ipAddress: session.ipAddress,
+      userAgent: session.userAgent,
     };
   }
 
@@ -37,6 +52,8 @@ export class PrismaSessionRepository implements SessionRepository {
       userId: session.userId,
       expiresAt: session.expiresAt,
       createdAt: session.createdAt,
+      ipAddress: session.ipAddress,
+      userAgent: session.userAgent,
     };
   }
 
