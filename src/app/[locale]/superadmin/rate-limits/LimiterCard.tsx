@@ -17,6 +17,7 @@ import {
   type EnrichedEntry,
 } from '@/web/actions/rateLimitAdmin';
 import { ConfirmDialog } from './ConfirmDialog';
+import { User } from '@/domain/user/User';
 
 interface LimiterCardProps {
   overview: LimiterOverview;
@@ -325,7 +326,11 @@ export function LimiterCard({ overview, onMutate }: LimiterCardProps) {
                         {entry.resolvedUser && (
                           <div className="text-xs text-zinc-500">
                             {t('resolvedUser', {
-                              name: `${entry.resolvedUser.firstName} ${entry.resolvedUser.lastName}`,
+                              name: User.formatFullName(
+                                entry.resolvedUser.firstName,
+                                entry.resolvedUser.lastName,
+                                entry.resolvedUser.middleName
+                              ),
                               phone: entry.resolvedUser.phoneNumber,
                             })}
                           </div>

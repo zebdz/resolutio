@@ -176,9 +176,9 @@ describe('User', () => {
   });
 
   describe('getFullName', () => {
-    it('should return full name with middle name in lastName middleName firstName order', () => {
+    it('should return full name with middle name in lastName firstName middleName order', () => {
       const user = User.create(validProps);
-      expect(user.getFullName()).toBe('Doe Smith John');
+      expect(user.getFullName()).toBe('Doe John Smith');
     });
 
     it('should return full name without middle name in lastName firstName order', () => {

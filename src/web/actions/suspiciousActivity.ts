@@ -21,6 +21,7 @@ export interface SuspiciousKeySummary {
     id: string;
     firstName: string;
     lastName: string;
+    middleName: string | null;
     phoneNumber: string;
   };
   blockStatus?: { blocked: boolean; reason?: string; blockedAt?: Date } | null;
@@ -88,7 +89,7 @@ export async function getSuspiciousActivitySummaryAction(input: {
   const pageSize = input.pageSize ?? 20;
 
   // Build where clause from filters
-   
+
   const whereAnd: any[] = [];
 
   if (input.search?.trim()) {
@@ -106,7 +107,7 @@ export async function getSuspiciousActivitySummaryAction(input: {
       select: { id: true },
     });
     const userIds = matchingUsers.map((u) => u.id);
-     
+
     const orConditions: any[] = [
       { key: { contains: search, mode: 'insensitive' } },
     ];
@@ -131,11 +132,10 @@ export async function getSuspiciousActivitySummaryAction(input: {
   const where = whereAnd.length > 0 ? { AND: whereAnd } : {};
 
   // Build having clause from min/max blocked
-   
+
   let having: any = undefined;
 
   if (input.minBlocked || input.maxBlocked) {
-     
     const countFilter: any = {};
 
     if (input.minBlocked) {
@@ -180,6 +180,7 @@ export async function getSuspiciousActivitySummaryAction(input: {
             id: true,
             firstName: true,
             lastName: true,
+            middleName: true,
             phoneNumber: true,
           },
         })
@@ -360,7 +361,11 @@ export interface UserBlockHistoryEntry {
   status: string;
   reason: string | null;
   createdAt: Date;
-  statusChangedBy: { firstName: string; lastName: string };
+  statusChangedBy: {
+    firstName: string;
+    lastName: string;
+    middleName: string | null;
+  };
 }
 
 export async function getUserBlockHistoryAction(input: {
@@ -387,7 +392,7 @@ export async function getUserBlockHistoryAction(input: {
       reason: true,
       createdAt: true,
       statusChangedBy: {
-        select: { firstName: true, lastName: true },
+        select: { firstName: true, lastName: true, middleName: true },
       },
     },
   });

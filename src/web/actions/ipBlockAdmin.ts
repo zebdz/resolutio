@@ -17,7 +17,12 @@ export interface BlockedIpEntry {
   status: string;
   reason: string | null;
   createdAt: Date;
-  statusChangedBy: { id: string; firstName: string; lastName: string };
+  statusChangedBy: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    middleName: string | null;
+  };
 }
 
 export interface IpBlockHistoryEntry {
@@ -26,7 +31,11 @@ export interface IpBlockHistoryEntry {
   status: string;
   reason: string | null;
   createdAt: Date;
-  statusChangedBy: { firstName: string; lastName: string };
+  statusChangedBy: {
+    firstName: string;
+    lastName: string;
+    middleName: string | null;
+  };
 }
 
 const ipBlockRepo = new IpBlockRepository(prisma);
@@ -192,7 +201,7 @@ export async function getBlockedIpsAction(input: {
       reason: true,
       createdAt: true,
       statusChangedBy: {
-        select: { id: true, firstName: true, lastName: true },
+        select: { id: true, firstName: true, lastName: true, middleName: true },
       },
     },
   });

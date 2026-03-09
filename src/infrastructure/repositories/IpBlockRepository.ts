@@ -82,7 +82,12 @@ export class IpBlockRepository {
         reason: true,
         createdAt: true,
         statusChangedBy: {
-          select: { id: true, firstName: true, lastName: true },
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            middleName: true,
+          },
         },
       },
     });
@@ -111,7 +116,7 @@ export class IpBlockRepository {
         reason: true,
         createdAt: true,
         statusChangedBy: {
-          select: { firstName: true, lastName: true },
+          select: { firstName: true, lastName: true, middleName: true },
         },
       },
     });

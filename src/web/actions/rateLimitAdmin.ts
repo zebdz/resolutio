@@ -31,6 +31,7 @@ export interface EnrichedEntry {
     id: string;
     firstName: string;
     lastName: string;
+    middleName: string | null;
     phoneNumber: string;
   };
 }
@@ -260,6 +261,7 @@ export async function searchRateLimitEntriesAction(input: {
           id: true,
           firstName: true,
           lastName: true,
+          middleName: true,
           phoneNumber: true,
         },
         take: 1,
@@ -376,6 +378,7 @@ async function searchUsersByPhone(query: string) {
       id: true,
       firstName: true,
       lastName: true,
+      middleName: true,
       phoneNumber: true,
     },
     take: 20,
@@ -396,6 +399,7 @@ async function searchUsersByQuery(query: string) {
         id: true,
         firstName: true,
         lastName: true,
+        middleName: true,
         phoneNumber: true,
       },
       take: 20,

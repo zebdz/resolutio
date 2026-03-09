@@ -21,6 +21,7 @@ import {
   type SuspiciousKeySummary,
 } from '@/web/actions/suspiciousActivity';
 import { blockIpAction } from '@/web/actions/ipBlockAdmin';
+import { User } from '@/domain/user/User';
 
 const PAGE_SIZE = 20;
 
@@ -116,11 +117,19 @@ export function SuspiciousActivityPanel() {
     []
   );
 
+  // Initial fetch + re-fetch when filters change
   useEffect(() => {
     let cancelled = false;
+    pageRef.current = 1;
+
     getSuspiciousActivitySummaryAction({
       page: 1,
       pageSize: PAGE_SIZE,
+      search: search || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      minBlocked: minBlocked ? Number(minBlocked) : undefined,
+      maxBlocked: maxBlocked ? Number(maxBlocked) : undefined,
     }).then((result) => {
       if (!cancelled && result.success) {
         setItems(result.data.items);
@@ -131,13 +140,7 @@ export function SuspiciousActivityPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
-
-  // Re-fetch when filters change
-  useEffect(() => {
-    pageRef.current = 1;
-    fetchSummary(1, { search, dateFrom, dateTo, minBlocked, maxBlocked });
-  }, [search, dateFrom, dateTo, minBlocked, maxBlocked, fetchSummary]);
+  }, [search, dateFrom, dateTo, minBlocked, maxBlocked]);
 
   const handleLoadMore = () => {
     const next = pageRef.current + 1;
@@ -165,7 +168,11 @@ export function SuspiciousActivityPanel() {
       return;
     }
 
-    const name = `${item.resolvedUser.firstName} ${item.resolvedUser.lastName}`;
+    const name = User.formatFullName(
+      item.resolvedUser.firstName,
+      item.resolvedUser.lastName,
+      item.resolvedUser.middleName
+    );
     const limiterLabel = tLabels(item.limiterLabel);
     const reason = t('autoReason', {
       count: item.totalEvents,
@@ -219,7 +226,11 @@ export function SuspiciousActivityPanel() {
       return;
     }
 
-    const name = `${item.resolvedUser.firstName} ${item.resolvedUser.lastName}`;
+    const name = User.formatFullName(
+      item.resolvedUser.firstName,
+      item.resolvedUser.lastName,
+      item.resolvedUser.middleName
+    );
     setUnblockTarget({ userId: item.userId, name, reason: '' });
   };
 

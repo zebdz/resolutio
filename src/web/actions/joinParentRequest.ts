@@ -315,7 +315,11 @@ export async function getIncomingJoinParentRequestsAction(
       id: string;
       childOrgId: string;
       childOrgName: string;
-      requestingAdminName: string;
+      requestingAdmin: {
+        firstName: string;
+        lastName: string;
+        middleName?: string | null;
+      } | null;
       message: string;
       createdAt: Date;
     }>;
@@ -355,9 +359,13 @@ export async function getIncomingJoinParentRequestsAction(
           id: req.id,
           childOrgId: req.childOrgId,
           childOrgName: childOrg?.name ?? 'Unknown',
-          requestingAdminName: admin
-            ? `${admin.firstName} ${admin.lastName}`
-            : 'Unknown',
+          requestingAdmin: admin
+            ? {
+                firstName: admin.firstName,
+                lastName: admin.lastName,
+                middleName: admin.middleName,
+              }
+            : null,
           message: req.message,
           createdAt: req.createdAt,
         };
@@ -379,8 +387,16 @@ export interface EnrichedJoinParentRequest {
   childOrgName: string;
   parentOrgId: string;
   parentOrgName: string;
-  requestingAdminName: string;
-  handlingAdminName: string | null;
+  requestingAdmin: {
+    firstName: string;
+    lastName: string;
+    middleName?: string | null;
+  } | null;
+  handlingAdmin: {
+    firstName: string;
+    lastName: string;
+    middleName?: string | null;
+  } | null;
   message: string;
   rejectionReason: string | null;
   createdAt: Date;
@@ -465,11 +481,19 @@ export async function getAllJoinParentRequestsAction(
         childOrgName: childOrg?.name ?? 'Unknown',
         parentOrgId: req.parentOrgId,
         parentOrgName: parentOrg?.name ?? 'Unknown',
-        requestingAdminName: requestingAdmin
-          ? `${requestingAdmin.firstName} ${requestingAdmin.lastName}`
-          : 'Unknown',
-        handlingAdminName: handlingAdmin
-          ? `${handlingAdmin.firstName} ${handlingAdmin.lastName}`
+        requestingAdmin: requestingAdmin
+          ? {
+              firstName: requestingAdmin.firstName,
+              lastName: requestingAdmin.lastName,
+              middleName: requestingAdmin.middleName,
+            }
+          : null,
+        handlingAdmin: handlingAdmin
+          ? {
+              firstName: handlingAdmin.firstName,
+              lastName: handlingAdmin.lastName,
+              middleName: handlingAdmin.middleName,
+            }
           : null,
         message: req.message,
         rejectionReason: req.rejectionReason,

@@ -566,11 +566,7 @@ export function CreatePollForm() {
 
       {/* Bottom Save Button */}
       <div className="flex justify-end gap-2">
-        <Button
-          color="zinc"
-          onClick={() => router.back()}
-          disabled={isSaving}
-        >
+        <Button color="zinc" onClick={() => router.back()} disabled={isSaving}>
           {t('cancel')}
         </Button>
         <Button color="brand-green" onClick={handleSave} disabled={isSaving}>

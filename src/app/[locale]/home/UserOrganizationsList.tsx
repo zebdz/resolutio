@@ -13,6 +13,7 @@ import {
   cancelJoinRequestAction,
   joinOrganizationAction,
 } from '@/web/actions/organization';
+import { User } from '@/domain/user/User';
 
 interface UserOrganization {
   id: string;
@@ -27,6 +28,7 @@ interface UserOrganization {
     id: string;
     firstName: string;
     lastName: string;
+    middleName: string | null;
   };
   parentOrg?: { id: string; name: string } | null;
 }
@@ -361,8 +363,13 @@ export function UserOrganizationsList({
                     )}
                     {org.rejectedBy && org.rejectedAt && (
                       <Text className="mt-4 text-xs text-zinc-500 dark:text-zinc-500">
-                        {t('joinRequest.rejectedBy')} {org.rejectedBy.firstName}{' '}
-                        {org.rejectedBy.lastName} {t('joinRequest.rejectedOn')}{' '}
+                        {t('joinRequest.rejectedBy')}{' '}
+                        {User.formatFullName(
+                          org.rejectedBy.firstName,
+                          org.rejectedBy.lastName,
+                          org.rejectedBy.middleName
+                        )}{' '}
+                        {t('joinRequest.rejectedOn')}{' '}
                         {org.rejectedAt.toLocaleDateString()}
                       </Text>
                     )}

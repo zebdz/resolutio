@@ -15,6 +15,7 @@ import {
   PrismaBoardRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
+import { User } from '@/domain/user/User';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { z } from 'zod';
 
@@ -300,7 +301,11 @@ export async function getWeightHistoryAction(
       oldWeight: item.history.oldWeight,
       newWeight: item.history.newWeight,
       reason: item.history.reason || '',
-      changedBy: `${item.changedByUser.firstName} ${item.changedByUser.lastName}`,
+      changedBy: User.formatFullName(
+        item.changedByUser.firstName,
+        item.changedByUser.lastName,
+        item.changedByUser.middleName
+      ),
       changedAt: item.history.changedAt.toISOString(),
     }));
 

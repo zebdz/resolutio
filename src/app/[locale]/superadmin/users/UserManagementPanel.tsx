@@ -23,6 +23,7 @@ import {
 } from '@/web/actions/suspiciousActivity';
 import { BlockUserDialog } from './BlockUserDialog';
 import { BlockHistoryDialog } from './BlockHistoryDialog';
+import { User } from '@/domain/user/User';
 
 export function UserManagementPanel() {
   const t = useTranslations('superadmin.users');
@@ -136,7 +137,7 @@ export function UserManagementPanel() {
   };
 
   const getUserName = (user: AdminUserResult) =>
-    `${user.firstName} ${user.lastName}`;
+    User.formatFullName(user.firstName, user.lastName, user.middleName);
 
   return (
     <div className="space-y-4">

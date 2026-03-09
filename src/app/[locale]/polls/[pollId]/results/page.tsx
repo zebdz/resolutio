@@ -11,6 +11,7 @@ import {
   ProtocolSignWillingnessEntry,
 } from '@/src/application/poll/GetPollResultsUseCase';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { User } from '@/domain/user/User';
 
 interface ResultsPageProps {
   params: Promise<{
@@ -100,13 +101,11 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
         voters: canViewVoters
           ? a.voters.map((v: any) => ({
               userId: v.userId,
-              userName: [
-                v.userName.lastName,
-                v.userName.middleName,
+              userName: User.formatFullName(
                 v.userName.firstName,
-              ]
-                .filter(Boolean)
-                .join(' '),
+                v.userName.lastName,
+                v.userName.middleName
+              ),
               weight:
                 typeof v.weight === 'object' ? Number(v.weight) : v.weight,
             }))

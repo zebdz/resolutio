@@ -1,4 +1,5 @@
 import type { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
+import { User } from '@/domain/user/User';
 
 export interface ProtocolSignerEntry {
   firstName: string;
@@ -28,9 +29,7 @@ export interface ProtocolSignersPdfTranslations {
 }
 
 function formatFullName(entry: ProtocolSignerEntry): string {
-  return [entry.lastName, entry.middleName, entry.firstName]
-    .filter(Boolean)
-    .join(' ');
+  return User.formatFullName(entry.firstName, entry.lastName, entry.middleName);
 }
 
 function buildSignersTable(

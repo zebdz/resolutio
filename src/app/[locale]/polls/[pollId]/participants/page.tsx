@@ -7,6 +7,7 @@ import ParticipantManagement from '@/web/components/participants/ParticipantMana
 import { Heading } from '@/app/components/catalyst/heading';
 import { ParticipantWithUser } from '@/src/application/poll/GetParticipantsUseCase';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { User } from '@/domain/user/User';
 
 import {
   prisma,
@@ -84,9 +85,11 @@ export default async function ParticipantsPage({
     (p: ParticipantWithUser) => ({
       id: p.participant.id,
       userId: p.participant.userId,
-      userName: [p.user.lastName, p.user.middleName, p.user.firstName]
-        .filter(Boolean)
-        .join(' '),
+      userName: User.formatFullName(
+        p.user.firstName,
+        p.user.lastName,
+        p.user.middleName
+      ),
       weight: p.participant.userWeight,
       updatedAt: p.participant.snapshotAt.toISOString(),
     })

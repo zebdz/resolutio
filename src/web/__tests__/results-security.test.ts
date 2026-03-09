@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { User } from '@/domain/user/User';
 
 /**
  * Security test suite for poll results voter data protection
@@ -36,17 +37,29 @@ describe('Poll Results Security', () => {
                 voters: [
                   {
                     userId: 'user-1',
-                    userName: { firstName: 'Alice', lastName: 'Smith' },
+                    userName: {
+                      firstName: 'Alice',
+                      lastName: 'Smith',
+                      middleName: null,
+                    },
                     weight: 10,
                   },
                   {
                     userId: 'user-2',
-                    userName: { firstName: 'Bob', lastName: 'Johnson' },
+                    userName: {
+                      firstName: 'Bob',
+                      lastName: 'Johnson',
+                      middleName: null,
+                    },
                     weight: 10,
                   },
                   {
                     userId: 'user-3',
-                    userName: { firstName: 'Charlie', lastName: 'Brown' },
+                    userName: {
+                      firstName: 'Charlie',
+                      lastName: 'Brown',
+                      middleName: null,
+                    },
                     weight: 10,
                   },
                 ],
@@ -82,7 +95,11 @@ describe('Poll Results Security', () => {
             voters: canViewVoters
               ? a.voters.map((v: any) => ({
                   userId: v.userId,
-                  userName: `${v.userName.firstName} ${v.userName.lastName}`,
+                  userName: User.formatFullName(
+                    v.userName.firstName,
+                    v.userName.lastName,
+                    v.userName.middleName
+                  ),
                   weight: v.weight,
                 }))
               : [], // Empty array if user doesn't have permission
@@ -126,12 +143,20 @@ describe('Poll Results Security', () => {
                 voters: [
                   {
                     userId: 'user-1',
-                    userName: { firstName: 'Alice', lastName: 'Smith' },
+                    userName: {
+                      firstName: 'Alice',
+                      lastName: 'Smith',
+                      middleName: null,
+                    },
                     weight: 10,
                   },
                   {
                     userId: 'user-2',
-                    userName: { firstName: 'Bob', lastName: 'Johnson' },
+                    userName: {
+                      firstName: 'Bob',
+                      lastName: 'Johnson',
+                      middleName: null,
+                    },
                     weight: 10,
                   },
                 ],
@@ -151,7 +176,11 @@ describe('Poll Results Security', () => {
             voters: canViewVoters
               ? a.voters.map((v: any) => ({
                   userId: v.userId,
-                  userName: `${v.userName.firstName} ${v.userName.lastName}`,
+                  userName: User.formatFullName(
+                    v.userName.firstName,
+                    v.userName.lastName,
+                    v.userName.middleName
+                  ),
                   weight: v.weight,
                 }))
               : [],
@@ -163,12 +192,12 @@ describe('Poll Results Security', () => {
       expect(serializedResults.questions[0].answers[0].voters.length).toBe(2);
       expect(serializedResults.questions[0].answers[0].voters[0]).toEqual({
         userId: 'user-1',
-        userName: 'Alice Smith',
+        userName: 'Smith Alice',
         weight: 10,
       });
       expect(serializedResults.questions[0].answers[0].voters[1]).toEqual({
         userId: 'user-2',
-        userName: 'Bob Johnson',
+        userName: 'Johnson Bob',
         weight: 10,
       });
     });
@@ -186,7 +215,11 @@ describe('Poll Results Security', () => {
                 voters: [
                   {
                     userId: 'u1',
-                    userName: { firstName: 'A', lastName: 'B' },
+                    userName: {
+                      firstName: 'A',
+                      lastName: 'B',
+                      middleName: null,
+                    },
                     weight: 5,
                   },
                 ],
@@ -196,7 +229,11 @@ describe('Poll Results Security', () => {
                 voters: [
                   {
                     userId: 'u2',
-                    userName: { firstName: 'C', lastName: 'D' },
+                    userName: {
+                      firstName: 'C',
+                      lastName: 'D',
+                      middleName: null,
+                    },
                     weight: 10,
                   },
                 ],
@@ -211,12 +248,20 @@ describe('Poll Results Security', () => {
                 voters: [
                   {
                     userId: 'u3',
-                    userName: { firstName: 'E', lastName: 'F' },
+                    userName: {
+                      firstName: 'E',
+                      lastName: 'F',
+                      middleName: null,
+                    },
                     weight: 15,
                   },
                   {
                     userId: 'u4',
-                    userName: { firstName: 'G', lastName: 'H' },
+                    userName: {
+                      firstName: 'G',
+                      lastName: 'H',
+                      middleName: null,
+                    },
                     weight: 20,
                   },
                 ],
@@ -234,7 +279,11 @@ describe('Poll Results Security', () => {
             voters: canViewVoters
               ? a.voters.map((v: any) => ({
                   userId: v.userId,
-                  userName: `${v.userName.firstName} ${v.userName.lastName}`,
+                  userName: User.formatFullName(
+                    v.userName.firstName,
+                    v.userName.lastName,
+                    v.userName.middleName
+                  ),
                   weight: v.weight,
                 }))
               : [],

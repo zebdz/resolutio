@@ -175,6 +175,7 @@ describe('GetUserOrganizationsUseCase', () => {
           id: 'admin-1',
           firstName: 'Admin',
           lastName: 'User',
+          middleName: null,
         },
       },
       {
@@ -201,6 +202,7 @@ describe('GetUserOrganizationsUseCase', () => {
           id: 'admin-2',
           firstName: 'Another',
           lastName: 'Admin',
+          middleName: null,
         },
       }
     );
@@ -220,6 +222,7 @@ describe('GetUserOrganizationsUseCase', () => {
         id: 'admin-2',
         firstName: 'Another',
         lastName: 'Admin',
+        middleName: null,
       });
 
       const rejected2 = result.value.rejected[1];
@@ -230,6 +233,7 @@ describe('GetUserOrganizationsUseCase', () => {
         id: 'admin-1',
         firstName: 'Admin',
         lastName: 'User',
+        middleName: null,
       });
 
       expect(result.value.member).toEqual([]);
@@ -305,6 +309,7 @@ describe('GetUserOrganizationsUseCase', () => {
           id: 'admin-3',
           firstName: 'Admin',
           lastName: 'Three',
+          middleName: null,
         },
       }
     );

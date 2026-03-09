@@ -13,6 +13,7 @@ import {
   removeOrgAdminAction,
   searchUsersForOrgAdminAction,
 } from '@/web/actions/organization';
+import { User } from '@/domain/user/User';
 import { searchUserByPhoneAction } from '@/web/actions/user';
 import { PhoneInput } from '@/web/components/phone';
 
@@ -174,9 +175,7 @@ export function AdminManagementSection({
   };
 
   function formatName(user: Admin) {
-    return [user.lastName, user.middleName, user.firstName]
-      .filter(Boolean)
-      .join(' ');
+    return User.formatFullName(user.firstName, user.lastName, user.middleName);
   }
 
   return (
@@ -321,9 +320,11 @@ function SearchSection({
   };
 
   function formatName(user: SearchResult) {
-    const name = [user.lastName, user.middleName, user.firstName]
-      .filter(Boolean)
-      .join(' ');
+    const name = User.formatFullName(
+      user.firstName,
+      user.lastName,
+      user.middleName
+    );
 
     return `${name} (@${user.nickname})`;
   }

@@ -11,9 +11,10 @@ import {
   searchUsersForBoardAction,
 } from '@/web/actions/board';
 import { searchUserByPhoneAction } from '@/web/actions/user';
+import { User } from '@/domain/user/User';
 import { PhoneInput } from '@/web/components/phone';
 
-type User = {
+type UserResult = {
   id: string;
   firstName: string;
   lastName: string;
@@ -31,7 +32,7 @@ export default function AddOutsideMemberSection({
   const t = useTranslations('organization.boards.manageSingle');
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [searchResults, setSearchResults] = useState<UserResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +40,7 @@ export default function AddOutsideMemberSection({
 
   // Phone search state
   const [phoneQuery, setPhoneQuery] = useState('');
-  const [phoneResult, setPhoneResult] = useState<User | null>(null);
+  const [phoneResult, setPhoneResult] = useState<UserResult | null>(null);
   const [isPhoneSearching, setIsPhoneSearching] = useState(false);
   const [phoneSearchError, setPhoneSearchError] = useState<string | null>(null);
   const [phoneSearchDone, setPhoneSearchDone] = useState(false);
@@ -125,10 +126,12 @@ export default function AddOutsideMemberSection({
     setIsPhoneSearching(false);
   };
 
-  function formatName(user: User) {
-    const name = [user.lastName, user.middleName, user.firstName]
-      .filter(Boolean)
-      .join(' ');
+  function formatName(user: UserResult) {
+    const name = User.formatFullName(
+      user.firstName,
+      user.lastName,
+      user.middleName
+    );
 
     return `${name} (@${user.nickname})`;
   }

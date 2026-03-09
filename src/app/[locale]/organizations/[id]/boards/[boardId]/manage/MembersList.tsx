@@ -13,6 +13,7 @@ import {
 } from '@/app/components/catalyst/dialog';
 import { Textarea } from '@/app/components/catalyst/textarea';
 import { removeBoardMemberAction } from '@/web/actions/board';
+import { User } from '@/domain/user/User';
 
 type Member = {
   id: string;
@@ -91,9 +92,11 @@ export default function MembersList({ boardId, members }: MembersListProps) {
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <h4 className="font-semibold text-zinc-900 dark:text-zinc-100">
-                  {[member.lastName, member.middleName, member.firstName]
-                    .filter(Boolean)
-                    .join(' ')}
+                  {User.formatFullName(
+                    member.firstName,
+                    member.lastName,
+                    member.middleName
+                  )}
                 </h4>
               </div>
               <div>

@@ -618,6 +618,7 @@ export async function getUserOrganizationsAction(): Promise<
         id: string;
         firstName: string;
         lastName: string;
+        middleName: string | null;
       };
       parentOrg: { id: string; name: string } | null;
     }>;

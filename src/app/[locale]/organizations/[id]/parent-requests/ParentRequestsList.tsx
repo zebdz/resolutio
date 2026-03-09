@@ -15,12 +15,17 @@ import {
   DialogTitle,
 } from '@/app/components/catalyst/dialog';
 import { handleJoinParentRequestAction } from '@/web/actions/joinParentRequest';
+import { User } from '@/domain/user/User';
 
 interface ParentRequest {
   id: string;
   childOrgId: string;
   childOrgName: string;
-  requestingAdminName: string;
+  requestingAdmin: {
+    firstName: string;
+    lastName: string;
+    middleName?: string | null;
+  } | null;
   message: string;
   createdAt: Date;
 }
@@ -133,7 +138,14 @@ export function ParentRequestsList({
                   </Badge>
                 </div>
                 <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-                  {t('requestingAdmin')}: {request.requestingAdminName}
+                  {t('requestingAdmin')}:{' '}
+                  {request.requestingAdmin
+                    ? User.formatFullName(
+                        request.requestingAdmin.firstName,
+                        request.requestingAdmin.lastName,
+                        request.requestingAdmin.middleName
+                      )
+                    : '—'}
                 </Text>
                 <Text className="text-sm text-zinc-600 dark:text-zinc-400">
                   {t('requestMessage')}: {request.message}

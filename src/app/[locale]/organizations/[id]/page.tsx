@@ -166,7 +166,10 @@ export default async function OrganizationDetailPage({
                   adminOrgIds={adminOrgIds}
                   isSuperAdmin={isSuperAdmin}
                   fixedOrganizationId={id}
-                  initialBoards={boards.map((b) => ({ id: b.id, name: b.name }))}
+                  initialBoards={boards.map((b) => ({
+                    id: b.id,
+                    name: b.name,
+                  }))}
                 />
               ) : (
                 <Text className="text-zinc-500 dark:text-zinc-400">

@@ -257,7 +257,7 @@ export class User {
   }
 
   /**
-   * Format a full name in lastName middleName firstName order.
+   * Format a full name in lastName firstName middleName order.
    * Usable without a User instance (e.g. from plain objects / DTOs).
    */
   static formatFullName(
@@ -265,7 +265,7 @@ export class User {
     lastName: string,
     middleName?: string | null
   ): string {
-    return [lastName, middleName, firstName].filter(Boolean).join(' ');
+    return [lastName, firstName, middleName].filter(Boolean).join(' ');
   }
 
   // Method to check if user can be authenticated

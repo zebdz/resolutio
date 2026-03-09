@@ -149,7 +149,12 @@ describe('IpBlockRepository', () => {
           reason: true,
           createdAt: true,
           statusChangedBy: {
-            select: { id: true, firstName: true, lastName: true },
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              middleName: true,
+            },
           },
         },
       });
@@ -206,7 +211,7 @@ describe('IpBlockRepository', () => {
           reason: true,
           createdAt: true,
           statusChangedBy: {
-            select: { firstName: true, lastName: true },
+            select: { firstName: true, lastName: true, middleName: true },
           },
         },
       });

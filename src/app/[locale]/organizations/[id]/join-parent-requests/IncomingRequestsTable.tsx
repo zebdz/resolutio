@@ -24,6 +24,7 @@ import {
 } from '@/app/components/catalyst/dialog';
 import { handleJoinParentRequestAction } from '@/web/actions/joinParentRequest';
 import type { EnrichedJoinParentRequest } from '@/web/actions/joinParentRequest';
+import { User } from '@/domain/user/User';
 
 interface IncomingRequestsTableProps {
   requests: EnrichedJoinParentRequest[];
@@ -203,12 +204,26 @@ export function IncomingRequestsTable({
                 <StatusBadge status={request.status} />
               </TableCell>
               <TableCell>{request.childOrgName}</TableCell>
-              <TableCell>{request.requestingAdminName}</TableCell>
+              <TableCell>
+                {request.requestingAdmin
+                  ? User.formatFullName(
+                      request.requestingAdmin.firstName,
+                      request.requestingAdmin.lastName,
+                      request.requestingAdmin.middleName
+                    )
+                  : '—'}
+              </TableCell>
               <TableCell className="hidden max-w-xs truncate sm:table-cell">
                 {request.message}
               </TableCell>
               <TableCell className="hidden sm:table-cell">
-                {request.handlingAdminName ?? '—'}
+                {request.handlingAdmin
+                  ? User.formatFullName(
+                      request.handlingAdmin.firstName,
+                      request.handlingAdmin.lastName,
+                      request.handlingAdmin.middleName
+                    )
+                  : '—'}
               </TableCell>
               <TableCell className="hidden max-w-xs truncate md:table-cell">
                 {request.rejectionReason ?? '—'}

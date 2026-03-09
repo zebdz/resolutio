@@ -22,6 +22,7 @@ export interface RejectedOrganization {
     id: string;
     firstName: string;
     lastName: string;
+    middleName: string | null;
   };
   parentOrg: { id: string; name: string } | null;
 }
@@ -59,6 +60,7 @@ export class GetUserOrganizationsUseCase {
             id: true,
             firstName: true,
             lastName: true,
+            middleName: true,
           },
         },
       },
@@ -114,6 +116,7 @@ export class GetUserOrganizationsUseCase {
             id: membership.rejectedBy.id,
             firstName: membership.rejectedBy.firstName,
             lastName: membership.rejectedBy.lastName,
+            middleName: membership.rejectedBy.middleName,
           },
           parentOrg,
         });

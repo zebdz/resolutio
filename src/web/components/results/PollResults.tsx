@@ -8,6 +8,7 @@ import ExportPdfButton from './ExportPdfButton';
 import ExportProtocolPdfButton from './ExportProtocolPdfButton';
 import { Button } from '@/app/components/catalyst/button';
 import { PollState } from '@/src/domain/poll/PollState';
+import { User } from '@/domain/user/User';
 import type { QuestionType } from '@/src/domain/poll/QuestionType';
 
 interface AnswerResult {
@@ -303,9 +304,11 @@ export default function PollResults({
                             key={p.userId}
                             className="text-sm text-zinc-700 dark:text-zinc-300"
                           >
-                            {[p.lastName, p.middleName, p.firstName]
-                              .filter(Boolean)
-                              .join(' ')}
+                            {User.formatFullName(
+                              p.firstName,
+                              p.lastName,
+                              p.middleName
+                            )}
                           </li>
                         ))}
                     </ul>
@@ -328,9 +331,11 @@ export default function PollResults({
                             key={p.userId}
                             className="text-sm text-zinc-700 dark:text-zinc-300"
                           >
-                            {[p.lastName, p.middleName, p.firstName]
-                              .filter(Boolean)
-                              .join(' ')}
+                            {User.formatFullName(
+                              p.firstName,
+                              p.lastName,
+                              p.middleName
+                            )}
                           </li>
                         ))}
                     </ul>

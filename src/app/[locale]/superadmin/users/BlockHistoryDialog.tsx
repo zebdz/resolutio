@@ -8,13 +8,18 @@ import {
   DialogBody,
   DialogTitle,
 } from '@/app/components/catalyst/dialog';
+import { User } from '@/domain/user/User';
 
 interface HistoryEntry {
   id: string;
   status: string;
   reason: string | null;
   createdAt: Date;
-  statusChangedBy: { firstName: string; lastName: string };
+  statusChangedBy: {
+    firstName: string;
+    lastName: string;
+    middleName?: string | null;
+  };
 }
 
 interface BlockHistoryDialogProps {
@@ -73,7 +78,11 @@ export function BlockHistoryDialog({
                   <span className="text-sm text-zinc-500">
                     {changedByLabel.replace(
                       '{name}',
-                      `${entry.statusChangedBy.firstName} ${entry.statusChangedBy.lastName}`
+                      User.formatFullName(
+                        entry.statusChangedBy.firstName,
+                        entry.statusChangedBy.lastName,
+                        entry.statusChangedBy.middleName
+                      )
                     )}
                   </span>
                 </div>

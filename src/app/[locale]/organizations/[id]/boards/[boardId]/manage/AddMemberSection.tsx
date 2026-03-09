@@ -7,6 +7,7 @@ import { Button } from '@/app/components/catalyst/button';
 import { Field, Label } from '@/app/components/catalyst/fieldset';
 import { Select } from '@/app/components/catalyst/select';
 import { addBoardMemberAction } from '@/web/actions/board';
+import { User } from '@/domain/user/User';
 
 type AddMemberSectionProps = {
   boardId: string;
@@ -69,9 +70,11 @@ export default function AddMemberSection({
             <option value="">{t('selectUser')}</option>
             {availableUsers.map((user) => (
               <option key={user.id} value={user.id}>
-                {[user.lastName, user.middleName, user.firstName]
-                  .filter(Boolean)
-                  .join(' ')}
+                {User.formatFullName(
+                  user.firstName,
+                  user.lastName,
+                  user.middleName
+                )}
               </option>
             ))}
           </Select>

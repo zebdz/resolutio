@@ -22,6 +22,7 @@ import {
   type BlockedIpEntry,
   type IpBlockHistoryEntry,
 } from '@/web/actions/ipBlockAdmin';
+import { User } from '@/domain/user/User';
 
 const PAGE_SIZE = 20;
 
@@ -258,7 +259,11 @@ export function BlockedIpsPanel() {
                     </div>
                     <div>
                       {t('blockedBy', {
-                        name: `${item.statusChangedBy.firstName} ${item.statusChangedBy.lastName}`,
+                        name: User.formatFullName(
+                          item.statusChangedBy.firstName,
+                          item.statusChangedBy.lastName,
+                          item.statusChangedBy.middleName
+                        ),
                       })}
                     </div>
                   </div>
@@ -412,7 +417,11 @@ export function BlockedIpsPanel() {
                     </span>
                     <span className="text-sm text-zinc-500">
                       {t('changedBy', {
-                        name: `${entry.statusChangedBy.firstName} ${entry.statusChangedBy.lastName}`,
+                        name: User.formatFullName(
+                          entry.statusChangedBy.firstName,
+                          entry.statusChangedBy.lastName,
+                          entry.statusChangedBy.middleName
+                        ),
                       })}
                     </span>
                   </div>

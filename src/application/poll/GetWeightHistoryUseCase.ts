@@ -18,11 +18,13 @@ export interface WeightHistoryWithUser {
     id: string;
     firstName: string;
     lastName: string;
+    middleName: string | null;
   };
   participantUser: {
     id: string;
     firstName: string;
     lastName: string;
+    middleName: string | null;
   };
 }
 
@@ -91,6 +93,7 @@ export class GetWeightHistoryUseCase {
           id: true,
           firstName: true,
           lastName: true,
+          middleName: true,
         },
       });
 
@@ -100,6 +103,7 @@ export class GetWeightHistoryUseCase {
           id: true,
           firstName: true,
           lastName: true,
+          middleName: true,
         },
       });
 
