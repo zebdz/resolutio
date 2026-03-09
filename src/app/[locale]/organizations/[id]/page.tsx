@@ -146,22 +146,33 @@ export default async function OrganizationDetailPage({
         )}
 
         {/* Polls Section - Visible to members and admins */}
-        {(isUserMember || isUserAdmin) && pollsData && (
+        {(isUserMember || isUserAdmin) && (
           <>
             <Divider />
             <div>
-              <Heading level={2} className="mb-4">
-                {t('recentPolls')}
-              </Heading>
-              <PollsList
-                initialPolls={pollsData.polls}
-                initialTotalCount={pollsData.totalCount}
-                userId={user!.id}
-                adminOrgIds={adminOrgIds}
-                isSuperAdmin={isSuperAdmin}
-                fixedOrganizationId={id}
-                initialBoards={boards.map((b) => ({ id: b.id, name: b.name }))}
-              />
+              <div className="flex items-center justify-between mb-4">
+                <Heading level={2}>{t('recentPolls')}</Heading>
+                {isUserAdmin && (
+                  <Link href="/polls/create">
+                    <Button color="brand-green">{t('createPoll')}</Button>
+                  </Link>
+                )}
+              </div>
+              {pollsData ? (
+                <PollsList
+                  initialPolls={pollsData.polls}
+                  initialTotalCount={pollsData.totalCount}
+                  userId={user!.id}
+                  adminOrgIds={adminOrgIds}
+                  isSuperAdmin={isSuperAdmin}
+                  fixedOrganizationId={id}
+                  initialBoards={boards.map((b) => ({ id: b.id, name: b.name }))}
+                />
+              ) : (
+                <Text className="text-zinc-500 dark:text-zinc-400">
+                  {t('noPolls')}
+                </Text>
+              )}
             </div>
           </>
         )}

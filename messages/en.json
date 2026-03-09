@@ -278,6 +278,7 @@
       "parentOrgSection": "Parent Organization",
       "memberRequests": "Member Requests",
       "recentPolls": "Recent Polls",
+      "createPoll": "Create Poll",
       "noPolls": "No polls yet",
       "pollBoard": "Board",
       "pollStartDate": "Start Date",
