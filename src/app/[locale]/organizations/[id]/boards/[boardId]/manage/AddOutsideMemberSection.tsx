@@ -185,14 +185,15 @@ export default function AddOutsideMemberSection({
           {searchResults.map((user) => (
             <div
               key={user.id}
-              className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800"
+              className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-700 dark:bg-zinc-800"
             >
-              <div>
+              <div className="min-w-0">
                 <p className="font-medium text-zinc-900 dark:text-zinc-100">
                   {formatName(user)}
                 </p>
               </div>
               <Button
+                className="w-full sm:w-auto"
                 color="brand-green"
                 onClick={() => handleAdd(user.id)}
                 disabled={isAdding}
@@ -208,8 +209,8 @@ export default function AddOutsideMemberSection({
       <div className="mt-6 border-t border-zinc-200 pt-4 dark:border-zinc-700">
         <Field>
           <Label>{t('phoneSearchLabel')}</Label>
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <div className="w-full sm:flex-1">
               <PhoneInput
                 name="phoneSearch"
                 value={phoneQuery}
@@ -223,6 +224,7 @@ export default function AddOutsideMemberSection({
               />
             </div>
             <Button
+              className="w-full sm:w-auto"
               color="zinc"
               onClick={handlePhoneSearch}
               disabled={isAdding || isPhoneSearching || phoneQuery.length < 5}
@@ -248,13 +250,14 @@ export default function AddOutsideMemberSection({
 
         {phoneResult && (
           <div className="mt-4">
-            <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
-              <div>
+            <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-700 dark:bg-zinc-800">
+              <div className="min-w-0">
                 <p className="font-medium text-zinc-900 dark:text-zinc-100">
                   {formatName(phoneResult)}
                 </p>
               </div>
               <Button
+                className="w-full sm:w-auto"
                 color="brand-green"
                 onClick={() => handleAdd(phoneResult.id)}
                 disabled={isAdding}

@@ -35,7 +35,7 @@ export default async function OrganizationModifyPage({
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect(`/${locale}/auth/login`);
+    redirect(`/${locale}/login`);
   }
 
   const result = await getOrganizationDetailsAction(id);

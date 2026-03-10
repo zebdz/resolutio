@@ -58,7 +58,7 @@ export default function AddMemberSection({
       <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
         {t('addMember')}
       </h3>
-      <div className="flex gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row">
         <Field className="flex-1">
           <Label>{t('selectUser')}</Label>
           <Select
@@ -81,6 +81,7 @@ export default function AddMemberSection({
         </Field>
         <div className="flex items-end">
           <Button
+            className="w-full sm:w-auto"
             color="brand-green"
             onClick={handleAdd}
             disabled={isAdding || !selectedUserId}

@@ -33,7 +33,7 @@ export default async function ParticipantsPage({
   const { pollId } = await params;
 
   if (!user) {
-    redirect('/auth/login');
+    redirect('/login');
   }
 
   // Get poll details

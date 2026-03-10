@@ -189,15 +189,15 @@ export function AdminManagementSection({
         {initialAdmins.map((admin) => (
           <div
             key={admin.id}
-            className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+            className="flex flex-col gap-3 rounded-lg border border-zinc-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800 dark:bg-zinc-900"
           >
-            <div>
+            <div className="min-w-0">
               <p className="font-medium text-zinc-900 dark:text-zinc-100">
                 {formatName(admin)}
               </p>
             </div>
             {admin.id !== currentUserId && (
-              <div className="flex items-center gap-2">
+              <div className="flex w-full items-center gap-2 sm:w-auto">
                 {confirmRemoveId === admin.id ? (
                   <>
                     <Button
@@ -374,14 +374,15 @@ function SearchSection({
           {results.map((user) => (
             <div
               key={user.id}
-              className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800"
+              className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-700 dark:bg-zinc-800"
             >
-              <div>
+              <div className="min-w-0">
                 <p className="font-medium text-zinc-900 dark:text-zinc-100">
                   {formatName(user)}
                 </p>
               </div>
               <Button
+                className="w-full sm:w-auto"
                 color="brand-green"
                 onClick={() => onAdd(user.id)}
                 disabled={addingId !== null}
@@ -398,8 +399,8 @@ function SearchSection({
         <div className="mt-6 border-t border-zinc-200 pt-4 dark:border-zinc-700">
           <Field>
             <Label>{t('phoneSearchLabel')}</Label>
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="w-full sm:flex-1">
                 <PhoneInput
                   name="phoneSearch"
                   value={phoneQuery}
@@ -413,6 +414,7 @@ function SearchSection({
                 />
               </div>
               <Button
+                className="w-full sm:w-auto"
                 color="zinc"
                 onClick={handlePhoneSearch}
                 disabled={
@@ -440,13 +442,14 @@ function SearchSection({
 
           {phoneResult && (
             <div className="mt-4">
-              <div className="flex items-center justify-between rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-800">
-                <div>
+              <div className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-700 dark:bg-zinc-800">
+                <div className="min-w-0">
                   <p className="font-medium text-zinc-900 dark:text-zinc-100">
                     {formatName(phoneResult)}
                   </p>
                 </div>
                 <Button
+                  className="w-full sm:w-auto"
                   color="brand-green"
                   onClick={() => onAdd(phoneResult.id)}
                   disabled={addingId !== null}
