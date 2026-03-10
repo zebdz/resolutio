@@ -844,7 +844,14 @@
       "deleted": "Уведомления удалены",
       "delete": "Удалить",
       "loadMore": "Загрузить ещё",
-      "cancel": "Отмена"
+      "cancel": "Отмена",
+      "actions": {
+        "viewPendingRequests": "Просмотреть заявки",
+        "viewOrganization": "Просмотреть организацию",
+        "viewParentRequests": "Просмотреть запросы",
+        "voteNow": "Голосовать",
+        "viewResults": "Результаты"
+      }
     }
   },
   "navbar": {

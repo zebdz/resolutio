@@ -21,6 +21,7 @@ import {
   MegaphoneIcon,
   CheckCircleIcon,
   XCircleIcon,
+  ChevronRightIcon,
 } from '@heroicons/react/20/solid';
 import {
   markNotificationReadAction,
@@ -28,6 +29,8 @@ import {
   getNotificationsAction,
   deleteNotificationsAction,
 } from '@/web/actions/notification';
+import { Link } from '@/src/i18n/routing';
+import { getNotificationActionUrl } from '@/web/utils/notificationActionUrl';
 
 interface NotificationData {
   id: string;
@@ -73,6 +76,7 @@ export function NotificationsList({
   initialTotalCount,
 }: NotificationsListProps) {
   const t = useTranslations('notification.page');
+  const tActions = useTranslations('notification.page.actions');
   const tTypes = useTranslations('notification.types');
   const router = useRouter();
   const [notifications, setNotifications] = useState(initialNotifications);
@@ -395,6 +399,28 @@ export function NotificationsList({
                         </button>
                       )}
                     </div>
+
+                    {(() => {
+                      const action = getNotificationActionUrl(
+                        notification.type,
+                        notification.data
+                      );
+
+                      if (!action) {return null;}
+
+                      return (
+                        <Link
+                          href={action.href}
+                          onClick={() => {
+                            if (isUnread) {handleMarkAsRead(notification.id);}
+                          }}
+                          className="mt-1.5 inline-flex items-center gap-0.5 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                          {tActions(action.actionKey as any)}
+                          <ChevronRightIcon className="h-3.5 w-3.5" />
+                        </Link>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

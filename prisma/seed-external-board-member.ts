@@ -84,7 +84,9 @@ async function main() {
   const seenOrgIds = new Set<string>();
   const selectedBoards = boards
     .filter((b) => {
-      if (seenOrgIds.has(b.organizationId)) {return false;}
+      if (seenOrgIds.has(b.organizationId)) {
+        return false;
+      }
 
       seenOrgIds.add(b.organizationId);
 

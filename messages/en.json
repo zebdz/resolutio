@@ -844,7 +844,14 @@
       "deleted": "Notifications deleted",
       "delete": "Delete",
       "loadMore": "Load more",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "actions": {
+        "viewPendingRequests": "View pending requests",
+        "viewOrganization": "View organization",
+        "viewParentRequests": "View parent requests",
+        "voteNow": "Vote now",
+        "viewResults": "View results"
+      }
     }
   },
   "navbar": {
