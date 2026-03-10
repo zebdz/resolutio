@@ -36,6 +36,7 @@ import {
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
+import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
 import { QuestionType } from '@/domain/poll/QuestionType';
 import { PollState } from '@/domain/poll/PollState';
 import { PollSearchFilters } from '@/domain/poll/PollRepository';
@@ -188,16 +189,9 @@ export async function createPollAction(
     const validation = CreatePollSchema.safeParse(input);
 
     if (!validation.success) {
-      const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err) => {
-        const path = err.path.join('.');
-
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
-        }
-
-        fieldErrors[path].push(err.message);
-      });
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
 
       return {
         success: false,
@@ -290,16 +284,9 @@ export async function addQuestionAction(
     const validation = AddQuestionSchema.safeParse(parsedInput);
 
     if (!validation.success) {
-      const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err) => {
-        const path = err.path.join('.');
-
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
-        }
-
-        fieldErrors[path].push(err.message);
-      });
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
 
       return {
         success: false,
@@ -367,16 +354,9 @@ export async function updateQuestionOrderAction(input: {
     const validation = UpdateQuestionOrderSchema.safeParse(input);
 
     if (!validation.success) {
-      const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err) => {
-        const path = err.path.join('.');
-
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
-        }
-
-        fieldErrors[path].push(err.message);
-      });
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
 
       return {
         success: false,
@@ -680,16 +660,9 @@ export async function updatePollAction(
     const validation = UpdatePollSchema.safeParse(input);
 
     if (!validation.success) {
-      const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err) => {
-        const path = err.path.join('.');
-
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
-        }
-
-        fieldErrors[path].push(err.message);
-      });
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
 
       return {
         success: false,

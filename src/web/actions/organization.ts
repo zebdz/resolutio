@@ -33,6 +33,7 @@ import {
 import { Notification } from '@/domain/notification/Notification';
 import { getCurrentUser } from '../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
+import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
 
 // Action result type for client-side handling
 export type ActionResult<T = void> =
@@ -161,16 +162,9 @@ export async function createOrganizationAction(
     const validation = CreateOrganizationSchema.safeParse(input);
 
     if (!validation.success) {
-      const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err) => {
-        const path = err.path.join('.');
-
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
-        }
-
-        fieldErrors[path].push(err.message);
-      });
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
 
       return {
         success: false,
@@ -452,16 +446,9 @@ export async function joinOrganizationAction(
     const validation = JoinOrganizationSchema.safeParse(input);
 
     if (!validation.success) {
-      const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err) => {
-        const path = err.path.join('.');
-
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
-        }
-
-        fieldErrors[path].push(err.message);
-      });
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
 
       return {
         success: false,
@@ -789,16 +776,9 @@ export async function handleJoinRequestAction(
     const validation = HandleJoinRequestSchema.safeParse(input);
 
     if (!validation.success) {
-      const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err) => {
-        const path = err.path.join('.');
-
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
-        }
-
-        fieldErrors[path].push(err.message);
-      });
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
 
       return {
         success: false,

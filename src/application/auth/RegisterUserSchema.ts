@@ -12,13 +12,13 @@ export const RegisterUserSchema = z
   .object({
     firstName: z
       .string()
-      .min(1, 'First name is required')
+      .min(1, UserDomainCodes.FIRST_NAME_REQUIRED)
       .max(NAME_MAX_LENGTH, UserDomainCodes.FIRST_NAME_INVALID)
       .regex(NAME_REGEX, UserDomainCodes.FIRST_NAME_INVALID)
       .trim(),
     lastName: z
       .string()
-      .min(1, 'Last name is required')
+      .min(1, UserDomainCodes.LAST_NAME_REQUIRED)
       .max(NAME_MAX_LENGTH, UserDomainCodes.LAST_NAME_INVALID)
       .regex(NAME_REGEX, UserDomainCodes.LAST_NAME_INVALID)
       .trim(),
@@ -31,17 +31,14 @@ export const RegisterUserSchema = z
       .or(z.literal('')),
     phoneNumber: z
       .string()
-      .regex(PHONE_NUMBER_REGEX, 'Invalid phone number format'),
+      .regex(PHONE_NUMBER_REGEX, UserDomainCodes.PHONE_NUMBER_INVALID),
     password: z
       .string()
-      .min(
-        PASSWORD_MIN_LENGTH,
-        `Password must be at least ${PASSWORD_MIN_LENGTH} characters`
-      ),
+      .min(PASSWORD_MIN_LENGTH, UserDomainCodes.PASSWORD_TOO_SHORT),
     confirmPassword: z.string(),
     language: z.enum(['en', 'ru']).optional().default('ru'),
     consentGiven: z.literal(true, {
-      message: 'Consent is required',
+      message: UserDomainCodes.CONSENT_REQUIRED,
     }),
   })
   .refine(
@@ -58,7 +55,7 @@ export const RegisterUserSchema = z
     }
   )
   .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords don't match",
+    message: UserDomainCodes.PASSWORDS_MISMATCH,
     path: ['confirmPassword'],
   });
 

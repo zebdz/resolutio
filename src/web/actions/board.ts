@@ -18,6 +18,7 @@ import {
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
+import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
 
 // Action result type for client-side handling
 export type ActionResult<T = void> =
@@ -86,16 +87,9 @@ export async function createBoardAction(
     const validation = CreateBoardSchema.safeParse(input);
 
     if (!validation.success) {
-      const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err) => {
-        const path = err.path.join('.');
-
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
-        }
-
-        fieldErrors[path].push(err.message);
-      });
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
 
       return {
         success: false,

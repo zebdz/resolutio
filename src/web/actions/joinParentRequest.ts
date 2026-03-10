@@ -19,6 +19,7 @@ import {
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
+import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
 import { ActionResult } from './organization';
 
 // Initialize dependencies
@@ -99,16 +100,9 @@ export async function requestJoinParentAction(
     const validation = RequestJoinParentSchema.safeParse(input);
 
     if (!validation.success) {
-      const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err) => {
-        const path = err.path.join('.');
-
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
-        }
-
-        fieldErrors[path].push(err.message);
-      });
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
 
       return { success: false, error: t('validationFailed'), fieldErrors };
     }
@@ -208,16 +202,9 @@ export async function handleJoinParentRequestAction(
     const validation = HandleJoinParentRequestSchema.safeParse(input);
 
     if (!validation.success) {
-      const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err) => {
-        const path = err.path.join('.');
-
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
-        }
-
-        fieldErrors[path].push(err.message);
-      });
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
 
       return { success: false, error: t('validationFailed'), fieldErrors };
     }

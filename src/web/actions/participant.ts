@@ -17,6 +17,7 @@ import {
 import { getCurrentUser } from '../lib/session';
 import { User } from '@/domain/user/User';
 import { checkRateLimit } from '@/web/actions/rateLimit';
+import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
 import { z } from 'zod';
 
 // Action result type for client-side handling
@@ -157,16 +158,9 @@ export async function updateParticipantWeightAction(data: {
     const validation = UpdateWeightSchema.safeParse(data);
 
     if (!validation.success) {
-      const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err) => {
-        const path = err.path.join('.');
-
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
-        }
-
-        fieldErrors[path].push(err.message);
-      });
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
 
       return {
         success: false,

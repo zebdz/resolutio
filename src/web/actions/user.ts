@@ -14,6 +14,11 @@ import {
 } from '@/web/actions/rateLimit';
 import { Locale } from '@/src/i18n/locales';
 import { revalidatePath } from 'next/cache';
+import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
+import {
+  NICKNAME_MIN_LENGTH,
+  NICKNAME_MAX_LENGTH,
+} from '@/src/domain/user/Nickname';
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
@@ -72,16 +77,10 @@ export async function updateProfileAction(
     const validation = UpdateUserProfileSchema.safeParse(input);
 
     if (!validation.success) {
-      const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err) => {
-        const path = err.path.join('.');
-
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
-        }
-
-        fieldErrors[path].push(err.message);
-      });
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues,
+        { minLength: NICKNAME_MIN_LENGTH, maxLength: NICKNAME_MAX_LENGTH }
+      );
 
       return {
         success: false,
@@ -151,16 +150,10 @@ export async function completePrivacySetupAction(
     const validation = CompletePrivacySetupSchema.safeParse(input);
 
     if (!validation.success) {
-      const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err) => {
-        const path = err.path.join('.');
-
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
-        }
-
-        fieldErrors[path].push(err.message);
-      });
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues,
+        { minLength: NICKNAME_MIN_LENGTH, maxLength: NICKNAME_MAX_LENGTH }
+      );
 
       return {
         success: false,

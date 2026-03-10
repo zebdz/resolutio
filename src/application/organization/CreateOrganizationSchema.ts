@@ -3,22 +3,23 @@ import {
   ORGANIZATION_NAME_MAX_LENGTH,
   ORGANIZATION_DESCRIPTION_MAX_LENGTH,
 } from '../../domain/organization/Organization';
+import { OrganizationDomainCodes } from '../../domain/organization/OrganizationDomainCodes';
 
 export const CreateOrganizationSchema = z.object({
   name: z
     .string()
-    .min(1, 'Organization name is required')
+    .min(1, OrganizationDomainCodes.ORGANIZATION_NAME_EMPTY)
     .max(
       ORGANIZATION_NAME_MAX_LENGTH,
-      `Organization name cannot exceed ${ORGANIZATION_NAME_MAX_LENGTH} characters`
+      OrganizationDomainCodes.ORGANIZATION_NAME_TOO_LONG
     )
     .trim(),
   description: z
     .string()
-    .min(1, 'Organization description is required')
+    .min(1, OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_EMPTY)
     .max(
       ORGANIZATION_DESCRIPTION_MAX_LENGTH,
-      `Organization description cannot exceed ${ORGANIZATION_DESCRIPTION_MAX_LENGTH} characters`
+      OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_TOO_LONG
     )
     .trim(),
   parentId: z.string().optional().nullable(),

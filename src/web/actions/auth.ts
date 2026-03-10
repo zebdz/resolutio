@@ -7,7 +7,11 @@ import { RegisterUserUseCase } from '@/application/auth/RegisterUserUseCase';
 import { LoginUserUseCase } from '@/application/auth/LoginUserUseCase';
 import { LogoutUserUseCase } from '@/application/auth/LogoutUserUseCase';
 import { Locale, defaultLocale } from '@/src/i18n/locales';
-import { NAME_MIN_LENGTH, NAME_MAX_LENGTH } from '@/domain/user/User';
+import {
+  NAME_MIN_LENGTH,
+  NAME_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+} from '@/domain/user/User';
 import {
   prisma,
   PrismaUserRepository,
@@ -26,6 +30,7 @@ import {
 } from '../lib/session';
 import { RegisterUserSchema } from '@/application/auth/RegisterUserSchema';
 import { LoginUserSchema } from '@/application/auth/LoginUserSchema';
+import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
 import {
   UnauthorizedError,
   DuplicateError,
@@ -160,24 +165,13 @@ export async function registerAction(
     const validation = RegisterUserSchema.safeParse(input);
 
     if (!validation.success) {
-      const tDomain = await getTranslations('domain');
-      const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err) => {
-        const path = err.path.join('.');
-
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues,
+        {
+          minLength: NAME_MIN_LENGTH,
+          maxLength: NAME_MAX_LENGTH,
         }
-
-        // Translate domain codes (e.g. "domain.user.firstNameInvalid")
-        const msg = err.message.startsWith('domain.')
-          ? tDomain(err.message.replace('domain.', '') as any, {
-              minLength: NAME_MIN_LENGTH,
-              maxLength: NAME_MAX_LENGTH,
-            })
-          : err.message;
-        fieldErrors[path].push(msg);
-      });
+      );
 
       return {
         success: false,
@@ -313,16 +307,9 @@ export async function loginAction(
     const validation = LoginUserSchema.safeParse(input);
 
     if (!validation.success) {
-      const fieldErrors: Record<string, string[]> = {};
-      validation.error.issues.forEach((err) => {
-        const path = err.path.join('.');
-
-        if (!fieldErrors[path]) {
-          fieldErrors[path] = [];
-        }
-
-        fieldErrors[path].push(err.message);
-      });
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
 
       return {
         success: false,

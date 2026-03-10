@@ -934,11 +934,18 @@
     "user": {
       "userNotFound": "User not found",
       "nicknameTaken": "This nickname is already taken",
-      "nicknameInvalid": "Nickname must be 3-30 characters: letters, numbers, underscores, dots",
+      "nicknameInvalid": "Nickname must be {minLength}-{maxLength} characters: letters, numbers, underscores (not several in a row and not at the end)",
       "privacySetupRequired": "Please complete your privacy settings",
+      "firstNameRequired": "First name is required",
       "firstNameInvalid": "First name must start with an uppercase letter, contain only letters, apostrophes, or hyphens, and be {minLength}-{maxLength} characters",
+      "lastNameRequired": "Last name is required",
       "lastNameInvalid": "Last name must start with an uppercase letter, contain only letters, apostrophes, or hyphens, and be {minLength}-{maxLength} characters",
       "middleNameInvalid": "Middle name must start with an uppercase letter, contain only letters, apostrophes, or hyphens, and be {minLength}-{maxLength} characters",
+      "phoneNumberInvalid": "Invalid phone number format",
+      "passwordRequired": "Password is required",
+      "passwordTooShort": "Password must be at least {minLength} characters",
+      "consentRequired": "Consent is required",
+      "passwordsMismatch": "Passwords don't match",
       "passwordMatchesPersonalInfo": "Password must not match your name or phone number"
     }
   },
