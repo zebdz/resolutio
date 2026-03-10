@@ -91,6 +91,10 @@ vi.mock('@/infrastructure/rateLimit/superadminWhitelist', () => ({
   isSuperadminSession: mockIsSuperadminSession,
 }));
 
+vi.mock('@/infrastructure/rateLimit/superadminFallbackCheck', () => ({
+  checkSuperadminBySessionFallback: () => Promise.resolve(false),
+}));
+
 vi.mock('@/infrastructure/rateLimit/registry', () => ({
   serverActionSessionLimiter,
   serverActionIpLimiter,

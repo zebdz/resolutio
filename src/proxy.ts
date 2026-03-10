@@ -12,6 +12,7 @@ import {
   isSuperadminIp,
   isSuperadminSession,
 } from './infrastructure/rateLimit/superadminWhitelist';
+import { checkSuperadminBySessionFallback } from './infrastructure/rateLimit/superadminFallbackCheck';
 
 const intlMiddleware = createMiddleware(routing);
 
@@ -36,7 +37,7 @@ function extractLocale(request: NextRequest): string {
   return routing.defaultLocale;
 }
 
-export default function middleware(request: NextRequest) {
+export default async function middleware(request: NextRequest) {
   // Don't rate-limit or IP-block the error pages themselves
   if (
     RATE_LIMITED_PATH.test(request.nextUrl.pathname) ||
@@ -48,6 +49,11 @@ export default function middleware(request: NextRequest) {
   // Server actions: skip rate limiting — they can't handle non-RSC responses.
   // Protected by page-level rate limiting, auth checks, and client-side debounce.
   if (request.headers.has('next-action')) {
+    return intlMiddleware(request);
+  }
+
+  // Dev mode: skip general-purpose rate limiting (login/registration/phone limits still active)
+  if (process.env.NODE_ENV === 'development') {
     return intlMiddleware(request);
   }
 
@@ -95,6 +101,13 @@ export default function middleware(request: NextRequest) {
   const isSuperadminForRateLimit = sessionCookie
     ? isSuperadminSession(sessionCookie)
     : isSuperadminIp(ip);
+
+  // DB fallback: check if rate-limited session belongs to a superadmin not yet in whitelist
+  if (blocked && !isSuperadminForRateLimit && sessionCookie) {
+    if (await checkSuperadminBySessionFallback(sessionCookie, ip)) {
+      blocked = false;
+    }
+  }
 
   if (blocked && !isSuperadminForRateLimit) {
     // Browsers: redirect to error page

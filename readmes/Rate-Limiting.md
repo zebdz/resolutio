@@ -102,10 +102,12 @@ Same CGNAT reasoning as middleware. A single page load triggers 4-6 data-fetchin
 Superadmins are automatically whitelisted from all rate limiting and IP blocking. This prevents superadmins from getting 429s while managing the platform.
 
 - **How it works**: When `requireSuperadmin()` succeeds, it calls `registerSuperadminAccess(ip, userId, sessionId)` which adds IP, session (both with 1hr TTL), and userId to an in-memory whitelist
+- **Layout registration**: The superadmin layout (`src/app/[locale]/superadmin/layout.tsx`) also calls `registerSuperadminAccess()` on every page visit — ensures the whitelist stays populated even when just browsing `/superadmin/*` pages (not only on server actions)
 - **Session-based bypass (authenticated)**: Middleware and `checkRateLimit()` use `isSuperadminSession(sessionId)` for authenticated requests — prevents regular users on the same IP/network from inheriting superadmin's rate limit bypass
 - **IP-based bypass (unauthenticated)**: Falls back to `isSuperadminIp(ip)` for unauthenticated requests (theoretical)
-- **IP block bypass**: `isSuperadminIp(ip)` still used for IP block check (line 56 in proxy.ts) — correct, IP blocks target IPs
-- **TTL**: IP and session entries expire after 1 hour; re-registered on every superadmin action call
+- **IP block bypass**: `isSuperadminIp(ip)` still used for IP block check (line 66 in proxy.ts) — correct, IP blocks target IPs
+- **DB fallback**: When a request is rate-limited AND not in the in-memory whitelist, `checkSuperadminBySessionFallback()` queries the DB to check if the session belongs to a superadmin. If yes, registers in whitelist and bypasses. This covers the rare case where the whitelist has expired but the user is still a superadmin. Only triggers on the actual rate-limit path — no DB cost for normal requests.
+- **TTL**: IP and session entries expire after 1 hour; re-registered on every superadmin action call and layout visit
 - **UserIds**: Stored in a `Set` (no expiry) — used for potential future checks
 
 ### Live monitoring
@@ -115,6 +117,17 @@ The `/superadmin/rate-monitor` page shows real-time rate limit entries across al
 - Filter by key (IP/session) or limiter label
 - Progress bars per limiter showing usage ratio (green/yellow/red)
 - Unlock blocked keys directly from the monitor
+
+## Dev-mode skip
+
+In development (`NODE_ENV === 'development'`), the general-purpose rate limiters are skipped entirely:
+
+- **Middleware** (`src/proxy.ts`): Returns `intlMiddleware(request)` immediately — no IP extraction, no session/IP rate limiting
+- **Server actions** (`src/web/actions/rateLimit.ts`): `checkRateLimit()` returns `null` immediately
+
+**Still active in dev:** Login, registration, phone search, and IP blocking rate limits — these are separate functions not affected by the dev skip.
+
+This prevents HMR + multiple tabs from hitting the 60/min middleware session limit during development.
 
 ## In-memory store details
 
@@ -127,18 +140,19 @@ The `/superadmin/rate-monitor` page shows real-time rate limit entries across al
 
 ## Key files
 
-| File                                                  | Purpose                                             |
-| ----------------------------------------------------- | --------------------------------------------------- |
-| `src/infrastructure/rateLimit/InMemoryRateLimiter.ts` | Rate limiter class (sliding window)                 |
-| `src/infrastructure/rateLimit/extractIp.ts`           | IP extraction for middleware                        |
-| `src/infrastructure/rateLimit/registry.ts`            | All limiter singletons via globalThis               |
-| `src/infrastructure/rateLimit/index.ts`               | Re-exports from registry                            |
-| `src/infrastructure/rateLimit/superadminWhitelist.ts` | Superadmin IP/userId whitelist (globalThis)         |
-| `src/web/actions/rateLimit.ts`                        | Server action rate limit helper (session+IP)        |
-| `src/web/actions/superadminAuth.ts`                   | Shared requireSuperadmin() + whitelist registration |
-| `src/web/actions/rateLimitMonitor.ts`                 | Live monitor snapshot/detail actions                |
-| `src/web/lib/clientIp.ts`                             | IP extraction for Node.js (server actions)          |
-| `src/proxy.ts`                                        | Middleware integration                              |
-| `src/app/[locale]/rate-limited/page.tsx`              | Error page with countdown + retry                   |
-| `src/app/[locale]/superadmin/rate-monitor/`           | Live rate limit monitoring page                     |
-| `messages/en.json` / `messages/ru.json`               | Localized messages (`rateLimit` key)                |
+| File                                                      | Purpose                                             |
+| --------------------------------------------------------- | --------------------------------------------------- |
+| `src/infrastructure/rateLimit/InMemoryRateLimiter.ts`     | Rate limiter class (sliding window)                 |
+| `src/infrastructure/rateLimit/extractIp.ts`               | IP extraction for middleware                        |
+| `src/infrastructure/rateLimit/registry.ts`                | All limiter singletons via globalThis               |
+| `src/infrastructure/rateLimit/index.ts`                   | Re-exports from registry                            |
+| `src/infrastructure/rateLimit/superadminWhitelist.ts`     | Superadmin IP/userId whitelist (globalThis)         |
+| `src/infrastructure/rateLimit/superadminFallbackCheck.ts` | DB fallback for superadmin check when rate-limited  |
+| `src/web/actions/rateLimit.ts`                            | Server action rate limit helper (session+IP)        |
+| `src/web/actions/superadminAuth.ts`                       | Shared requireSuperadmin() + whitelist registration |
+| `src/web/actions/rateLimitMonitor.ts`                     | Live monitor snapshot/detail actions                |
+| `src/web/lib/clientIp.ts`                                 | IP extraction for Node.js (server actions)          |
+| `src/proxy.ts`                                            | Middleware integration                              |
+| `src/app/[locale]/rate-limited/page.tsx`                  | Error page with countdown + retry                   |
+| `src/app/[locale]/superadmin/rate-monitor/`               | Live rate limit monitoring page                     |
+| `messages/en.json` / `messages/ru.json`                   | Localized messages (`rateLimit` key)                |

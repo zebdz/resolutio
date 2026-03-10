@@ -25,6 +25,10 @@ vi.mock('../infrastructure/rateLimit/superadminWhitelist', () => ({
   isSuperadminSession: () => false,
 }));
 
+vi.mock('../infrastructure/rateLimit/superadminFallbackCheck', () => ({
+  checkSuperadminBySessionFallback: () => Promise.resolve(false),
+}));
+
 // Use real limiter for testing — vi.hoisted ensures it's available in vi.mock factory
 const { testSessionLimiter, testIpLimiter } = vi.hoisted(() => {
   // Inline the limiter logic to avoid import hoisting issues
@@ -126,74 +130,76 @@ describe('proxy middleware dual-key rate limiting', () => {
     testIpLimiter.clearAll();
   });
 
-  it('unauthenticated: blocks when IP exceeds limit', () => {
+  it('unauthenticated: blocks when IP exceeds limit', async () => {
     // Exhaust 3 requests (our test limiter limit)
     for (let i = 0; i < 3; i++) {
-      const res = middleware(makeRequest('/en/dashboard'));
+      const res = await middleware(makeRequest('/en/dashboard'));
       expect(res.status).not.toBe(302);
     }
 
     // 4th request should be blocked
-    const res = middleware(makeRequest('/en/dashboard'));
+    const res = await middleware(makeRequest('/en/dashboard'));
     expect(res.status).toBe(302);
     expect(res.headers.get('location')).toContain('/rate-limited');
   });
 
-  it('authenticated: blocks based on session, not IP', () => {
+  it('authenticated: blocks based on session, not IP', async () => {
     // Exhaust IP budget (3 requests from same IP but different sessions)
     for (let i = 0; i < 3; i++) {
-      middleware(
+      await middleware(
         makeRequest('/en/dashboard', { sessionCookie: `session-${i}` })
       );
     }
 
     // IP is exhausted, but a new session should still be allowed
-    const res = middleware(
+    const res = await middleware(
       makeRequest('/en/dashboard', { sessionCookie: 'session-new' })
     );
     expect(res.status).not.toBe(302);
   });
 
-  it('authenticated: blocks when session exceeds limit', () => {
+  it('authenticated: blocks when session exceeds limit', async () => {
     // Exhaust session budget
     for (let i = 0; i < 3; i++) {
-      const res = middleware(
+      const res = await middleware(
         makeRequest('/en/dashboard', { sessionCookie: 'same-session' })
       );
       expect(res.status).not.toBe(302);
     }
 
     // 4th request with same session should be blocked
-    const res = middleware(
+    const res = await middleware(
       makeRequest('/en/dashboard', { sessionCookie: 'same-session' })
     );
     expect(res.status).toBe(302);
     expect(res.headers.get('location')).toContain('/rate-limited');
   });
 
-  it('two authenticated users behind same IP get independent budgets', () => {
+  it('two authenticated users behind same IP get independent budgets', async () => {
     // User A makes 3 requests (exhausts their budget)
     for (let i = 0; i < 3; i++) {
-      middleware(makeRequest('/en/dashboard', { sessionCookie: 'user-a' }));
+      await middleware(
+        makeRequest('/en/dashboard', { sessionCookie: 'user-a' })
+      );
     }
 
     // User A is blocked
-    const resA = middleware(
+    const resA = await middleware(
       makeRequest('/en/dashboard', { sessionCookie: 'user-a' })
     );
     expect(resA.status).toBe(302);
 
     // User B (same IP) should NOT be blocked
-    const resB = middleware(
+    const resB = await middleware(
       makeRequest('/en/dashboard', { sessionCookie: 'user-b' })
     );
     expect(resB.status).not.toBe(302);
   });
 
-  it('authenticated requests do not record IP hits', () => {
+  it('authenticated requests do not record IP hits', async () => {
     // Make authenticated requests
     for (let i = 0; i < 2; i++) {
-      middleware(
+      await middleware(
         makeRequest('/en/dashboard', { sessionCookie: 'some-session' })
       );
     }
@@ -203,10 +209,10 @@ describe('proxy middleware dual-key rate limiting', () => {
     expect(ipResult.remaining).toBe(3);
   });
 
-  it('API route returns 429 JSON when session-blocked', () => {
+  it('API route returns 429 JSON when session-blocked', async () => {
     // Exhaust session budget
     for (let i = 0; i < 3; i++) {
-      middleware(
+      await middleware(
         makeRequest('/api/something', {
           sessionCookie: 'api-session',
           accept: 'application/json',
@@ -215,7 +221,7 @@ describe('proxy middleware dual-key rate limiting', () => {
     }
 
     // 4th request
-    const res = middleware(
+    const res = await middleware(
       makeRequest('/api/something', {
         sessionCookie: 'api-session',
         accept: 'application/json',

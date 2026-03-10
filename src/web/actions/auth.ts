@@ -46,6 +46,7 @@ import {
   resetLoginRateLimit,
 } from '@/web/actions/rateLimit';
 import { getClientIp } from '@/web/lib/clientIp';
+import { registerSuperadminAccess } from '@/infrastructure/rateLimit/superadminWhitelist';
 
 // Helper function to check if error is a Prisma connection error
 function isDatabaseConnectionError(error: unknown): boolean {
@@ -405,6 +406,15 @@ export async function loginAction(
       result.value.session.id,
       result.value.expiresInSeconds
     );
+
+    // Register superadmin whitelist on login (so they bypass rate limits immediately)
+    if (await userRepository.isSuperAdmin(result.value.user.id)) {
+      registerSuperadminAccess(
+        clientIp,
+        result.value.user.id,
+        result.value.session.id
+      );
+    }
 
     // Build response data
     const data: LoginActionData = {

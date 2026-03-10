@@ -16,6 +16,7 @@ import {
   isSuperadminIp,
   isSuperadminSession,
 } from '@/infrastructure/rateLimit/superadminWhitelist';
+import { checkSuperadminBySessionFallback } from '@/infrastructure/rateLimit/superadminFallbackCheck';
 
 const LOGIN_WINDOW_MS = 15 * 60_000; // 15 minutes
 const REGISTRATION_WINDOW_MS = 60 * 60_000; // 1 hour
@@ -32,6 +33,11 @@ export async function checkRateLimit(): Promise<{
   success: false;
   error: string;
 } | null> {
+  // Dev mode: skip general-purpose rate limiting (login/registration/phone limits still active)
+  if (process.env.NODE_ENV === 'development') {
+    return null;
+  }
+
   const ip = await getClientIp();
   const sessionId = await getSessionCookie();
 
@@ -43,6 +49,11 @@ export async function checkRateLimit(): Promise<{
 
     // Session-based superadmin check — IP alone is not enough (shared network)
     if (!sessionResult.allowed && !isSuperadminSession(sessionId)) {
+      // DB fallback: check if session belongs to a superadmin not yet in whitelist
+      if (await checkSuperadminBySessionFallback(sessionId, ip)) {
+        return null;
+      }
+
       const t = await getTranslations('rateLimit');
 
       return { success: false, error: t('tooManyRequests') };
