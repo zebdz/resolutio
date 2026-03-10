@@ -6,6 +6,7 @@ import { Link } from '@/src/i18n/routing';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { searchPollsAction } from '@/web/actions/poll';
 import { getUserMemberOrganizationsAction } from '@/web/actions/organization';
+import { getUserBoardsAction } from '@/web/actions/board';
 import {
   prisma,
   PrismaOrganizationRepository,
@@ -43,15 +44,28 @@ export default async function PollsPage() {
       name: o.organization.name,
     }));
   } else {
-    const orgsResult = await getUserMemberOrganizationsAction();
+    const [orgsResult, boardsResult] = await Promise.all([
+      getUserMemberOrganizationsAction(),
+      getUserBoardsAction(),
+    ]);
     const memberOrgs = orgsResult.success ? orgsResult.data : [];
+    const boards = boardsResult.success ? boardsResult.data : [];
 
-    // Merge admin orgs that aren't already in member list
+    // Merge admin orgs and board-derived orgs that aren't already in member list
     const orgMap = new Map(memberOrgs.map((o) => [o.id, o]));
 
     for (const adminOrg of adminOrgs) {
       if (!orgMap.has(adminOrg.id)) {
         orgMap.set(adminOrg.id, { id: adminOrg.id, name: adminOrg.name });
+      }
+    }
+
+    for (const board of boards) {
+      if (!orgMap.has(board.organizationId)) {
+        orgMap.set(board.organizationId, {
+          id: board.organizationId,
+          name: board.organizationName,
+        });
       }
     }
 

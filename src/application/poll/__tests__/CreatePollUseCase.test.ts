@@ -313,6 +313,7 @@ describe('CreatePollUseCase', () => {
       (board as any).props.id = 'board-1';
       boardRepository.addBoard(board);
       await boardRepository.addUserToBoard('user-1', 'board-1');
+      organizationRepository.addMember('user-1', 'org-1');
 
       const startDate = new Date('2025-01-01');
       const endDate = new Date('2025-12-31');
@@ -338,6 +339,38 @@ describe('CreatePollUseCase', () => {
         expect(result.value.startDate).toEqual(startDate);
         expect(result.value.endDate).toEqual(endDate);
         expect(result.value.isDraft()).toBe(true);
+      }
+    });
+
+    it('should allow external board member (non-org member) to create a board-scoped poll', async () => {
+      const boardResult = Board.create('Test Board', 'org-1');
+      expect(boardResult.success).toBe(true);
+      const board = boardResult.value;
+      (board as any).props.id = 'board-1';
+      boardRepository.addBoard(board);
+      await boardRepository.addUserToBoard('user-1', 'board-1');
+      // Note: user-1 is NOT added as org member
+
+      const startDate = new Date('2025-01-01');
+      const endDate = new Date('2025-12-31');
+
+      const result = await useCase.execute({
+        title: 'External Board Poll',
+        description: 'Poll by external board member',
+        organizationId: 'org-1',
+        boardId: 'board-1',
+        createdBy: 'user-1',
+        startDate,
+        endDate,
+      });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.title).toBe('External Board Poll');
+        expect(result.value.organizationId).toBe('org-1');
+        expect(result.value.boardId).toBe('board-1');
+        expect(result.value.createdBy).toBe('user-1');
       }
     });
 

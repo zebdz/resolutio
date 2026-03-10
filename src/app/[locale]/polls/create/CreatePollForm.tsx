@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Heading } from '@/app/components/catalyst/heading';
@@ -11,6 +11,7 @@ import { Field, Label } from '@/app/components/catalyst/fieldset';
 import { Select } from '@/app/components/catalyst/select';
 import { PollSidebar } from '@/web/components/PollSidebar';
 import { QuestionForm } from '@/web/components/QuestionForm';
+import { Link } from '@/src/i18n/routing';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { QuestionType } from '@/domain/poll/QuestionType';
 import { createPollAction, addQuestionAction } from '@/web/actions/poll';
@@ -60,6 +61,18 @@ export function CreatePollForm() {
   >([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Merge direct org memberships with orgs derived from board memberships
+  const allOrganizations = useMemo(() => {
+    const orgIds = new Set(organizations.map((o) => o.id));
+    const boardOrgs = boards
+      .filter((b) => !orgIds.has(b.organizationId))
+      .map((b) => ({ id: b.organizationId, name: b.organizationName }));
+    const uniqueBoardOrgs = boardOrgs.filter(
+      (org, i, arr) => arr.findIndex((o) => o.id === org.id) === i
+    );
+    return [...organizations, ...uniqueBoardOrgs];
+  }, [organizations, boards]);
+
   const [pollData, setPollData] = useState<PollData>({
     title: '',
     description: '',
@@ -87,13 +100,6 @@ export function CreatePollForm() {
 
         if (orgsResult.success) {
           setOrganizations(orgsResult.data);
-
-          if (orgsResult.data.length > 0 && !pollData.organizationId) {
-            setPollData((prev) => ({
-              ...prev,
-              organizationId: orgsResult.data[0].id,
-            }));
-          }
         } else {
           setError(orgsResult.error);
         }
@@ -110,6 +116,16 @@ export function CreatePollForm() {
 
     loadData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-select first org when allOrganizations becomes available
+  useEffect(() => {
+    if (allOrganizations.length > 0 && !pollData.organizationId) {
+      setPollData((prev) => ({
+        ...prev,
+        organizationId: allOrganizations[0].id,
+      }));
+    }
+  }, [allOrganizations]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Filter boards by selected organization
   const filteredBoards = boards.filter(
@@ -358,6 +374,36 @@ export function CreatePollForm() {
     };
   };
 
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Heading className="text-3xl font-bold">{t('createPoll')}</Heading>
+        <div className="p-12 text-center text-zinc-500 dark:text-zinc-400">
+          {t('loadingOrganizations')}
+        </div>
+      </div>
+    );
+  }
+
+  if (organizations.length === 0 && boards.length === 0) {
+    return (
+      <div className="space-y-6">
+        <Heading className="text-3xl font-bold">{t('createPoll')}</Heading>
+        <div className="rounded-lg border-2 border-dashed border-zinc-300 p-12 text-center dark:border-zinc-700">
+          <p className="text-lg text-zinc-500 dark:text-zinc-400">
+            {t('noMembership')}
+          </p>
+          <Link
+            href="/organizations"
+            className="mt-4 inline-block rounded-lg bg-brand-green px-4 py-2 text-sm font-semibold text-white hover:bg-brand-green/90"
+          >
+            {t('browseOrganizations')}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -398,17 +444,17 @@ export function CreatePollForm() {
                 boardId: '',
               })
             }
-            disabled={isLoading || organizations.length === 0}
+            disabled={isLoading || allOrganizations.length === 0}
             required
           >
             {isLoading ? (
               <option value="">{t('loadingOrganizations')}</option>
-            ) : organizations.length === 0 ? (
+            ) : allOrganizations.length === 0 ? (
               <option value="">{t('noOrganizationsAvailable')}</option>
             ) : (
               <>
                 <option value="">{t('selectAnOrganization')}</option>
-                {organizations.map((org) => (
+                {allOrganizations.map((org) => (
                   <option key={org.id} value={org.id}>
                     {org.name}
                   </option>

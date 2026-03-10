@@ -23,6 +23,7 @@
     "prisma:generate": "prisma generate",
     "prisma:db:push": "prisma db push",
     "db:seed": "npx tsx prisma/seed.ts",
+    "db:seed:external-board-member": "npx tsx prisma/seed-external-board-member.ts",
     "db:status": "npx prisma migrate status",
     "db:migrate": "npx prisma migrate deploy"
   },

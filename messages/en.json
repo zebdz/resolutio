@@ -541,6 +541,8 @@
     "selectAnOrganization": "Select an organization",
     "loadingOrganizations": "Loading organizations...",
     "noOrganizationsAvailable": "No organizations available",
+    "noMembership": "You are not a member of any organization or board yet. To create a poll, you need to first join an organization.",
+    "browseOrganizations": "Browse Organizations",
     "orgWidePoll": "Organization-wide poll (no specific board)",
     "selectQuestionToEdit": "Select a question from the sidebar to edit",
     "selectBoard": "Select Board (optional)",
