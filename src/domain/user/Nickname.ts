@@ -1,44 +1,39 @@
 import { randomBytes } from 'crypto';
+import { UserDomainCodes } from './UserDomainCodes';
 
 export const NICKNAME_MIN_LENGTH = 5;
-export const NICKNAME_MAX_LENGTH = 20;
+export const NICKNAME_MAX_LENGTH = 30;
 
 export class Nickname {
   private constructor(private readonly value: string) {}
 
   static create(nickname: string): Nickname {
     if (!nickname || nickname.length < NICKNAME_MIN_LENGTH) {
-      throw new Error(
-        `Nickname must be at least ${NICKNAME_MIN_LENGTH} characters`
-      );
+      throw new Error(UserDomainCodes.NICKNAME_INVALID);
     }
 
     if (nickname.length > NICKNAME_MAX_LENGTH) {
-      throw new Error(
-        `Nickname must be at most ${NICKNAME_MAX_LENGTH} characters`
-      );
+      throw new Error(UserDomainCodes.NICKNAME_INVALID);
     }
 
     // Must start with a letter
     if (!/^[a-zA-Z]/.test(nickname)) {
-      throw new Error('Nickname must start with a letter');
+      throw new Error(UserDomainCodes.NICKNAME_INVALID);
     }
 
     // Must not end with underscore
     if (nickname.endsWith('_')) {
-      throw new Error('Nickname cannot end with an underscore');
+      throw new Error(UserDomainCodes.NICKNAME_INVALID);
     }
 
     // Only alphanumeric and underscores
     if (!/^[a-zA-Z0-9_]+$/.test(nickname)) {
-      throw new Error(
-        'Nickname can only contain letters, numbers, and underscores'
-      );
+      throw new Error(UserDomainCodes.NICKNAME_INVALID);
     }
 
     // No consecutive underscores
     if (/_{2,}/.test(nickname)) {
-      throw new Error('Nickname cannot have consecutive underscores');
+      throw new Error(UserDomainCodes.NICKNAME_INVALID);
     }
 
     return new Nickname(nickname);

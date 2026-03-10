@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Nickname } from '../Nickname';
+import { UserDomainCodes } from '../UserDomainCodes';
 
 describe('Nickname', () => {
   describe('create', () => {
@@ -40,7 +41,7 @@ describe('Nickname', () => {
     });
 
     it('should throw for nickname longer than max length', () => {
-      expect(() => Nickname.create('a'.repeat(21))).toThrow();
+      expect(() => Nickname.create('a'.repeat(31))).toThrow();
     });
 
     it('should throw for consecutive underscores', () => {
@@ -55,6 +56,24 @@ describe('Nickname', () => {
 
     it('should throw for empty string', () => {
       expect(() => Nickname.create('')).toThrow();
+    });
+
+    it('should throw domain code, not hardcoded English', () => {
+      const cases = [
+        '', // empty
+        'ab', // too short
+        'a'.repeat(31), // too long
+        '1user', // starts with digit
+        'john_', // ends with underscore
+        'john__doe', // consecutive underscores
+        'john@doe', // special chars
+      ];
+
+      for (const input of cases) {
+        expect(() => Nickname.create(input)).toThrow(
+          UserDomainCodes.NICKNAME_INVALID
+        );
+      }
     });
   });
 

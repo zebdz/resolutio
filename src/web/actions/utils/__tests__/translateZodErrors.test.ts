@@ -42,7 +42,7 @@ describe('Schema domain codes — user schemas', () => {
   it('UpdateUserProfileSchema: nickname too long → domain code', () => {
     const result = UpdateUserProfileSchema.safeParse({
       userId: 'test',
-      nickname: 'a'.repeat(21),
+      nickname: 'a'.repeat(31),
     });
     expect(result.success).toBe(false);
 

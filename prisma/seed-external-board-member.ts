@@ -38,7 +38,9 @@ async function main() {
 
   if (existing) {
     await prisma.boardUser.deleteMany({ where: { userId: existing.id } });
-    await prisma.organizationUser.deleteMany({ where: { userId: existing.id } });
+    await prisma.organizationUser.deleteMany({
+      where: { userId: existing.id },
+    });
     await prisma.session.deleteMany({ where: { userId: existing.id } });
     await prisma.user.delete({ where: { id: existing.id } });
     console.log('Deleted existing external board member');
@@ -74,16 +76,21 @@ async function main() {
     console.error(
       'No boards found. Run the main seeder first: npx tsx prisma/seed.ts'
     );
+
     return;
   }
 
   // Pick boards from distinct organizations (up to 3)
   const seenOrgIds = new Set<string>();
-  const selectedBoards = boards.filter((b) => {
-    if (seenOrgIds.has(b.organizationId)) return false;
-    seenOrgIds.add(b.organizationId);
-    return true;
-  }).slice(0, 3);
+  const selectedBoards = boards
+    .filter((b) => {
+      if (seenOrgIds.has(b.organizationId)) {return false;}
+
+      seenOrgIds.add(b.organizationId);
+
+      return true;
+    })
+    .slice(0, 3);
 
   // Add user to these boards WITHOUT adding to orgs
   for (const board of selectedBoards) {

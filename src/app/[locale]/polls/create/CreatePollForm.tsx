@@ -70,6 +70,7 @@ export function CreatePollForm() {
     const uniqueBoardOrgs = boardOrgs.filter(
       (org, i, arr) => arr.findIndex((o) => o.id === org.id) === i
     );
+
     return [...organizations, ...uniqueBoardOrgs];
   }, [organizations, boards]);
 
