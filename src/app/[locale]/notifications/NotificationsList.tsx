@@ -406,13 +406,17 @@ export function NotificationsList({
                         notification.data
                       );
 
-                      if (!action) {return null;}
+                      if (!action) {
+                        return null;
+                      }
 
                       return (
                         <Link
                           href={action.href}
                           onClick={() => {
-                            if (isUnread) {handleMarkAsRead(notification.id);}
+                            if (isUnread) {
+                              handleMarkAsRead(notification.id);
+                            }
                           }}
                           className="mt-1.5 inline-flex items-center gap-0.5 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                         >

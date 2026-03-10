@@ -162,7 +162,9 @@ export async function searchBlockedIpsAction(input: {
   }
 
   if (input.query.length < 3) {
-    return { success: false, error: 'Query must be at least 3 characters' };
+    const tIP = await getTranslations('superadmin.blockedIps');
+
+    return { success: false, error: tIP('searchMinChars') };
   }
 
   const results = await ipBlockRepo.searchBlockedIps(input.query);

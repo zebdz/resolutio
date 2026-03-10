@@ -416,7 +416,9 @@ export async function searchUsersForAdminAction(input: {
   }
 
   if (input.query.length < 3) {
-    return { success: false, error: 'Query must be at least 3 characters' };
+    const tUsers = await getTranslations('superadmin.users');
+
+    return { success: false, error: tUsers('searchMinChars') };
   }
 
   // Search by name/nickname/phone

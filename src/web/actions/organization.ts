@@ -491,7 +491,7 @@ export async function joinOrganizationAction(
     ) {
       return {
         success: false,
-        error: 'You have already requested to join this organization',
+        error: tOrg('errors.pendingRequest'),
       };
     }
 

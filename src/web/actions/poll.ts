@@ -507,9 +507,11 @@ export async function getPollsByBoardIdAction(
       const isMember = await boardRepository.isUserMember(user.id, boardId);
 
       if (!isMember) {
+        const tBoard = await getTranslations('board.errors');
+
         return {
           success: false,
-          error: 'User is not a member of this board',
+          error: tBoard('notMember'),
         };
       }
     }
@@ -736,9 +738,11 @@ export async function canEditPollAction(
     const poll = pollResult.value;
 
     if (!poll) {
+      const tPoll = await getTranslations('poll.errors');
+
       return {
         success: false,
-        error: 'Poll not found',
+        error: tPoll('pollNotFound'),
       };
     }
 

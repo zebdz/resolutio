@@ -311,7 +311,7 @@ export async function getPollResultsAction(
  */
 export async function canUserVoteAction(
   pollId: string
-): Promise<ActionResult<{ canVote: boolean; reason?: string }>> {
+): Promise<ActionResult<{ canVote: boolean; reasonCode?: string }>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -344,9 +344,11 @@ export async function canUserVoteAction(
     const poll = pollResult.value;
 
     if (!poll) {
+      const tPoll = await getTranslations('poll.errors');
+
       return {
         success: false,
-        error: 'poll.errors.pollNotFound',
+        error: tPoll('pollNotFound'),
       };
     }
 
@@ -356,7 +358,7 @@ export async function canUserVoteAction(
         success: true,
         data: {
           canVote: false,
-          reason: 'Poll is not active',
+          reasonCode: 'pollNotActive',
         },
       };
     }
@@ -366,7 +368,7 @@ export async function canUserVoteAction(
         success: true,
         data: {
           canVote: false,
-          reason: 'Poll has finished',
+          reasonCode: 'pollFinished',
         },
       };
     }
@@ -387,7 +389,7 @@ export async function canUserVoteAction(
         success: true,
         data: {
           canVote: false,
-          reason: 'User is not a participant in this poll',
+          reasonCode: 'cannotVote',
         },
       };
     }
@@ -410,7 +412,7 @@ export async function canUserVoteAction(
         success: true,
         data: {
           canVote: false,
-          reason: 'User has already finished voting',
+          reasonCode: 'alreadyVoted',
         },
       };
     }

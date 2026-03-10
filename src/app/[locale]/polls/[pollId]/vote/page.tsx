@@ -20,6 +20,7 @@ interface VotePageProps {
 export default async function VotePage({ params }: VotePageProps) {
   const { pollId } = await params;
   const commonT = await getTranslations('common');
+  const votingT = await getTranslations('poll.voting');
 
   // Check if user can vote
   const canVoteResult = await canUserVoteAction(pollId);
@@ -49,7 +50,7 @@ export default async function VotePage({ params }: VotePageProps) {
       <AuthenticatedLayout>
         <div className="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20">
           <p className="text-sm text-yellow-800 dark:text-yellow-200">
-            {canVoteResult.data.reason}
+            {votingT(canVoteResult.data.reasonCode as any)}
           </p>
         </div>
         <div className="mt-4">

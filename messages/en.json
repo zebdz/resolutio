@@ -655,6 +655,7 @@
       "cannotVote": "You are not eligible to vote on this poll",
       "alreadyVoted": "You have already completed this poll",
       "pollNotActive": "This poll is not currently active",
+      "pollFinished": "This poll has ended",
       "pollNotFound": "Poll not found",
       "willingToSignProtocolTitle": "Willing to sign the final protocol",
       "willingToSignProtocolDescription": "By enabling this, you confirm willingness to sign the final protocol of this vote"
@@ -1067,6 +1068,7 @@
       "resetSelected": "Reset Selected ({count})",
       "searchPlaceholder": "Search by key (IP, user, org, phone...)",
       "searchMinChars": "Type at least 3 characters",
+      "invalidLimiterLabel": "Invalid limiter label",
       "noEntries": "No entries",
       "noResults": "No matching entries",
       "entryCount": "{count} entries",

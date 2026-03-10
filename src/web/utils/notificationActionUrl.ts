@@ -62,13 +62,19 @@ export function getNotificationActionUrl(
 ): ActionResult {
   const config = TYPE_CONFIG[type];
 
-  if (!config) {return null;}
+  if (!config) {
+    return null;
+  }
 
-  if (!data) {return null;}
+  if (!data) {
+    return null;
+  }
 
   const id = data[config.dataKey];
 
-  if (typeof id !== 'string') {return null;}
+  if (typeof id !== 'string') {
+    return null;
+  }
 
   return { href: config.url(id), actionKey: config.actionKey };
 }

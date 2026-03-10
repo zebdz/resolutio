@@ -1,5 +1,6 @@
 'use server';
 
+import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/infrastructure/index';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import {
@@ -101,10 +102,11 @@ export async function resetLimiterAction(input: {
     return auth;
   }
 
+  const tRL = await getTranslations('superadmin.rateLimits');
   const entry = getLimiterByLabel(input.label);
 
   if (!entry) {
-    return { success: false, error: 'Invalid limiter label' };
+    return { success: false, error: tRL('invalidLimiterLabel') };
   }
 
   entry.limiter.clearAll();
@@ -131,10 +133,11 @@ export async function clearBlockedKeysAction(input: {
     return auth;
   }
 
+  const tRL = await getTranslations('superadmin.rateLimits');
   const entry = getLimiterByLabel(input.label);
 
   if (!entry) {
-    return { success: false, error: 'Invalid limiter label' };
+    return { success: false, error: tRL('invalidLimiterLabel') };
   }
 
   const blockedKeys = entry.limiter.getBlockedKeys();
@@ -163,14 +166,16 @@ export async function searchRateLimitEntriesAction(input: {
     return auth;
   }
 
+  const tRL = await getTranslations('superadmin.rateLimits');
+
   if (input.query.length < 3) {
-    return { success: false, error: 'Query must be at least 3 characters' };
+    return { success: false, error: tRL('searchMinChars') };
   }
 
   const entry = getLimiterByLabel(input.label);
 
   if (!entry) {
-    return { success: false, error: 'Invalid limiter label' };
+    return { success: false, error: tRL('invalidLimiterLabel') };
   }
 
   // Raw key search
@@ -294,10 +299,11 @@ export async function resetRateLimitKeysAction(input: {
     return auth;
   }
 
+  const tRL = await getTranslations('superadmin.rateLimits');
   const entry = getLimiterByLabel(input.label);
 
   if (!entry) {
-    return { success: false, error: 'Invalid limiter label' };
+    return { success: false, error: tRL('invalidLimiterLabel') };
   }
 
   entry.limiter.resetKeys(input.keys);
@@ -325,10 +331,11 @@ export async function lockRateLimitKeyAction(input: {
     return auth;
   }
 
+  const tRL = await getTranslations('superadmin.rateLimits');
   const entry = getLimiterByLabel(input.label);
 
   if (!entry) {
-    return { success: false, error: 'Invalid limiter label' };
+    return { success: false, error: tRL('invalidLimiterLabel') };
   }
 
   entry.limiter.lockKey(input.key);
@@ -356,10 +363,11 @@ export async function unlockRateLimitKeyAction(input: {
     return auth;
   }
 
+  const tRL = await getTranslations('superadmin.rateLimits');
   const entry = getLimiterByLabel(input.label);
 
   if (!entry) {
-    return { success: false, error: 'Invalid limiter label' };
+    return { success: false, error: tRL('invalidLimiterLabel') };
   }
 
   entry.limiter.resetKeys([input.key]);
