@@ -6,6 +6,7 @@ import { Result, success, failure } from '../../domain/shared/Result';
 import { HandleJoinParentRequestInput } from './HandleJoinParentRequestSchema';
 import { OrganizationErrors } from './OrganizationErrors';
 import { NotifyOrgJoinedParentUseCase } from '../notification/NotifyOrgJoinedParentUseCase';
+import { NotifyJoinParentRequestRejectedUseCase } from '../notification/NotifyJoinParentRequestRejectedUseCase';
 
 export interface HandleJoinParentRequestDependencies {
   organizationRepository: OrganizationRepository;
@@ -89,6 +90,17 @@ export class HandleJoinParentRequestUseCase {
       // 5b. Reject the request
       request.reject(adminUserId, rejectionReason);
       await this.deps.joinParentRequestRepository.update(request);
+
+      // 6b. Notify child org admins + members
+      const notifyRejectedUseCase = new NotifyJoinParentRequestRejectedUseCase({
+        organizationRepository: this.deps.organizationRepository,
+        notificationRepository: this.deps.notificationRepository,
+      });
+      await notifyRejectedUseCase.execute({
+        childOrgId: request.childOrgId,
+        parentOrgId: request.parentOrgId,
+        rejectionReason: rejectionReason!,
+      });
     }
 
     return success(undefined);

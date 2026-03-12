@@ -9,10 +9,13 @@ import { Field, Label } from '@/app/components/catalyst/fieldset';
 import { Input } from '@/app/components/catalyst/input';
 import { AlertBanner } from '@/app/components/catalyst/alert-banner';
 import {
-  addOrgAdminAction,
   removeOrgAdminAction,
   searchUsersForOrgAdminAction,
 } from '@/web/actions/organization';
+import {
+  createAdminInviteAction,
+  revokeInviteAction,
+} from '@/web/actions/invitation';
 import { User } from '@/domain/user/User';
 import { searchUserByPhoneAction } from '@/web/actions/user';
 import { PhoneInput } from '@/web/components/phone';
@@ -26,16 +29,35 @@ type Admin = {
 
 type SearchResult = Admin & { nickname: string };
 
+type PendingInvite = {
+  id: string;
+  inviteeId: string;
+  inviterId: string;
+  createdAt: Date;
+};
+
+type InviteeUser = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  middleName: string | null;
+  nickname: string;
+};
+
 type Props = {
   organizationId: string;
   admins: Admin[];
   currentUserId: string;
+  pendingInvites?: PendingInvite[];
+  inviteeUsers?: InviteeUser[];
 };
 
 export function AdminManagementSection({
   organizationId,
   admins: initialAdmins,
   currentUserId,
+  pendingInvites: initialPendingInvites = [],
+  inviteeUsers = [],
 }: Props) {
   const t = useTranslations('organization.modify');
   const router = useRouter();
@@ -59,7 +81,16 @@ export function AdminManagementSection({
     string | null
   >(null);
 
-  const [addingId, setAddingId] = useState<string | null>(null);
+  const [invitingId, setInvitingId] = useState<string | null>(null);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>(
+    initialPendingInvites
+  );
+
+  // Sync local state when server re-renders with new props (after router.refresh)
+  useEffect(() => {
+    setPendingInvites(initialPendingInvites);
+  }, [initialPendingInvites]);
 
   // Debounced member search
   const performMemberSearch = useCallback(
@@ -139,11 +170,11 @@ export function AdminManagementSection({
     return () => clearTimeout(timer);
   }, [nonMemberQuery, performNonMemberSearch]);
 
-  const handleAddAdmin = async (userId: string) => {
-    setAddingId(userId);
+  const handleInviteAdmin = async (userId: string) => {
+    setInvitingId(userId);
     setError(null);
 
-    const result = await addOrgAdminAction(organizationId, userId);
+    const result = await createAdminInviteAction(organizationId, userId);
 
     if (result.success) {
       setMemberQuery('');
@@ -155,7 +186,23 @@ export function AdminManagementSection({
       setError(result.error);
     }
 
-    setAddingId(null);
+    setInvitingId(null);
+  };
+
+  const handleRevokeInvite = async (inviteId: string) => {
+    setRevokingId(inviteId);
+    setError(null);
+
+    const result = await revokeInviteAction(inviteId);
+
+    if (result.success) {
+      setPendingInvites((prev) => prev.filter((inv) => inv.id !== inviteId));
+      router.refresh();
+    } else {
+      setError(result.error);
+    }
+
+    setRevokingId(null);
   };
 
   const handleRemoveAdmin = async (userId: string) => {
@@ -237,33 +284,79 @@ export function AdminManagementSection({
         )}
       </div>
 
-      {/* Add from members */}
+      {/* Invite from members */}
       <SearchSection
-        title={t('addAdminFromMembers')}
+        title={t('inviteAdminFromMembers')}
         query={memberQuery}
         onQueryChange={setMemberQuery}
         results={memberResults}
         isSearching={isMemberSearching}
         searchError={memberSearchError}
-        addingId={addingId}
-        onAdd={handleAddAdmin}
+        invitingId={invitingId}
+        onInvite={handleInviteAdmin}
         showPhoneSearch={false}
         t={t}
       />
 
-      {/* Add from non-members */}
+      {/* Invite from non-members */}
       <SearchSection
-        title={t('addAdminFromNonMembers')}
+        title={t('inviteAdminFromNonMembers')}
         query={nonMemberQuery}
         onQueryChange={setNonMemberQuery}
         results={nonMemberResults}
         isSearching={isNonMemberSearching}
         searchError={nonMemberSearchError}
-        addingId={addingId}
-        onAdd={handleAddAdmin}
+        invitingId={invitingId}
+        onInvite={handleInviteAdmin}
         showPhoneSearch={true}
         t={t}
       />
+
+      {/* Pending Invitations */}
+      <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
+        <h3 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          {t('pendingInvites')}
+        </h3>
+        {pendingInvites.length === 0 ? (
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            {t('noInvites')}
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {pendingInvites.map((invite) => {
+              const invitee = inviteeUsers.find(
+                (u) => u.id === invite.inviteeId
+              );
+              const displayName = invitee
+                ? `${User.formatFullName(invitee.firstName, invitee.lastName, invitee.middleName)} (@${invitee.nickname})`
+                : invite.inviteeId;
+
+              return (
+                <div
+                  key={invite.id}
+                  className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-700 dark:bg-zinc-800"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-zinc-900 dark:text-zinc-100">
+                      {displayName}
+                    </p>
+                  </div>
+                  <Button
+                    className="w-full sm:w-auto"
+                    color="red"
+                    onClick={() => handleRevokeInvite(invite.id)}
+                    disabled={revokingId !== null}
+                  >
+                    {revokingId === invite.id
+                      ? t('revoking')
+                      : t('revokeInvite')}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -275,8 +368,8 @@ function SearchSection({
   results,
   isSearching,
   searchError,
-  addingId,
-  onAdd,
+  invitingId,
+  onInvite,
   showPhoneSearch,
   t,
 }: {
@@ -286,8 +379,8 @@ function SearchSection({
   results: SearchResult[];
   isSearching: boolean;
   searchError: string | null;
-  addingId: string | null;
-  onAdd: (userId: string) => void;
+  invitingId: string | null;
+  onInvite: (userId: string) => void;
   showPhoneSearch: boolean;
   t: ReturnType<typeof useTranslations>;
 }) {
@@ -343,7 +436,7 @@ function SearchSection({
           value={query}
           onChange={(e) => onQueryChange(e.target.value)}
           placeholder={t('searchPlaceholder')}
-          disabled={addingId !== null}
+          disabled={invitingId !== null}
         />
       </Field>
 
@@ -384,10 +477,10 @@ function SearchSection({
               <Button
                 className="w-full sm:w-auto"
                 color="brand-green"
-                onClick={() => onAdd(user.id)}
-                disabled={addingId !== null}
+                onClick={() => onInvite(user.id)}
+                disabled={invitingId !== null}
               >
-                {addingId === user.id ? t('adding') : t('addAdmin')}
+                {invitingId === user.id ? t('inviting') : t('inviteAdmin')}
               </Button>
             </div>
           ))}
@@ -410,7 +503,7 @@ function SearchSection({
                     setPhoneResult(null);
                     setPhoneSearchError(null);
                   }}
-                  disabled={addingId !== null || isPhoneSearching}
+                  disabled={invitingId !== null || isPhoneSearching}
                 />
               </div>
               <Button
@@ -418,7 +511,9 @@ function SearchSection({
                 color="zinc"
                 onClick={handlePhoneSearch}
                 disabled={
-                  addingId !== null || isPhoneSearching || phoneQuery.length < 5
+                  invitingId !== null ||
+                  isPhoneSearching ||
+                  phoneQuery.length < 5
                 }
               >
                 {isPhoneSearching
@@ -451,10 +546,12 @@ function SearchSection({
                 <Button
                   className="w-full sm:w-auto"
                   color="brand-green"
-                  onClick={() => onAdd(phoneResult.id)}
-                  disabled={addingId !== null}
+                  onClick={() => onInvite(phoneResult.id)}
+                  disabled={invitingId !== null}
                 >
-                  {addingId === phoneResult.id ? t('adding') : t('addAdmin')}
+                  {invitingId === phoneResult.id
+                    ? t('inviting')
+                    : t('inviteAdmin')}
                 </Button>
               </div>
             </div>

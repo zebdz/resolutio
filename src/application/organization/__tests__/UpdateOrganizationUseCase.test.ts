@@ -95,6 +95,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   async setParentId(): Promise<void> {}
   async addAdmin(): Promise<void> {}
   async removeAdmin(): Promise<void> {}
+  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+    return [];
+  }
 
   // Test helpers
   addOrganization(org: Organization): void {

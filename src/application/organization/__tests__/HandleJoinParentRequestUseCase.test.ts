@@ -126,6 +126,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   getParentUpdates() {
     return this.parentUpdates;
   }
+  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+    return [];
+  }
 }
 
 // Mock JoinParentRequestRepository

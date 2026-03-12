@@ -118,6 +118,8 @@
     "member": "Member",
     "joinedAt": "Joined",
     "logout": "Logout",
+    "pendingInvitations": "Invitations",
+    "pendingInvitationsCount": "You have {count} pending {count, plural, =1 {invitation} other {invitations}}",
     "archivedBadge": "Archived",
     "joinRequest": {
       "requested": "Requested",
@@ -270,6 +272,7 @@
       "firstAdmin": "First Administrator",
       "joinOrganization": "Request to Join",
       "joining": "Requesting...",
+      "joinRequestSent": "Your request to join has been sent. You will be notified when it is reviewed.",
       "boards": "Boards",
       "boardMemberCount": "{count, plural, =0 {No members} =1 {1 member} other {# members}}",
       "boardMember": "Member",
@@ -297,7 +300,14 @@
       "expandHierarchy": "Expand",
       "memberCount": "{count, plural, =0 {No members} =1 {1 member} other {# members}}",
       "youAreMember": "Member",
-      "modifyButton": "Manage"
+      "modifyButton": "Manage",
+      "members": "Members",
+      "manageMembers": "Manage Members",
+      "searchMembers": "Search members...",
+      "showingMembers": "Showing {from}–{to} of {total}",
+      "previousPage": "Previous",
+      "nextPage": "Next",
+      "noMembersFound": "No members found"
     },
     "modify": {
       "title": "Modify Organization",
@@ -311,8 +321,8 @@
       "saving": "Saving...",
       "updateSuccess": "Organization updated successfully",
       "adminSection": "Administrators",
-      "addAdminFromMembers": "Add from members",
-      "addAdminFromNonMembers": "Add from non-members",
+      "inviteAdminFromMembers": "Invite from members",
+      "inviteAdminFromNonMembers": "Invite from non-members",
       "searchPlaceholder": "Search by name or nickname",
       "searchMinChars": "Enter at least 2 characters to search",
       "noResults": "No results found",
@@ -328,7 +338,14 @@
       "removeAdminConfirm": "Are you sure you want to remove {name} as administrator?",
       "confirmRemove": "Remove Admin",
       "cancel": "Cancel",
-      "lastAdminWarning": "Cannot remove the last admin"
+      "lastAdminWarning": "Cannot remove the last admin",
+      "inviteAdmin": "Invite",
+      "inviting": "Inviting...",
+      "invited": "Invited",
+      "pendingInvites": "Pending Invitations",
+      "revokeInvite": "Revoke",
+      "revoking": "Revoking...",
+      "noInvites": "No pending invitations"
     },
     "pendingRequestsPage": {
       "title": "Pending Join Requests",
@@ -354,6 +371,9 @@
       "subtitle": "Send a request for {organization} to join a parent organization",
       "selectParent": "Select Parent Organization",
       "selectParentPlaceholder": "Choose an organization...",
+      "typeToSearch": "Type to search organizations...",
+      "noResultsFound": "No organizations found",
+      "searchingOrgs": "Searching...",
       "message": "Message",
       "messagePlaceholder": "Explain why your organization wants to join this parent...",
       "submit": "Send Request",
@@ -425,7 +445,7 @@
         "subtitle": "Add and remove members for board: {board}",
         "members": "Board Members",
         "addMember": "Add Member",
-        "addOutsideMember": "Add an Outside Member",
+        "inviteOutsideMember": "Invite an Outside Member",
         "searchPlaceholder": "Search users by name or nickname...",
         "noMembers": "No members yet",
         "noResults": "No users found",
@@ -452,7 +472,15 @@
         "add": "Add",
         "adding": "Adding...",
         "addSuccess": "Member added successfully",
-        "removeSuccess": "Member removed successfully"
+        "removeSuccess": "Member removed successfully",
+        "invite": "Invite",
+        "inviteMember": "Invite Member",
+        "inviting": "Inviting...",
+        "invited": "Invited",
+        "pendingInvites": "Pending Invitations",
+        "revokeInvite": "Revoke",
+        "revoking": "Revoking...",
+        "noInvites": "No pending invitations"
       },
       "create": {
         "title": "Create Board",
@@ -803,6 +831,11 @@
         "title": "New join parent request",
         "body": "{childOrgName} wants to join {parentOrgName}"
       },
+      "joinParentRequestRejected": {
+        "title": "Join parent request rejected",
+        "body": "{parentOrgName} rejected {childOrgName}'s request to join",
+        "bodyWithReason": "{parentOrgName} rejected {childOrgName}'s request to join: {rejectionReason}"
+      },
       "joinRequestReceived": {
         "title": "New join request",
         "body": "{requesterName} wants to join {organizationName}"
@@ -827,6 +860,46 @@
       "autoJoinFailed": {
         "title": "Auto-join failed",
         "body": "Please try to manually join the organization \"{organizationName}\""
+      },
+      "adminInviteReceived": {
+        "title": "Admin invitation",
+        "body": "{inviterName} invites you to become an admin of {organizationName}"
+      },
+      "boardMemberInviteReceived": {
+        "title": "Board member invitation",
+        "body": "{inviterName} invites you to join the board \"{boardName}\" in {organizationName}"
+      },
+      "memberInviteReceived": {
+        "title": "Organization membership invitation",
+        "body": "{inviterName} invites you to join {organizationName}"
+      },
+      "adminInviteAccepted": {
+        "title": "Admin invitation accepted",
+        "body": "{inviteeName} accepted the admin invitation for {organizationName}"
+      },
+      "boardMemberInviteAccepted": {
+        "title": "Board member invitation accepted",
+        "body": "{inviteeName} accepted the invitation to join the board \"{boardName}\" in {organizationName}"
+      },
+      "memberInviteAccepted": {
+        "title": "Membership invitation accepted",
+        "body": "{inviteeName} accepted the invitation to join {organizationName}"
+      },
+      "inviteRevoked": {
+        "title": "Invitation revoked",
+        "body": "Your invitation to {organizationName} has been revoked"
+      },
+      "adminRemoved": {
+        "title": "Removed from administrators",
+        "body": "{actorName} removed you from administrators of {organizationName}"
+      },
+      "boardMemberRemoved": {
+        "title": "Removed from board",
+        "body": "{actorName} removed you from the board \"{boardName}\" in {organizationName}"
+      },
+      "inviteDeclined": {
+        "title": "Invitation declined",
+        "body": "{inviteeName} declined the invitation to {organizationName}"
       }
     },
     "page": {
@@ -851,7 +924,9 @@
         "viewOrganization": "View organization",
         "viewParentRequests": "View parent requests",
         "voteNow": "Vote now",
-        "viewResults": "View results"
+        "viewResults": "View results",
+        "respondToInvite": "Respond to invitation",
+        "viewBoard": "View board"
       }
     }
   },
@@ -879,6 +954,9 @@
       "messageTooLong": "Message cannot exceed 2000 characters",
       "notPending": "Join parent request is not pending",
       "rejectionReasonRequired": "Rejection reason is required"
+    },
+    "invitation": {
+      "notPending": "Invitation is no longer pending"
     },
     "board": {
       "boardNameEmpty": "Board name cannot be empty",
@@ -1256,5 +1334,65 @@
     "tooManyPhoneSearches": "Too many phone search attempts. Please wait and try again.",
     "tooManyLoginAttempts": "Too many failed login attempts. Please wait {minutes} minutes and try again.",
     "tooManyRegistrations": "Too many registration attempts. Please wait {minutes} minutes and try again."
+  },
+  "invitation": {
+    "errors": {
+      "notFound": "Invitation not found",
+      "notPending": "Invitation is no longer pending",
+      "alreadyInvited": "User has already been invited",
+      "inviteeAlreadyAdmin": "User is already an admin",
+      "inviteeAlreadyBoardMember": "User is already a board member",
+      "inviteeAlreadyMember": "User is already a member",
+      "inviteeInHierarchy": "User is already a member of an organization in this hierarchy",
+      "notInvitee": "You are not the invitee",
+      "notAdmin": "You do not have permission to perform this action",
+      "orgNotFound": "Organization not found",
+      "orgArchived": "Organization is archived",
+      "boardNotFound": "Board not found",
+      "boardArchived": "Board is archived",
+      "userNotFound": "User not found"
+    },
+    "page": {
+      "title": "Invitation",
+      "adminInvite": "Admin Invitation",
+      "boardMemberInvite": "Board Member Invitation",
+      "memberInvite": "Membership Invitation",
+      "from": "From",
+      "organization": "Organization",
+      "board": "Board",
+      "sentAt": "Sent",
+      "accept": "Accept",
+      "decline": "Decline",
+      "accepting": "Accepting...",
+      "declining": "Declining...",
+      "accepted": "Invitation accepted",
+      "declined": "Invitation declined",
+      "alreadyHandled": "This invitation has already been {status}",
+      "statusAccepted": "accepted",
+      "statusDeclined": "declined",
+      "statusRevoked": "revoked"
+    },
+    "listTitle": "Pending Invitations",
+    "noInvitations": "No pending invitations"
+  },
+  "manageMembers": {
+    "title": "Manage Members",
+    "back": "Back to organization",
+    "inviteMember": "Invite Member",
+    "searchPlaceholder": "Search by name or nickname",
+    "searchMinChars": "Enter at least 2 characters to search",
+    "noResults": "No results found",
+    "phoneSearchLabel": "Find by phone number",
+    "phoneSearchPlaceholder": "Enter phone number",
+    "phoneSearchButton": "Find",
+    "phoneSearchNotFound": "No user found with this phone number",
+    "phoneSearchSearching": "Searching...",
+    "invite": "Invite",
+    "inviting": "Inviting...",
+    "invited": "Invited",
+    "pendingInvites": "Pending Invitations",
+    "revokeInvite": "Revoke",
+    "revoking": "Revoking...",
+    "noInvites": "No pending invitations"
   }
 }

@@ -1,5 +1,6 @@
 import { PrismaClient } from '@/generated/prisma/client';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { OrganizationMembershipService } from '../../domain/organization/OrganizationMembershipService';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
@@ -86,24 +87,11 @@ export class HandleJoinRequestUseCase {
       });
 
       // Remove user from existing memberships in hierarchy orgs
-      const hierarchyOrgIds =
-        await this.deps.organizationRepository.getFullTreeOrgIds(
-          organizationId
-        );
-
-      const userMemberships =
-        await this.deps.organizationRepository.findMembershipsByUserId(
-          requesterId
-        );
-
-      for (const membership of userMemberships) {
-        if (hierarchyOrgIds.includes(membership.id)) {
-          await this.deps.organizationRepository.removeUserFromOrganization(
-            requesterId,
-            membership.id
-          );
-        }
-      }
+      await OrganizationMembershipService.removeUserFromHierarchyOrgs(
+        requesterId,
+        organizationId,
+        this.deps.organizationRepository
+      );
     } else {
       await this.deps.prisma.organizationUser.update({
         where: {

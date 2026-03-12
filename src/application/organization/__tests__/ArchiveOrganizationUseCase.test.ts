@@ -131,6 +131,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   async findPendingRequestsByUserId(): Promise<Organization[]> {
     return [];
   }
+  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+    return [];
+  }
 
   // Test helpers
   addOrganization(org: Organization): void {

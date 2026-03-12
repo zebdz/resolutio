@@ -120,6 +120,9 @@ class MockOrganizationRepository implements OrganizationRepository {
 
     this.adminRoles.get(orgId)!.add(userId);
   }
+  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+    return [];
+  }
 }
 
 // Mock JoinParentRequestRepository

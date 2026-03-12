@@ -1,9 +1,12 @@
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
+import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { BoardErrors } from './BoardErrors';
 import { OrganizationErrors } from '../organization/OrganizationErrors';
+import { User } from '../../domain/user/User';
+import { NotifyBoardMemberRemovedUseCase } from '../notification/NotifyBoardMemberRemovedUseCase';
 
 export interface RemoveBoardMemberInput {
   boardId: string;
@@ -16,17 +19,20 @@ export interface RemoveBoardMemberDependencies {
   boardRepository: BoardRepository;
   organizationRepository: OrganizationRepository;
   userRepository: UserRepository;
+  notificationRepository: NotificationRepository;
 }
 
 export class RemoveBoardMemberUseCase {
   private boardRepository: BoardRepository;
   private organizationRepository: OrganizationRepository;
   private userRepository: UserRepository;
+  private notificationRepository: NotificationRepository;
 
   constructor(dependencies: RemoveBoardMemberDependencies) {
     this.boardRepository = dependencies.boardRepository;
     this.organizationRepository = dependencies.organizationRepository;
     this.userRepository = dependencies.userRepository;
+    this.notificationRepository = dependencies.notificationRepository;
   }
 
   async execute(input: RemoveBoardMemberInput): Promise<Result<void, string>> {
@@ -75,6 +81,30 @@ export class RemoveBoardMemberUseCase {
       input.adminUserId,
       input.reason
     );
+
+    // Notify removed member (fire-and-forget)
+    const actor = await this.userRepository.findById(input.adminUserId);
+    const actorName = actor
+      ? User.formatFullName(actor.firstName, actor.lastName, actor.middleName)
+      : '';
+    const organization = await this.organizationRepository.findById(
+      board.organizationId
+    );
+
+    new NotifyBoardMemberRemovedUseCase({
+      notificationRepository: this.notificationRepository,
+    })
+      .execute({
+        removedUserId: input.userId,
+        organizationId: board.organizationId,
+        organizationName: organization?.name ?? '',
+        boardId: board.id,
+        boardName: board.name,
+        actorName,
+      })
+      .catch((err) =>
+        console.error('Failed to notify board member removed:', err)
+      );
 
     return success(undefined);
   }

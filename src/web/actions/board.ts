@@ -1,20 +1,18 @@
 'use server';
 
-import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { CreateBoardUseCase } from '@/application/board/CreateBoardUseCase';
 import { ArchiveBoardUseCase } from '@/application/board/ArchiveBoardUseCase';
-import { AddBoardMemberUseCase } from '@/application/board/AddBoardMemberUseCase';
 import { RemoveBoardMemberUseCase } from '@/application/board/RemoveBoardMemberUseCase';
 import { CreateBoardSchema } from '@/application/board/CreateBoardSchema';
 import { ArchiveBoardSchema } from '@/application/board/ArchiveBoardSchema';
-import { AddBoardMemberSchema } from '@/application/board/AddBoardMemberSchema';
 import { RemoveBoardMemberSchema } from '@/application/board/RemoveBoardMemberSchema';
 import {
   prisma,
   PrismaOrganizationRepository,
   PrismaBoardRepository,
   PrismaUserRepository,
+  PrismaNotificationRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
@@ -29,6 +27,7 @@ export type ActionResult<T = void> =
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const boardRepository = new PrismaBoardRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
+const notificationRepository = new PrismaNotificationRepository(prisma);
 
 // Use cases
 const createBoardUseCase = new CreateBoardUseCase({
@@ -43,16 +42,11 @@ const archiveBoardUseCase = new ArchiveBoardUseCase({
   userRepository,
 });
 
-const addBoardMemberUseCase = new AddBoardMemberUseCase({
-  boardRepository,
-  organizationRepository,
-  userRepository,
-});
-
 const removeBoardMemberUseCase = new RemoveBoardMemberUseCase({
   boardRepository,
   organizationRepository,
   userRepository,
+  notificationRepository,
 });
 
 export async function createBoardAction(
@@ -184,74 +178,6 @@ export async function archiveBoardAction(
     };
   } catch (error) {
     console.error('Error archiving board:', error);
-
-    return {
-      success: false,
-      error: t('generic'),
-    };
-  }
-}
-
-export async function addBoardMemberAction(
-  formData: FormData
-): Promise<ActionResult> {
-  const rateLimited = await checkRateLimit();
-
-  if (rateLimited) {
-    return rateLimited;
-  }
-
-  const t = await getTranslations('common.errors');
-
-  try {
-    // Get current user
-    const user = await getCurrentUser();
-
-    if (!user) {
-      return {
-        success: false,
-        error: t('unauthorized'),
-      };
-    }
-
-    // Extract form data
-    const input = {
-      boardId: formData.get('boardId') as string,
-      userId: formData.get('userId') as string,
-    };
-
-    // Validate with Zod
-    const validation = AddBoardMemberSchema.safeParse(input);
-
-    if (!validation.success) {
-      return {
-        success: false,
-        error: t('validationFailed'),
-      };
-    }
-
-    // Execute use case
-    const result = await addBoardMemberUseCase.execute({
-      ...validation.data,
-      adminUserId: user.id,
-    });
-
-    if (!result.success) {
-      const errorParts = result.error.split('.');
-      const tError = await getTranslations(errorParts.shift());
-
-      return {
-        success: false,
-        error: tError(errorParts.join('.')),
-      };
-    }
-
-    return {
-      success: true,
-      data: undefined,
-    };
-  } catch (error) {
-    console.error('Error adding board member:', error);
 
     return {
       success: false,

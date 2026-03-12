@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { CreateOrganizationUseCase } from '@/application/organization/CreateOrganizationUseCase';
 import { CreateOrganizationSchema } from '@/application/organization/CreateOrganizationSchema';
+import { SearchOrganizationsUseCase } from '@/application/organization/SearchOrganizationsUseCase';
 import { ArchiveOrganizationUseCase } from '@/application/organization/ArchiveOrganizationUseCase';
 import { ArchiveOrganizationSchema } from '@/application/organization/ArchiveOrganizationSchema';
 import { UnarchiveOrganizationUseCase } from '@/application/organization/UnarchiveOrganizationUseCase';
@@ -21,7 +22,6 @@ import { GetOrganizationPendingRequestsUseCase } from '@/application/organizatio
 import { CancelJoinRequestUseCase } from '@/application/organization/CancelJoinRequestUseCase';
 import { CancelJoinRequestSchema } from '@/application/organization/CancelJoinRequestSchema';
 import { UpdateOrganizationUseCase } from '@/application/organization/UpdateOrganizationUseCase';
-import { AddOrgAdminUseCase } from '@/application/organization/AddOrgAdminUseCase';
 import { RemoveOrgAdminUseCase } from '@/application/organization/RemoveOrgAdminUseCase';
 import {
   prisma,
@@ -117,14 +117,14 @@ const updateOrganizationUseCase = new UpdateOrganizationUseCase({
   userRepository,
 });
 
-const addOrgAdminUseCase = new AddOrgAdminUseCase({
-  organizationRepository,
-  userRepository,
-});
-
 const removeOrgAdminUseCase = new RemoveOrgAdminUseCase({
   organizationRepository,
   userRepository,
+  notificationRepository,
+});
+
+const searchOrganizationsUseCase = new SearchOrganizationsUseCase({
+  organizationRepository,
 });
 
 export async function createOrganizationAction(
@@ -315,10 +315,7 @@ export async function listOrganizationsAction(): Promise<
   const t = await getTranslations('common.errors');
 
   try {
-    // Get current user to filter out their memberships
-    const user = await getCurrentUser();
-
-    const result = await listOrganizationsUseCase.execute({}, user?.id);
+    const result = await listOrganizationsUseCase.execute();
 
     if (!result.success) {
       return {
@@ -356,7 +353,7 @@ export interface SearchOrganizationsInput {
   pageSize?: number;
 }
 
-export async function searchOrganizationsAction(
+export async function searchOrganizationsNotAlreadyMemberOfAction(
   input: SearchOrganizationsInput
 ): Promise<
   ActionResult<{
@@ -1321,47 +1318,6 @@ export async function updateOrganizationAction(
   }
 }
 
-export async function addOrgAdminAction(
-  organizationId: string,
-  targetUserId: string
-): Promise<ActionResult> {
-  const rateLimited = await checkRateLimit();
-
-  if (rateLimited) {
-    return rateLimited;
-  }
-
-  const t = await getTranslations('common.errors');
-  const tOrg = await getTranslations('organization');
-
-  try {
-    const user = await getCurrentUser();
-
-    if (!user) {
-      return { success: false, error: t('unauthorized') };
-    }
-
-    const result = await addOrgAdminUseCase.execute({
-      organizationId,
-      targetUserId,
-      actorUserId: user.id,
-    });
-
-    if (!result.success) {
-      return {
-        success: false,
-        error: translateErrorCode(result.error, tOrg),
-      };
-    }
-
-    return { success: true, data: undefined };
-  } catch (error) {
-    console.error('Error adding org admin:', error);
-
-    return { success: false, error: t('generic') };
-  }
-}
-
 export async function removeOrgAdminAction(
   organizationId: string,
   targetUserId: string
@@ -1443,6 +1399,43 @@ export async function getOrgAdminsAction(organizationId: string): Promise<
     };
   } catch (error) {
     console.error('Error getting org admins:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+export async function searchOrganizationsForJoinParentAction(
+  query: string,
+  excludeIds: string[]
+): Promise<ActionResult<Array<{ id: string; name: string }>>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const result = await searchOrganizationsUseCase.execute({
+      query,
+      excludeIds,
+      limit: 20,
+    });
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, data: result.value };
+  } catch (error) {
+    console.error('Error searching organizations for join parent:', error);
 
     return { success: false, error: t('generic') };
   }

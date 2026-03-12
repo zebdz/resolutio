@@ -90,6 +90,9 @@ class MockOrganizationRepository implements OrganizationRepository {
     this.adminRoles.get(organizationId)!.add(userId);
   }
   async removeAdmin(): Promise<void> {}
+  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+    return [];
+  }
 
   // Test helpers
   addOrganization(org: Organization): void {

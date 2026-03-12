@@ -25,16 +25,20 @@ export class NotifyOrgJoinedParentUseCase {
       return;
     }
 
-    const memberUserIds =
-      await this.deps.organizationRepository.findAcceptedMemberUserIdsIncludingDescendants(
+    const [memberUserIds, adminUserIds] = await Promise.all([
+      this.deps.organizationRepository.findAcceptedMemberUserIdsIncludingDescendants(
         childOrgId
-      );
+      ),
+      this.deps.organizationRepository.findAdminUserIds(childOrgId),
+    ]);
 
-    if (memberUserIds.length === 0) {
+    const recipientIds = [...new Set([...memberUserIds, ...adminUserIds])];
+
+    if (recipientIds.length === 0) {
       return;
     }
 
-    const notifications = memberUserIds
+    const notifications = recipientIds
       .map((userId) =>
         Notification.create({
           userId,

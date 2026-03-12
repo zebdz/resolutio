@@ -6,10 +6,8 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/app/components/catalyst/button';
 import { Field, Label } from '@/app/components/catalyst/fieldset';
 import { Input } from '@/app/components/catalyst/input';
-import {
-  addBoardMemberAction,
-  searchUsersForBoardAction,
-} from '@/web/actions/board';
+import { searchUsersForBoardAction } from '@/web/actions/board';
+import { createBoardMemberInviteAction } from '@/web/actions/invitation';
 import { searchUserByPhoneAction } from '@/web/actions/user';
 import { User } from '@/domain/user/User';
 import { PhoneInput } from '@/web/components/phone';
@@ -22,19 +20,19 @@ type UserResult = {
   nickname: string;
 };
 
-type AddOutsideMemberSectionProps = {
+type InviteOutsideMemberSectionProps = {
   boardId: string;
 };
 
-export default function AddOutsideMemberSection({
+export default function InviteOutsideMemberSection({
   boardId,
-}: AddOutsideMemberSectionProps) {
+}: InviteOutsideMemberSectionProps) {
   const t = useTranslations('organization.boards.manageSingle');
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<UserResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [isAdding, setIsAdding] = useState(false);
+  const [isInviting, setIsInviting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
 
@@ -80,15 +78,11 @@ export default function AddOutsideMemberSection({
     return () => clearTimeout(timer);
   }, [searchQuery, performSearch]);
 
-  const handleAdd = async (userId: string) => {
-    setIsAdding(true);
+  const handleInvite = async (userId: string) => {
+    setIsInviting(true);
     setError(null);
 
-    const formData = new FormData();
-    formData.append('boardId', boardId);
-    formData.append('userId', userId);
-
-    const result = await addBoardMemberAction(formData);
+    const result = await createBoardMemberInviteAction(boardId, userId);
 
     if (result.success) {
       setSearchQuery('');
@@ -96,11 +90,11 @@ export default function AddOutsideMemberSection({
       setPhoneQuery('');
       setPhoneResult(null);
       setPhoneSearchDone(false);
-      setIsAdding(false);
+      setIsInviting(false);
       router.refresh();
     } else {
       setError(result.error);
-      setIsAdding(false);
+      setIsInviting(false);
     }
   };
 
@@ -139,7 +133,7 @@ export default function AddOutsideMemberSection({
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
       <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
-        {t('addOutsideMember')}
+        {t('inviteOutsideMember')}
       </h3>
 
       {/* Name/nickname search */}
@@ -150,7 +144,7 @@ export default function AddOutsideMemberSection({
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder={t('searchPlaceholder')}
-          disabled={isAdding}
+          disabled={isInviting}
         />
       </Field>
 
@@ -195,10 +189,10 @@ export default function AddOutsideMemberSection({
               <Button
                 className="w-full sm:w-auto"
                 color="brand-green"
-                onClick={() => handleAdd(user.id)}
-                disabled={isAdding}
+                onClick={() => handleInvite(user.id)}
+                disabled={isInviting}
               >
-                {isAdding ? t('adding') : t('add')}
+                {isInviting ? t('inviting') : t('invite')}
               </Button>
             </div>
           ))}
@@ -220,14 +214,14 @@ export default function AddOutsideMemberSection({
                   setPhoneResult(null);
                   setPhoneSearchError(null);
                 }}
-                disabled={isAdding || isPhoneSearching}
+                disabled={isInviting || isPhoneSearching}
               />
             </div>
             <Button
               className="w-full sm:w-auto"
               color="zinc"
               onClick={handlePhoneSearch}
-              disabled={isAdding || isPhoneSearching || phoneQuery.length < 5}
+              disabled={isInviting || isPhoneSearching || phoneQuery.length < 5}
             >
               {isPhoneSearching
                 ? t('phoneSearchSearching')
@@ -259,10 +253,10 @@ export default function AddOutsideMemberSection({
               <Button
                 className="w-full sm:w-auto"
                 color="brand-green"
-                onClick={() => handleAdd(phoneResult.id)}
-                disabled={isAdding}
+                onClick={() => handleInvite(phoneResult.id)}
+                disabled={isInviting}
               >
-                {isAdding ? t('adding') : t('add')}
+                {isInviting ? t('inviting') : t('invite')}
               </Button>
             </div>
           </div>

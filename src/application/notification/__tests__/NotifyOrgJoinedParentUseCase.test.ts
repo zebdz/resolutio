@@ -9,6 +9,7 @@ import { Organization } from '../../../domain/organization/Organization';
 class MockOrganizationRepository implements OrganizationRepository {
   private organizations: Map<string, Organization> = new Map();
   private memberUserIds: Map<string, string[]> = new Map();
+  private adminUserIds: Map<string, string[]> = new Map();
 
   async save(org: Organization): Promise<Organization> {
     return org;
@@ -29,6 +30,9 @@ class MockOrganizationRepository implements OrganizationRepository {
     return [];
   }
   async getDescendantIds(): Promise<string[]> {
+    return [];
+  }
+  async getFullTreeOrgIds(): Promise<string[]> {
     return [];
   }
   async isUserMember(): Promise<boolean> {
@@ -77,12 +81,15 @@ class MockOrganizationRepository implements OrganizationRepository {
     return { organizations: [], totalCount: 0 };
   }
   async setParentId(): Promise<void> {}
-  async findAdminUserIds(): Promise<string[]> {
-    return [];
+  async findAdminUserIds(organizationId: string): Promise<string[]> {
+    return this.adminUserIds.get(organizationId) || [];
   }
 
   async addAdmin(): Promise<void> {}
   async removeAdmin(): Promise<void> {}
+  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+    return [];
+  }
 
   // Test helpers
   addOrganization(org: Organization) {
@@ -90,6 +97,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
   setMemberUserIds(orgId: string, userIds: string[]) {
     this.memberUserIds.set(orgId, userIds);
+  }
+  setAdminUserIds(orgId: string, userIds: string[]) {
+    this.adminUserIds.set(orgId, userIds);
   }
 }
 
@@ -223,5 +233,42 @@ describe('NotifyOrgJoinedParentUseCase', () => {
     });
 
     expect(notifRepo.getSavedBatch()).toHaveLength(0);
+  });
+
+  it('should notify admin-only users who are not members', async () => {
+    const childOrg = createOrg('child-1', 'Child Org');
+    const parentOrg = createOrg('parent-1', 'Parent Org');
+    orgRepo.addOrganization(childOrg);
+    orgRepo.addOrganization(parentOrg);
+    orgRepo.setMemberUserIds('child-1', ['user-1']);
+    orgRepo.setAdminUserIds('child-1', ['admin-only']);
+
+    await useCase.execute({ childOrgId: 'child-1', parentOrgId: 'parent-1' });
+
+    const saved = notifRepo.getSavedBatch();
+    expect(saved).toHaveLength(2);
+    const userIds = saved.map((n) => n.userId);
+    expect(userIds).toContain('user-1');
+    expect(userIds).toContain('admin-only');
+  });
+
+  it('should deduplicate users who are both admin and member', async () => {
+    const childOrg = createOrg('child-1', 'Child Org');
+    const parentOrg = createOrg('parent-1', 'Parent Org');
+    orgRepo.addOrganization(childOrg);
+    orgRepo.addOrganization(parentOrg);
+    orgRepo.setMemberUserIds('child-1', ['user-1', 'user-2']);
+    orgRepo.setAdminUserIds('child-1', ['user-1', 'admin-only']);
+
+    await useCase.execute({ childOrgId: 'child-1', parentOrgId: 'parent-1' });
+
+    const saved = notifRepo.getSavedBatch();
+    expect(saved).toHaveLength(3);
+    const userIds = saved.map((n) => n.userId);
+    expect(userIds).toContain('user-1');
+    expect(userIds).toContain('user-2');
+    expect(userIds).toContain('admin-only');
+    // user-1 should appear only once
+    expect(userIds.filter((id) => id === 'user-1')).toHaveLength(1);
   });
 });

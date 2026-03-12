@@ -7,6 +7,8 @@ import { UserRepository } from '../../../domain/user/UserRepository';
 import { Organization } from '../../../domain/organization/Organization';
 import { User } from '../../../domain/user/User';
 import { PhoneNumber } from '../../../domain/user/PhoneNumber';
+import { NotificationRepository } from '../../../domain/notification/NotificationRepository';
+import { Notification } from '../../../domain/notification/Notification';
 
 // Mock BoardRepository
 class MockBoardRepository implements BoardRepository {
@@ -206,14 +208,52 @@ class MockOrganizationRepository implements OrganizationRepository {
   async findAdminUserIds(): Promise<string[]> {
     return [];
   }
+  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+    return [];
+  }
+}
+
+// Mock NotificationRepository
+class MockNotificationRepository implements NotificationRepository {
+  private saved: Notification | null = null;
+
+  async save(notification: Notification): Promise<Notification> {
+    this.saved = notification;
+
+    return notification;
+  }
+  async saveBatch(): Promise<void> {}
+  async findById(): Promise<Notification | null> {
+    return null;
+  }
+  async findByUserId(): Promise<Notification[]> {
+    return [];
+  }
+  async getUnreadCount(): Promise<number> {
+    return 0;
+  }
+  async markAsRead(): Promise<void> {}
+  async markAllAsRead(): Promise<void> {}
+  async findByIds(): Promise<Notification[]> {
+    return [];
+  }
+  async deleteByIds(): Promise<void> {}
+  async getCountByUserId(): Promise<number> {
+    return 0;
+  }
+
+  getSaved() {
+    return this.saved;
+  }
 }
 
 // Mock UserRepository
 class MockUserRepository implements UserRepository {
   private superAdmins: Set<string> = new Set();
+  private users: Map<string, User> = new Map();
 
   async findById(id: string): Promise<User | null> {
-    return null;
+    return this.users.get(id) || null;
   }
 
   async findByIds(ids: string[]): Promise<User[]> {
@@ -247,9 +287,13 @@ class MockUserRepository implements UserRepository {
   addSuperAdmin(userId: string): void {
     this.superAdmins.add(userId);
   }
+  addUser(user: User): void {
+    this.users.set(user.id, user);
+  }
 
   clear(): void {
     this.superAdmins.clear();
+    this.users.clear();
   }
 
   async findByNickname(): Promise<User | null> {
@@ -277,15 +321,18 @@ describe('RemoveBoardMemberUseCase', () => {
   let boardRepository: MockBoardRepository;
   let organizationRepository: MockOrganizationRepository;
   let userRepository: MockUserRepository;
+  let notificationRepository: MockNotificationRepository;
 
   beforeEach(() => {
     boardRepository = new MockBoardRepository();
     organizationRepository = new MockOrganizationRepository();
     userRepository = new MockUserRepository();
+    notificationRepository = new MockNotificationRepository();
     useCase = new RemoveBoardMemberUseCase({
       boardRepository,
       organizationRepository,
       userRepository,
+      notificationRepository,
     });
   });
 
@@ -474,6 +521,61 @@ describe('RemoveBoardMemberUseCase', () => {
 
       const isMember = await boardRepository.isUserMember('user-1', 'board-1');
       expect(isMember).toBe(false);
+    });
+  });
+
+  it('should notify removed board member after successful removal', async () => {
+    const orgResult = Organization.create('Test Org', 'Test Desc', 'creator-1');
+
+    if (orgResult.success) {
+      const org = orgResult.value;
+      (org as any).props.id = 'org-1';
+      organizationRepository.addOrganization(org);
+      organizationRepository.addAdmin('org-1', 'admin-1');
+    }
+
+    const boardResult = Board.create('Main Board', 'org-1');
+
+    if (boardResult.success) {
+      const board = boardResult.value;
+      (board as any).props.id = 'board-1';
+      boardRepository.addBoard(board);
+    }
+
+    await boardRepository.addUserToBoard('user-1', 'board-1');
+
+    const actor = User.reconstitute({
+      id: 'admin-1',
+      firstName: 'Ivan',
+      lastName: 'Petrov',
+      phoneNumber: PhoneNumber.create('+79001234567'),
+      password: 'hashedpw',
+      language: 'ru',
+      createdAt: new Date(),
+    });
+    userRepository.addUser(actor);
+
+    const result = await useCase.execute({
+      boardId: 'board-1',
+      userId: 'user-1',
+      adminUserId: 'admin-1',
+    });
+
+    expect(result.success).toBe(true);
+
+    // Wait for fire-and-forget notification
+    await new Promise((r) => setTimeout(r, 10));
+
+    const saved = notificationRepository.getSaved();
+    expect(saved).not.toBeNull();
+    expect(saved!.userId).toBe('user-1');
+    expect(saved!.type).toBe('board_member_removed');
+    expect(saved!.data).toEqual({
+      organizationId: 'org-1',
+      organizationName: 'Test Org',
+      boardId: 'board-1',
+      boardName: 'Main Board',
+      actorName: 'Petrov Ivan',
     });
   });
 });

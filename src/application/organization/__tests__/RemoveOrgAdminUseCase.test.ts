@@ -5,6 +5,8 @@ import { OrganizationRepository } from '../../../domain/organization/Organizatio
 import { UserRepository } from '../../../domain/user/UserRepository';
 import { User } from '../../../domain/user/User';
 import { PhoneNumber } from '../../../domain/user/PhoneNumber';
+import { NotificationRepository } from '../../../domain/notification/NotificationRepository';
+import { Notification } from '../../../domain/notification/Notification';
 
 class MockOrganizationRepository implements OrganizationRepository {
   private organizations: Map<string, Organization> = new Map();
@@ -101,6 +103,10 @@ class MockOrganizationRepository implements OrganizationRepository {
     admins?.delete(userId);
   }
 
+  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+    return [];
+  }
+
   // Test helpers
   addOrganization(org: Organization): void {
     this.organizations.set(org.id, org);
@@ -114,10 +120,45 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
 }
 
+class MockNotificationRepository implements NotificationRepository {
+  private saved: Notification | null = null;
+
+  async save(notification: Notification): Promise<Notification> {
+    this.saved = notification;
+
+    return notification;
+  }
+  async saveBatch(): Promise<void> {}
+  async findById(): Promise<Notification | null> {
+    return null;
+  }
+  async findByUserId(): Promise<Notification[]> {
+    return [];
+  }
+  async getUnreadCount(): Promise<number> {
+    return 0;
+  }
+  async markAsRead(): Promise<void> {}
+  async markAllAsRead(): Promise<void> {}
+  async findByIds(): Promise<Notification[]> {
+    return [];
+  }
+  async deleteByIds(): Promise<void> {}
+  async getCountByUserId(): Promise<number> {
+    return 0;
+  }
+
+  getSaved() {
+    return this.saved;
+  }
+}
+
 class MockUserRepository implements UserRepository {
   private superAdmins: Set<string> = new Set();
-  async findById(): Promise<User | null> {
-    return null;
+  private users: Map<string, User> = new Map();
+
+  async findById(id: string): Promise<User | null> {
+    return this.users.get(id) || null;
   }
   async findByIds(): Promise<User[]> {
     return [];
@@ -142,6 +183,9 @@ class MockUserRepository implements UserRepository {
   }
   addSuperAdmin(userId: string): void {
     this.superAdmins.add(userId);
+  }
+  addUser(user: User): void {
+    this.users.set(user.id, user);
   }
 
   async findByNickname(): Promise<User | null> {
@@ -192,13 +236,16 @@ describe('RemoveOrgAdminUseCase', () => {
   let useCase: RemoveOrgAdminUseCase;
   let orgRepo: MockOrganizationRepository;
   let userRepo: MockUserRepository;
+  let notifRepo: MockNotificationRepository;
 
   beforeEach(() => {
     orgRepo = new MockOrganizationRepository();
     userRepo = new MockUserRepository();
+    notifRepo = new MockNotificationRepository();
     useCase = new RemoveOrgAdminUseCase({
       organizationRepository: orgRepo,
       userRepository: userRepo,
+      notificationRepository: notifRepo,
     });
   });
 
@@ -355,5 +402,43 @@ describe('RemoveOrgAdminUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it('should notify removed admin after successful removal', async () => {
+    orgRepo.addOrganization(makeOrg('org-1'));
+    orgRepo.setAdmin('org-1', 'admin-1');
+    orgRepo.setAdmin('org-1', 'admin-2');
+
+    const actor = User.reconstitute({
+      id: 'admin-1',
+      firstName: 'Ivan',
+      lastName: 'Petrov',
+      phoneNumber: PhoneNumber.create('+79001234567'),
+      password: 'hashedpw',
+      language: 'ru',
+      createdAt: new Date(),
+    });
+    userRepo.addUser(actor);
+
+    const result = await useCase.execute({
+      organizationId: 'org-1',
+      targetUserId: 'admin-2',
+      actorUserId: 'admin-1',
+    });
+
+    expect(result.success).toBe(true);
+
+    // Wait for fire-and-forget notification
+    await new Promise((r) => setTimeout(r, 10));
+
+    const saved = notifRepo.getSaved();
+    expect(saved).not.toBeNull();
+    expect(saved!.userId).toBe('admin-2');
+    expect(saved!.type).toBe('admin_removed');
+    expect(saved!.data).toEqual({
+      organizationId: 'org-1',
+      organizationName: 'Test Org',
+      actorName: 'Petrov Ivan',
+    });
   });
 });

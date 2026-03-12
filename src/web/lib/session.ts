@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import {
   prisma,
@@ -34,7 +35,7 @@ export async function deleteSessionCookie(): Promise<void> {
   cookieStore.delete(SESSION_COOKIE_NAME);
 }
 
-export async function getCurrentUser(): Promise<User | null> {
+export const getCurrentUser = cache(async (): Promise<User | null> => {
   try {
     const sessionId = await getSessionCookie();
 
@@ -70,4 +71,4 @@ export async function getCurrentUser(): Promise<User | null> {
     // User will be treated as not logged in
     return null;
   }
-}
+});

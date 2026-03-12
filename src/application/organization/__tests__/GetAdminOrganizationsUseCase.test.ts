@@ -156,6 +156,9 @@ class MockOrganizationRepository implements OrganizationRepository {
 
   async addAdmin(): Promise<void> {}
   async removeAdmin(): Promise<void> {}
+  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+    return [];
+  }
 }
 
 describe('GetAdminOrganizationsUseCase', () => {

@@ -1,7 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { getOrganizationDetailsAction } from '@/web/actions/organization';
-import { listOrganizationsAction } from '@/web/actions/organization';
 import { getChildOrgJoinParentRequestAction } from '@/web/actions/joinParentRequest';
 import { Heading, Subheading } from '@/app/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
@@ -42,19 +41,10 @@ export default async function JoinParentPage({ params }: PageProps) {
     redirect(`/${locale}/organizations/${organizationId}`);
   }
 
-  // Get all orgs and exclude self + descendants
-  const [orgsResult, descendantIds] = await Promise.all([
-    listOrganizationsAction(),
-    organizationRepository.getDescendantIds(organizationId),
-  ]);
-
-  const excludeIds = new Set([organizationId, ...descendantIds]);
-
-  const availableOrgs = orgsResult.success
-    ? orgsResult.data.organizations
-        .filter((org) => !excludeIds.has(org.id))
-        .map((org) => ({ id: org.id, name: org.name }))
-    : [];
+  // Build excludeIds: self + descendants
+  const descendantIds =
+    await organizationRepository.getDescendantIds(organizationId);
+  const excludeIds = [organizationId, ...descendantIds];
 
   const { organization } = detailsResult.data;
 
@@ -75,10 +65,7 @@ export default async function JoinParentPage({ params }: PageProps) {
           </Subheading>
         </div>
 
-        <JoinParentForm
-          childOrgId={organizationId}
-          availableOrgs={availableOrgs}
-        />
+        <JoinParentForm childOrgId={organizationId} excludeIds={excludeIds} />
       </div>
     </AuthenticatedLayout>
   );

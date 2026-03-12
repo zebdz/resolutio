@@ -1,7 +1,10 @@
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
+import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { OrganizationErrors } from './OrganizationErrors';
+import { User } from '../../domain/user/User';
+import { NotifyAdminRemovedUseCase } from '../notification/NotifyAdminRemovedUseCase';
 
 export interface RemoveOrgAdminInput {
   organizationId: string;
@@ -12,15 +15,18 @@ export interface RemoveOrgAdminInput {
 export interface RemoveOrgAdminDependencies {
   organizationRepository: OrganizationRepository;
   userRepository: UserRepository;
+  notificationRepository: NotificationRepository;
 }
 
 export class RemoveOrgAdminUseCase {
   private organizationRepository: OrganizationRepository;
   private userRepository: UserRepository;
+  private notificationRepository: NotificationRepository;
 
   constructor(dependencies: RemoveOrgAdminDependencies) {
     this.organizationRepository = dependencies.organizationRepository;
     this.userRepository = dependencies.userRepository;
+    this.notificationRepository = dependencies.notificationRepository;
   }
 
   async execute(input: RemoveOrgAdminInput): Promise<Result<void, string>> {
@@ -77,6 +83,23 @@ export class RemoveOrgAdminUseCase {
 
       throw error;
     }
+
+    // Notify removed admin (fire-and-forget)
+    const actor = await this.userRepository.findById(input.actorUserId);
+    const actorName = actor
+      ? User.formatFullName(actor.firstName, actor.lastName, actor.middleName)
+      : '';
+
+    new NotifyAdminRemovedUseCase({
+      notificationRepository: this.notificationRepository,
+    })
+      .execute({
+        removedUserId: input.targetUserId,
+        organizationId: input.organizationId,
+        organizationName: organization.name,
+        actorName,
+      })
+      .catch((err) => console.error('Failed to notify admin removed:', err));
 
     return success(undefined);
   }

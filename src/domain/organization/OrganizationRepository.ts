@@ -171,6 +171,17 @@ export interface OrganizationRepository {
   setParentId(organizationId: string, parentId: string | null): Promise<void>;
 
   /**
+   * Fuzzy (subsequence) search for organizations by name.
+   * Query "abc" matches names containing a...b...c in order.
+   * Excludes archived orgs and orgs in excludeIds.
+   */
+  searchByNameFuzzy(
+    query: string,
+    excludeIds: string[],
+    limit: number
+  ): Promise<Array<{ id: string; name: string }>>;
+
+  /**
    * Adds a user as an admin of an organization
    */
   addAdmin(organizationId: string, userId: string): Promise<void>;

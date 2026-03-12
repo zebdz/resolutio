@@ -17,6 +17,8 @@ import {
   PrismaOrganizationRepository,
   PrismaUserRepository,
 } from '@/infrastructure/index';
+import { OrgMembersList } from './OrgMembersList';
+import { getOrgMembersAction } from '@/web/actions/invitation';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
@@ -66,6 +68,19 @@ export default async function OrganizationDetailPage({
     ]);
     userMemberOrgIds = memberOrgs.map((o) => o.id);
     isSuperAdmin = superAdmin;
+  }
+
+  // Fetch initial members for the collapsible list
+  let initialMembers: any[] = [];
+  let initialMembersTotalCount = 0;
+
+  if (user && (isUserMember || isUserAdmin || isSuperAdmin)) {
+    const membersResult = await getOrgMembersAction(id);
+
+    if (membersResult.success) {
+      initialMembers = membersResult.data.members;
+      initialMembersTotalCount = membersResult.data.totalCount;
+    }
   }
 
   if (user && (isUserMember || isUserAdmin)) {
@@ -135,6 +150,16 @@ export default async function OrganizationDetailPage({
           isUserMember={isUserMember}
           showMemberRequests={false}
         />
+
+        {/* Members Section */}
+        {(isUserMember || isUserAdmin || isSuperAdmin) && (
+          <OrgMembersList
+            organizationId={id}
+            initialMembers={initialMembers}
+            initialTotalCount={initialMembersTotalCount}
+            isAdmin={isUserAdmin || isSuperAdmin}
+          />
+        )}
 
         {/* Boards Section - Visible to members, admins and superadmins */}
         {(isUserMember || isUserAdmin || isSuperAdmin) && (

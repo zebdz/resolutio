@@ -42,6 +42,16 @@ describe('getNotificationActionUrl', () => {
       });
     });
 
+    it('join_parent_request_rejected → /organizations/{id}', () => {
+      const result = getNotificationActionUrl('join_parent_request_rejected', {
+        childOrgId: 'child-1',
+      });
+      expect(result).toEqual({
+        href: '/organizations/child-1',
+        actionKey: 'viewOrganization',
+      });
+    });
+
     it('org_joined_parent → /organizations/{id}', () => {
       const result = getNotificationActionUrl('org_joined_parent', {
         parentOrgId: 'parent-2',
@@ -98,6 +108,66 @@ describe('getNotificationActionUrl', () => {
       });
       expect(result).toEqual({
         href: '/organizations/org-6',
+        actionKey: 'viewOrganization',
+      });
+    });
+
+    it('admin_invite_received → /invitations', () => {
+      const result = getNotificationActionUrl('admin_invite_received', {
+        invitationId: 'inv-1',
+      });
+      expect(result).toEqual({
+        href: '/invitations',
+        actionKey: 'respondToInvite',
+      });
+    });
+
+    it('board_member_invite_received → /invitations', () => {
+      const result = getNotificationActionUrl('board_member_invite_received', {
+        invitationId: 'inv-2',
+      });
+      expect(result).toEqual({
+        href: '/invitations',
+        actionKey: 'respondToInvite',
+      });
+    });
+
+    it('member_invite_received → /invitations', () => {
+      const result = getNotificationActionUrl('member_invite_received', {
+        invitationId: 'inv-3',
+      });
+      expect(result).toEqual({
+        href: '/invitations',
+        actionKey: 'respondToInvite',
+      });
+    });
+
+    it('admin_removed → /organizations/{id}', () => {
+      const result = getNotificationActionUrl('admin_removed', {
+        organizationId: 'org-7',
+      });
+      expect(result).toEqual({
+        href: '/organizations/org-7',
+        actionKey: 'viewOrganization',
+      });
+    });
+
+    it('board_member_removed → /organizations/{id}', () => {
+      const result = getNotificationActionUrl('board_member_removed', {
+        organizationId: 'org-8',
+      });
+      expect(result).toEqual({
+        href: '/organizations/org-8',
+        actionKey: 'viewOrganization',
+      });
+    });
+
+    it('invite_declined → /organizations/{id}', () => {
+      const result = getNotificationActionUrl('invite_declined', {
+        organizationId: 'org-9',
+      });
+      expect(result).toEqual({
+        href: '/organizations/org-9',
         actionKey: 'viewOrganization',
       });
     });

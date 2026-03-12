@@ -118,6 +118,8 @@
     "member": "Участник",
     "joinedAt": "Присоединился",
     "logout": "Выйти",
+    "pendingInvitations": "Приглашения",
+    "pendingInvitationsCount": "У вас {count} {count, plural, =1 {приглашение} few {приглашения} other {приглашений}}",
     "archivedBadge": "В архиве",
     "joinRequest": {
       "requested": "Заявка подана",
@@ -270,6 +272,7 @@
       "firstAdmin": "Первый администратор",
       "joinOrganization": "Подать заявку на вступление",
       "joining": "Отправка заявки...",
+      "joinRequestSent": "Ваша заявка на вступление отправлена. Вы получите уведомление, когда она будет рассмотрена.",
       "boards": "Органы управления",
       "boardMemberCount": "{count, plural, =0 {Нет участников} =1 {1 участник} few {# участника} other {# участников}}",
       "boardMember": "Участник",
@@ -297,7 +300,14 @@
       "expandHierarchy": "Развернуть",
       "memberCount": "{count, plural, =0 {Нет участников} =1 {1 участник} few {# участника} other {# участников}}",
       "youAreMember": "Участник",
-      "modifyButton": "Управление"
+      "modifyButton": "Управление",
+      "members": "Участники",
+      "manageMembers": "Управление участниками",
+      "searchMembers": "Поиск участников...",
+      "showingMembers": "Показаны {from}–{to} из {total}",
+      "previousPage": "Назад",
+      "nextPage": "Далее",
+      "noMembersFound": "Участники не найдены"
     },
     "modify": {
       "title": "Редактирование организации",
@@ -311,8 +321,8 @@
       "saving": "Сохранение...",
       "updateSuccess": "Организация успешно обновлена",
       "adminSection": "Администраторы",
-      "addAdminFromMembers": "Добавить из участников",
-      "addAdminFromNonMembers": "Добавить не из участников",
+      "inviteAdminFromMembers": "Пригласить из участников",
+      "inviteAdminFromNonMembers": "Пригласить не из участников",
       "searchPlaceholder": "Поиск по имени или никнейму",
       "searchMinChars": "Введите минимум 2 символа для поиска",
       "noResults": "Ничего не найдено",
@@ -328,7 +338,14 @@
       "removeAdminConfirm": "Вы уверены, что хотите удалить {name} из администраторов?",
       "confirmRemove": "Удалить администратора",
       "cancel": "Отмена",
-      "lastAdminWarning": "Нельзя удалить последнего администратора"
+      "lastAdminWarning": "Нельзя удалить последнего администратора",
+      "inviteAdmin": "Пригласить",
+      "inviting": "Отправка...",
+      "invited": "Приглашён",
+      "pendingInvites": "Ожидающие приглашения",
+      "revokeInvite": "Отозвать",
+      "revoking": "Отзыв...",
+      "noInvites": "Нет ожидающих приглашений"
     },
     "pendingRequestsPage": {
       "title": "Заявки на вступление",
@@ -354,6 +371,9 @@
       "subtitle": "Отправить запрос на присоединение {organization} к родительской организации",
       "selectParent": "Выберите родительскую организацию",
       "selectParentPlaceholder": "Выберите организацию...",
+      "typeToSearch": "Введите для поиска организаций...",
+      "noResultsFound": "Организации не найдены",
+      "searchingOrgs": "Поиск...",
       "message": "Сообщение",
       "messagePlaceholder": "Объясните, почему ваша организация хочет присоединиться...",
       "submit": "Отправить запрос",
@@ -425,7 +445,7 @@
         "subtitle": "Добавление и удаление участников органа управления: {board}",
         "members": "Участники органа управления",
         "addMember": "Добавить участника",
-        "addOutsideMember": "Добавить внешнего участника",
+        "inviteOutsideMember": "Пригласить внешнего участника",
         "searchPlaceholder": "Поиск пользователей по имени или никнейму...",
         "noMembers": "Участников пока нет",
         "noResults": "Пользователи не найдены",
@@ -452,7 +472,15 @@
         "add": "Добавить",
         "adding": "Добавление...",
         "addSuccess": "Участник успешно добавлен",
-        "removeSuccess": "Участник успешно удалён"
+        "removeSuccess": "Участник успешно удалён",
+        "invite": "Пригласить",
+        "inviteMember": "Пригласить участника",
+        "inviting": "Отправка...",
+        "invited": "Приглашён",
+        "pendingInvites": "Ожидающие приглашения",
+        "revokeInvite": "Отозвать",
+        "revoking": "Отзыв...",
+        "noInvites": "Нет ожидающих приглашений"
       },
       "create": {
         "title": "Создать орган управления",
@@ -803,6 +831,11 @@
         "title": "Новый запрос на присоединение",
         "body": "{childOrgName} хочет присоединиться к {parentOrgName}"
       },
+      "joinParentRequestRejected": {
+        "title": "Запрос на присоединение отклонён",
+        "body": "{parentOrgName} отклонила запрос {childOrgName} на присоединение",
+        "bodyWithReason": "{parentOrgName} отклонила запрос {childOrgName} на присоединение: {rejectionReason}"
+      },
       "joinRequestReceived": {
         "title": "Новый запрос на вступление",
         "body": "{requesterName} хочет вступить в {organizationName}"
@@ -827,6 +860,46 @@
       "autoJoinFailed": {
         "title": "Не удалось автоматически вступить",
         "body": "Пожалуйста, попробуйте вручную вступить в организацию «{organizationName}»"
+      },
+      "adminInviteReceived": {
+        "title": "Приглашение в администраторы",
+        "body": "{inviterName} приглашает вас стать администратором {organizationName}"
+      },
+      "boardMemberInviteReceived": {
+        "title": "Приглашение в орган управления",
+        "body": "{inviterName} приглашает вас в орган управления «{boardName}» в {organizationName}"
+      },
+      "memberInviteReceived": {
+        "title": "Приглашение в организацию",
+        "body": "{inviterName} приглашает вас вступить в {organizationName}"
+      },
+      "adminInviteAccepted": {
+        "title": "Приглашение администратора принято",
+        "body": "{inviteeName} принял(а) приглашение стать администратором {organizationName}"
+      },
+      "boardMemberInviteAccepted": {
+        "title": "Приглашение в орган управления принято",
+        "body": "{inviteeName} принял(а) приглашение в орган управления «{boardName}» в {organizationName}"
+      },
+      "memberInviteAccepted": {
+        "title": "Приглашение в организацию принято",
+        "body": "{inviteeName} принял(а) приглашение вступить в {organizationName}"
+      },
+      "inviteRevoked": {
+        "title": "Приглашение отозвано",
+        "body": "Ваше приглашение в {organizationName} было отозвано"
+      },
+      "adminRemoved": {
+        "title": "Удалены из администраторов",
+        "body": "{actorName} удалил(а) вас из администраторов {organizationName}"
+      },
+      "boardMemberRemoved": {
+        "title": "Удалены из органа управления",
+        "body": "{actorName} удалил(а) вас из органа управления «{boardName}» в {organizationName}"
+      },
+      "inviteDeclined": {
+        "title": "Приглашение отклонено",
+        "body": "{inviteeName} отклонил(а) приглашение в {organizationName}"
       }
     },
     "page": {
@@ -851,7 +924,9 @@
         "viewOrganization": "Просмотреть организацию",
         "viewParentRequests": "Просмотреть запросы",
         "voteNow": "Голосовать",
-        "viewResults": "Результаты"
+        "viewResults": "Результаты",
+        "respondToInvite": "Ответить на приглашение",
+        "viewBoard": "Просмотреть орган управления"
       }
     }
   },
@@ -873,6 +948,9 @@
       "organizationDescriptionTooLong": "Описание организации не может превышать 1000 символов",
       "organizationAlreadyArchived": "Организация уже архивирована",
       "organizationNotArchived": "Организация не архивирована"
+    },
+    "invitation": {
+      "notPending": "Приглашение больше не ожидает ответа"
     },
     "joinParentRequest": {
       "messageEmpty": "Сообщение не может быть пустым",
@@ -1256,5 +1334,65 @@
     "tooManyPhoneSearches": "Слишком много попыток поиска по телефону. Подождите и попробуйте снова.",
     "tooManyLoginAttempts": "Слишком много неудачных попыток входа. Подождите {minutes} минут и попробуйте снова.",
     "tooManyRegistrations": "Слишком много попыток регистрации. Подождите {minutes} минут и попробуйте снова."
+  },
+  "invitation": {
+    "errors": {
+      "notFound": "Приглашение не найдено",
+      "notPending": "Приглашение больше не ожидает ответа",
+      "alreadyInvited": "Пользователь уже приглашён",
+      "inviteeAlreadyAdmin": "Пользователь уже является администратором",
+      "inviteeAlreadyBoardMember": "Пользователь уже является членом органа управления",
+      "inviteeAlreadyMember": "Пользователь уже является участником",
+      "inviteeInHierarchy": "Пользователь уже является участником организации в этой иерархии",
+      "notInvitee": "Вы не являетесь приглашённым",
+      "notAdmin": "У вас нет прав для выполнения этого действия",
+      "orgNotFound": "Организация не найдена",
+      "orgArchived": "Организация архивирована",
+      "boardNotFound": "Орган управления не найден",
+      "boardArchived": "Орган управления архивирован",
+      "userNotFound": "Пользователь не найден"
+    },
+    "page": {
+      "title": "Приглашение",
+      "adminInvite": "Приглашение в администраторы",
+      "boardMemberInvite": "Приглашение в орган управления",
+      "memberInvite": "Приглашение в организацию",
+      "from": "От",
+      "organization": "Организация",
+      "board": "Орган управления",
+      "sentAt": "Отправлено",
+      "accept": "Принять",
+      "decline": "Отклонить",
+      "accepting": "Принятие...",
+      "declining": "Отклонение...",
+      "accepted": "Приглашение принято",
+      "declined": "Приглашение отклонено",
+      "alreadyHandled": "Это приглашение уже было {status}",
+      "statusAccepted": "принято",
+      "statusDeclined": "отклонено",
+      "statusRevoked": "отозвано"
+    },
+    "listTitle": "Ожидающие приглашения",
+    "noInvitations": "Нет ожидающих приглашений"
+  },
+  "manageMembers": {
+    "title": "Управление участниками",
+    "back": "Назад к организации",
+    "inviteMember": "Пригласить участника",
+    "searchPlaceholder": "Поиск по имени или никнейму",
+    "searchMinChars": "Введите минимум 2 символа для поиска",
+    "noResults": "Ничего не найдено",
+    "phoneSearchLabel": "Найти по номеру телефона",
+    "phoneSearchPlaceholder": "Введите номер телефона",
+    "phoneSearchButton": "Найти",
+    "phoneSearchNotFound": "Пользователь с таким номером не найден",
+    "phoneSearchSearching": "Поиск...",
+    "invite": "Пригласить",
+    "inviting": "Отправка...",
+    "invited": "Приглашён",
+    "pendingInvites": "Ожидающие приглашения",
+    "revokeInvite": "Отозвать",
+    "revoking": "Отзыв...",
+    "noInvites": "Нет ожидающих приглашений"
   }
 }

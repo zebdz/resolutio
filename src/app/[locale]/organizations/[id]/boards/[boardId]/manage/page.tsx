@@ -1,13 +1,19 @@
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { getBoardDetailsAction } from '@/web/actions/board';
+import { getPendingBoardInvitesAction } from '@/web/actions/invitation';
 import { Heading, Subheading } from '@/app/components/catalyst/heading';
 import { Button } from '@/app/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
-import AddMemberSection from './AddMemberSection';
-import AddOutsideMemberSection from './AddOutsideMemberSection';
+import { User } from '@/domain/user/User';
+import InviteMemberSection from './InviteMemberSection';
+import InviteOutsideMemberSection from './InviteOutsideMemberSection';
 import MembersList from './MembersList';
+import PendingBoardInvites from './PendingBoardInvites';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { prisma, PrismaUserRepository } from '@/infrastructure/index';
+
+const userRepository = new PrismaUserRepository(prisma);
 
 type PageProps = {
   params: Promise<{
@@ -36,6 +42,25 @@ export default async function ManageSingleBoardPage({ params }: PageProps) {
     (om) => !members.some((m) => m.id === om.id)
   );
 
+  // Fetch pending board invites and resolve invitee names
+  const invitesResult = await getPendingBoardInvitesAction(boardId);
+  const rawInvites = invitesResult.success ? invitesResult.data : [];
+
+  const inviteeIds = rawInvites.map((inv) => inv.inviteeId);
+  const inviteeUserDomains =
+    inviteeIds.length > 0 ? await userRepository.findByIds(inviteeIds) : [];
+  const inviteeMap = new Map(
+    inviteeUserDomains.map((u) => [
+      u.id,
+      User.formatFullName(u.firstName, u.lastName, u.middleName),
+    ])
+  );
+
+  const pendingInvites = rawInvites.map((inv) => ({
+    id: inv.id,
+    inviteeName: inviteeMap.get(inv.inviteeId) || inv.inviteeId,
+  }));
+
   return (
     <AuthenticatedLayout>
       <div className="mx-auto max-w-6xl px-4 py-8">
@@ -54,15 +79,28 @@ export default async function ManageSingleBoardPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Add Member Section */}
+        {/* Invite Member Section */}
         <div className="mb-8">
-          <AddMemberSection boardId={boardId} availableUsers={availableUsers} />
+          <InviteMemberSection
+            boardId={boardId}
+            availableUsers={availableUsers}
+          />
         </div>
 
-        {/* Add Outside Member Section */}
+        {/* Invite Outside Member Section */}
         <div className="mb-8">
-          <AddOutsideMemberSection boardId={boardId} />
+          <InviteOutsideMemberSection boardId={boardId} />
         </div>
+
+        {/* Pending Invitations */}
+        {pendingInvites.length > 0 && (
+          <div className="mb-8">
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">
+              {t('pendingInvites')}
+            </h3>
+            <PendingBoardInvites invites={pendingInvites} />
+          </div>
+        )}
 
         {/* Members List */}
         <div>

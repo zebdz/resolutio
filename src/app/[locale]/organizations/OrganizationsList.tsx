@@ -18,7 +18,7 @@ import { Badge } from '@/app/components/catalyst/badge';
 import { Link } from '@/src/i18n/routing';
 import {
   joinOrganizationAction,
-  searchOrganizationsAction,
+  searchOrganizationsNotAlreadyMemberOfAction,
   type ActionResult,
   type SearchOrganizationsInput,
 } from '@/web/actions/organization';
@@ -64,7 +64,8 @@ export function OrganizationsList({
   const tSuperadmin = useTranslations('superadmin.organizations');
   const router = useRouter();
 
-  const effectiveSearchAction = searchAction ?? searchOrganizationsAction;
+  const effectiveSearchAction =
+    searchAction ?? searchOrganizationsNotAlreadyMemberOfAction;
 
   const [organizations, setOrganizations] =
     useState<OrganizationItem[]>(initialOrganizations);

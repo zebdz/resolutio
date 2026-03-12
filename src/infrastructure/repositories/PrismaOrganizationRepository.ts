@@ -1,4 +1,4 @@
-import { PrismaClient } from '@/generated/prisma/client';
+import { Prisma, PrismaClient } from '@/generated/prisma/client';
 import { Organization } from '../../domain/organization/Organization';
 import {
   OrganizationRepository,
@@ -691,5 +691,40 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       })),
       totalCount,
     };
+  }
+
+  async searchByNameFuzzy(
+    query: string,
+    excludeIds: string[],
+    limit: number
+  ): Promise<Array<{ id: string; name: string }>> {
+    // Sanitize: strip SQL wildcards, limit length
+    const sanitized = query.replace(/[%_]/g, '').slice(0, 100);
+
+    if (!sanitized) {
+      return [];
+    }
+
+    // Build subsequence pattern: "abc" → "%a%b%c%"
+    const pattern = '%' + sanitized.split('').join('%') + '%';
+
+    if (excludeIds.length > 0) {
+      return this.prisma.$queryRaw<Array<{ id: string; name: string }>>`
+        SELECT id, name FROM organizations
+        WHERE LOWER(name) LIKE LOWER(${pattern})
+          AND archived_at IS NULL
+          AND id NOT IN (${Prisma.join(excludeIds)})
+        ORDER BY name
+        LIMIT ${limit}
+      `;
+    }
+
+    return this.prisma.$queryRaw<Array<{ id: string; name: string }>>`
+      SELECT id, name FROM organizations
+      WHERE LOWER(name) LIKE LOWER(${pattern})
+        AND archived_at IS NULL
+      ORDER BY name
+      LIMIT ${limit}
+    `;
   }
 }

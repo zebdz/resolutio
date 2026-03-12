@@ -13,9 +13,6 @@ interface AuthenticatedLayoutProps {
   children: React.ReactNode;
 }
 
-const userRepository = new PrismaUserRepository(prisma);
-const notificationRepository = new PrismaNotificationRepository(prisma);
-
 export async function AuthenticatedLayout({
   children,
 }: AuthenticatedLayoutProps) {
@@ -34,6 +31,9 @@ export async function AuthenticatedLayout({
   if (!user.privacySetupCompleted) {
     redirect('/privacy-setup');
   }
+
+  const userRepository = new PrismaUserRepository(prisma);
+  const notificationRepository = new PrismaNotificationRepository(prisma);
 
   const [isSuperAdmin, isBlocked, unreadNotificationCount] = await Promise.all([
     userRepository.isSuperAdmin(user.id),

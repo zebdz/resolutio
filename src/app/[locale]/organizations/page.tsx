@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { Heading } from '@/app/components/catalyst/heading';
 import { Text } from '@/app/components/catalyst/text';
-import { searchOrganizationsAction } from '@/web/actions/organization';
+import { searchOrganizationsNotAlreadyMemberOfAction } from '@/web/actions/organization';
 import { OrganizationsList } from './OrganizationsList';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 
@@ -16,7 +16,7 @@ export default async function OrganizationsPage() {
     return <AuthenticatedLayout>{null}</AuthenticatedLayout>;
   }
 
-  const result = await searchOrganizationsAction({
+  const result = await searchOrganizationsNotAlreadyMemberOfAction({
     page: 1,
     pageSize: PAGE_SIZE,
   });

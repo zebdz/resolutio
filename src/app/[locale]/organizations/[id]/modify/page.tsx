@@ -10,6 +10,7 @@ import {
   getOrgAdminsAction,
   getOrganizationPendingRequestsAction,
 } from '@/web/actions/organization';
+import { getPendingAdminInvitesAction } from '@/web/actions/invitation';
 import {
   getChildOrgJoinParentRequestAction,
   getIncomingJoinParentRequestsAction,
@@ -73,12 +74,17 @@ export default async function OrganizationModifyPage({
   } | null = null;
   let incomingParentRequestCount = 0;
 
-  const [childReqResult, incomingReqResult, pendingMembersResult] =
-    await Promise.all([
-      getChildOrgJoinParentRequestAction(id),
-      getIncomingJoinParentRequestsAction(id),
-      getOrganizationPendingRequestsAction(id, 1, 1),
-    ]);
+  const [
+    childReqResult,
+    incomingReqResult,
+    pendingMembersResult,
+    pendingAdminInvitesResult,
+  ] = await Promise.all([
+    getChildOrgJoinParentRequestAction(id),
+    getIncomingJoinParentRequestsAction(id),
+    getOrganizationPendingRequestsAction(id, 1, 1),
+    getPendingAdminInvitesAction(id),
+  ]);
 
   if (childReqResult.success) {
     pendingParentRequest = childReqResult.data.request;
@@ -91,6 +97,24 @@ export default async function OrganizationModifyPage({
   const pendingMemberRequestCount = pendingMembersResult.success
     ? pendingMembersResult.data.totalCount
     : 0;
+
+  const pendingAdminInvites = pendingAdminInvitesResult.success
+    ? pendingAdminInvitesResult.data
+    : [];
+
+  // Resolve invitee user details
+  const inviteeUserIds = pendingAdminInvites.map((inv) => inv.inviteeId);
+  const inviteeUserDomains =
+    inviteeUserIds.length > 0
+      ? await userRepository.findByIds(inviteeUserIds)
+      : [];
+  const inviteeUsers = inviteeUserDomains.map((u) => ({
+    id: u.id,
+    firstName: u.firstName,
+    lastName: u.lastName,
+    middleName: u.middleName ?? null,
+    nickname: u.nickname.getValue(),
+  }));
 
   return (
     <AuthenticatedLayout>
@@ -120,6 +144,8 @@ export default async function OrganizationModifyPage({
           organizationId={id}
           admins={admins}
           currentUserId={user.id}
+          pendingInvites={pendingAdminInvites}
+          inviteeUsers={inviteeUsers}
         />
 
         <Divider />

@@ -218,6 +218,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   async findAdminUserIds(): Promise<string[]> {
     return [];
   }
+  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+    return [];
+  }
 }
 
 // Mock UserRepository

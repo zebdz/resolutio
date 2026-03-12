@@ -58,11 +58,22 @@ function getNotificationIcon(type: string) {
     case 'join_request_accepted':
       return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
     case 'join_request_rejected':
+    case 'join_parent_request_rejected':
       return <XCircleIcon className="h-5 w-5 text-red-500" />;
     case 'poll_activated':
       return <MegaphoneIcon className="h-5 w-5 text-green-500" />;
     case 'poll_finished':
       return <CheckCircleIcon className="h-5 w-5 text-purple-500" />;
+    case 'admin_invite_received':
+    case 'board_member_invite_received':
+    case 'member_invite_received':
+      return <EnvelopeIcon className="h-5 w-5 text-blue-500" />;
+    case 'admin_invite_accepted':
+    case 'board_member_invite_accepted':
+    case 'member_invite_accepted':
+      return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
+    case 'invite_revoked':
+      return <XCircleIcon className="h-5 w-5 text-red-500" />;
     default:
       return <BellIcon className="h-5 w-5 text-zinc-400" />;
   }

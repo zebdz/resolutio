@@ -156,6 +156,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
 
   async removeAdmin(): Promise<void> {}
+  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+    return [];
+  }
 }
 
 class MockUserRepository implements UserRepository {

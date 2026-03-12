@@ -6,6 +6,7 @@ import { CreateOrganizationButton } from './CreateOrganizationButton';
 import { UserOrganizationsList } from './UserOrganizationsList';
 import { getAdminOrganizationsAction } from '@/web/actions/organization';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { PendingInvitesSection } from './PendingInvitesSection';
 
 export default async function HomePage({
   params,
@@ -39,6 +40,9 @@ export default async function HomePage({
             </Link>
           )}
         </div>
+
+        {/* Pending Invitations */}
+        <PendingInvitesSection />
 
         {/* User Organizations List */}
         <UserOrganizationsList adminOrganizations={adminOrganizations} />

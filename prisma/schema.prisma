@@ -62,6 +62,8 @@ model User {
   changedUserBlockStatuses   UserBlockStatus[] @relation("StatusChangedBySuperadmin")
   changedIpBlockStatuses     IpBlockStatus[]   @relation("IpBlockStatusChangedBy")
   otpVerifications           OtpVerification[]
+  invitationsSent            Invitation[] @relation("InvitationInviter")
+  invitationsReceived        Invitation[] @relation("InvitationInvitee")
 
   @@map("users")
 }
@@ -109,6 +111,7 @@ model Organization {
   polls               Poll[]
   childJoinRequests   OrganizationJoinParentRequest[] @relation("ChildOrgJoinParent")
   parentJoinRequests  OrganizationJoinParentRequest[] @relation("ParentOrgJoinParent")
+  invitations         Invitation[]
 
   @@index([parentId])
   @@index([createdById])
@@ -163,6 +166,7 @@ model Board {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   members      BoardUser[]
   polls        Poll[]
+  invitations  Invitation[]
 
   @@unique([name, organizationId])
   @@index([organizationId])
@@ -466,5 +470,28 @@ model IpBlockStatus {
   @@index([ipAddress])
   @@index([ipAddress, createdAt])
   @@map("ip_block_statuses")
+}
+
+// Invitation Models
+model Invitation {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  boardId        String?   @map("board_id")
+  inviterId      String    @map("inviter_id")
+  inviteeId      String    @map("invitee_id")
+  type           String    // "admin_invite" | "board_member_invite" | "member_invite"
+  status         String    @default("pending") // "pending" | "accepted" | "declined" | "revoked"
+  createdAt      DateTime  @default(now()) @map("created_at")
+  handledAt      DateTime? @map("handled_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  board        Board?       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  inviter      User         @relation("InvitationInviter", fields: [inviterId], references: [id])
+  invitee      User         @relation("InvitationInvitee", fields: [inviteeId], references: [id])
+
+  @@index([organizationId, type, status])
+  @@index([boardId, status])
+  @@index([inviteeId, status])
+  @@map("invitations")
 }
 
