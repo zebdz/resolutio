@@ -19,6 +19,44 @@ interface OrgHierarchyTreeProps {
 const ZOOM_STEP = 0.25;
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 4;
+const WRAP_MAX_CHARS = 14;
+
+/** Split text into lines of ~WRAP_MAX_CHARS, breaking on spaces/hyphens. */
+function wrapText(text: string): string[] {
+  if (text.length <= WRAP_MAX_CHARS) {
+    return [text];
+  }
+
+  const lines: string[] = [];
+  let remaining = text;
+
+  while (remaining.length > WRAP_MAX_CHARS) {
+    // Find last space or hyphen within limit
+    let breakIdx = -1;
+
+    for (let i = WRAP_MAX_CHARS; i >= 0; i--) {
+      if (remaining[i] === ' ' || remaining[i] === '-') {
+        breakIdx = i;
+        break;
+      }
+    }
+
+    if (breakIdx === -1) {
+      // No break point found — force break at limit
+      breakIdx = WRAP_MAX_CHARS;
+    }
+
+    const isHyphen = remaining[breakIdx] === '-';
+    lines.push(remaining.slice(0, breakIdx + (isHyphen ? 1 : 0)).trimEnd());
+    remaining = remaining.slice(breakIdx + (isHyphen ? 1 : 0)).trimStart();
+  }
+
+  if (remaining) {
+    lines.push(remaining);
+  }
+
+  return lines;
+}
 
 function TreeDiagram({
   tree,
@@ -228,7 +266,7 @@ function TreeDiagram({
     layout(root);
 
     // Compute tight bounding box from actual node positions
-    const PAD = 80;
+    const PAD = 100;
     let minX = Infinity,
       maxX = -Infinity,
       minY = Infinity,
@@ -302,19 +340,29 @@ function TreeDiagram({
       )
       .attr('stroke-width', (d) => (d.data.id === currentOrgId ? 2 : 1));
 
-    // Labels — always horizontal
-    node
-      .append('text')
-      .attr('dy', '-0.8em')
-      .attr('text-anchor', 'middle')
-      .attr('font-size', '11px')
-      .attr('font-weight', (d) =>
-        d.data.id === currentOrgId ? 'bold' : 'normal'
-      )
-      .attr('fill', (d) =>
-        d.data.id === currentOrgId ? '#6366f1' : 'currentColor'
-      )
-      .text((d) => d.data.name);
+    // Labels — always horizontal, wrapped into multiple lines
+    const LINE_HEIGHT = 13; // px between tspan lines
+    node.each(function (d) {
+      const lines = wrapText(d.data.name);
+      // Stack lines upward: bottom line at dy=-0.8em above node
+      const baseY = -10; // px above node center (≈ -0.8em at 11px)
+      const topY = baseY - (lines.length - 1) * LINE_HEIGHT;
+
+      const textEl = select(this)
+        .append('text')
+        .attr('text-anchor', 'middle')
+        .attr('font-size', '11px')
+        .attr('font-weight', d.data.id === currentOrgId ? 'bold' : 'normal')
+        .attr('fill', d.data.id === currentOrgId ? '#6366f1' : 'currentColor');
+
+      lines.forEach((line, i) => {
+        textEl
+          .append('tspan')
+          .attr('x', 0)
+          .attr('y', topY + i * LINE_HEIGHT)
+          .text(line);
+      });
+    });
 
     // Member count below name
     node
