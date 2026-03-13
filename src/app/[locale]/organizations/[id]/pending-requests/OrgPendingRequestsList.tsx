@@ -27,6 +27,7 @@ import {
   handleJoinRequestAction,
   getOrganizationPendingRequestsAction,
 } from '@/web/actions/organization';
+import { User } from '@/src/domain/user/User';
 
 interface OrgPendingRequest {
   userId: string;
@@ -273,9 +274,11 @@ export function OrgPendingRequestsList({
               <TableRow key={request.userId}>
                 <TableCell>{actionButtons(request)}</TableCell>
                 <TableCell>
-                  {request.lastName}
-                  {request.middleName ? ` ${request.middleName}` : ''}{' '}
-                  {request.firstName}
+                  {User.formatFullName(
+                    request.firstName,
+                    request.lastName,
+                    request.middleName
+                  )}
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
                   {new Date(request.requestedAt).toLocaleDateString()}
@@ -296,9 +299,11 @@ export function OrgPendingRequestsList({
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 space-y-2">
                 <Heading level={3} className="text-lg font-semibold">
-                  {request.lastName}
-                  {request.middleName ? ` ${request.middleName}` : ''}{' '}
-                  {request.firstName}
+                  {User.formatFullName(
+                    request.firstName,
+                    request.lastName,
+                    request.middleName
+                  )}
                 </Heading>
                 <Text className="text-xs text-zinc-500 dark:text-zinc-500">
                   {t('requestedAt')}{' '}
@@ -324,13 +329,11 @@ export function OrgPendingRequestsList({
         <DialogDescription>
           {selectedRequest &&
             t('rejectDialogDescription', {
-              name: [
-                selectedRequest.lastName,
-                selectedRequest.middleName,
+              name: User.formatFullName(
                 selectedRequest.firstName,
-              ]
-                .filter(Boolean)
-                .join(' '),
+                selectedRequest.lastName,
+                selectedRequest.middleName
+              ),
               organization: organizationName,
             })}
         </DialogDescription>

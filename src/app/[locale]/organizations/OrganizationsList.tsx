@@ -22,6 +22,7 @@ import {
   type ActionResult,
   type SearchOrganizationsInput,
 } from '@/web/actions/organization';
+import { User } from '@/domain/user/User';
 
 const PAGE_SIZE = 30;
 
@@ -30,7 +31,12 @@ export interface OrganizationItem {
   name: string;
   description: string;
   memberCount: number;
-  firstAdmin: { id: string; firstName: string; lastName: string } | null;
+  firstAdmin: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    middleName: string | null;
+  } | null;
   parentOrg?: { id: string; name: string } | null;
   archivedAt?: Date | null;
 }
@@ -272,8 +278,12 @@ export function OrganizationsList({
 
                   {org.firstAdmin && (
                     <Text className="text-xs text-zinc-500 dark:text-zinc-400">
-                      {t('admin')}: {org.firstAdmin.firstName}{' '}
-                      {org.firstAdmin.lastName}
+                      {t('admin')}:{' '}
+                      {User.formatFullName(
+                        org.firstAdmin.firstName,
+                        org.firstAdmin.lastName,
+                        org.firstAdmin.middleName
+                      )}
                     </Text>
                   )}
                 </div>

@@ -401,8 +401,12 @@ export function SuspiciousActivityPanel() {
                 <div className="truncate font-mono text-sm">{item.key}</div>
                 {item.resolvedUser && (
                   <div className="text-xs text-zinc-500">
-                    {item.resolvedUser.firstName} {item.resolvedUser.lastName} (
-                    {item.resolvedUser.phoneNumber})
+                    {User.formatFullName(
+                      item.resolvedUser.firstName,
+                      item.resolvedUser.lastName,
+                      item.resolvedUser.middleName
+                    )}{' '}
+                    ({item.resolvedUser.phoneNumber})
                   </div>
                 )}
               </div>

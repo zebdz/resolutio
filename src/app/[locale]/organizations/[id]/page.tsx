@@ -19,6 +19,7 @@ import {
 } from '@/infrastructure/index';
 import { OrgMembersList } from './OrgMembersList';
 import { getOrgMembersAction } from '@/web/actions/invitation';
+import { User } from '@/domain/user/User';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
@@ -117,13 +118,11 @@ export default async function OrganizationDetailPage({
           {firstAdmin && (
             <Text className="text-sm text-zinc-600 dark:text-zinc-400">
               {t('firstAdmin')}:{' '}
-              {[
-                firstAdmin.lastName,
-                firstAdmin.middleName,
+              {User.formatFullName(
                 firstAdmin.firstName,
-              ]
-                .filter(Boolean)
-                .join(' ')}
+                firstAdmin.lastName,
+                firstAdmin.middleName
+              )}
             </Text>
           )}
         </div>
