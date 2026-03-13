@@ -338,6 +338,7 @@ function makePendingInvitation(
 const mockPrisma = {
   organizationUser: {
     create: vi.fn().mockResolvedValue({}),
+    upsert: vi.fn().mockResolvedValue({}),
   },
   organizationAdminUser: {
     findUnique: vi.fn().mockResolvedValue(null),
@@ -360,6 +361,7 @@ describe('HandleInviteUseCase', () => {
     userRepo = new MockUserRepository();
     notifRepo = new MockNotificationRepository();
     mockPrisma.organizationUser.create.mockResolvedValue({});
+    mockPrisma.organizationUser.upsert.mockResolvedValue({});
     mockPrisma.organizationAdminUser.findUnique.mockResolvedValue(null);
 
     useCase = new HandleInviteUseCase({
@@ -590,11 +592,21 @@ describe('HandleInviteUseCase', () => {
     });
     expect(result.success).toBe(true);
 
-    // Verify OrganizationUser was created
-    expect(mockPrisma.organizationUser.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+    // Verify OrganizationUser was upserted
+    expect(mockPrisma.organizationUser.upsert).toHaveBeenCalledWith({
+      where: {
+        organizationId_userId: {
+          organizationId: 'org-1',
+          userId: 'user-2',
+        },
+      },
+      create: expect.objectContaining({
         organizationId: 'org-1',
         userId: 'user-2',
+        status: 'accepted',
+        acceptedByUserId: 'user-1',
+      }),
+      update: expect.objectContaining({
         status: 'accepted',
         acceptedByUserId: 'user-1',
       }),
@@ -607,5 +619,45 @@ describe('HandleInviteUseCase', () => {
     const updated = await invitationRepo.findById('inv-1');
     expect(updated!.status).toBe('accepted');
     expect(updated!.handledAt).not.toBeNull();
+  });
+
+  it('should accept member invite when user already has a pending membership (upsert)', async () => {
+    const inv = makePendingInvitation('inv-1', {
+      inviteeId: 'user-2',
+      inviterId: 'user-1',
+      organizationId: 'org-1',
+      type: 'member_invite',
+    });
+    invitationRepo.addInvitation(inv);
+
+    orgRepo.addOrganization(makeOrg('org-1'));
+    userRepo.addUser(makeUser('user-2'));
+
+    const result = await useCase.execute({
+      invitationId: 'inv-1',
+      action: 'accept',
+      actorUserId: 'user-2',
+    });
+    expect(result.success).toBe(true);
+
+    // Verify upsert was used (handles existing pending membership)
+    expect(mockPrisma.organizationUser.upsert).toHaveBeenCalledWith({
+      where: {
+        organizationId_userId: {
+          organizationId: 'org-1',
+          userId: 'user-2',
+        },
+      },
+      create: expect.objectContaining({
+        organizationId: 'org-1',
+        userId: 'user-2',
+        status: 'accepted',
+        acceptedByUserId: 'user-1',
+      }),
+      update: expect.objectContaining({
+        status: 'accepted',
+        acceptedByUserId: 'user-1',
+      }),
+    });
   });
 });

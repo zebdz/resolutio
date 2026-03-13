@@ -166,11 +166,22 @@ export class HandleInviteUseCase {
           console.error('Failed to notify board member invite accepted:', err)
         );
     } else if (invitation.type === 'member_invite') {
-      // Create membership directly with accepted status
-      await this.deps.prisma.organizationUser.create({
-        data: {
+      // Upsert membership: user may already have a pending/rejected record from a join request
+      await this.deps.prisma.organizationUser.upsert({
+        where: {
+          organizationId_userId: {
+            organizationId: invitation.organizationId,
+            userId: invitation.inviteeId,
+          },
+        },
+        create: {
           organizationId: invitation.organizationId,
           userId: invitation.inviteeId,
+          status: 'accepted',
+          acceptedAt: new Date(),
+          acceptedByUserId: invitation.inviterId,
+        },
+        update: {
           status: 'accepted',
           acceptedAt: new Date(),
           acceptedByUserId: invitation.inviterId,

@@ -7,11 +7,12 @@ import { Divider } from '@/app/components/catalyst/divider';
 import { Link } from '@/src/i18n/routing';
 import {
   getOrganizationDetailsAction,
-  getOrgAdminsAction,
+  getOrgAdminsPaginatedAction,
   getOrganizationPendingRequestsAction,
 } from '@/web/actions/organization';
 import {
   getPendingAdminInvitesAction,
+  getPendingMemberInvitesAction,
   getOrgMembersAction,
 } from '@/web/actions/invitation';
 import {
@@ -63,9 +64,12 @@ export default async function OrganizationModifyPage({
     redirect(`/${locale}/organizations/${id}`);
   }
 
-  // Fetch admins
-  const adminsResult = await getOrgAdminsAction(id);
-  const admins = adminsResult.success ? adminsResult.data : [];
+  // Fetch admins (paginated)
+  const adminsResult = await getOrgAdminsPaginatedAction(id);
+  const initialAdmins = adminsResult.success ? adminsResult.data.admins : [];
+  const initialAdminsTotalCount = adminsResult.success
+    ? adminsResult.data.totalCount
+    : 0;
 
   // Fetch join parent request data
   let pendingParentRequest: {
@@ -82,12 +86,14 @@ export default async function OrganizationModifyPage({
     incomingReqResult,
     pendingMembersResult,
     pendingAdminInvitesResult,
+    pendingMemberInvitesResult,
     membersResult,
   ] = await Promise.all([
     getChildOrgJoinParentRequestAction(id),
     getIncomingJoinParentRequestsAction(id),
     getOrganizationPendingRequestsAction(id, 1, 1),
     getPendingAdminInvitesAction(id),
+    getPendingMemberInvitesAction(id),
     getOrgMembersAction(id),
   ]);
 
@@ -103,9 +109,13 @@ export default async function OrganizationModifyPage({
     ? pendingMembersResult.data.totalCount
     : 0;
 
-  const pendingAdminInvites = pendingAdminInvitesResult.success
-    ? pendingAdminInvitesResult.data
-    : [];
+  const pendingAdminInviteCount = pendingAdminInvitesResult.success
+    ? pendingAdminInvitesResult.data.length
+    : 0;
+
+  const pendingMemberInviteCount = pendingMemberInvitesResult.success
+    ? pendingMemberInvitesResult.data.length
+    : 0;
 
   const initialMembers = membersResult.success
     ? membersResult.data.members
@@ -113,20 +123,6 @@ export default async function OrganizationModifyPage({
   const initialMembersTotalCount = membersResult.success
     ? membersResult.data.totalCount
     : 0;
-
-  // Resolve invitee user details
-  const inviteeUserIds = pendingAdminInvites.map((inv) => inv.inviteeId);
-  const inviteeUserDomains =
-    inviteeUserIds.length > 0
-      ? await userRepository.findByIds(inviteeUserIds)
-      : [];
-  const inviteeUsers = inviteeUserDomains.map((u) => ({
-    id: u.id,
-    firstName: u.firstName,
-    lastName: u.lastName,
-    middleName: u.middleName ?? null,
-    nickname: u.nickname.getValue(),
-  }));
 
   return (
     <AuthenticatedLayout>
@@ -154,10 +150,9 @@ export default async function OrganizationModifyPage({
         {/* Admin Management */}
         <AdminManagementSection
           organizationId={id}
-          admins={admins}
-          currentUserId={user.id}
-          pendingInvites={pendingAdminInvites}
-          inviteeUsers={inviteeUsers}
+          initialAdmins={initialAdmins}
+          initialAdminsTotalCount={initialAdminsTotalCount}
+          pendingAdminInviteCount={pendingAdminInviteCount}
         />
 
         <Divider />
@@ -168,6 +163,7 @@ export default async function OrganizationModifyPage({
           isUserMember={isUserMember}
           showMemberRequests={isUserAdmin || isSuperAdmin}
           pendingMemberRequestCount={pendingMemberRequestCount}
+          pendingMemberInviteCount={pendingMemberInviteCount}
           showMembersList={true}
           initialMembers={initialMembers}
           initialMembersTotalCount={initialMembersTotalCount}

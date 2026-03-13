@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CreateOrgMemberInviteUseCase } from '../CreateOrgMemberInviteUseCase';
 import { InvitationRepository } from '../../../domain/invitation/InvitationRepository';
 import { Invitation } from '../../../domain/invitation/Invitation';
@@ -283,6 +283,12 @@ function makeUser(id: string): User {
   return user;
 }
 
+const mockPrisma = {
+  organizationUser: {
+    findUnique: vi.fn().mockResolvedValue(null),
+  },
+} as any;
+
 describe('CreateOrgMemberInviteUseCase', () => {
   let useCase: CreateOrgMemberInviteUseCase;
   let invitationRepo: MockInvitationRepository;
@@ -291,15 +297,18 @@ describe('CreateOrgMemberInviteUseCase', () => {
   let notifRepo: MockNotificationRepository;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     invitationRepo = new MockInvitationRepository();
     orgRepo = new MockOrganizationRepository();
     userRepo = new MockUserRepository();
     notifRepo = new MockNotificationRepository();
+    mockPrisma.organizationUser.findUnique.mockResolvedValue(null);
     useCase = new CreateOrgMemberInviteUseCase({
       invitationRepository: invitationRepo,
       organizationRepository: orgRepo,
       userRepository: userRepo,
       notificationRepository: notifRepo,
+      prisma: mockPrisma,
     });
   });
 
@@ -421,6 +430,30 @@ describe('CreateOrgMemberInviteUseCase', () => {
 
     if (!result.success) {
       expect(result.error).toBe(InvitationErrors.ALREADY_INVITED);
+    }
+  });
+
+  it('should fail when invitee has a pending join request', async () => {
+    orgRepo.addOrganization(makeOrg('org-1'));
+    orgRepo.setAdmin('org-1', 'admin-1');
+    userRepo.addUser(makeUser('user-1'));
+
+    // User has a pending join request (organizationUser with status 'pending')
+    mockPrisma.organizationUser.findUnique.mockResolvedValueOnce({
+      organizationId: 'org-1',
+      userId: 'user-1',
+      status: 'pending',
+    });
+
+    const result = await useCase.execute({
+      organizationId: 'org-1',
+      inviteeId: 'user-1',
+      actorUserId: 'admin-1',
+    });
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error).toBe(InvitationErrors.INVITEE_HAS_PENDING_REQUEST);
     }
   });
 

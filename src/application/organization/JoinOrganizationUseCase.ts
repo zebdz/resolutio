@@ -1,5 +1,6 @@
 import { PrismaClient } from '@/generated/prisma/client';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { InvitationRepository } from '../../domain/invitation/InvitationRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
@@ -9,6 +10,7 @@ import { NotifyJoinRequestReceivedUseCase } from '../notification/NotifyJoinRequ
 
 export interface JoinOrganizationDependencies {
   organizationRepository: OrganizationRepository;
+  invitationRepository: InvitationRepository;
   notificationRepository: NotificationRepository;
   userRepository: UserRepository;
   prisma: PrismaClient;
@@ -54,6 +56,17 @@ export class JoinOrganizationUseCase {
       if (existingMembership.status === 'pending') {
         return failure(OrganizationErrors.PENDING_REQUEST);
       }
+    }
+
+    // Check if user has a pending member invite for this org
+    const pendingInvite =
+      await this.deps.invitationRepository.findPendingMemberInvite(
+        organizationId,
+        userId
+      );
+
+    if (pendingInvite) {
+      return failure(OrganizationErrors.PENDING_INVITE);
     }
 
     // Check hierarchy constraints - block if pending request anywhere in hierarchy tree

@@ -11,6 +11,7 @@ type Props = {
   isUserMember: boolean;
   showMemberRequests: boolean;
   pendingMemberRequestCount?: number;
+  pendingMemberInviteCount?: number;
   showMembersList?: boolean;
   initialMembers?: OrgMember[];
   initialMembersTotalCount?: number;
@@ -21,6 +22,7 @@ export async function MembershipSection({
   isUserMember,
   showMemberRequests,
   pendingMemberRequestCount = 0,
+  pendingMemberInviteCount = 0,
   showMembersList = false,
   initialMembers = [],
   initialMembersTotalCount = 0,
@@ -53,7 +55,14 @@ export async function MembershipSection({
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <Link href={`/organizations/${organizationId}/manage-members`}>
-                <Button color="zinc">{t('manageMembers')}</Button>
+                <Button color="zinc">
+                  {t('manageMembers')}
+                  {pendingMemberInviteCount > 0 && (
+                    <Badge className="ml-2 !bg-white/90 !text-zinc-900">
+                      {pendingMemberInviteCount}
+                    </Badge>
+                  )}
+                </Button>
               </Link>
               {showMemberRequests && (
                 <Link
@@ -62,7 +71,7 @@ export async function MembershipSection({
                   <Button color="zinc">
                     {t('memberRequests')}
                     {pendingMemberRequestCount > 0 && (
-                      <Badge color="red" className="ml-2">
+                      <Badge className="ml-2 !bg-white/90 !text-zinc-900">
                         {pendingMemberRequestCount}
                       </Badge>
                     )}

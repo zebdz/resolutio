@@ -2,22 +2,26 @@ import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 import { Link } from '@/src/i18n/routing';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
-import { InviteMemberSection } from './InviteMemberSection';
-import { PendingMemberInvites } from './PendingMemberInvites';
-import { getPendingMemberInvitesAction } from '@/web/actions/invitation';
-import { getOrganizationDetailsAction } from '@/web/actions/organization';
+import { CurrentAdminsList } from './CurrentAdminsList';
+import { InviteAdminSection } from './InviteAdminSection';
+import { PendingAdminInvites } from './PendingAdminInvites';
+import { getPendingAdminInvitesAction } from '@/web/actions/invitation';
+import {
+  getOrganizationDetailsAction,
+  getOrgAdminsPaginatedAction,
+} from '@/web/actions/organization';
 import { getCurrentUser } from '@/web/lib/session';
 import { prisma, PrismaUserRepository } from '@/infrastructure/index';
 
 const userRepository = new PrismaUserRepository(prisma);
 
-export default async function ManageMembersPage({
+export default async function ManageAdminsPage({
   params,
 }: {
   params: Promise<{ id: string; locale: string }>;
 }) {
   const { id: organizationId, locale } = await params;
-  const t = await getTranslations('manageMembers');
+  const t = await getTranslations('manageAdmins');
 
   const user = await getCurrentUser();
 
@@ -37,7 +41,12 @@ export default async function ManageMembersPage({
     redirect(`/${locale}/organizations/${organizationId}`);
   }
 
-  const pendingResult = await getPendingMemberInvitesAction(organizationId);
+  const [adminsResult, pendingResult] = await Promise.all([
+    getOrgAdminsPaginatedAction(organizationId, 1, 100),
+    getPendingAdminInvitesAction(organizationId),
+  ]);
+
+  const admins = adminsResult.success ? adminsResult.data.admins : [];
   const pendingInvites = pendingResult.success ? pendingResult.data : [];
 
   // Resolve invitee user details
@@ -69,8 +78,13 @@ export default async function ManageMembersPage({
         </h1>
 
         <div className="space-y-6">
-          <InviteMemberSection organizationId={organizationId} />
-          <PendingMemberInvites
+          <CurrentAdminsList
+            organizationId={organizationId}
+            admins={admins}
+            currentUserId={user.id}
+          />
+          <InviteAdminSection organizationId={organizationId} />
+          <PendingAdminInvites
             organizationId={organizationId}
             initialInvites={pendingInvites}
             inviteeUsers={inviteeUsers}

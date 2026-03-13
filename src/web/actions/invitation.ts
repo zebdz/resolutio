@@ -172,6 +172,7 @@ export async function createOrgMemberInviteAction(
     }
 
     const useCase = new CreateOrgMemberInviteUseCase({
+      prisma,
       invitationRepository,
       organizationRepository,
       userRepository,

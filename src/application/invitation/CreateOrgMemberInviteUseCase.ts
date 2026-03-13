@@ -1,3 +1,4 @@
+import { PrismaClient } from '@/generated/prisma/client';
 import { InvitationRepository } from '../../domain/invitation/InvitationRepository';
 import { Invitation } from '../../domain/invitation/Invitation';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
@@ -15,6 +16,7 @@ export interface CreateOrgMemberInviteInput {
 }
 
 export interface CreateOrgMemberInviteDependencies {
+  prisma: PrismaClient;
   invitationRepository: InvitationRepository;
   organizationRepository: OrganizationRepository;
   userRepository: UserRepository;
@@ -71,6 +73,20 @@ export class CreateOrgMemberInviteUseCase {
 
     if (isAlreadyMember) {
       return failure(InvitationErrors.INVITEE_ALREADY_MEMBER);
+    }
+
+    // Check invitee doesn't have a pending join request
+    const pendingRequest = await this.deps.prisma.organizationUser.findUnique({
+      where: {
+        organizationId_userId: {
+          organizationId,
+          userId: inviteeId,
+        },
+      },
+    });
+
+    if (pendingRequest && pendingRequest.status === 'pending') {
+      return failure(InvitationErrors.INVITEE_HAS_PENDING_REQUEST);
     }
 
     // Check not member of any org in hierarchy tree

@@ -9,6 +9,7 @@ export const OrganizationErrors = {
   // Join/Membership
   ALREADY_MEMBER: 'organization.errors.alreadyMember',
   PENDING_REQUEST: 'organization.errors.pendingRequest',
+  PENDING_INVITE: 'organization.errors.pendingInvite',
   REJECTED_REQUEST: 'organization.errors.rejectedRequest',
   HIERARCHY_CONFLICT: 'organization.errors.hierarchyConflict',
   PENDING_HIERARCHY_REQUEST: 'organization.errors.pendingHierarchyRequest',

@@ -4,6 +4,8 @@ import { Organization } from '../../../domain/organization/Organization';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { NotificationRepository } from '../../../domain/notification/NotificationRepository';
 import { UserRepository } from '../../../domain/user/UserRepository';
+import { InvitationRepository } from '../../../domain/invitation/InvitationRepository';
+import { Invitation } from '../../../domain/invitation/Invitation';
 import { Notification } from '../../../domain/notification/Notification';
 import { OrganizationErrors } from '../OrganizationErrors';
 
@@ -334,22 +336,60 @@ class MockUserRepository implements UserRepository {
   }
 }
 
+// Mock InvitationRepository
+class MockInvitationRepository implements InvitationRepository {
+  findPendingMemberInvite =
+    vi.fn<(orgId: string, inviteeId: string) => Promise<Invitation | null>>();
+
+  constructor() {
+    this.findPendingMemberInvite.mockResolvedValue(null);
+  }
+
+  async save(invitation: Invitation): Promise<Invitation> {
+    return invitation;
+  }
+  async update(invitation: Invitation): Promise<Invitation> {
+    return invitation;
+  }
+  async findById(): Promise<Invitation | null> {
+    return null;
+  }
+  async findPendingByInviteeId(): Promise<Invitation[]> {
+    return [];
+  }
+  async findPendingByOrganizationId(): Promise<Invitation[]> {
+    return [];
+  }
+  async findPendingByBoardId(): Promise<Invitation[]> {
+    return [];
+  }
+  async findPendingAdminInvite(): Promise<Invitation | null> {
+    return null;
+  }
+  async findPendingBoardMemberInvite(): Promise<Invitation | null> {
+    return null;
+  }
+}
+
 describe('JoinOrganizationUseCase', () => {
   let useCase: JoinOrganizationUseCase;
   let organizationRepository: MockOrganizationRepository;
   let notificationRepository: MockNotificationRepository;
   let userRepository: MockUserRepository;
+  let invitationRepository: MockInvitationRepository;
   let prisma: MockPrismaClient;
 
   beforeEach(() => {
     organizationRepository = new MockOrganizationRepository();
     notificationRepository = new MockNotificationRepository();
     userRepository = new MockUserRepository();
+    invitationRepository = new MockInvitationRepository();
     prisma = new MockPrismaClient();
     useCase = new JoinOrganizationUseCase({
       organizationRepository,
       notificationRepository,
       userRepository,
+      invitationRepository,
       prisma: prisma as any,
     });
   });
@@ -480,6 +520,47 @@ describe('JoinOrganizationUseCase', () => {
 
       if (!result.success) {
         expect(result.error).toBe(OrganizationErrors.PENDING_REQUEST);
+      }
+    }
+  });
+
+  it('should fail if user has a pending member invite', async () => {
+    const orgResult = Organization.create(
+      'Test Organization',
+      'Test description',
+      'creator-123'
+    );
+    expect(orgResult.success).toBe(true);
+
+    if (orgResult.success) {
+      const org = orgResult.value;
+      (org as any).props.id = 'org-123';
+      organizationRepository.addOrganization(org);
+
+      // User has a pending member invite for this org
+      invitationRepository.findPendingMemberInvite.mockResolvedValueOnce(
+        Invitation.reconstitute({
+          id: 'inv-1',
+          organizationId: 'org-123',
+          boardId: null,
+          inviterId: 'admin-1',
+          inviteeId: 'user-456',
+          type: 'member_invite',
+          status: 'pending',
+          createdAt: new Date(),
+          handledAt: null,
+        })
+      );
+
+      const result = await useCase.execute(
+        { organizationId: 'org-123' },
+        'user-456'
+      );
+
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        expect(result.error).toBe(OrganizationErrors.PENDING_INVITE);
       }
     }
   });

@@ -23,12 +23,14 @@ import { CancelJoinRequestUseCase } from '@/application/organization/CancelJoinR
 import { CancelJoinRequestSchema } from '@/application/organization/CancelJoinRequestSchema';
 import { UpdateOrganizationUseCase } from '@/application/organization/UpdateOrganizationUseCase';
 import { RemoveOrgAdminUseCase } from '@/application/organization/RemoveOrgAdminUseCase';
+import { GetOrgAdminsPaginatedUseCase } from '@/application/organization/GetOrgAdminsPaginatedUseCase';
 import {
   prisma,
   PrismaOrganizationRepository,
   PrismaBoardRepository,
   PrismaUserRepository,
   PrismaNotificationRepository,
+  PrismaInvitationRepository,
 } from '@/infrastructure/index';
 import { Notification } from '@/domain/notification/Notification';
 import { getCurrentUser } from '../lib/session';
@@ -45,6 +47,7 @@ const organizationRepository = new PrismaOrganizationRepository(prisma);
 const boardRepository = new PrismaBoardRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 const notificationRepository = new PrismaNotificationRepository(prisma);
+const invitationRepository = new PrismaInvitationRepository(prisma);
 
 // Use cases
 const createOrganizationUseCase = new CreateOrganizationUseCase({
@@ -77,6 +80,7 @@ const handleJoinRequestUseCase = new HandleJoinRequestUseCase({
 
 const joinOrganizationUseCase = new JoinOrganizationUseCase({
   organizationRepository,
+  invitationRepository,
   notificationRepository,
   userRepository,
   prisma,
@@ -1359,16 +1363,12 @@ export async function removeOrgAdminAction(
   }
 }
 
-export async function getOrgAdminsAction(organizationId: string): Promise<
-  ActionResult<
-    Array<{
-      id: string;
-      firstName: string;
-      lastName: string;
-      middleName?: string;
-    }>
-  >
-> {
+export async function getOrgAdminsPaginatedAction(
+  organizationId: string,
+  page: number = 1,
+  pageSize: number = 20,
+  query?: string
+) {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -1381,26 +1381,32 @@ export async function getOrgAdminsAction(organizationId: string): Promise<
     const user = await getCurrentUser();
 
     if (!user) {
-      return { success: false, error: t('unauthorized') };
+      return { success: false as const, error: t('unauthorized') };
     }
 
-    const adminIds =
-      await organizationRepository.findAdminUserIds(organizationId);
-    const adminUsers = await userRepository.findByIds(adminIds);
+    const useCase = new GetOrgAdminsPaginatedUseCase({
+      prisma,
+      organizationRepository,
+      userRepository,
+    });
 
-    return {
-      success: true,
-      data: adminUsers.map((u) => ({
-        id: u.id,
-        firstName: u.firstName,
-        lastName: u.lastName,
-        middleName: u.middleName,
-      })),
-    };
+    const result = await useCase.execute({
+      organizationId,
+      actorUserId: user.id,
+      page,
+      pageSize,
+      query,
+    });
+
+    if (!result.success) {
+      return { success: false as const, error: t('unexpected') };
+    }
+
+    return { success: true as const, data: result.value };
   } catch (error) {
-    console.error('Error getting org admins:', error);
+    console.error('Error fetching org admins paginated:', error);
 
-    return { success: false, error: t('generic') };
+    return { success: false as const, error: t('unexpected') };
   }
 }
 

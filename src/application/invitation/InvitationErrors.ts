@@ -13,6 +13,7 @@ export const InvitationErrors = {
   BOARD_NOT_FOUND: 'invitation.errors.boardNotFound',
   BOARD_ARCHIVED: 'invitation.errors.boardArchived',
   USER_NOT_FOUND: 'invitation.errors.userNotFound',
+  INVITEE_HAS_PENDING_REQUEST: 'invitation.errors.inviteeHasPendingRequest',
 } as const;
 
 export type InvitationError =
