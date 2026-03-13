@@ -69,6 +69,16 @@ export function Combobox<T>({
           aria-label={ariaLabel}
           displayValue={(option: T) => displayValue(option) ?? ''}
           onChange={(event) => setQuery(event.target.value)}
+          // WORKAROUND: Headless UI intercepts Home/End to navigate options.
+          // Remove once https://github.com/tailwindlabs/headlessui/commit/433b174 lands in a stable release.
+          onKeyDown={(e) => {
+            if ((e.key === 'Home' || e.key === 'End') && !e.shiftKey) {
+              e.preventDefault();
+              const input = e.currentTarget;
+              const pos = e.key === 'Home' ? 0 : input.value.length;
+              input.setSelectionRange(pos, pos);
+            }
+          }}
           placeholder={placeholder}
           className={clsx([
             className,

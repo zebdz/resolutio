@@ -161,6 +161,16 @@ export function JoinParentForm({
               data-slot="control"
               displayValue={(org: OrgOption | null) => org?.name ?? ''}
               onChange={(e) => setQuery(e.target.value)}
+              // WORKAROUND: Headless UI intercepts Home/End to navigate options.
+              // Remove once https://github.com/tailwindlabs/headlessui/commit/433b174 lands in a stable release.
+              onKeyDown={(e) => {
+                if ((e.key === 'Home' || e.key === 'End') && !e.shiftKey) {
+                  e.preventDefault();
+                  const input = e.currentTarget;
+                  const pos = e.key === 'Home' ? 0 : input.value.length;
+                  input.setSelectionRange(pos, pos);
+                }
+              }}
               placeholder={t('typeToSearch')}
               className={inputClasses}
             />
