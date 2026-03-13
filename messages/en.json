@@ -279,7 +279,7 @@
       "manageBoards": "Manage Boards",
       "membershipSection": "Membership",
       "parentOrgSection": "Parent Organization",
-      "memberRequests": "Member Requests",
+      "memberRequests": "Manage join requests",
       "recentPolls": "Recent Polls",
       "createPoll": "Create Poll",
       "noPolls": "No polls yet",
@@ -420,7 +420,7 @@
       "columnHandlingAdmin": "Handling Admin",
       "columnRejectionReason": "Rejection Reason",
       "columnHandledAt": "Handled At",
-      "parentOrgRequests": "Parent Org Requests",
+      "parentOrgRequests": "Requests from organizations to join",
       "joinParentOrg": "Join Parent Org"
     },
     "boards": {

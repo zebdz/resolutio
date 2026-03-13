@@ -10,7 +10,10 @@ import {
   getOrgAdminsAction,
   getOrganizationPendingRequestsAction,
 } from '@/web/actions/organization';
-import { getPendingAdminInvitesAction } from '@/web/actions/invitation';
+import {
+  getPendingAdminInvitesAction,
+  getOrgMembersAction,
+} from '@/web/actions/invitation';
 import {
   getChildOrgJoinParentRequestAction,
   getIncomingJoinParentRequestsAction,
@@ -79,11 +82,13 @@ export default async function OrganizationModifyPage({
     incomingReqResult,
     pendingMembersResult,
     pendingAdminInvitesResult,
+    membersResult,
   ] = await Promise.all([
     getChildOrgJoinParentRequestAction(id),
     getIncomingJoinParentRequestsAction(id),
     getOrganizationPendingRequestsAction(id, 1, 1),
     getPendingAdminInvitesAction(id),
+    getOrgMembersAction(id),
   ]);
 
   if (childReqResult.success) {
@@ -101,6 +106,13 @@ export default async function OrganizationModifyPage({
   const pendingAdminInvites = pendingAdminInvitesResult.success
     ? pendingAdminInvitesResult.data
     : [];
+
+  const initialMembers = membersResult.success
+    ? membersResult.data.members
+    : [];
+  const initialMembersTotalCount = membersResult.success
+    ? membersResult.data.totalCount
+    : 0;
 
   // Resolve invitee user details
   const inviteeUserIds = pendingAdminInvites.map((inv) => inv.inviteeId);
@@ -156,6 +168,9 @@ export default async function OrganizationModifyPage({
           isUserMember={isUserMember}
           showMemberRequests={isUserAdmin || isSuperAdmin}
           pendingMemberRequestCount={pendingMemberRequestCount}
+          showMembersList={true}
+          initialMembers={initialMembers}
+          initialMembersTotalCount={initialMembersTotalCount}
         />
 
         {/* Parent Org Section */}

@@ -157,7 +157,6 @@ export default async function OrganizationDetailPage({
             organizationId={id}
             initialMembers={initialMembers}
             initialTotalCount={initialMembersTotalCount}
-            isAdmin={isUserAdmin || isSuperAdmin}
           />
         )}
 

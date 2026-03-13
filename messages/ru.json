@@ -279,7 +279,7 @@
       "manageBoards": "Редактор органов управления",
       "membershipSection": "Участники",
       "parentOrgSection": "Родительская организация",
-      "memberRequests": "Заявки участников",
+      "memberRequests": "Управление заявками на вступление",
       "recentPolls": "Недавние голосования",
       "createPoll": "Создать голосование",
       "noPolls": "Голосований пока нет",
@@ -420,7 +420,7 @@
       "columnHandlingAdmin": "Обработавший администратор",
       "columnRejectionReason": "Причина отклонения",
       "columnHandledAt": "Дата обработки",
-      "parentOrgRequests": "Запросы родительской орг.",
+      "parentOrgRequests": "Запросы организаций на присоединение",
       "joinParentOrg": "Присоединиться к родительской орг."
     },
     "boards": {
