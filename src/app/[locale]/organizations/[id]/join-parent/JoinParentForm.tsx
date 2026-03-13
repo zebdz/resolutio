@@ -97,7 +97,6 @@ export function JoinParentForm({
     if (result.success) {
       setIsSubmitting(false);
       router.back();
-      router.refresh();
     } else {
       setError(result.error);
       setIsSubmitting(false);

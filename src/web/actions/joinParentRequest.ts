@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
 import { RequestJoinParentUseCase } from '@/application/organization/RequestJoinParentUseCase';
 import { RequestJoinParentSchema } from '@/application/organization/RequestJoinParentSchema';
@@ -116,6 +117,8 @@ export async function requestJoinParentAction(
 
       return { success: false, error: errorMessage };
     }
+
+    revalidatePath(`/organizations/${input.childOrgId}/modify`);
 
     return { success: true, data: undefined };
   } catch (error) {
