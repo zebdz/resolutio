@@ -7,6 +7,7 @@ import { UserOrganizationsList } from './UserOrganizationsList';
 import { getAdminOrganizationsAction } from '@/web/actions/organization';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 import { PendingInvitesSection } from './PendingInvitesSection';
+import { PendingJoinRequestsSection } from './PendingJoinRequestsSection';
 
 export default async function HomePage({
   params,
@@ -41,11 +42,14 @@ export default async function HomePage({
           )}
         </div>
 
-        {/* Pending Invitations */}
-        <PendingInvitesSection />
-
         {/* User Organizations List */}
         <UserOrganizationsList adminOrganizations={adminOrganizations} />
+
+        {/* Pending Join Requests */}
+        <PendingJoinRequestsSection />
+
+        {/* Pending Invitations */}
+        <PendingInvitesSection />
       </div>
     </AuthenticatedLayout>
   );

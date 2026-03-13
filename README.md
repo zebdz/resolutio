@@ -17,19 +17,19 @@ Resolutio gives communities the tools to self-organize and make formal decisions
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | Next.js 16 (App Router) |
-| Language | TypeScript |
-| UI | React 19, Tailwind CSS v4, Tailwind Catalyst |
-| Database | PostgreSQL, Prisma 7 |
-| Auth | Session-based, Argon2 password hashing, OTP phone verification |
-| i18n | next-intl (Russian, English) |
-| Validation | Zod |
-| Bot Protection | Cloudflare Turnstile |
-| PDF | pdfmake |
-| Testing | Vitest (unit), Playwright (e2e) |
-| Architecture | Domain-Driven Design |
+| Layer          | Technology                                                     |
+| -------------- | -------------------------------------------------------------- |
+| Framework      | Next.js 16 (App Router)                                        |
+| Language       | TypeScript                                                     |
+| UI             | React 19, Tailwind CSS v4, Tailwind Catalyst                   |
+| Database       | PostgreSQL, Prisma 7                                           |
+| Auth           | Session-based, Argon2 password hashing, OTP phone verification |
+| i18n           | next-intl (Russian, English)                                   |
+| Validation     | Zod                                                            |
+| Bot Protection | Cloudflare Turnstile                                           |
+| PDF            | pdfmake                                                        |
+| Testing        | Vitest (unit), Playwright (e2e)                                |
+| Architecture   | Domain-Driven Design                                           |
 
 ## Project Structure
 

@@ -120,6 +120,7 @@
     "logout": "Logout",
     "pendingInvitations": "Invitations",
     "pendingInvitationsCount": "You have {count} pending {count, plural, =1 {invitation} other {invitations}}",
+    "pendingRequestsCount": "You have {count} pending join {count, plural, =1 {request} other {requests}}",
     "archivedBadge": "Archived",
     "joinRequest": {
       "requested": "Requested",
@@ -1356,6 +1357,10 @@
     },
     "listTitle": "Pending Invitations",
     "noInvitations": "No pending invitations"
+  },
+  "joinRequests": {
+    "listTitle": "Join Requests",
+    "noRequests": "No pending join requests"
   },
   "manageMembers": {
     "title": "Manage Members",

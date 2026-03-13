@@ -120,6 +120,7 @@
     "logout": "Выйти",
     "pendingInvitations": "Приглашения",
     "pendingInvitationsCount": "У вас {count} {count, plural, =1 {приглашение} few {приглашения} other {приглашений}}",
+    "pendingRequestsCount": "У вас {count} {count, plural, =1 {заявка на вступление} few {заявки на вступление} other {заявок на вступление}}",
     "archivedBadge": "В архиве",
     "joinRequest": {
       "requested": "Заявка подана",
@@ -1356,6 +1357,10 @@
     },
     "listTitle": "Ожидающие приглашения",
     "noInvitations": "Нет ожидающих приглашений"
+  },
+  "joinRequests": {
+    "listTitle": "Заявки на вступление",
+    "noRequests": "Нет заявок на вступление"
   },
   "manageMembers": {
     "title": "Управление участниками",
