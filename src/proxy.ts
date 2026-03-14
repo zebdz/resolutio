@@ -54,6 +54,10 @@ export default async function middleware(request: NextRequest) {
 
   // Dev mode: skip general-purpose rate limiting (login/registration/phone limits still active)
   if (process.env.NODE_ENV === 'development') {
+    if (request.nextUrl.pathname.startsWith('/api')) {
+      return NextResponse.next();
+    }
+
     return intlMiddleware(request);
   }
 

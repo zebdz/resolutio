@@ -408,7 +408,7 @@ export function CreatePollForm() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <Heading className="text-3xl font-bold">{t('createPoll')}</Heading>
         <div className="flex gap-2">
           <Button

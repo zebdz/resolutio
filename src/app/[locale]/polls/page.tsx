@@ -90,7 +90,7 @@ export default async function PollsPage() {
     <AuthenticatedLayout>
       <div className="space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-2">
             <Heading className="text-3xl font-bold">
               {isSuperAdmin ? t('allPolls') : t('title')}

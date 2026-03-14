@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "Running lint..."
-yarn lint
+echo "Running format + lint..."
+yarn fl
+git add -u
 
 echo "Running typecheck..."
 yarn typecheck

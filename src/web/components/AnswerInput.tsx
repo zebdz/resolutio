@@ -86,7 +86,7 @@ export function AnswerInput({
         color="red"
         onClick={onDelete}
         disabled={disabled}
-        className="opacity-0 group-hover:opacity-100 transition-opacity"
+        className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
       >
         <XMarkIcon className="w-4 h-4" />
       </Button>
