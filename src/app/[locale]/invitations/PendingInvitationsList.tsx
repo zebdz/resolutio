@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Badge } from '@/app/components/catalyst/badge';
 import { Button } from '@/app/components/catalyst/button';
 import { Heading } from '@/app/components/catalyst/heading';
 import { Text } from '@/app/components/catalyst/text';
@@ -66,8 +67,14 @@ export function PendingInvitationsList({
     );
   }
 
+  const BADGE_COLOR: Record<string, 'purple' | 'blue' | 'lime'> = {
+    admin_invite: 'purple',
+    board_member_invite: 'blue',
+    member_invite: 'lime',
+  };
+
   return (
-    <div className="space-y-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {invites.map((invite) => {
         const loading = loadingState[invite.id];
         const isLoading = !!loading;
@@ -76,51 +83,30 @@ export function PendingInvitationsList({
         return (
           <div
             key={invite.id}
-            className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
+            className="flex flex-col rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
           >
-            <Heading className="mb-4 text-xl font-bold">
-              {t(titleKey as any)}
-            </Heading>
+            <div className="flex items-start justify-between">
+              <Heading level={3} className="text-lg font-semibold">
+                {invite.organizationName}
+              </Heading>
+              <Badge color={BADGE_COLOR[invite.type] || 'lime'}>
+                {t(titleKey as any)}
+              </Badge>
+            </div>
 
-            <dl className="space-y-3">
-              <div>
-                <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                  {t('organization')}
-                </dt>
-                <dd className="text-zinc-900 dark:text-zinc-100">
-                  {invite.organizationName}
-                </dd>
-              </div>
+            {invite.boardName && (
+              <Text className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                {t('board')}: {invite.boardName}
+              </Text>
+            )}
 
-              {invite.boardName && (
-                <div>
-                  <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                    {t('board')}
-                  </dt>
-                  <dd className="text-zinc-900 dark:text-zinc-100">
-                    {invite.boardName}
-                  </dd>
-                </div>
-              )}
+            <Text className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              {t('from')}: {invite.inviterName}
+            </Text>
 
-              <div>
-                <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                  {t('from')}
-                </dt>
-                <dd className="text-zinc-900 dark:text-zinc-100">
-                  {invite.inviterName}
-                </dd>
-              </div>
-
-              <div>
-                <dt className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                  {t('sentAt')}
-                </dt>
-                <dd className="text-zinc-900 dark:text-zinc-100">
-                  {new Date(invite.createdAt).toLocaleDateString()}
-                </dd>
-              </div>
-            </dl>
+            <Text className="mt-auto pt-4 text-xs text-zinc-500 dark:text-zinc-500">
+              {t('sentAt')}: {new Date(invite.createdAt).toLocaleDateString()}
+            </Text>
 
             <div className="mt-4 flex gap-3">
               <Button
