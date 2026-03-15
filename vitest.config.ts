@@ -1,7 +1,30 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
+import fs from 'fs';
+import { getGitVersion, getBuildId } from './build/version-helper';
+
+const version = getGitVersion();
+const buildId = getBuildId();
+
+function versionFilePlugin() {
+  return {
+    name: 'version-file',
+    writeBundle(options: { dir?: string }) {
+      const outDir = options.dir || 'dist';
+      fs.writeFileSync(
+        path.resolve(outDir, 'version.txt'),
+        `${version} (${buildId})\n`
+      );
+    },
+  };
+}
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+    __BUILD_ID__: JSON.stringify(buildId),
+  },
+  plugins: [versionFilePlugin()],
   test: {
     globals: true,
     environment: 'node',

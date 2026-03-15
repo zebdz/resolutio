@@ -3,6 +3,7 @@
 import * as Headless from '@headlessui/react';
 import React, { useState } from 'react';
 import { NavbarItem } from './navbar';
+import { getVersion } from '@/src/lib/version';
 
 function OpenMenuIcon() {
   return (
@@ -59,7 +60,7 @@ export function StackedLayout({
   const [showSidebar, setShowSidebar] = useState(false);
 
   return (
-    <div className="relative isolate flex min-h-svh w-full flex-col bg-white lg:bg-zinc-100 dark:bg-zinc-900 dark:lg:bg-zinc-950">
+    <div className="relative isolate flex min-h-svh w-full flex-col bg-white dark:bg-zinc-900">
       {/* Sidebar on mobile */}
       <MobileSidebar open={showSidebar} close={() => setShowSidebar(false)}>
         {sidebar}
@@ -79,9 +80,12 @@ export function StackedLayout({
       </header>
 
       {/* Content */}
-      <main className="flex flex-1 flex-col pb-2 lg:px-2">
-        <div className="grow p-6 lg:rounded-lg lg:bg-white lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-zinc-950/5 dark:lg:bg-zinc-900 dark:lg:ring-white/10">
+      <main className="flex flex-1 flex-col">
+        <div className="relative grow p-6 lg:p-10">
           <div className="mx-auto max-w-6xl">{children}</div>
+          <span className="absolute bottom-1 right-3 hidden text-xs text-zinc-300 lg:block">
+            {getVersion()}
+          </span>
         </div>
       </main>
     </div>

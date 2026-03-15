@@ -1,5 +1,6 @@
 import type React from 'react';
 import { LocaleSwitcher } from '@/web/components/LocaleSwitcher';
+import { getVersion } from '@/src/lib/version';
 
 export function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -10,6 +11,9 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
       <div className="flex grow items-center justify-center p-6 lg:rounded-lg lg:bg-white lg:p-10 lg:shadow-xs lg:ring-1 lg:ring-zinc-950/5 dark:lg:bg-zinc-900 dark:lg:ring-white/10">
         {children}
       </div>
+      <footer className="py-2 text-center text-xs text-zinc-400">
+        {getVersion()}
+      </footer>
     </main>
   );
 }
