@@ -92,6 +92,8 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: Generate Prisma client
+        env:
+          DATABASE_URL: ${{ inputs.branch == 'beta' && secrets.DATABASE_URL_BETA || secrets.DATABASE_URL }}
         run: yarn prisma generate
 
       - name: Lint
