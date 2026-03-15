@@ -135,6 +135,7 @@ jobs:
             prisma/ \
             public/ \
             messages/ \
+            build/version-helper.ts \
             package.json \
             next.config.ts \
             prisma.config.ts \
