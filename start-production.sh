@@ -16,6 +16,11 @@ NODE_BIN=$(command -v node || echo "/var/www/www-root/data/.nvm/versions/node/v2
 BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$BASE_DIR"
 
+# Read PORT from deployed .env (created by CI workflow)
+if [ -z "$PORT" ] && [ -f "$BASE_DIR/.env" ]; then
+    PORT=$(grep -E '^PORT=' "$BASE_DIR/.env" | cut -d= -f2)
+fi
+
 # Set environment variables
 export NODE_ENV=production
 export PORT=${PORT:-3000}
