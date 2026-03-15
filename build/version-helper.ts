@@ -7,11 +7,27 @@ export function getGitVersion(): string {
   try {
     return execSync('git describe --tags').toString().trim();
   } catch {
-    const pkg = JSON.parse(
-      fs.readFileSync(path.resolve(__dirname, '..', 'package.json'), 'utf-8')
-    );
-    const shortHash = execSync('git rev-parse --short HEAD').toString().trim();
-    return `v${pkg.version}-${shortHash}`;
+    try {
+      const pkg = JSON.parse(
+        fs.readFileSync(
+          path.resolve(__dirname, '..', 'package.json'),
+          'utf-8'
+        )
+      );
+      const shortHash = execSync('git rev-parse --short HEAD')
+        .toString()
+        .trim();
+      return `v${pkg.version}-${shortHash}`;
+    } catch {
+      // No git available (e.g. deployed server) — fall back to package version
+      const pkg = JSON.parse(
+        fs.readFileSync(
+          path.resolve(__dirname, '..', 'package.json'),
+          'utf-8'
+        )
+      );
+      return `v${pkg.version}`;
+    }
   }
 }
 

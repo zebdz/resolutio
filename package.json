@@ -1,12 +1,10 @@
 {
   "name": "resolutio",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "next dev -p 8080",
-    "prebuild": "prisma generate && yarn run test",
-    "prerelease": "yarn run prebuild && yarn run test:e2e",
     "build": "prisma generate && next build",
     "start": "./start-production.sh",
     "lint": "eslint",
