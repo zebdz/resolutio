@@ -176,6 +176,7 @@ jobs:
 
             # Run deployment script
             ./deploy-on-server.sh
+            DEPLOY_EXIT=\$?
 
             # Show the last few lines of the log if it exists
             echo ""
@@ -185,6 +186,8 @@ jobs:
             else
               echo "No deployment log found (deploy.log doesn't exist yet)"
             fi
+
+            exit \$DEPLOY_EXIT
           EOF
 
           echo "✅ Deployment complete!"
