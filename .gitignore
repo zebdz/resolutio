@@ -22,6 +22,7 @@
 
 # production
 /build
+!/build/version-helper.ts
 
 # misc
 .DS_Store
