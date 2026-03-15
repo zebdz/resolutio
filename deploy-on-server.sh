@@ -60,6 +60,12 @@ log "Running database migrations..."
 # Find and kill existing next-server process on this port
 log "Stopping existing Next.js server on port $PORT..."
 EXISTING_PID=$(lsof -Pi ":$PORT" -sTCP:LISTEN -t 2>/dev/null || true)
+
+# Fallback: try fuser if lsof found nothing
+if [ -z "$EXISTING_PID" ]; then
+    EXISTING_PID=$(fuser "$PORT"/tcp 2>/dev/null | tr -d ' ' || true)
+fi
+
 if [ -n "$EXISTING_PID" ]; then
     log "Found existing process on port $PORT: $EXISTING_PID"
     kill -TERM $EXISTING_PID 2>/dev/null || true
@@ -88,6 +94,9 @@ sleep 5
 
 # Check if ISP panel already restarted the server
 NEW_PID=$(lsof -Pi ":$PORT" -sTCP:LISTEN -t 2>/dev/null || true)
+if [ -z "$NEW_PID" ]; then
+    NEW_PID=$(fuser "$PORT"/tcp 2>/dev/null | tr -d ' ' || true)
+fi
 
 if [ -n "$NEW_PID" ]; then
     log "✅ ISP panel automatically restarted the server (PID: $NEW_PID)"
