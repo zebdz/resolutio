@@ -91,6 +91,15 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Lint
+        run: yarn lint
+
+      - name: Typecheck
+        run: yarn typecheck
+
+      - name: Test
+        run: yarn test
+
       - name: Build application
         env:
           DATABASE_URL: ${{ inputs.branch == 'beta' && secrets.DATABASE_URL_BETA || secrets.DATABASE_URL }}
