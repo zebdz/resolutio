@@ -1,12 +1,10 @@
 {
   "name": "resolutio",
-  "version": "0.1.1",
+  "version": "1.0.6",
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
     "dev": "next dev -p 8080",
-    "prebuild": "prisma generate && yarn run test",
-    "prerelease": "yarn run prebuild && yarn run test:e2e",
     "build": "prisma generate && next build",
     "start": "./start-production.sh",
     "lint": "eslint",
@@ -26,7 +24,10 @@
     "db:seed": "npx tsx prisma/seed.ts",
     "db:seed:external-board-member": "npx tsx prisma/seed-external-board-member.ts",
     "db:status": "npx prisma migrate status",
-    "db:migrate": "npx prisma migrate deploy"
+    "db:migrate": "npx prisma migrate deploy",
+    "db:clear": "npx tsx prisma/db-clear.ts",
+    "db:superadmin:add": "npx tsx prisma/superadmin-add.ts",
+    "db:superadmin:remove": "npx tsx prisma/superadmin-remove.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

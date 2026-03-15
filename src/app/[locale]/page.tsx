@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { Button } from '@/app/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import { LocaleSwitcher } from '@/web/components/LocaleSwitcher';
+import { getVersion } from '@/src/lib/version';
 
 export async function generateMetadata() {
   const t = await getTranslations('landing');
@@ -184,7 +185,10 @@ export default async function HomePage() {
           >
             {t('privacyPolicy')}
           </Link>
-          <span className="text-sm text-white/50">{t('copyright')}</span>
+          <div className="flex flex-col items-center gap-1 sm:items-end">
+            <span className="text-sm text-white/50">{t('copyright')}</span>
+            <span className="text-xs text-white/30">{getVersion()}</span>
+          </div>
         </div>
       </footer>
     </div>

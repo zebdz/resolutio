@@ -6,7 +6,6 @@ import { Badge } from '@/app/components/catalyst/badge';
 import VoterBreakdownDialog from './VoterBreakdownDialog';
 import ExportPdfButton from './ExportPdfButton';
 import ExportProtocolPdfButton from './ExportProtocolPdfButton';
-import { Button } from '@/app/components/catalyst/button';
 import { PollState } from '@/src/domain/poll/PollState';
 import { User } from '@/domain/user/User';
 import type { QuestionType } from '@/src/domain/poll/QuestionType';
@@ -207,22 +206,20 @@ export default function PollResults({
                             {answer.weightedVotes.toFixed(2)} {t('voteWeight')})
                           </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-2xl font-semibold text-zinc-900 dark:text-white">
-                            {answer.percentage.toFixed(1)}%
-                          </div>
-                          {canViewVoters && answer.voteCount > 0 && (
-                            <Button
-                              type="button"
-                              color="zinc"
-                              onClick={() => handleViewVoters(answer)}
-                              className="mt-2 text-xs"
-                            >
-                              {t('viewVoters')}
-                            </Button>
-                          )}
+                        <div className="text-2xl font-semibold text-zinc-900 dark:text-white">
+                          {answer.percentage.toFixed(1)}%
                         </div>
                       </div>
+
+                      {canViewVoters && answer.voteCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleViewVoters(answer)}
+                          className="mb-2 w-full text-left text-xs text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 cursor-pointer"
+                        >
+                          {t('viewVoters')} &rarr;
+                        </button>
+                      )}
 
                       {/* Progress bar */}
                       <div className="h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full overflow-hidden">
@@ -246,11 +243,11 @@ export default function PollResults({
         {/* Protocol sign willingness section (admin only) */}
         {canViewVoters && results.protocolSignWillingness.length > 0 && (
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
-            <div className="flex items-center justify-between p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-6">
               <button
                 type="button"
                 onClick={() => setProtocolOpen(!protocolOpen)}
-                className="flex items-center gap-3 text-left cursor-pointer"
+                className="flex flex-wrap items-center gap-3 text-left cursor-pointer"
               >
                 <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">
                   {t('protocolSignWillingness')}

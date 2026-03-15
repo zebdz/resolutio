@@ -3,10 +3,12 @@ import { Heading } from '@/app/components/catalyst/heading';
 import { Text } from '@/app/components/catalyst/text';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 import { getUserOrganizationsAction } from '@/web/actions/organization';
+import { Link } from '@/src/i18n/routing';
 import { PendingJoinRequestsList } from './PendingJoinRequestsList';
 
 export default async function JoinRequestsPage() {
   const t = await getTranslations('joinRequests');
+  const tCommon = await getTranslations('common');
 
   const result = await getUserOrganizationsAction();
 
@@ -27,7 +29,15 @@ export default async function JoinRequestsPage() {
   return (
     <AuthenticatedLayout>
       <div className="space-y-6">
-        <Heading className="text-3xl font-bold">{t('listTitle')}</Heading>
+        <div className="space-y-2">
+          <Link
+            href="/home"
+            className="inline-block text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            {tCommon('backToHome')}
+          </Link>
+          <Heading className="text-3xl font-bold">{t('listTitle')}</Heading>
+        </div>
         {pending.length === 0 && rejected.length === 0 ? (
           <Text className="text-zinc-500 dark:text-zinc-400">
             {t('noRequests')}

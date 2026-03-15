@@ -21,7 +21,8 @@
 /out/
 
 # production
-/build
+/build/*
+!/build/version-helper.ts
 
 # misc
 .DS_Store
@@ -36,6 +37,9 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+
+# direnv
+.envrc
 
 # vercel
 .vercel

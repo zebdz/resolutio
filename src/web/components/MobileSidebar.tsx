@@ -6,6 +6,7 @@ import { Link } from '@/src/i18n/routing';
 import {
   Sidebar,
   SidebarBody,
+  SidebarFooter,
   SidebarHeader,
   SidebarItem,
   SidebarLabel,
@@ -20,6 +21,7 @@ import {
   BellIcon,
 } from '@heroicons/react/20/solid';
 import { LocaleSwitcher } from './LocaleSwitcher';
+import { getVersion } from '@/src/lib/version';
 
 interface MobileSidebarProps {
   isSuperAdmin: boolean;
@@ -133,6 +135,10 @@ export function MobileSidebar({
           </div>
         </div>
       </SidebarBody>
+
+      <SidebarFooter>
+        <p className="px-4 py-2 text-xs text-white/40">{getVersion()}</p>
+      </SidebarFooter>
     </Sidebar>
   );
 }

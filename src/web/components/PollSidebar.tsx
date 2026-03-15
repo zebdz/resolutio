@@ -134,7 +134,7 @@ function QuestionItem({
         <button
           type="button"
           onClick={handleDelete}
-          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+          className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
           aria-label="Delete question"
         >
           <TrashIcon className="w-4 h-4 text-red-500" />
@@ -217,7 +217,7 @@ function PageGroup({
           <button
             type="button"
             onClick={handlePageDelete}
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+            className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
             aria-label={`${t('delete')} ${t('page')} ${pageNumber}`}
           >
             <TrashIcon className="w-4 h-4 text-red-500" />

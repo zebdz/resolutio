@@ -1,26 +1,89 @@
-name: Deploy to Production
+name: Deploy (reusable)
 
 on:
-  push:
-    branches:
-      - master
+  workflow_call:
+    inputs:
+      branch:
+        required: true
+        type: string
+      deploy_dir:
+        required: true
+        type: string
+      site_url:
+        required: true
+        type: string
+      port:
+        required: true
+        type: string
+
+permissions:
+  contents: write
 
 jobs:
+  backup-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Create backup branch
+        env:
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          BACKUP_BRANCH="backups/${BRANCH}/${TIMESTAMP}"
+          echo "Creating backup branch: ${BACKUP_BRANCH}"
+          git checkout -b "${BACKUP_BRANCH}"
+          git push origin "${BACKUP_BRANCH}"
+
+  cleanup-old-backups:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Delete backup branches older than 30 days
+        env:
+          BRANCH: ${{ inputs.branch }}
+        run: |
+          CUTOFF=$(date -u -d '30 days ago' +%Y%m%dT%H%M%SZ)
+          PREFIX="backups/${BRANCH}/"
+
+          echo "Cleaning up backups older than ${CUTOFF} under ${PREFIX}"
+
+          git ls-remote --heads origin "refs/heads/${PREFIX}*" | while read sha ref; do
+            BRANCH_NAME="${ref#refs/heads/}"
+            TIMESTAMP="${BRANCH_NAME#${PREFIX}}"
+
+            if [[ "${TIMESTAMP}" < "${CUTOFF}" ]]; then
+              echo "Deleting old backup: ${BRANCH_NAME}"
+              git push origin --delete "${BRANCH_NAME}"
+            else
+              echo "Keeping: ${BRANCH_NAME}"
+            fi
+          done
+
   deploy:
+    needs: [backup-branch, cleanup-old-backups]
     runs-on: ubuntu-latest
 
     env:
       SERVER_USER: www-root
       SERVER_IP: 89.111.155.217
-      DEPLOY_DIR: /var/www/www-root/data/www/resolutio.site
-      SITE_URL: https://resolutio.site
+      DEPLOY_DIR: ${{ inputs.deploy_dir }}
+      SITE_URL: ${{ inputs.site_url }}
+      PORT: ${{ inputs.port }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'yarn'
@@ -28,26 +91,42 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Generate Prisma client
+        env:
+          DATABASE_URL: ${{ inputs.branch == 'beta' && secrets.DATABASE_URL_BETA || secrets.DATABASE_URL }}
+        run: yarn prisma generate
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Typecheck
+        run: yarn typecheck
+
+      - name: Test
+        run: yarn test
+
       - name: Build application
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ inputs.branch == 'beta' && secrets.DATABASE_URL_BETA || secrets.DATABASE_URL }}
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
         run: yarn build
 
       - name: Create deployment package
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ inputs.branch == 'beta' && secrets.DATABASE_URL_BETA || secrets.DATABASE_URL }}
           TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
           OTP_CODE_SECRET: ${{ secrets.OTP_CODE_SECRET }}
           OTP_EXPIRY_MINUTES: ${{ vars.OTP_EXPIRY_MINUTES || '10' }}
           OTP_MAX_ATTEMPTS: ${{ vars.OTP_MAX_ATTEMPTS || '5' }}
+          PORT: ${{ inputs.port }}
         run: |
-          # Create .env file for production
+          # Create .env file for deployment
           echo "DATABASE_URL=$DATABASE_URL" > .env
           echo "TURNSTILE_SECRET_KEY=$TURNSTILE_SECRET_KEY" >> .env
           echo "OTP_CODE_SECRET=$OTP_CODE_SECRET" >> .env
           echo "OTP_EXPIRY_MINUTES=$OTP_EXPIRY_MINUTES" >> .env
           echo "OTP_MAX_ATTEMPTS=$OTP_MAX_ATTEMPTS" >> .env
+          echo "PORT=$PORT" >> .env
 
           tar -czf deploy.tar.gz \
             .next/ \
@@ -56,6 +135,7 @@ jobs:
             prisma/ \
             public/ \
             messages/ \
+            build/version-helper.ts \
             package.json \
             next.config.ts \
             prisma.config.ts \
@@ -74,9 +154,8 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ env.SERVER_IP }} >> ~/.ssh/known_hosts
 
-      - name: Deploy to production server
+      - name: Deploy to server
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DEPLOY_DIR: ${{ env.DEPLOY_DIR }}
         run: |
           # Upload deployment package
@@ -84,20 +163,20 @@ jobs:
           scp -i ~/.ssh/id_ed25519 deploy.tar.gz ${{ env.SERVER_USER }}@${{ env.SERVER_IP }}:${DEPLOY_DIR}/
 
           # Execute deployment on server
-          echo "🚀 Deploying on production server..."
+          echo "🚀 Deploying on server..."
           ssh -i ~/.ssh/id_ed25519 ${{ env.SERVER_USER }}@${{ env.SERVER_IP }} << EOF
             cd ${DEPLOY_DIR}
-            
+
             # Extract the deployment package
             echo "📂 Extracting deployment package..."
             tar -xzf deploy.tar.gz
-            
+
             # Make deployment script executable
             chmod +x deploy-on-server.sh
-            
+
             # Run deployment script
             ./deploy-on-server.sh
-            
+
             # Show the last few lines of the log if it exists
             echo ""
             if [ -f deploy.log ]; then
@@ -123,7 +202,7 @@ jobs:
           while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
             echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" ${{ env.SITE_URL }}/ru || echo "000")
-            
+
             if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
               echo "✅ Site is responding (HTTP $HTTP_CODE)"
               break

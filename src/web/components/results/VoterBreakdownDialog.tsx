@@ -63,8 +63,8 @@ export default function VoterBreakdownDialog({
             <p className="text-zinc-600 dark:text-zinc-400">{t('noVoters')}</p>
           </div>
         ) : (
-          <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden">
-            <Table>
+          <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 overflow-hidden [--gutter:1rem]">
+            <Table bleed className="!mx-0">
               <TableHead>
                 <TableRow>
                   <TableHeader>{t('voterName')}</TableHeader>

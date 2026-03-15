@@ -3,10 +3,12 @@ import { Heading } from '@/app/components/catalyst/heading';
 import { Text } from '@/app/components/catalyst/text';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 import { getUserPendingInvitesAction } from '@/web/actions/invitation';
+import { Link } from '@/src/i18n/routing';
 import { PendingInvitationsList } from './PendingInvitationsList';
 
 export default async function InvitationsPage() {
   const t = await getTranslations('invitation');
+  const tCommon = await getTranslations('common');
 
   const result = await getUserPendingInvitesAction();
 
@@ -15,7 +17,15 @@ export default async function InvitationsPage() {
   return (
     <AuthenticatedLayout>
       <div className="space-y-6">
-        <Heading className="text-3xl font-bold">{t('listTitle')}</Heading>
+        <div className="space-y-2">
+          <Link
+            href="/home"
+            className="inline-block text-sm text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            {tCommon('backToHome')}
+          </Link>
+          <Heading className="text-3xl font-bold">{t('listTitle')}</Heading>
+        </div>
         {invites.length === 0 ? (
           <Text className="text-zinc-500 dark:text-zinc-400">
             {t('noInvitations')}
