@@ -111,6 +111,7 @@ export function UserOrganizationsList({
               <Link
                 key={org.id}
                 href={`/organizations/${org.id}`}
+                prefetch={false}
                 className={`block rounded-lg border p-6 transition-shadow hover:shadow-md ${
                   org.archivedAt
                     ? 'border-pink-200 bg-pink-50 dark:border-pink-900 dark:bg-pink-950'
@@ -163,6 +164,7 @@ export function UserOrganizationsList({
                 <Link
                   key={org.id}
                   href={`/organizations/${org.id}`}
+                  prefetch={false}
                   className={`block rounded-lg border p-6 transition-shadow hover:shadow-md ${
                     org.archivedAt
                       ? 'border-pink-200 bg-pink-50 dark:border-pink-900 dark:bg-pink-950'

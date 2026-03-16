@@ -252,7 +252,7 @@ export function OrganizationsList({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Link href={`/organizations/${org.id}`}>
+                  <Link href={`/organizations/${org.id}`} prefetch={false}>
                     <Heading
                       level={3}
                       className="text-lg font-semibold hover:text-brand-green"

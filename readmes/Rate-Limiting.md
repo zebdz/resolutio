@@ -6,7 +6,7 @@ Three-layer rate limiting using IP, session, and userId keys:
 
 | Layer                    | Key                    | File                                       | Limit             | Covers                                               |
 | ------------------------ | ---------------------- | ------------------------------------------ | ----------------- | ---------------------------------------------------- |
-| Middleware (session)     | session (auth)         | `src/infrastructure/rateLimit/registry.ts` | 60/min            | Page loads, API routes — authenticated users         |
+| Middleware (session)     | session (auth)         | `src/infrastructure/rateLimit/registry.ts` | 120/min           | Page loads, API routes — authenticated users         |
 | Middleware (IP)          | IP (unauth)            | `src/infrastructure/rateLimit/registry.ts` | 50,000/min        | Page loads, API routes — unauthenticated traffic     |
 | Server actions (session) | session (auth)         | `src/web/actions/rateLimit.ts`             | 200/min           | All Next.js server actions — authenticated users     |
 | Server actions (IP)      | IP (unauth)            | `src/web/actions/rateLimit.ts`             | 200,000/min       | All Next.js server actions — unauthenticated traffic |
@@ -28,7 +28,11 @@ Next.js server actions use an internal RSC protocol. Middleware can't return a r
 
 ### Why split session/IP limiters?
 
-Authed and unauthed traffic have fundamentally different trust levels. Session-keyed limits (60/min middleware, 200/min server actions) are tight — each session is a single user. IP-keyed limits must be very high because CGNAT (mobile carriers, universities, corporate networks) funnels thousands of legitimate users through a single IP. Sharing one limiter instance would force a compromise — too high for sessions, too low for IPs.
+Authed and unauthed traffic have fundamentally different trust levels. Session-keyed limits (120/min middleware, 200/min server actions) are tight — each session is a single user. IP-keyed limits must be very high because CGNAT (mobile carriers, universities, corporate networks) funnels thousands of legitimate users through a single IP. Sharing one limiter instance would force a compromise — too high for sessions, too low for IPs.
+
+### Why 120/min for middleware session?
+
+Next.js App Router generates multiple RSC requests per navigation (one per route segment, plus parallel fetches). Pages with many `<Link>` components (e.g., organization lists) also trigger prefetch requests for each visible link. With `prefetch={false}` on high-cardinality lists, 120/min comfortably covers normal browsing. All list-rendered links (organizations, join requests, notifications) use `prefetch={false}` to avoid exhausting this limit.
 
 ### Why 50,000/min for middleware IP?
 
@@ -127,7 +131,7 @@ In development (`NODE_ENV === 'development'`), the general-purpose rate limiters
 
 **Still active in dev:** Login, registration, phone search, and IP blocking rate limits — these are separate functions not affected by the dev skip.
 
-This prevents HMR + multiple tabs from hitting the 60/min middleware session limit during development.
+This prevents HMR + multiple tabs from hitting the 120/min middleware session limit during development.
 
 ## In-memory store details
 

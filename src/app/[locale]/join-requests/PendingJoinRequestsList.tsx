@@ -117,7 +117,11 @@ export function PendingJoinRequestsList({
                 key={org.id}
                 className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"
               >
-                <Link href={`/organizations/${org.id}`} className="block">
+                <Link
+                  href={`/organizations/${org.id}`}
+                  prefetch={false}
+                  className="block"
+                >
                   <div className="flex items-start justify-between">
                     <Heading level={3} className="text-lg font-semibold">
                       {org.name}
@@ -165,7 +169,11 @@ export function PendingJoinRequestsList({
                   key={org.id}
                   className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950"
                 >
-                  <Link href={`/organizations/${org.id}`} className="block">
+                  <Link
+                    href={`/organizations/${org.id}`}
+                    prefetch={false}
+                    className="block"
+                  >
                     <div className="flex items-start justify-between">
                       <Heading level={3} className="text-lg font-semibold">
                         {org.name}
