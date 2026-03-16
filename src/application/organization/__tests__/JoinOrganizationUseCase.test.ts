@@ -565,6 +565,72 @@ describe('JoinOrganizationUseCase', () => {
     }
   });
 
+  it('should pass joinTokenId to create when provided', async () => {
+    const orgResult = Organization.create(
+      'Test Organization',
+      'Test description',
+      'creator-123'
+    );
+    expect(orgResult.success).toBe(true);
+
+    if (orgResult.success) {
+      const org = orgResult.value;
+      (org as any).props.id = 'org-123';
+      organizationRepository.addOrganization(org);
+
+      const createSpy = vi.fn(prisma.organizationUser.create);
+      prisma.organizationUser.create = createSpy;
+
+      const result = await useCase.execute(
+        { organizationId: 'org-123', joinTokenId: 'token-abc' },
+        'user-456'
+      );
+
+      expect(result.success).toBe(true);
+      expect(createSpy).toHaveBeenCalledWith({
+        data: {
+          organizationId: 'org-123',
+          userId: 'user-456',
+          status: 'pending',
+          joinTokenId: 'token-abc',
+        },
+      });
+    }
+  });
+
+  it('should pass joinTokenId as null when not provided', async () => {
+    const orgResult = Organization.create(
+      'Test Organization',
+      'Test description',
+      'creator-123'
+    );
+    expect(orgResult.success).toBe(true);
+
+    if (orgResult.success) {
+      const org = orgResult.value;
+      (org as any).props.id = 'org-123';
+      organizationRepository.addOrganization(org);
+
+      const createSpy = vi.fn(prisma.organizationUser.create);
+      prisma.organizationUser.create = createSpy;
+
+      const result = await useCase.execute(
+        { organizationId: 'org-123' },
+        'user-456'
+      );
+
+      expect(result.success).toBe(true);
+      expect(createSpy).toHaveBeenCalledWith({
+        data: {
+          organizationId: 'org-123',
+          userId: 'user-456',
+          status: 'pending',
+          joinTokenId: null,
+        },
+      });
+    }
+  });
+
   it('should allow join request when member of parent org', async () => {
     const parentResult = Organization.create(
       'Parent Organization',
@@ -736,6 +802,7 @@ describe('JoinOrganizationUseCase', () => {
           rejectedAt: null,
           rejectedByUserId: null,
           rejectionReason: null,
+          joinTokenId: null,
         },
       });
     }

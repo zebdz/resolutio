@@ -13,6 +13,7 @@ export { PrismaQuestionRepository } from './repositories/PrismaQuestionRepositor
 export { PrismaAnswerRepository } from './repositories/PrismaAnswerRepository';
 export { PrismaDraftRepository } from './repositories/PrismaDraftRepository';
 export { PrismaJoinParentRequestRepository } from './repositories/PrismaJoinParentRequestRepository';
+export { PrismaJoinTokenRepository } from './repositories/PrismaJoinTokenRepository';
 export { PrismaNotificationRepository } from './repositories/PrismaNotificationRepository';
 export { PrismaInvitationRepository } from './repositories/PrismaInvitationRepository';
 export { PrismaOtpRepository } from './repositories/PrismaOtpRepository';

@@ -3,6 +3,7 @@ import { AuthLayout } from '@/app/components/catalyst/auth-layout';
 import { LoginForm } from '@/web/components/auth/LoginForm';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
+import { consumeReturnToCookieServer } from '@/web/lib/returnTo.server';
 
 export async function generateMetadata() {
   const t = await getTranslations('auth.login');
@@ -17,7 +18,8 @@ export default async function LoginPage() {
   const user = await getCurrentUser();
 
   if (user) {
-    redirect('/home');
+    const returnTo = await consumeReturnToCookieServer();
+    redirect(returnTo || '/home');
   }
 
   return (
