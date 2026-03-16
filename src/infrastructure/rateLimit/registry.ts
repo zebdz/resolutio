@@ -15,8 +15,8 @@ interface RateLimitGlobal {
 
 const globalForRateLimit = globalThis as unknown as RateLimitGlobal;
 
-// 60 / min
-const MIDDLEWARE_SESSION_MAX = 60;
+// 120 / min
+const MIDDLEWARE_SESSION_MAX = 120;
 const MIDDLEWARE_SESSION_WINDOW_MS = 60_000;
 
 // 50_000 / min

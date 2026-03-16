@@ -424,6 +424,7 @@ export function NotificationsList({
                       return (
                         <Link
                           href={action.href}
+                          prefetch={false}
                           onClick={() => {
                             if (isUnread) {
                               handleMarkAsRead(notification.id);
