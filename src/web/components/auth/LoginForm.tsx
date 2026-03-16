@@ -2,8 +2,9 @@
 
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/src/i18n/routing';
 import Link from 'next/link';
+import { consumeReturnToClient } from '@/web/lib/returnTo.client';
 import { Button } from '@/app/components/catalyst/button';
 import { Input } from '@/app/components/catalyst/input';
 import { Field, Label, FieldGroup } from '@/app/components/catalyst/fieldset';
@@ -83,7 +84,8 @@ export function LoginForm() {
 
         router.push('/confirm-phone');
       } else {
-        router.push('/home');
+        const returnTo = consumeReturnToClient();
+        router.push(returnTo || '/home');
       }
     });
   }

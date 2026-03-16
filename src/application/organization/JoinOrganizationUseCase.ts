@@ -95,6 +95,7 @@ export class JoinOrganizationUseCase {
           rejectedAt: null,
           rejectedByUserId: null,
           rejectionReason: null,
+          joinTokenId: input.joinTokenId ?? null,
         },
       });
     } else {
@@ -104,6 +105,7 @@ export class JoinOrganizationUseCase {
           organizationId,
           userId,
           status: 'pending',
+          joinTokenId: input.joinTokenId ?? null,
         },
       });
     }
