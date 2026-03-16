@@ -327,7 +327,8 @@
       "descriptionPlaceholder": "Describe the purpose and goals",
       "save": "Save Changes",
       "saving": "Saving...",
-      "updateSuccess": "Organization updated successfully"
+      "updateSuccess": "Organization updated successfully",
+      "manageTokens": "Manage Join Links"
     },
     "pendingRequestsPage": {
       "title": "Pending Join Requests",
@@ -1018,6 +1019,14 @@
       "consentRequired": "Consent is required",
       "passwordsMismatch": "Passwords don't match",
       "passwordMatchesPersonalInfo": "Password must not match your name or phone number"
+    },
+    "joinToken": {
+      "descriptionEmpty": "Token description is required",
+      "descriptionTooLong": "Token description is too long (max 500 characters)",
+      "maxUsesInvalid": "Max uses must be a positive number",
+      "alreadyExpired": "Token is already expired",
+      "notExpired": "Token is not expired",
+      "tokenExhausted": "Token has reached its maximum number of uses"
     }
   },
   "phone": {
@@ -1407,5 +1416,61 @@
     "revokeInvite": "Revoke",
     "revoking": "Revoking...",
     "noInvites": "No pending invitations"
+  },
+  "joinToken": {
+    "page": {
+      "title": "Join {orgName}",
+      "description": "You have been invited to this organization",
+      "confirmButton": "Confirm Join Request",
+      "confirming": "Submitting...",
+      "loginToJoin": "Sign in to join",
+      "registerToJoin": "Create account to join",
+      "requestSent": "Your join request has been sent. You will be notified when it is reviewed.",
+      "memberCount": "{count, plural, =0 {No members} =1 {1 member} other {# members}}"
+    },
+    "errors": {
+      "notFound": "This join link is invalid",
+      "expired": "This join link has expired",
+      "exhausted": "This join link is no longer active"
+    },
+    "manage": {
+      "title": "Manage Join Links",
+      "backToModify": "Back to organization settings",
+      "createTitle": "Create Join Link",
+      "description": "Description",
+      "descriptionPlaceholder": "e.g., Posted on community bulletin board",
+      "maxUses": "Max uses",
+      "maxUsesPlaceholder": "Leave empty for unlimited",
+      "create": "Create",
+      "creating": "Creating...",
+      "searchPlaceholder": "Search tokens...",
+      "noTokens": "No join links yet",
+      "copyLink": "Copy link",
+      "copySuccess": "Link copied to clipboard",
+      "createSuccess": "Join link created",
+      "expire": "Expire",
+      "reactivate": "Reactivate",
+      "editMaxUses": "Edit max uses",
+      "save": "Save",
+      "cancel": "Cancel",
+      "loadMore": "Load more",
+      "loading": "Loading...",
+      "showInactive": "Show inactive",
+      "status": {
+        "active": "Active",
+        "expired": "Expired",
+        "exhausted": "Exhausted"
+      },
+      "table": {
+        "description": "Description",
+        "token": "Token",
+        "created": "Created",
+        "creator": "Creator",
+        "uses": "Uses",
+        "status": "Status",
+        "actions": "Actions",
+        "unlimited": "Unlimited"
+      }
+    }
   }
 }

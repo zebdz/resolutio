@@ -19,6 +19,7 @@ import {
   getChildOrgJoinParentRequestAction,
   getIncomingJoinParentRequestsAction,
 } from '@/web/actions/joinParentRequest';
+import { Button } from '@/app/components/catalyst/button';
 import { MembershipSection } from '../MembershipSection';
 import { ParentOrgSection } from '../ParentOrgSection';
 import { BoardsSection } from '../BoardsSection';
@@ -168,6 +169,15 @@ export default async function OrganizationModifyPage({
           initialMembers={initialMembers}
           initialMembersTotalCount={initialMembersTotalCount}
         />
+
+        <Divider />
+
+        {/* Manage Join Links */}
+        <div>
+          <Link href={`/organizations/${id}/manage-tokens`}>
+            <Button color="zinc">{t('manageTokens')}</Button>
+          </Link>
+        </div>
 
         {/* Parent Org Section */}
         <ParentOrgSection

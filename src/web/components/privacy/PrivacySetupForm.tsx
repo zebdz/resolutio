@@ -14,6 +14,7 @@ import { Input } from '@/app/components/catalyst/input';
 import { Switch, SwitchField } from '@/app/components/catalyst/switch';
 import { AlertBanner } from '@/app/components/catalyst/alert-banner';
 import { completePrivacySetupAction } from '@/web/actions/user';
+import { consumeReturnToClient } from '@/web/lib/returnTo.client';
 
 type Props = {
   nickname: string;
@@ -51,7 +52,8 @@ export function PrivacySetupForm({ nickname }: Props) {
           setFieldErrors(result.fieldErrors);
         }
       } else {
-        router.push('/home');
+        const returnTo = consumeReturnToClient();
+        router.push(returnTo || '/home');
       }
     });
   }

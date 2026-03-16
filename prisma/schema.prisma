@@ -64,6 +64,7 @@ model User {
   otpVerifications           OtpVerification[]
   invitationsSent            Invitation[] @relation("InvitationInviter")
   invitationsReceived        Invitation[] @relation("InvitationInvitee")
+  joinTokensCreated          OrganizationJoinToken[] @relation("JoinTokenCreator")
 
   @@map("users")
 }
@@ -112,6 +113,7 @@ model Organization {
   childJoinRequests   OrganizationJoinParentRequest[] @relation("ChildOrgJoinParent")
   parentJoinRequests  OrganizationJoinParentRequest[] @relation("ParentOrgJoinParent")
   invitations         Invitation[]
+  joinTokens          OrganizationJoinToken[]
 
   @@index([parentId])
   @@index([createdById])
@@ -129,8 +131,10 @@ model OrganizationUser {
   rejectionReason   String?   @map("rejection_reason")
   acceptedByUserId  String?   @map("accepted_by_user_id")
   rejectedByUserId  String?   @map("rejected_by_user_id")
+  joinTokenId       String?   @map("join_token_id")
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  joinToken    OrganizationJoinToken? @relation(fields: [joinTokenId], references: [id])
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   acceptedBy   User?        @relation("AcceptedByAdmin", fields: [acceptedByUserId], references: [id])
   rejectedBy   User?        @relation("RejectedByAdmin", fields: [rejectedByUserId], references: [id])
@@ -140,6 +144,25 @@ model OrganizationUser {
   @@index([acceptedByUserId])
   @@index([rejectedByUserId])
   @@map("organization_users")
+}
+
+model OrganizationJoinToken {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  token          String    @unique
+  description    String
+  maxUses        Int?      @map("max_uses")
+  useCount       Int       @default(0) @map("use_count")
+  createdById    String    @map("created_by_id")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  expiredAt      DateTime? @map("expired_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  createdBy    User         @relation("JoinTokenCreator", fields: [createdById], references: [id])
+  usages       OrganizationUser[]
+
+  @@index([organizationId])
+  @@map("organization_join_tokens")
 }
 
 model OrganizationAdminUser {

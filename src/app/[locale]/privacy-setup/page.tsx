@@ -7,6 +7,7 @@ import { Button } from '@/app/components/catalyst/button';
 import { Divider } from '@/app/components/catalyst/divider';
 import { PrivacySetupForm } from '@/web/components/privacy/PrivacySetupForm';
 import { logoutAction } from '@/web/actions/auth';
+import { consumeReturnToCookieServer } from '@/web/lib/returnTo.server';
 
 export async function generateMetadata() {
   const t = await getTranslations('privacySetup');
@@ -28,7 +29,8 @@ export default async function PrivacySetupPage() {
 
   // Already completed — go home
   if (user.privacySetupCompleted) {
-    redirect('/home');
+    const returnTo = await consumeReturnToCookieServer();
+    redirect(returnTo || '/home');
   }
 
   const t = await getTranslations('privacySetup');
