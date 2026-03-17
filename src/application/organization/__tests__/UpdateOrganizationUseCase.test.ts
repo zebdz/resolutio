@@ -1,14 +1,22 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { UpdateOrganizationUseCase } from '../UpdateOrganizationUseCase';
+import { OrganizationErrors } from '../OrganizationErrors';
 import { Organization } from '../../../domain/organization/Organization';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../../domain/user/UserRepository';
+import { NotificationRepository } from '../../../domain/notification/NotificationRepository';
+import { Notification } from '../../../domain/notification/Notification';
 import { User } from '../../../domain/user/User';
 import { PhoneNumber } from '../../../domain/user/PhoneNumber';
 
 class MockOrganizationRepository implements OrganizationRepository {
   private organizations: Map<string, Organization> = new Map();
   private adminRoles: Map<string, Set<string>> = new Map();
+  private setAllowMultiTreeMembershipCalls: Array<{
+    orgId: string;
+    value: boolean | null;
+  }> = [];
+  private usersWithMultipleMemberships: string[] = [];
 
   async save(organization: Organization): Promise<Organization> {
     this.organizations.set(organization.id, organization);
@@ -98,6 +106,23 @@ class MockOrganizationRepository implements OrganizationRepository {
   async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
     return [];
   }
+  async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
+    return false;
+  }
+  async findUsersWithMultipleMembershipsInOrgs(
+    _orgIds: string[]
+  ): Promise<string[]> {
+    return this.usersWithMultipleMemberships;
+  }
+  async setAllowMultiTreeMembership(
+    organizationId: string,
+    value: boolean | null
+  ): Promise<void> {
+    this.setAllowMultiTreeMembershipCalls.push({
+      orgId: organizationId,
+      value,
+    });
+  }
 
   // Test helpers
   addOrganization(org: Organization): void {
@@ -109,6 +134,37 @@ class MockOrganizationRepository implements OrganizationRepository {
     }
 
     this.adminRoles.get(organizationId)!.add(userId);
+  }
+  setUsersWithMultipleMemberships(userIds: string[]): void {
+    this.usersWithMultipleMemberships = userIds;
+  }
+  getSetAllowMultiTreeMembershipCalls() {
+    return this.setAllowMultiTreeMembershipCalls;
+  }
+}
+
+class MockNotificationRepository implements NotificationRepository {
+  async save(notification: Notification): Promise<Notification> {
+    return notification;
+  }
+  async saveBatch(): Promise<void> {}
+  async findById(): Promise<Notification | null> {
+    return null;
+  }
+  async findByUserId(): Promise<Notification[]> {
+    return [];
+  }
+  async getUnreadCount(): Promise<number> {
+    return 0;
+  }
+  async markAsRead(): Promise<void> {}
+  async markAllAsRead(): Promise<void> {}
+  async findByIds(): Promise<Notification[]> {
+    return [];
+  }
+  async deleteByIds(): Promise<void> {}
+  async getCountByUserId(): Promise<number> {
+    return 0;
   }
 }
 
@@ -176,6 +232,7 @@ function makeOrg(
     createdById: 'creator-1',
     createdAt: new Date(),
     archivedAt: null,
+    allowMultiTreeMembership: false,
   });
 
   return org;
@@ -190,6 +247,7 @@ function makeArchivedOrg(id: string): Organization {
     createdById: 'creator-1',
     createdAt: new Date(),
     archivedAt: new Date(),
+    allowMultiTreeMembership: false,
   });
 }
 
@@ -197,13 +255,16 @@ describe('UpdateOrganizationUseCase', () => {
   let useCase: UpdateOrganizationUseCase;
   let organizationRepository: MockOrganizationRepository;
   let userRepository: MockUserRepository;
+  let notificationRepository: MockNotificationRepository;
 
   beforeEach(() => {
     organizationRepository = new MockOrganizationRepository();
     userRepository = new MockUserRepository();
+    notificationRepository = new MockNotificationRepository();
     useCase = new UpdateOrganizationUseCase({
       organizationRepository,
       userRepository,
+      notificationRepository,
     });
   });
 
@@ -362,5 +423,150 @@ describe('UpdateOrganizationUseCase', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  describe('allowMultiTreeMembership toggle', () => {
+    it('should allow root org to enable multi-membership', async () => {
+      organizationRepository.addOrganization(makeOrg('org-1'));
+      organizationRepository.setAdmin('org-1', 'admin-1');
+
+      const result = await useCase.execute({
+        organizationId: 'org-1',
+        userId: 'admin-1',
+        name: 'Test Org',
+        description: 'Test description',
+        allowMultiTreeMembership: true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(
+        organizationRepository.getSetAllowMultiTreeMembershipCalls()
+      ).toContainEqual({ orgId: 'org-1', value: true });
+    });
+
+    it('should reject toggle on child org with NOT_ROOT_ORG', async () => {
+      const childOrg = Organization.reconstitute({
+        id: 'org-child',
+        name: 'Child Org',
+        description: 'desc',
+        parentId: 'org-parent',
+        createdById: 'creator-1',
+        createdAt: new Date(),
+        archivedAt: null,
+        allowMultiTreeMembership: null,
+      });
+      organizationRepository.addOrganization(childOrg);
+      organizationRepository.setAdmin('org-child', 'admin-1');
+
+      const result = await useCase.execute({
+        organizationId: 'org-child',
+        userId: 'admin-1',
+        name: 'Child Org',
+        description: 'desc',
+        allowMultiTreeMembership: true,
+      });
+
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        expect(result.error).toBe(OrganizationErrors.NOT_ROOT_ORG);
+      }
+    });
+
+    it('should reject disabling when users have multiple memberships', async () => {
+      const rootOrg = Organization.reconstitute({
+        id: 'org-1',
+        name: 'Root Org',
+        description: 'desc',
+        parentId: null,
+        createdById: 'creator-1',
+        createdAt: new Date(),
+        archivedAt: null,
+        allowMultiTreeMembership: true,
+      });
+      organizationRepository.addOrganization(rootOrg);
+      organizationRepository.setAdmin('org-1', 'admin-1');
+      organizationRepository.setUsersWithMultipleMemberships(['user-1']);
+
+      const result = await useCase.execute({
+        organizationId: 'org-1',
+        userId: 'admin-1',
+        name: 'Root Org',
+        description: 'desc',
+        allowMultiTreeMembership: false,
+      });
+
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        expect(result.error).toBe(
+          OrganizationErrors.MULTI_MEMBERSHIP_CONFLICTS_EXIST
+        );
+      }
+    });
+
+    it('should allow disabling when no users have multiple memberships', async () => {
+      const rootOrg = Organization.reconstitute({
+        id: 'org-1',
+        name: 'Root Org',
+        description: 'desc',
+        parentId: null,
+        createdById: 'creator-1',
+        createdAt: new Date(),
+        archivedAt: null,
+        allowMultiTreeMembership: true,
+      });
+      organizationRepository.addOrganization(rootOrg);
+      organizationRepository.setAdmin('org-1', 'admin-1');
+      organizationRepository.setUsersWithMultipleMemberships([]);
+
+      const result = await useCase.execute({
+        organizationId: 'org-1',
+        userId: 'admin-1',
+        name: 'Root Org',
+        description: 'desc',
+        allowMultiTreeMembership: false,
+      });
+
+      expect(result.success).toBe(true);
+      expect(
+        organizationRepository.getSetAllowMultiTreeMembershipCalls()
+      ).toContainEqual({ orgId: 'org-1', value: false });
+    });
+
+    it('should not call setAllowMultiTreeMembership when value unchanged', async () => {
+      organizationRepository.addOrganization(makeOrg('org-1'));
+      organizationRepository.setAdmin('org-1', 'admin-1');
+
+      const result = await useCase.execute({
+        organizationId: 'org-1',
+        userId: 'admin-1',
+        name: 'Test Org',
+        description: 'Test description',
+        allowMultiTreeMembership: false,
+      });
+
+      expect(result.success).toBe(true);
+      expect(
+        organizationRepository.getSetAllowMultiTreeMembershipCalls()
+      ).toHaveLength(0);
+    });
+
+    it('should not change setting when allowMultiTreeMembership not in input', async () => {
+      organizationRepository.addOrganization(makeOrg('org-1'));
+      organizationRepository.setAdmin('org-1', 'admin-1');
+
+      const result = await useCase.execute({
+        organizationId: 'org-1',
+        userId: 'admin-1',
+        name: 'Test Org',
+        description: 'Test description',
+      });
+
+      expect(result.success).toBe(true);
+      expect(
+        organizationRepository.getSetAllowMultiTreeMembershipCalls()
+      ).toHaveLength(0);
+    });
   });
 });

@@ -14,6 +14,12 @@ class MockOrganizationRepository implements OrganizationRepository {
   private organizations: Map<string, Organization> = new Map();
   private adminRoles: Map<string, Set<string>> = new Map();
   private parentUpdates: Array<{ orgId: string; parentId: string | null }> = [];
+  private acceptedMembers: Map<string, Set<string>> = new Map();
+  private allowMultiTreeMembershipMap: Map<string, boolean | null> = new Map();
+  private allowMultiTreeMembershipUpdates: Array<{
+    orgId: string;
+    value: boolean | null;
+  }> = [];
 
   async save(org: Organization): Promise<Organization> {
     return org;
@@ -75,8 +81,24 @@ class MockOrganizationRepository implements OrganizationRepository {
   async update(org: Organization): Promise<Organization> {
     return org;
   }
-  async findAcceptedMemberUserIdsIncludingDescendants(): Promise<string[]> {
-    return [];
+  async findAcceptedMemberUserIdsIncludingDescendants(
+    orgId: string
+  ): Promise<string[]> {
+    const descendants = await this.getDescendantIds(orgId);
+    const allOrgIds = [orgId, ...descendants];
+    const allMembers = new Set<string>();
+
+    for (const id of allOrgIds) {
+      const members = this.acceptedMembers.get(id);
+
+      if (members) {
+        for (const m of members) {
+          allMembers.add(m);
+        }
+      }
+    }
+
+    return Array.from(allMembers);
   }
   async removeUserFromOrganization(): Promise<void> {}
   async findPendingRequestsByUserId(): Promise<Organization[]> {
@@ -128,6 +150,45 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
   async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
     return [];
+  }
+  async getFullTreeOrgIds(): Promise<string[]> {
+    return [];
+  }
+  async getRootAllowMultiTreeMembership(orgId: string): Promise<boolean> {
+    const ancestorIds = await this.getAncestorIds(orgId);
+    const rootId =
+      ancestorIds.length > 0 ? ancestorIds[ancestorIds.length - 1] : orgId;
+
+    return this.allowMultiTreeMembershipMap.get(rootId) ?? false;
+  }
+  async findUsersWithMultipleMembershipsInOrgs(
+    _orgIds: string[]
+  ): Promise<string[]> {
+    return [];
+  }
+  async setAllowMultiTreeMembership(
+    organizationId: string,
+    value: boolean | null
+  ): Promise<void> {
+    this.allowMultiTreeMembershipUpdates.push({ orgId: organizationId, value });
+    this.allowMultiTreeMembershipMap.set(organizationId, value);
+  }
+
+  // Test helpers
+  addAcceptedMember(orgId: string, userId: string) {
+    if (!this.acceptedMembers.has(orgId)) {
+      this.acceptedMembers.set(orgId, new Set());
+    }
+
+    this.acceptedMembers.get(orgId)!.add(userId);
+  }
+
+  setAllowMultiTreeMembershipValue(orgId: string, value: boolean | null) {
+    this.allowMultiTreeMembershipMap.set(orgId, value);
+  }
+
+  getAllowMultiTreeMembershipUpdates() {
+    return this.allowMultiTreeMembershipUpdates;
   }
 }
 
@@ -238,6 +299,7 @@ function createOrg(
     createdById: 'creator-1',
     createdAt: new Date(),
     archivedAt: null,
+    allowMultiTreeMembership: parentId ? null : false,
   });
 }
 
@@ -470,5 +532,136 @@ describe('HandleJoinParentRequestUseCase', () => {
     if (!result.success) {
       expect(result.error).toBe(OrganizationErrors.CANNOT_JOIN_OWN_DESCENDANT);
     }
+  });
+
+  it('should block accept when trees have overlapping members and both disallow multi-membership', async () => {
+    const childOrg = createOrg('child-1', 'Child');
+    const parentOrg = createOrg('parent-1', 'Parent');
+    orgRepo.addOrganization(childOrg);
+    orgRepo.addOrganization(parentOrg);
+    orgRepo.addAdmin('parent-1', 'parent-admin');
+
+    orgRepo.addAcceptedMember('child-1', 'user-1');
+    orgRepo.addAcceptedMember('parent-1', 'user-1');
+    orgRepo.setAllowMultiTreeMembershipValue('child-1', false);
+    orgRepo.setAllowMultiTreeMembershipValue('parent-1', false);
+
+    const request = createPendingRequest('req-1', 'child-1', 'parent-1');
+    joinParentRepo.addRequest(request);
+
+    const result = await useCase.execute({
+      requestId: 'req-1',
+      adminUserId: 'parent-admin',
+      action: 'accept',
+    });
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error).toBe(OrganizationErrors.MULTI_MEMBERSHIP_CONFLICT);
+    }
+  });
+
+  it('should allow accept when trees have overlapping members and both allow multi-membership', async () => {
+    const childOrg = createOrg('child-1', 'Child');
+    const parentOrg = createOrg('parent-1', 'Parent');
+    orgRepo.addOrganization(childOrg);
+    orgRepo.addOrganization(parentOrg);
+    orgRepo.addAdmin('parent-1', 'parent-admin');
+
+    orgRepo.addAcceptedMember('child-1', 'user-1');
+    orgRepo.addAcceptedMember('parent-1', 'user-1');
+    orgRepo.setAllowMultiTreeMembershipValue('child-1', true);
+    orgRepo.setAllowMultiTreeMembershipValue('parent-1', true);
+
+    const request = createPendingRequest('req-1', 'child-1', 'parent-1');
+    joinParentRepo.addRequest(request);
+
+    const result = await useCase.execute({
+      requestId: 'req-1',
+      adminUserId: 'parent-admin',
+      action: 'accept',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should block accept when overlapping members and only parent allows multi-membership', async () => {
+    const childOrg = createOrg('child-1', 'Child');
+    const parentOrg = createOrg('parent-1', 'Parent');
+    orgRepo.addOrganization(childOrg);
+    orgRepo.addOrganization(parentOrg);
+    orgRepo.addAdmin('parent-1', 'parent-admin');
+
+    orgRepo.addAcceptedMember('child-1', 'user-1');
+    orgRepo.addAcceptedMember('parent-1', 'user-1');
+    orgRepo.setAllowMultiTreeMembershipValue('child-1', false);
+    orgRepo.setAllowMultiTreeMembershipValue('parent-1', true);
+
+    const request = createPendingRequest('req-1', 'child-1', 'parent-1');
+    joinParentRepo.addRequest(request);
+
+    const result = await useCase.execute({
+      requestId: 'req-1',
+      adminUserId: 'parent-admin',
+      action: 'accept',
+    });
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error).toBe(OrganizationErrors.MULTI_MEMBERSHIP_CONFLICT);
+    }
+  });
+
+  it('should allow accept when no overlapping members regardless of setting', async () => {
+    const childOrg = createOrg('child-1', 'Child');
+    const parentOrg = createOrg('parent-1', 'Parent');
+    orgRepo.addOrganization(childOrg);
+    orgRepo.addOrganization(parentOrg);
+    orgRepo.addAdmin('parent-1', 'parent-admin');
+
+    orgRepo.addAcceptedMember('child-1', 'user-1');
+    orgRepo.addAcceptedMember('parent-1', 'user-2');
+    orgRepo.setAllowMultiTreeMembershipValue('child-1', false);
+    orgRepo.setAllowMultiTreeMembershipValue('parent-1', false);
+
+    const request = createPendingRequest('req-1', 'child-1', 'parent-1');
+    joinParentRepo.addRequest(request);
+
+    const result = await useCase.execute({
+      requestId: 'req-1',
+      adminUserId: 'parent-admin',
+      action: 'accept',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should skip overlap check when reparenting within the same tree', async () => {
+    // A (root) → B → C, user-1 is member of both A and C
+    // C wants to become direct child of A — should NOT trigger overlap conflict
+    const orgA = createOrg('org-a', 'Org A');
+    const orgB = createOrg('org-b', 'Org B', 'org-a');
+    const orgC = createOrg('org-c', 'Org C', 'org-b');
+    orgRepo.addOrganization(orgA);
+    orgRepo.addOrganization(orgB);
+    orgRepo.addOrganization(orgC);
+    orgRepo.addAdmin('org-a', 'admin-a');
+
+    orgRepo.addAcceptedMember('org-a', 'user-1');
+    orgRepo.addAcceptedMember('org-c', 'user-1');
+    orgRepo.setAllowMultiTreeMembershipValue('org-a', false);
+
+    const request = createPendingRequest('req-1', 'org-c', 'org-a');
+    joinParentRepo.addRequest(request);
+
+    const result = await useCase.execute({
+      requestId: 'req-1',
+      adminUserId: 'admin-a',
+      action: 'accept',
+    });
+
+    expect(result.success).toBe(true);
   });
 });

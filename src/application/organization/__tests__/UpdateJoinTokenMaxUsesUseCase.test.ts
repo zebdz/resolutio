@@ -96,6 +96,13 @@ class MockOrganizationRepository implements OrganizationRepository {
   async searchByNameFuzzy() {
     return [];
   }
+  async getRootAllowMultiTreeMembership() {
+    return false;
+  }
+  async findUsersWithMultipleMembershipsInOrgs() {
+    return [];
+  }
+  async setAllowMultiTreeMembership() {}
 }
 
 // Mock UserRepository

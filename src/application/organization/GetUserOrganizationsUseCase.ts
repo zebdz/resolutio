@@ -82,6 +82,8 @@ export class GetUserOrganizationsUseCase {
         createdById: membership.organization.createdById,
         createdAt: membership.organization.createdAt,
         archivedAt: membership.organization.archivedAt,
+        allowMultiTreeMembership:
+          membership.organization.allowMultiTreeMembership ?? null,
       });
 
       const parentOrg = (membership.organization as any).parent

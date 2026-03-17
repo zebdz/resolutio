@@ -13,6 +13,7 @@ function makeOrg(
     createdById: 'user-1',
     createdAt: new Date(),
     archivedAt: null,
+    allowMultiTreeMembership: false,
     ...overrides,
   });
 }
@@ -136,5 +137,70 @@ describe('Organization.updateDescription', () => {
     }
 
     expect(org.description).toBe('A test organization');
+  });
+});
+
+describe('Organization.allowMultiTreeMembership', () => {
+  it('should default to false when created without parentId', () => {
+    const result = Organization.create('Test Org', 'Test desc', 'creator-1');
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.allowMultiTreeMembership).toBe(false);
+    }
+  });
+
+  it('should be null when created with parentId', () => {
+    const result = Organization.create(
+      'Test Org',
+      'Test desc',
+      'creator-1',
+      'parent-1'
+    );
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.allowMultiTreeMembership).toBeNull();
+    }
+  });
+
+  it('should accept explicit value when no parentId', () => {
+    const result = Organization.create(
+      'Test Org',
+      'Test desc',
+      'creator-1',
+      undefined,
+      true
+    );
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.allowMultiTreeMembership).toBe(true);
+    }
+  });
+
+  it('should ignore explicit value when parentId is provided', () => {
+    const result = Organization.create(
+      'Test Org',
+      'Test desc',
+      'creator-1',
+      'parent-1',
+      true
+    );
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.allowMultiTreeMembership).toBeNull();
+    }
+  });
+
+  it('should reconstitute with allowMultiTreeMembership', () => {
+    const org = makeOrg({ allowMultiTreeMembership: true });
+    expect(org.allowMultiTreeMembership).toBe(true);
+  });
+
+  it('should include allowMultiTreeMembership in toJSON', () => {
+    const org = makeOrg({ allowMultiTreeMembership: true });
+    expect(org.toJSON().allowMultiTreeMembership).toBe(true);
   });
 });

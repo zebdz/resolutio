@@ -12,6 +12,7 @@ function makeOrg(id: string): Organization {
     createdById: 'user-1',
     createdAt: new Date(),
     archivedAt: null,
+    allowMultiTreeMembership: false,
   });
 }
 
@@ -44,6 +45,10 @@ function makeMockOrgRepo(
     setParentId: vi.fn(),
     addAdmin: vi.fn(),
     removeAdmin: vi.fn(),
+    searchByNameFuzzy: vi.fn(),
+    getRootAllowMultiTreeMembership: vi.fn().mockResolvedValue(false),
+    findUsersWithMultipleMembershipsInOrgs: vi.fn().mockResolvedValue([]),
+    setAllowMultiTreeMembership: vi.fn(),
     ...overrides,
   } as OrganizationRepository;
 }
@@ -104,5 +109,56 @@ describe('OrganizationMembershipService.removeUserFromHierarchyOrgs', () => {
     );
 
     expect(removeFromOrg).not.toHaveBeenCalled();
+  });
+});
+
+describe('OrganizationMembershipService.findUsersWithMultipleTreeMemberships', () => {
+  it('should return empty array when no users have multiple memberships', async () => {
+    const findMultiple = vi.fn().mockResolvedValue([]);
+    const repo = makeMockOrgRepo({
+      getDescendantIds: vi.fn().mockResolvedValue(['child-1']),
+      findUsersWithMultipleMembershipsInOrgs: findMultiple,
+    });
+
+    const result =
+      await OrganizationMembershipService.findUsersWithMultipleTreeMemberships(
+        'root-1',
+        repo
+      );
+
+    expect(result).toEqual([]);
+    expect(findMultiple).toHaveBeenCalledWith(['root-1', 'child-1']);
+  });
+
+  it('should return userIds of users in multiple orgs within the tree', async () => {
+    const findMultiple = vi.fn().mockResolvedValue(['user-1']);
+    const repo = makeMockOrgRepo({
+      getDescendantIds: vi.fn().mockResolvedValue(['child-1', 'child-2']),
+      findUsersWithMultipleMembershipsInOrgs: findMultiple,
+    });
+
+    const result =
+      await OrganizationMembershipService.findUsersWithMultipleTreeMemberships(
+        'root-1',
+        repo
+      );
+
+    expect(result).toEqual(['user-1']);
+    expect(findMultiple).toHaveBeenCalledWith(['root-1', 'child-1', 'child-2']);
+  });
+
+  it('should include root org in the query', async () => {
+    const findMultiple = vi.fn().mockResolvedValue([]);
+    const repo = makeMockOrgRepo({
+      getDescendantIds: vi.fn().mockResolvedValue([]),
+      findUsersWithMultipleMembershipsInOrgs: findMultiple,
+    });
+
+    await OrganizationMembershipService.findUsersWithMultipleTreeMemberships(
+      'root-1',
+      repo
+    );
+
+    expect(findMultiple).toHaveBeenCalledWith(['root-1']);
   });
 });

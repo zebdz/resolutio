@@ -119,6 +119,7 @@ const unarchiveOrganizationUseCase = new UnarchiveOrganizationUseCase({
 const updateOrganizationUseCase = new UpdateOrganizationUseCase({
   organizationRepository,
   userRepository,
+  notificationRepository,
 });
 
 const removeOrgAdminUseCase = new RemoveOrgAdminUseCase({
@@ -155,11 +156,18 @@ export async function createOrganizationAction(
     }
 
     // Extract form data
+    const parentId = (formData.get('parentId') as string) || null;
+    const allowMultiTreeMembershipRaw = formData.get(
+      'allowMultiTreeMembership'
+    );
     const input = {
       name: formData.get('name') as string,
       description: formData.get('description') as string,
-      parentId: (formData.get('parentId') as string) || null,
+      parentId,
       autoJoin: formData.get('autoJoin') !== 'false',
+      allowMultiTreeMembership: parentId
+        ? false
+        : allowMultiTreeMembershipRaw === 'true',
     };
 
     // Validate with Zod
@@ -824,6 +832,8 @@ export async function getOrganizationDetailsAction(
       id: string;
       name: string;
       description: string;
+      parentId: string | null;
+      allowMultiTreeMembership: boolean | null;
       createdAt: Date;
     };
     boards: Array<{
@@ -853,6 +863,10 @@ export async function getOrganizationDetailsAction(
       memberCount: number;
       children: any[];
     };
+    rootOrgMultiMembershipSetting: {
+      allowed: boolean;
+      rootOrgName: string;
+    } | null;
   }>
 > {
   const rateLimited = await checkRateLimit();
@@ -881,14 +895,43 @@ export async function getOrganizationDetailsAction(
       };
     }
 
+    const org = result.value.organization;
+
+    // For child orgs, fetch root's multi-membership setting
+    let rootOrgMultiMembershipSetting: {
+      allowed: boolean;
+      rootOrgName: string;
+    } | null = null;
+
+    if (org.parentId) {
+      const allowed =
+        await organizationRepository.getRootAllowMultiTreeMembership(
+          organizationId
+        );
+      const ancestorIds =
+        await organizationRepository.getAncestorIds(organizationId);
+      const rootId =
+        ancestorIds.length > 0
+          ? ancestorIds[ancestorIds.length - 1]
+          : organizationId;
+      const rootOrg = await organizationRepository.findById(rootId);
+
+      rootOrgMultiMembershipSetting = {
+        allowed,
+        rootOrgName: rootOrg?.name ?? '',
+      };
+    }
+
     return {
       success: true,
       data: {
         organization: {
-          id: result.value.organization.id,
-          name: result.value.organization.name,
-          description: result.value.organization.description,
-          createdAt: result.value.organization.createdAt,
+          id: org.id,
+          name: org.name,
+          description: org.description,
+          parentId: org.parentId,
+          allowMultiTreeMembership: org.allowMultiTreeMembership,
+          createdAt: org.createdAt,
         },
         boards: result.value.boards.map((b) => ({
           id: b.board.id,
@@ -902,6 +945,7 @@ export async function getOrganizationDetailsAction(
         firstAdmin: result.value.firstAdmin,
         ancestors: result.value.ancestors,
         hierarchyTree: result.value.hierarchyTree,
+        rootOrgMultiMembershipSetting,
       },
     };
   } catch (error) {
@@ -1295,6 +1339,13 @@ export async function updateOrganizationAction(
     const organizationId = formData.get('organizationId') as string;
     const name = formData.get('name') as string;
     const description = formData.get('description') as string;
+    const allowMultiTreeMembershipRaw = formData.get(
+      'allowMultiTreeMembership'
+    );
+    const allowMultiTreeMembership =
+      allowMultiTreeMembershipRaw !== null
+        ? allowMultiTreeMembershipRaw === 'true'
+        : undefined;
 
     if (!organizationId) {
       return { success: false, error: t('validationFailed') };
@@ -1305,6 +1356,7 @@ export async function updateOrganizationAction(
       userId: user.id,
       name: name || '',
       description: description || '',
+      allowMultiTreeMembership,
     });
 
     if (!result.success) {
@@ -1533,6 +1585,46 @@ export async function searchUsersForOrgAdminAction(
     return { success: true, data: filteredUsers };
   } catch (error) {
     console.error('Error searching users for org admin:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+export async function getRootMultiMembershipInfoAction(
+  orgId: string
+): Promise<ActionResult<{ allowed: boolean; rootOrgName: string }>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const allowed =
+      await organizationRepository.getRootAllowMultiTreeMembership(orgId);
+
+    const ancestorIds = await organizationRepository.getAncestorIds(orgId);
+    const rootId =
+      ancestorIds.length > 0 ? ancestorIds[ancestorIds.length - 1] : orgId;
+    const rootOrg = await organizationRepository.findById(rootId);
+
+    return {
+      success: true,
+      data: {
+        allowed,
+        rootOrgName: rootOrg?.name ?? '',
+      },
+    };
+  } catch (error) {
+    console.error('Error getting root multi-membership info:', error);
 
     return { success: false, error: t('generic') };
   }

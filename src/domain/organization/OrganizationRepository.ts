@@ -192,4 +192,24 @@ export interface OrganizationRepository {
    * Throws if this is the last admin.
    */
   removeAdmin(organizationId: string, userId: string): Promise<void>;
+
+  /**
+   * Walks up the hierarchy to the root org and returns its allowMultiTreeMembership value.
+   * Returns false if root's value is NULL (data corruption fallback).
+   */
+  getRootAllowMultiTreeMembership(organizationId: string): Promise<boolean>;
+
+  /**
+   * Returns userIds that hold accepted memberships in 2+ of the given org IDs.
+   * Includes memberships in archived orgs.
+   */
+  findUsersWithMultipleMembershipsInOrgs(orgIds: string[]): Promise<string[]>;
+
+  /**
+   * Updates the allowMultiTreeMembership setting for an organization.
+   */
+  setAllowMultiTreeMembership(
+    organizationId: string,
+    value: boolean | null
+  ): Promise<void>;
 }

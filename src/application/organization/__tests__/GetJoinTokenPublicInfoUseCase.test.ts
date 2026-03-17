@@ -99,6 +99,13 @@ class MockOrganizationRepository implements OrganizationRepository {
   async searchByNameFuzzy() {
     return [];
   }
+  async getRootAllowMultiTreeMembership() {
+    return false;
+  }
+  async findUsersWithMultipleMembershipsInOrgs() {
+    return [];
+  }
+  async setAllowMultiTreeMembership() {}
 }
 
 // Mock JoinTokenRepository
@@ -195,6 +202,7 @@ function createOrg(
     createdById: 'creator-1',
     createdAt: new Date(),
     archivedAt: null,
+    allowMultiTreeMembership: false,
   });
 }
 
@@ -207,6 +215,7 @@ function createArchivedOrg(id: string, name: string): Organization {
     createdById: 'creator-1',
     createdAt: new Date(),
     archivedAt: new Date(),
+    allowMultiTreeMembership: false,
   });
 }
 

@@ -39,6 +39,7 @@ function makeOrgRow(
     createdById: string;
     createdAt: Date;
     archivedAt: Date | null;
+    allowMultiTreeMembership: boolean | null;
   }> = {}
 ) {
   return {
@@ -49,6 +50,7 @@ function makeOrgRow(
     createdById: overrides.createdById ?? 'user-1',
     createdAt: overrides.createdAt ?? new Date('2024-01-01'),
     archivedAt: overrides.archivedAt ?? null,
+    allowMultiTreeMembership: overrides.allowMultiTreeMembership ?? false,
   };
 }
 
@@ -955,6 +957,7 @@ describe('PrismaOrganizationRepository', () => {
           name: 'Updated Org',
           description: 'desc',
           archivedAt: null,
+          allowMultiTreeMembership: false,
         },
       });
     });

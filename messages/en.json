@@ -203,7 +203,10 @@
       "alreadyAdmin": "User is already an admin of this organization",
       "notOrgAdmin": "User is not an admin of this organization",
       "cannotRemoveSelf": "You cannot remove yourself as admin",
-      "userNotFound": "User not found"
+      "userNotFound": "User not found",
+      "multiMembershipConflict": "Cannot merge organizations: some users are members of both trees and at least one tree does not allow multi-membership",
+      "multiMembershipConflictsExist": "Cannot disable multi-membership: some users are members of multiple organizations in this tree. Remove duplicate memberships first.",
+      "notRootOrg": "This setting can only be modified on the root organization"
     },
     "create": {
       "title": "Create Organization",
@@ -220,6 +223,11 @@
       "autoJoin": "Join as member",
       "autoJoinDescription": "Automatically join as a member after creating",
       "autoJoinFailed": "Organization created, but auto-join failed. Please join manually.",
+      "allowMultiTreeMembership": "Allow multi-membership within hierarchy",
+      "allowMultiTreeMembershipDescription": "When enabled, users can be members of multiple organizations within this hierarchy tree",
+      "multiMembershipInherited": "Multi-membership: {status} (inherited from root org \"{rootOrgName}\")",
+      "allowed": "allowed",
+      "disallowed": "disallowed",
       "success": "Organization created successfully",
       "errors": {
         "nameRequired": "Organization name is required",
@@ -328,7 +336,12 @@
       "save": "Save Changes",
       "saving": "Saving...",
       "updateSuccess": "Organization updated successfully",
-      "manageTokens": "Manage Join Links"
+      "manageTokens": "Manage Join Links",
+      "allowMultiTreeMembershipLabel": "Allow multi-membership within hierarchy",
+      "allowMultiTreeMembershipDescription": "When enabled, users can be members of multiple organizations within this hierarchy tree",
+      "allowMultiTreeMembershipInherited": "Multi-membership: {status} (setting from root org \"{rootOrgName}\")",
+      "allowed": "allowed",
+      "disallowed": "disallowed"
     },
     "pendingRequestsPage": {
       "title": "Pending Join Requests",
@@ -884,6 +897,10 @@
       "inviteDeclined": {
         "title": "Invitation declined",
         "body": "{inviteeName} declined the invitation to {organizationName}"
+      },
+      "multiMembershipSettingChanged": {
+        "title": "Organization membership setting changed",
+        "body": "The multi-membership setting for {organizationName} has been {allowed, select, true {enabled} other {disabled}}"
       }
     },
     "page": {

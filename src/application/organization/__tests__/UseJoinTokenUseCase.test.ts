@@ -99,6 +99,9 @@ function createMockOrgRepo(): OrganizationRepository {
     searchByNameFuzzy: vi.fn(),
     addAdmin: vi.fn().mockResolvedValue(undefined),
     removeAdmin: vi.fn(),
+    getRootAllowMultiTreeMembership: vi.fn().mockResolvedValue(false),
+    findUsersWithMultipleMembershipsInOrgs: vi.fn().mockResolvedValue([]),
+    setAllowMultiTreeMembership: vi.fn(),
   };
 }
 

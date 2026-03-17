@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import {
   createOrganizationAction,
   getAdminOrganizationsAction,
+  getRootMultiMembershipInfoAction,
 } from '@/web/actions/organization';
 
 interface CreateOrganizationDialogProps {
@@ -47,6 +48,10 @@ export function CreateOrganizationDialog({
   const [isLoadingOrgs, setIsLoadingOrgs] = useState(false);
   const [autoJoin, setAutoJoin] = useState(true);
   const [selectedParentId, setSelectedParentId] = useState('');
+  const [allowMultiTreeMembership, setAllowMultiTreeMembership] =
+    useState(false);
+  const [parentRootMultiMembershipInfo, setParentRootMultiMembershipInfo] =
+    useState<{ allowed: boolean; rootOrgName: string } | null>(null);
 
   // Load admin organizations when dialog opens
   useEffect(() => {
@@ -72,6 +77,8 @@ export function CreateOrganizationDialog({
     setFieldErrors({});
     setAutoJoin(true);
     setSelectedParentId('');
+    setAllowMultiTreeMembership(false);
+    setParentRootMultiMembershipInfo(null);
 
     // Reset form fields
     if (formRef.current) {
@@ -177,8 +184,15 @@ export function CreateOrganizationDialog({
 
                     if (value) {
                       setAutoJoin(false);
+                      setAllowMultiTreeMembership(false);
+                      getRootMultiMembershipInfoAction(value).then((result) => {
+                        if (result.success) {
+                          setParentRootMultiMembershipInfo(result.data);
+                        }
+                      });
                     } else {
                       setAutoJoin(true);
+                      setParentRootMultiMembershipInfo(null);
                     }
                   }}
                 >
@@ -213,6 +227,39 @@ export function CreateOrganizationDialog({
               name="autoJoin"
               value={autoJoin ? 'true' : 'false'}
             />
+
+            {/* Multi-tree membership setting */}
+            {!selectedParentId ? (
+              <SwitchField>
+                <Label>{t('allowMultiTreeMembership')}</Label>
+                <Description>
+                  {t('allowMultiTreeMembershipDescription')}
+                </Description>
+                <Switch
+                  checked={allowMultiTreeMembership}
+                  onChange={setAllowMultiTreeMembership}
+                  color="brand-green"
+                  disabled={isSubmitting}
+                />
+              </SwitchField>
+            ) : parentRootMultiMembershipInfo ? (
+              <div className="text-sm text-zinc-600 dark:text-zinc-400">
+                {t('multiMembershipInherited', {
+                  status: parentRootMultiMembershipInfo.allowed
+                    ? t('allowed')
+                    : t('disallowed'),
+                  rootOrgName: parentRootMultiMembershipInfo.rootOrgName,
+                })}
+              </div>
+            ) : null}
+
+            {!selectedParentId && (
+              <input
+                type="hidden"
+                name="allowMultiTreeMembership"
+                value={allowMultiTreeMembership ? 'true' : 'false'}
+              />
+            )}
           </div>
         </DialogBody>
 
