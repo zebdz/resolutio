@@ -15,6 +15,7 @@ import {
 import { Locale } from '@/src/i18n/locales';
 import { revalidatePath } from 'next/cache';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import {
   NICKNAME_MIN_LENGTH,
   NICKNAME_MAX_LENGTH,
@@ -93,11 +94,9 @@ export async function updateProfileAction(
     const result = await updateUserProfileUseCase.execute(validation.data);
 
     if (!result.success) {
-      const errorCode = result.error.message;
-
       return {
         success: false,
-        error: t(errorCode as any),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -165,11 +164,9 @@ export async function completePrivacySetupAction(
     const result = await completePrivacySetupUseCase.execute(validation.data);
 
     if (!result.success) {
-      const errorCode = result.error.message;
-
       return {
         success: false,
-        error: t(errorCode as any),
+        error: await translateErrorCode(result.error),
       };
     }
 

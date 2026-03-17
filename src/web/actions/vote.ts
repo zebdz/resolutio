@@ -1,6 +1,7 @@
 'use server';
 
 import { getTranslations } from 'next-intl/server';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { SubmitDraftUseCase } from '@/application/poll/SubmitDraftUseCase';
 import { FinishVotingUseCase } from '@/application/poll/FinishVotingUseCase';
 import { GetUserVotingProgressUseCase } from '@/application/poll/GetUserVotingProgressUseCase';
@@ -126,11 +127,9 @@ export async function submitDraftAction(data: {
     const result = await submitDraftUseCase.execute(validation.data);
 
     if (!result.success) {
-      const errorT = await getTranslations();
-
       return {
         success: false,
-        error: errorT(result.error as any),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -177,11 +176,9 @@ export async function getUserVotingProgressAction(
     });
 
     if (!result.success) {
-      const errorT = await getTranslations();
-
       return {
         success: false,
-        error: errorT(result.error as any),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -233,11 +230,9 @@ export async function finishVotingAction(
     });
 
     if (!result.success) {
-      const errorT = await getTranslations();
-
       return {
         success: false,
-        error: errorT(result.error as any),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -284,11 +279,9 @@ export async function getPollResultsAction(
     });
 
     if (!result.success) {
-      const errorT = await getTranslations();
-
       return {
         success: false,
-        error: errorT(result.error as any),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -337,18 +330,16 @@ export async function canUserVoteAction(
     if (!pollResult.success) {
       return {
         success: false,
-        error: pollResult.error,
+        error: await translateErrorCode(pollResult.error),
       };
     }
 
     const poll = pollResult.value;
 
     if (!poll) {
-      const tPoll = await getTranslations('poll.errors');
-
       return {
         success: false,
-        error: tPoll('pollNotFound'),
+        error: await translateErrorCode('poll.errors.pollNotFound'),
       };
     }
 
@@ -380,7 +371,7 @@ export async function canUserVoteAction(
     if (!participantResult.success) {
       return {
         success: false,
-        error: participantResult.error,
+        error: await translateErrorCode(participantResult.error),
       };
     }
 
@@ -403,7 +394,7 @@ export async function canUserVoteAction(
     if (!hasFinishedResult.success) {
       return {
         success: false,
-        error: hasFinishedResult.error,
+        error: await translateErrorCode(hasFinishedResult.error),
       };
     }
 

@@ -13,8 +13,8 @@ import { OtpCodeHasher } from '../OtpCodeHasher';
 import { OtpDeliveryChannel, OtpDeliveryResult } from '../OtpDeliveryChannel';
 import { User } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
-import { UnauthorizedError } from '@/domain/shared/errors';
 import { Nickname } from '@/domain/user/Nickname';
+import { AuthErrors } from '../AuthErrors';
 
 // Mock UserRepository
 class MockUserRepository implements UserRepository {
@@ -268,7 +268,7 @@ describe('LoginUserUseCase', () => {
     expect(result.success).toBe(false);
 
     if (!result.success) {
-      expect(result.error).toBeInstanceOf(UnauthorizedError);
+      expect(result.error).toBe(AuthErrors.INVALID_CREDENTIALS);
     }
   });
 
@@ -284,7 +284,7 @@ describe('LoginUserUseCase', () => {
     expect(result.success).toBe(false);
 
     if (!result.success) {
-      expect(result.error).toBeInstanceOf(UnauthorizedError);
+      expect(result.error).toBe(AuthErrors.INVALID_CREDENTIALS);
     }
   });
 

@@ -2,7 +2,6 @@ import { User } from '@/src/domain/user/User';
 import { Nickname } from '@/src/domain/user/Nickname';
 import type { UserRepository } from '@/src/domain/user/UserRepository';
 import { Result, success, failure } from '@/src/domain/shared/Result';
-import { ValidationError } from '@/src/domain/shared/errors';
 import { UserDomainCodes } from '@/src/domain/user/UserDomainCodes';
 import type { Language } from '@/src/domain/user/User';
 
@@ -17,67 +16,63 @@ export interface UpdateUserProfileInput {
 export class UpdateUserProfileUseCase {
   constructor(private readonly userRepository: UserRepository) {}
 
-  async execute(input: UpdateUserProfileInput): Promise<Result<User, Error>> {
-    try {
-      const user = await this.userRepository.findById(input.userId);
+  async execute(input: UpdateUserProfileInput): Promise<Result<User, string>> {
+    const user = await this.userRepository.findById(input.userId);
 
-      if (!user) {
-        return failure(new Error(`User with ID ${input.userId} not found`));
-      }
-
-      let updatedUser = user;
-
-      // Update language if provided
-      if (input.language !== undefined) {
-        updatedUser = updatedUser.updateLanguage(input.language);
-      }
-
-      // Update nickname if provided and changed
-      if (input.nickname !== undefined) {
-        let nickname: Nickname;
-
-        try {
-          nickname = Nickname.create(input.nickname);
-        } catch {
-          return failure(new ValidationError(UserDomainCodes.NICKNAME_INVALID));
-        }
-
-        if (!user.nickname.equals(nickname)) {
-          const available = await this.userRepository.isNicknameAvailable(
-            nickname.getValue()
-          );
-
-          if (!available) {
-            return failure(new ValidationError(UserDomainCodes.NICKNAME_TAKEN));
-          }
-
-          updatedUser = updatedUser.updateNickname(nickname);
-        }
-      }
-
-      // Update privacy settings only if values actually changed
-      const nameChanged =
-        input.allowFindByName !== undefined &&
-        input.allowFindByName !== user.allowFindByName;
-      const phoneChanged =
-        input.allowFindByPhone !== undefined &&
-        input.allowFindByPhone !== user.allowFindByPhone;
-
-      if (nameChanged || phoneChanged) {
-        updatedUser = updatedUser.updatePrivacySettings({
-          allowFindByName: input.allowFindByName,
-          allowFindByPhone: input.allowFindByPhone,
-        });
-        // Transactional: update user + insert audit log
-        await this.userRepository.updatePrivacySettings(updatedUser);
-      }
-
-      // Save the updated user
-      const savedUser = await this.userRepository.save(updatedUser);
-
-      return success(savedUser);
-    } catch (error) {
-      return failure(error as Error);
+    if (!user) {
+      return failure(UserDomainCodes.USER_NOT_FOUND);
     }
+
+    let updatedUser = user;
+
+    // Update language if provided
+    if (input.language !== undefined) {
+      updatedUser = updatedUser.updateLanguage(input.language);
+    }
+
+    // Update nickname if provided and changed
+    if (input.nickname !== undefined) {
+      let nickname: Nickname;
+
+      try {
+        nickname = Nickname.create(input.nickname);
+      } catch {
+        return failure(UserDomainCodes.NICKNAME_INVALID);
+      }
+
+      if (!user.nickname.equals(nickname)) {
+        const available = await this.userRepository.isNicknameAvailable(
+          nickname.getValue()
+        );
+
+        if (!available) {
+          return failure(UserDomainCodes.NICKNAME_TAKEN);
+        }
+
+        updatedUser = updatedUser.updateNickname(nickname);
+      }
+    }
+
+    // Update privacy settings only if values actually changed
+    const nameChanged =
+      input.allowFindByName !== undefined &&
+      input.allowFindByName !== user.allowFindByName;
+    const phoneChanged =
+      input.allowFindByPhone !== undefined &&
+      input.allowFindByPhone !== user.allowFindByPhone;
+
+    if (nameChanged || phoneChanged) {
+      updatedUser = updatedUser.updatePrivacySettings({
+        allowFindByName: input.allowFindByName,
+        allowFindByPhone: input.allowFindByPhone,
+      });
+      // Transactional: update user + insert audit log
+      await this.userRepository.updatePrivacySettings(updatedUser);
+    }
+
+    // Save the updated user
+    const savedUser = await this.userRepository.save(updatedUser);
+
+    return success(savedUser);
   }
 }

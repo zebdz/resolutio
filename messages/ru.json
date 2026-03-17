@@ -58,6 +58,11 @@
       "errors": {
         "alreadyConfirmed": "Ваш телефон уже подтверждён."
       }
+    },
+    "errors": {
+      "accountNotConfirmed": "Ваш аккаунт ещё не подтверждён",
+      "invalidCredentials": "Неверный номер телефона или пароль",
+      "phoneExists": "Номер телефона уже зарегистрирован"
     }
   },
   "otp": {

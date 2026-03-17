@@ -13,7 +13,6 @@ import { PasswordHasher } from '../RegisterUserUseCase';
 import { SessionRepository, Session } from '@/domain/user/SessionRepository';
 import { OtpCodeHasher } from '../OtpCodeHasher';
 import { OtpDeliveryChannel, OtpDeliveryResult } from '../OtpDeliveryChannel';
-import { DuplicateError } from '@/domain/shared/errors';
 import { UserDomainCodes } from '@/domain/user/UserDomainCodes';
 
 // Mock UserRepository
@@ -266,7 +265,7 @@ describe('RegisterUserUseCase', () => {
     expect(result.success).toBe(false);
 
     if (!result.success) {
-      expect(result.error.message).toBe(AuthErrors.CONSENT_NOT_GIVEN);
+      expect(result.error).toBe(AuthErrors.CONSENT_NOT_GIVEN);
     }
   });
 
@@ -309,7 +308,7 @@ describe('RegisterUserUseCase', () => {
     expect(result.success).toBe(false);
 
     if (!result.success) {
-      expect(result.error).toBeInstanceOf(DuplicateError);
+      expect(result.error).toBe(AuthErrors.PHONE_EXISTS);
     }
   });
 
@@ -387,7 +386,7 @@ describe('RegisterUserUseCase', () => {
     expect(result.success).toBe(false);
 
     if (!result.success) {
-      expect(result.error.message).toBe(OtpErrors.SEND_FAILED);
+      expect(result.error).toBe(OtpErrors.SEND_FAILED);
     }
   });
 

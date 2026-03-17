@@ -58,6 +58,11 @@
       "errors": {
         "alreadyConfirmed": "Your phone is already confirmed."
       }
+    },
+    "errors": {
+      "accountNotConfirmed": "Your account is not yet confirmed",
+      "invalidCredentials": "Invalid phone number or password",
+      "phoneExists": "Phone number already registered"
     }
   },
   "otp": {

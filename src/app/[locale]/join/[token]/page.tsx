@@ -10,6 +10,7 @@ import {
   PrismaJoinTokenRepository,
 } from '@/infrastructure/index';
 import { GetJoinTokenPublicInfoUseCase } from '@/application/organization/GetJoinTokenPublicInfoUseCase';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { JoinConfirmButton } from './JoinConfirmButton';
 import { SetReturnTo } from './SetReturnTo';
 
@@ -31,17 +32,7 @@ export default async function JoinTokenPage({
   const result = await getPublicInfoUseCase.execute(token);
 
   if (!result.success) {
-    let errorMessage = result.error;
-
-    if (result.error.startsWith('joinToken.errors.')) {
-      const tErrors = await getTranslations('joinToken.errors');
-      errorMessage = tErrors(
-        result.error.replace('joinToken.errors.', '') as any
-      );
-    } else if (result.error.startsWith('organization.errors.')) {
-      const tOrg = await getTranslations('organization');
-      errorMessage = tOrg(result.error.replace('organization.', '') as any);
-    }
+    const errorMessage = await translateErrorCode(result.error);
 
     const tCommonErr = await getTranslations('common');
 

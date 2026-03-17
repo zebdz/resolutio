@@ -85,7 +85,7 @@ describe('CompletePrivacySetupUseCase', () => {
     expect(result.success).toBe(false);
 
     if (!result.success) {
-      expect(result.error.message).toBe(UserDomainCodes.USER_NOT_FOUND);
+      expect(result.error).toBe(UserDomainCodes.USER_NOT_FOUND);
     }
   });
 
@@ -103,7 +103,7 @@ describe('CompletePrivacySetupUseCase', () => {
     expect(result.success).toBe(false);
 
     if (!result.success) {
-      expect(result.error.message).toBe(UserDomainCodes.NICKNAME_TAKEN);
+      expect(result.error).toBe(UserDomainCodes.NICKNAME_TAKEN);
     }
   });
 
@@ -138,7 +138,7 @@ describe('CompletePrivacySetupUseCase', () => {
     expect(result.success).toBe(false);
 
     if (!result.success) {
-      expect(result.error.message).toBe(UserDomainCodes.NICKNAME_INVALID);
+      expect(result.error).toBe(UserDomainCodes.NICKNAME_INVALID);
     }
   });
 

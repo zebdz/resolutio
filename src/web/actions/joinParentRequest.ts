@@ -21,6 +21,7 @@ import {
 import { getCurrentUser } from '../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { ActionResult } from './organization';
 
 // Initialize dependencies
@@ -82,7 +83,6 @@ export async function requestJoinParentAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tOrg = await getTranslations('organization');
 
   try {
     const user = await getCurrentUser();
@@ -111,11 +111,10 @@ export async function requestJoinParentAction(
     const result = await requestJoinParentUseCase.execute(validation.data);
 
     if (!result.success) {
-      const errorMessage = result.error.startsWith('organization.errors.')
-        ? tOrg(result.error.replace('organization.', '') as any)
-        : result.error;
-
-      return { success: false, error: errorMessage };
+      return {
+        success: false,
+        error: await translateErrorCode(result.error),
+      };
     }
 
     revalidatePath(`/organizations/${input.childOrgId}/modify`);
@@ -138,7 +137,6 @@ export async function cancelJoinParentRequestAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tOrg = await getTranslations('organization');
 
   try {
     const user = await getCurrentUser();
@@ -161,11 +159,10 @@ export async function cancelJoinParentRequestAction(
     );
 
     if (!result.success) {
-      const errorMessage = result.error.startsWith('organization.errors.')
-        ? tOrg(result.error.replace('organization.', '') as any)
-        : result.error;
-
-      return { success: false, error: errorMessage };
+      return {
+        success: false,
+        error: await translateErrorCode(result.error),
+      };
     }
 
     return { success: true, data: undefined };
@@ -186,7 +183,6 @@ export async function handleJoinParentRequestAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tOrg = await getTranslations('organization');
 
   try {
     const user = await getCurrentUser();
@@ -217,11 +213,10 @@ export async function handleJoinParentRequestAction(
     );
 
     if (!result.success) {
-      const errorMessage = result.error.startsWith('organization.errors.')
-        ? tOrg(result.error.replace('organization.', '') as any)
-        : result.error;
-
-      return { success: false, error: errorMessage };
+      return {
+        success: false,
+        error: await translateErrorCode(result.error),
+      };
     }
 
     return { success: true, data: undefined };
@@ -266,7 +261,10 @@ export async function getChildOrgJoinParentRequestAction(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error };
+      return {
+        success: false,
+        error: await translateErrorCode(result.error),
+      };
     }
 
     if (!result.value) {
@@ -336,7 +334,10 @@ export async function getIncomingJoinParentRequestsAction(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error };
+      return {
+        success: false,
+        error: await translateErrorCode(result.error),
+      };
     }
 
     // Resolve child org names and requesting admin names
@@ -422,7 +423,10 @@ export async function getAllJoinParentRequestsAction(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error };
+      return {
+        success: false,
+        error: await translateErrorCode(result.error),
+      };
     }
 
     // Collect all unique user IDs and org IDs for batch lookup

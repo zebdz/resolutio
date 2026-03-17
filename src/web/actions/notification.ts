@@ -1,6 +1,7 @@
 'use server';
 
 import { getTranslations } from 'next-intl/server';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { GetNotificationsUseCase } from '@/application/notification/GetNotificationsUseCase';
 import { MarkNotificationReadUseCase } from '@/application/notification/MarkNotificationReadUseCase';
 import { MarkAllNotificationsReadUseCase } from '@/application/notification/MarkAllNotificationsReadUseCase';
@@ -75,7 +76,7 @@ export async function getNotificationsAction(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error };
+      return { success: false, error: await translateErrorCode(result.error) };
     }
 
     return {
@@ -125,7 +126,7 @@ export async function markNotificationReadAction(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error };
+      return { success: false, error: await translateErrorCode(result.error) };
     }
 
     return { success: true, data: undefined };
@@ -157,7 +158,7 @@ export async function markAllNotificationsReadAction(): Promise<ActionResult> {
     });
 
     if (!result.success) {
-      return { success: false, error: result.error };
+      return { success: false, error: await translateErrorCode(result.error) };
     }
 
     return { success: true, data: undefined };
@@ -191,7 +192,7 @@ export async function getUnreadNotificationCountAction(): Promise<
     });
 
     if (!result.success) {
-      return { success: false, error: result.error };
+      return { success: false, error: await translateErrorCode(result.error) };
     }
 
     return { success: true, data: result.value };
@@ -226,7 +227,7 @@ export async function deleteNotificationsAction(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error };
+      return { success: false, error: await translateErrorCode(result.error) };
     }
 
     return { success: true, data: undefined };

@@ -1,6 +1,7 @@
 'use server';
 
 import { getTranslations } from 'next-intl/server';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { GetParticipantsUseCase } from '@/application/poll/GetParticipantsUseCase';
 import { UpdateParticipantWeightUseCase } from '@/application/poll/UpdateParticipantWeightUseCase';
 import { RemoveParticipantUseCase } from '@/application/poll/RemoveParticipantUseCase';
@@ -105,11 +106,9 @@ export async function getParticipantsAction(
     });
 
     if (!result.success) {
-      const errorT = await getTranslations();
-
       return {
         success: false,
-        error: errorT(result.error as any),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -178,11 +177,9 @@ export async function updateParticipantWeightAction(data: {
     });
 
     if (!result.success) {
-      const errorT = await getTranslations();
-
       return {
         success: false,
-        error: errorT(result.error as any),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -229,11 +226,9 @@ export async function removeParticipantAction(
     });
 
     if (!result.success) {
-      const errorT = await getTranslations();
-
       return {
         success: false,
-        error: errorT(result.error as any),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -280,11 +275,9 @@ export async function getWeightHistoryAction(
     });
 
     if (!result.success) {
-      const errorT = await getTranslations();
-
       return {
         success: false,
-        error: errorT(result.error as any),
+        error: await translateErrorCode(result.error),
       };
     }
 

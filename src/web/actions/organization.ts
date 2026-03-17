@@ -36,6 +36,7 @@ import { Notification } from '@/domain/notification/Notification';
 import { getCurrentUser } from '../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 
 // Action result type for client-side handling
 export type ActionResult<T = void> =
@@ -142,7 +143,6 @@ export async function createOrganizationAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tOrg = await getTranslations('organization');
 
   try {
     // Get current user
@@ -192,14 +192,9 @@ export async function createOrganizationAction(
     );
 
     if (!result.success) {
-      // Translate error code to localized message
-      const errorMessage = result.error.startsWith('organization.errors.')
-        ? tOrg(result.error.replace('organization.', '') as any)
-        : result.error;
-
       return {
         success: false,
-        error: errorMessage,
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -332,7 +327,7 @@ export async function listOrganizationsAction(): Promise<
     if (!result.success) {
       return {
         success: false,
-        error: result.error,
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -399,7 +394,7 @@ export async function searchOrganizationsNotAlreadyMemberOfAction(
     const result = await listOrganizationsUseCase.execute(input, user?.id);
 
     if (!result.success) {
-      return { success: false, error: result.error };
+      return { success: false, error: await translateErrorCode(result.error) };
     }
 
     return {
@@ -473,14 +468,9 @@ export async function joinOrganizationAction(
     );
 
     if (!result.success) {
-      // Translate error code to localized message
-      const errorMessage = result.error.startsWith('organization.errors.')
-        ? tOrg(result.error.replace('organization.', '') as any)
-        : result.error;
-
       return {
         success: false,
-        error: errorMessage,
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -546,7 +536,7 @@ export async function getAdminOrganizationsAction(): Promise<
     if (!result.success) {
       return {
         success: false,
-        error: result.error,
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -643,7 +633,7 @@ export async function getUserOrganizationsAction(): Promise<
     if (!result.success) {
       return {
         success: false,
-        error: result.error,
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -730,7 +720,7 @@ export async function getPendingRequestsAction(
     if (!result.success) {
       return {
         success: false,
-        error: result.error,
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -761,7 +751,6 @@ export async function handleJoinRequestAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tOrg = await getTranslations('organization');
 
   try {
     const user = await getCurrentUser();
@@ -799,14 +788,9 @@ export async function handleJoinRequestAction(
     const result = await handleJoinRequestUseCase.execute(validation.data);
 
     if (!result.success) {
-      // Translate error code to localized message
-      const errorMessage = result.error.startsWith('organization.errors.')
-        ? tOrg(result.error.replace('organization.', '') as any)
-        : result.error;
-
       return {
         success: false,
-        error: errorMessage,
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -886,12 +870,9 @@ export async function getOrganizationDetailsAction(
     });
 
     if (!result.success) {
-      const errorParts = result.error.split('.');
-      const tError = await getTranslations(errorParts.shift());
-
       return {
         success: false,
-        error: tError(errorParts.join('.')),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -1002,7 +983,7 @@ export async function getOrganizationPendingRequestsAction(
     if (!result.success) {
       return {
         success: false,
-        error: result.error,
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -1033,7 +1014,6 @@ export async function cancelJoinRequestAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tOrg = await getTranslations('organization');
 
   try {
     const user = await getCurrentUser();
@@ -1060,13 +1040,9 @@ export async function cancelJoinRequestAction(
     const result = await cancelJoinRequestUseCase.execute(validation.data);
 
     if (!result.success) {
-      const errorMessage = result.error.startsWith('organization.errors.')
-        ? tOrg(result.error.replace('organization.', '') as any)
-        : result.error;
-
       return {
         success: false,
-        error: errorMessage,
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -1176,10 +1152,7 @@ export async function archiveOrganizationAction(
     });
 
     if (!result.success) {
-      const errorParts = result.error.split('.');
-      const tError = await getTranslations(errorParts.shift());
-
-      return { success: false, error: tError(errorParts.join('.')) };
+      return { success: false, error: await translateErrorCode(result.error) };
     }
 
     return { success: true, data: undefined };
@@ -1222,10 +1195,7 @@ export async function unarchiveOrganizationAction(
     });
 
     if (!result.success) {
-      const errorParts = result.error.split('.');
-      const tError = await getTranslations(errorParts.shift());
-
-      return { success: false, error: tError(errorParts.join('.')) };
+      return { success: false, error: await translateErrorCode(result.error) };
     }
 
     return { success: true, data: undefined };
@@ -1305,18 +1275,6 @@ export async function searchAllOrganizationsAction(
   }
 }
 
-function translateErrorCode(errorCode: string, tOrg: any): string {
-  if (errorCode.startsWith('organization.errors.')) {
-    return tOrg(errorCode.replace('organization.', '') as any);
-  }
-
-  if (errorCode.startsWith('domain.organization.')) {
-    return tOrg(errorCode.replace('domain.organization.', 'errors.') as any);
-  }
-
-  return errorCode;
-}
-
 export async function updateOrganizationAction(
   formData: FormData
 ): Promise<ActionResult> {
@@ -1327,7 +1285,6 @@ export async function updateOrganizationAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tOrg = await getTranslations('organization');
 
   try {
     const user = await getCurrentUser();
@@ -1362,7 +1319,7 @@ export async function updateOrganizationAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateErrorCode(result.error, tOrg),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -1385,7 +1342,6 @@ export async function removeOrgAdminAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tOrg = await getTranslations('organization');
 
   try {
     const user = await getCurrentUser();
@@ -1403,7 +1359,7 @@ export async function removeOrgAdminAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateErrorCode(result.error, tOrg),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -1488,7 +1444,7 @@ export async function searchOrganizationsForJoinParentAction(
     });
 
     if (!result.success) {
-      return { success: false, error: result.error };
+      return { success: false, error: await translateErrorCode(result.error) };
     }
 
     return { success: true, data: result.value };

@@ -31,12 +31,7 @@ import {
 import { RegisterUserSchema } from '@/application/auth/RegisterUserSchema';
 import { LoginUserSchema } from '@/application/auth/LoginUserSchema';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
-import {
-  UnauthorizedError,
-  DuplicateError,
-  ValidationError,
-} from '@/domain/shared/errors';
-import { OtpErrors } from '@/application/auth/OtpErrors';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { AuthErrors } from '@/application/auth/AuthErrors';
 import {
   checkRateLimit,
@@ -207,41 +202,7 @@ export async function registerAction(
     }
 
     if (!result.success) {
-      // Handle specific error types
-      if (result.error instanceof DuplicateError) {
-        return {
-          success: false,
-          error: t('phoneExists'),
-        };
-      }
-
-      // Handle consent error
-      if (
-        result.error instanceof ValidationError &&
-        result.error.message === AuthErrors.CONSENT_NOT_GIVEN
-      ) {
-        const tAuth = await getTranslations('auth.register.errors');
-
-        return {
-          success: false,
-          error: tAuth('consentNotGiven'),
-        };
-      }
-
-      // Handle OTP send failure
-      if (result.error.message === OtpErrors.SEND_FAILED) {
-        const tOtp = await getTranslations('otp.errors');
-
-        return {
-          success: false,
-          error: tOtp('sendFailed'),
-        };
-      }
-
-      return {
-        success: false,
-        error: result.error.message,
-      };
+      return { success: false, error: await translateErrorCode(result.error) };
     }
 
     // Set session cookie
@@ -364,38 +325,11 @@ export async function loginAction(
     }
 
     if (!result.success) {
-      // Check if the error is a database connection error
-      if (isDatabaseConnectionError(result.error)) {
-        return {
-          success: false,
-          error: t('databaseConnection'),
-        };
-      }
-
-      // Handle specific error types
-      if (result.error instanceof UnauthorizedError) {
+      if (result.error === AuthErrors.INVALID_CREDENTIALS) {
         await recordFailedLogin(validation.data.phoneNumber, clientIp);
-
-        return {
-          success: false,
-          error: t('invalidCredentials'),
-        };
       }
 
-      // Handle OTP send failure
-      if (result.error.message === OtpErrors.SEND_FAILED) {
-        const tOtp = await getTranslations('otp.errors');
-
-        return {
-          success: false,
-          error: tOtp('sendFailed'),
-        };
-      }
-
-      return {
-        success: false,
-        error: result.error.message,
-      };
+      return { success: false, error: await translateErrorCode(result.error) };
     }
 
     // Reset login rate limit on success
