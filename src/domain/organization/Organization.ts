@@ -12,6 +12,7 @@ export interface OrganizationProps {
   createdById: string;
   createdAt: Date;
   archivedAt: Date | null;
+  allowMultiTreeMembership: boolean | null;
 }
 
 export class Organization {
@@ -21,7 +22,8 @@ export class Organization {
     name: string,
     description: string,
     createdById: string,
-    parentId: string | null = null
+    parentId: string | null = null,
+    allowMultiTreeMembership?: boolean
   ): Result<Organization, string> {
     // Validate name
     if (!name || name.trim().length === 0) {
@@ -49,6 +51,9 @@ export class Organization {
       createdById,
       createdAt: new Date(),
       archivedAt: null,
+      allowMultiTreeMembership: parentId
+        ? null
+        : (allowMultiTreeMembership ?? false),
     });
 
     return success(organization);
@@ -85,6 +90,10 @@ export class Organization {
 
   public get archivedAt(): Date | null {
     return this.props.archivedAt;
+  }
+
+  public get allowMultiTreeMembership(): boolean | null {
+    return this.props.allowMultiTreeMembership;
   }
 
   public isArchived(): boolean {

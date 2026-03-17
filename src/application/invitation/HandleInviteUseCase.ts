@@ -188,12 +188,19 @@ export class HandleInviteUseCase {
         },
       });
 
-      // Remove from hierarchy orgs
-      await OrganizationMembershipService.removeUserFromHierarchyOrgs(
-        invitation.inviteeId,
-        invitation.organizationId,
-        this.deps.organizationRepository
-      );
+      // Remove from hierarchy orgs (unless multi-membership allowed)
+      const allowsMulti =
+        await this.deps.organizationRepository.getRootAllowMultiTreeMembership(
+          invitation.organizationId
+        );
+
+      if (!allowsMulti) {
+        await OrganizationMembershipService.removeUserFromHierarchyOrgs(
+          invitation.inviteeId,
+          invitation.organizationId,
+          this.deps.organizationRepository
+        );
+      }
 
       invitation.accept();
       await this.deps.invitationRepository.update(invitation);

@@ -257,6 +257,18 @@ class MockOrganizationRepository implements Pick<
   async findById(id: string): Promise<Organization | null> {
     return this.org;
   }
+  async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
+    return false;
+  }
+  async findUsersWithMultipleMembershipsInOrgs(
+    _orgIds: string[]
+  ): Promise<string[]> {
+    return [];
+  }
+  async setAllowMultiTreeMembership(
+    _organizationId: string,
+    _value: boolean | null
+  ): Promise<void> {}
 }
 
 class MockBoardRepository implements Pick<BoardRepository, 'findById'> {
@@ -300,6 +312,7 @@ describe('FinishVotingUseCase', () => {
         createdById: 'user-admin',
         createdAt: new Date(),
         archivedAt: null,
+        allowMultiTreeMembership: false,
       })
     );
     boardRepository = new MockBoardRepository();
@@ -765,6 +778,7 @@ describe('FinishVotingUseCase', () => {
         createdById: 'user-admin',
         createdAt: new Date(),
         archivedAt: new Date(),
+        allowMultiTreeMembership: false,
       })
     );
 

@@ -101,6 +101,7 @@ model Organization {
   createdById String   @map("created_by_id")
   createdAt   DateTime @default(now()) @map("created_at")
   archivedAt  DateTime? @map("archived_at")
+  allowMultiTreeMembership Boolean? @default(false) @map("allow_multi_tree_membership")
 
   // Relations
   createdBy           User                    @relation(fields: [createdById], references: [id])

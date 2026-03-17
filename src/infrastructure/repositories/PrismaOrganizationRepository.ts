@@ -22,6 +22,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         createdById: data.createdById,
         createdAt: data.createdAt,
         archivedAt: data.archivedAt,
+        allowMultiTreeMembership: data.allowMultiTreeMembership,
       },
     });
 
@@ -41,6 +42,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       createdById: created.createdById,
       createdAt: created.createdAt,
       archivedAt: created.archivedAt,
+      allowMultiTreeMembership: created.allowMultiTreeMembership ?? null,
     });
   }
 
@@ -61,6 +63,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       createdById: org.createdById,
       createdAt: org.createdAt,
       archivedAt: org.archivedAt,
+      allowMultiTreeMembership: org.allowMultiTreeMembership ?? null,
     });
   }
 
@@ -81,6 +84,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       createdById: org.createdById,
       createdAt: org.createdAt,
       archivedAt: org.archivedAt,
+      allowMultiTreeMembership: org.allowMultiTreeMembership ?? null,
     });
   }
 
@@ -98,6 +102,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         createdById: org.createdById,
         createdAt: org.createdAt,
         archivedAt: org.archivedAt,
+        allowMultiTreeMembership: org.allowMultiTreeMembership ?? null,
       })
     );
   }
@@ -116,6 +121,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         createdById: org.createdById,
         createdAt: org.createdAt,
         archivedAt: org.archivedAt,
+        allowMultiTreeMembership: org.allowMultiTreeMembership ?? null,
       })
     );
   }
@@ -223,6 +229,8 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         createdById: m.organization.createdById,
         createdAt: m.organization.createdAt,
         archivedAt: m.organization.archivedAt,
+        allowMultiTreeMembership:
+          m.organization.allowMultiTreeMembership ?? null,
       })
     );
   }
@@ -248,6 +256,8 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         createdById: admin.organization.createdById,
         createdAt: admin.organization.createdAt,
         archivedAt: admin.organization.archivedAt,
+        allowMultiTreeMembership:
+          admin.organization.allowMultiTreeMembership ?? null,
       })
     );
   }
@@ -261,6 +271,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         name: data.name,
         description: data.description,
         archivedAt: data.archivedAt,
+        allowMultiTreeMembership: data.allowMultiTreeMembership,
       },
     });
 
@@ -272,6 +283,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       createdById: updated.createdById,
       createdAt: updated.createdAt,
       archivedAt: updated.archivedAt,
+      allowMultiTreeMembership: updated.allowMultiTreeMembership ?? null,
     });
   }
 
@@ -329,6 +341,8 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         createdById: m.organization.createdById,
         createdAt: m.organization.createdAt,
         archivedAt: m.organization.archivedAt,
+        allowMultiTreeMembership:
+          m.organization.allowMultiTreeMembership ?? null,
       })
     );
   }
@@ -475,7 +489,61 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   ): Promise<void> {
     await this.prisma.organization.update({
       where: { id: organizationId },
-      data: { parentId },
+      data: {
+        parentId,
+        // When becoming a child, inherit from root (null). When becoming root, default to false.
+        allowMultiTreeMembership: parentId ? null : false,
+      },
+    });
+  }
+
+  async getRootAllowMultiTreeMembership(
+    organizationId: string
+  ): Promise<boolean> {
+    const ancestorIds = await this.getAncestorIds(organizationId);
+    const rootId =
+      ancestorIds.length > 0
+        ? ancestorIds[ancestorIds.length - 1]
+        : organizationId;
+
+    const rootOrg = await this.prisma.organization.findUnique({
+      where: { id: rootId },
+      select: { allowMultiTreeMembership: true },
+    });
+
+    return rootOrg?.allowMultiTreeMembership ?? false;
+  }
+
+  async findUsersWithMultipleMembershipsInOrgs(
+    orgIds: string[]
+  ): Promise<string[]> {
+    if (orgIds.length === 0) {
+      return [];
+    }
+
+    const result = await this.prisma.organizationUser.groupBy({
+      by: ['userId'],
+      where: {
+        organizationId: { in: orgIds },
+        status: 'accepted',
+      },
+      having: {
+        userId: {
+          _count: { gt: 1 },
+        },
+      },
+    });
+
+    return result.map((r: { userId: string }) => r.userId);
+  }
+
+  async setAllowMultiTreeMembership(
+    organizationId: string,
+    value: boolean | null
+  ): Promise<void> {
+    await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: { allowMultiTreeMembership: value },
     });
   }
 
@@ -575,6 +643,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         createdById: org.createdById,
         createdAt: org.createdAt,
         archivedAt: org.archivedAt,
+        allowMultiTreeMembership: org.allowMultiTreeMembership ?? null,
       }),
       memberCount: org._count.members,
       firstAdmin:
@@ -674,6 +743,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           createdById: org.createdById,
           createdAt: org.createdAt,
           archivedAt: org.archivedAt,
+          allowMultiTreeMembership: org.allowMultiTreeMembership ?? null,
         }),
         memberCount: org._count.members,
         firstAdmin:

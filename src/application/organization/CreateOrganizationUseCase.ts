@@ -59,7 +59,8 @@ export class CreateOrganizationUseCase {
       name,
       description,
       userId,
-      parentId
+      parentId,
+      input.allowMultiTreeMembership
     );
 
     if (!organizationResult.success) {

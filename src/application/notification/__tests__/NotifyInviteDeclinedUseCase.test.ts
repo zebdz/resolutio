@@ -82,6 +82,18 @@ class MockOrganizationRepository implements OrganizationRepository {
   async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
     return [];
   }
+  async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
+    return false;
+  }
+  async findUsersWithMultipleMembershipsInOrgs(
+    _orgIds: string[]
+  ): Promise<string[]> {
+    return [];
+  }
+  async setAllowMultiTreeMembership(
+    _organizationId: string,
+    _value: boolean | null
+  ): Promise<void> {}
 
   addOrganization(org: Organization) {
     this.organizations.set(org.id, org);
@@ -133,6 +145,7 @@ function createOrg(id: string, name: string): Organization {
     createdById: 'creator-1',
     createdAt: new Date(),
     archivedAt: null,
+    allowMultiTreeMembership: false,
   });
 }
 

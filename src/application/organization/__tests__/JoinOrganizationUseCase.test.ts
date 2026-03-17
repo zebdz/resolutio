@@ -261,6 +261,18 @@ class MockOrganizationRepository implements OrganizationRepository {
   async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
     return [];
   }
+  async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
+    return false;
+  }
+  async findUsersWithMultipleMembershipsInOrgs(
+    _orgIds: string[]
+  ): Promise<string[]> {
+    return [];
+  }
+  async setAllowMultiTreeMembership(
+    _organizationId: string,
+    _value: boolean | null
+  ): Promise<void> {}
 }
 
 // Mock NotificationRepository
@@ -919,6 +931,50 @@ describe('JoinOrganizationUseCase', () => {
             OrganizationErrors.PENDING_HIERARCHY_REQUEST
           );
         }
+      }
+    }
+  });
+
+  it('should skip hierarchy blocking when multi-tree membership allowed', async () => {
+    const rootResult = Organization.create(
+      'Root Organization',
+      'Root description',
+      'creator-123'
+    );
+    expect(rootResult.success).toBe(true);
+
+    if (rootResult.success) {
+      const root = rootResult.value;
+      (root as any).props.id = 'org-root';
+      organizationRepository.addOrganization(root);
+
+      const childResult = Organization.create(
+        'Child Organization',
+        'Child description',
+        'creator-123',
+        'org-root'
+      );
+      expect(childResult.success).toBe(true);
+
+      if (childResult.success) {
+        const child = childResult.value;
+        (child as any).props.id = 'org-child';
+        organizationRepository.addOrganization(child);
+
+        // User has pending request in child org
+        organizationRepository.addPendingRequest('user-456', 'org-child');
+
+        // Root allows multi-tree membership
+        organizationRepository.getRootAllowMultiTreeMembership = async () =>
+          true;
+
+        // Try to join root - should succeed because multi-membership is allowed
+        const result = await useCase.execute(
+          { organizationId: 'org-root' },
+          'user-456'
+        );
+
+        expect(result.success).toBe(true);
       }
     }
   });

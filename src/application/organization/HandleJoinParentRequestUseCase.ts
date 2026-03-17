@@ -62,6 +62,47 @@ export class HandleJoinParentRequestUseCase {
         return failure(OrganizationErrors.CANNOT_JOIN_OWN_DESCENDANT);
       }
 
+      // 4b. Check for overlapping members between the two trees
+      // Skip if child is already in the parent's tree (reparenting within same tree)
+      const parentAncestorIds =
+        await this.deps.organizationRepository.getAncestorIds(
+          request.childOrgId
+        );
+      const isAlreadyInSameTree =
+        parentAncestorIds.includes(request.parentOrgId) ||
+        descendantIds.includes(request.parentOrgId);
+
+      if (!isAlreadyInSameTree) {
+        const [childTreeMembers, parentTreeMembers] = await Promise.all([
+          this.deps.organizationRepository.findAcceptedMemberUserIdsIncludingDescendants(
+            request.childOrgId
+          ),
+          this.deps.organizationRepository.findAcceptedMemberUserIdsIncludingDescendants(
+            request.parentOrgId
+          ),
+        ]);
+
+        const parentMemberSet = new Set(parentTreeMembers);
+        const overlappingUserIds = childTreeMembers.filter((id) =>
+          parentMemberSet.has(id)
+        );
+
+        if (overlappingUserIds.length > 0) {
+          const [childTreeAllows, parentTreeAllows] = await Promise.all([
+            this.deps.organizationRepository.getRootAllowMultiTreeMembership(
+              request.childOrgId
+            ),
+            this.deps.organizationRepository.getRootAllowMultiTreeMembership(
+              request.parentOrgId
+            ),
+          ]);
+
+          if (!childTreeAllows || !parentTreeAllows) {
+            return failure(OrganizationErrors.MULTI_MEMBERSHIP_CONFLICT);
+          }
+        }
+      }
+
       // 5a. Accept the request
       request.accept(adminUserId);
       await this.deps.joinParentRequestRepository.update(request);

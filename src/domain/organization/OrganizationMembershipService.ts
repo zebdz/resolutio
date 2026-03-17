@@ -26,4 +26,21 @@ export class OrganizationMembershipService {
       }
     }
   }
+
+  /**
+   * Returns userIds that hold accepted memberships in 2+ orgs within the tree
+   * rooted at rootOrgId (including archived orgs).
+   */
+  static async findUsersWithMultipleTreeMemberships(
+    rootOrgId: string,
+    organizationRepository: OrganizationRepository
+  ): Promise<string[]> {
+    const descendantIds =
+      await organizationRepository.getDescendantIds(rootOrgId);
+    const allTreeOrgIds = [rootOrgId, ...descendantIds];
+
+    return organizationRepository.findUsersWithMultipleMembershipsInOrgs(
+      allTreeOrgIds
+    );
+  }
 }

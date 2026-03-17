@@ -140,6 +140,18 @@ class MockOrganizationRepository implements OrganizationRepository {
   async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
     return [];
   }
+  async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
+    return false;
+  }
+  async findUsersWithMultipleMembershipsInOrgs(
+    _orgIds: string[]
+  ): Promise<string[]> {
+    return [];
+  }
+  async setAllowMultiTreeMembership(
+    _organizationId: string,
+    _value: boolean | null
+  ): Promise<void> {}
 
   addOrganization(org: Organization): void {
     this.organizations.set(org.id, org);
@@ -284,6 +296,7 @@ function makeOrg(id: string, archived = false): Organization {
     createdById: 'creator-1',
     createdAt: new Date(),
     archivedAt: archived ? new Date() : null,
+    allowMultiTreeMembership: false,
   });
 }
 
@@ -619,6 +632,60 @@ describe('HandleInviteUseCase', () => {
     const updated = await invitationRepo.findById('inv-1');
     expect(updated!.status).toBe('accepted');
     expect(updated!.handledAt).not.toBeNull();
+  });
+
+  it('should skip hierarchy cleanup when root org allows multi-tree membership', async () => {
+    // Root org with allowMultiTreeMembership: true
+    const rootOrg = Organization.reconstitute({
+      id: 'root-org',
+      name: 'Root Org',
+      description: 'Root',
+      parentId: null,
+      createdById: 'creator-1',
+      createdAt: new Date(),
+      archivedAt: null,
+      allowMultiTreeMembership: true,
+    });
+    orgRepo.addOrganization(rootOrg);
+
+    // Child org under root
+    const childOrg = Organization.reconstitute({
+      id: 'child-org',
+      name: 'Child Org',
+      description: 'Child',
+      parentId: 'root-org',
+      createdById: 'creator-1',
+      createdAt: new Date(),
+      archivedAt: null,
+      allowMultiTreeMembership: null,
+    });
+    orgRepo.addOrganization(childOrg);
+
+    // getRootAllowMultiTreeMembership returns true for child-org
+    vi.spyOn(orgRepo, 'getRootAllowMultiTreeMembership').mockResolvedValue(
+      true
+    );
+
+    const inv = makePendingInvitation('inv-1', {
+      inviteeId: 'user-2',
+      inviterId: 'user-1',
+      organizationId: 'child-org',
+      type: 'member_invite',
+    });
+    invitationRepo.addInvitation(inv);
+    userRepo.addUser(makeUser('user-2'));
+
+    const result = await useCase.execute({
+      invitationId: 'inv-1',
+      action: 'accept',
+      actorUserId: 'user-2',
+    });
+    expect(result.success).toBe(true);
+
+    // Hierarchy cleanup should NOT have been triggered
+    expect(orgRepo.getFullTreeOrgIds).not.toHaveBeenCalled();
+    expect(orgRepo.findMembershipsByUserId).not.toHaveBeenCalled();
+    expect(orgRepo.removeUserFromOrganization).not.toHaveBeenCalled();
   });
 
   it('should accept member invite when user already has a pending membership (upsert)', async () => {

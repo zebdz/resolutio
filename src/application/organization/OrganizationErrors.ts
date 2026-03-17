@@ -40,6 +40,12 @@ export const OrganizationErrors = {
   NOT_ORG_ADMIN: 'organization.errors.notOrgAdmin',
   CANNOT_REMOVE_SELF: 'organization.errors.cannotRemoveSelf',
   USER_NOT_FOUND: 'organization.errors.userNotFound',
+
+  // Multi-tree membership
+  MULTI_MEMBERSHIP_CONFLICT: 'organization.errors.multiMembershipConflict',
+  MULTI_MEMBERSHIP_CONFLICTS_EXIST:
+    'organization.errors.multiMembershipConflictsExist',
+  NOT_ROOT_ORG: 'organization.errors.notRootOrg',
 } as const;
 
 export type OrganizationError =

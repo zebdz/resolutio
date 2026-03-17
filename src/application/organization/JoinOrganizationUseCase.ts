@@ -70,17 +70,27 @@ export class JoinOrganizationUseCase {
     }
 
     // Check hierarchy constraints - block if pending request anywhere in hierarchy tree
-    const hierarchyIds =
-      await this.deps.organizationRepository.getFullTreeOrgIds(organizationId);
-
-    const pendingOrgs =
-      await this.deps.organizationRepository.findPendingRequestsByUserId(
-        userId
+    // (unless multi-membership is allowed for this tree)
+    const allowsMulti =
+      await this.deps.organizationRepository.getRootAllowMultiTreeMembership(
+        organizationId
       );
 
-    for (const pendingOrg of pendingOrgs) {
-      if (hierarchyIds.includes(pendingOrg.id)) {
-        return failure(OrganizationErrors.PENDING_HIERARCHY_REQUEST);
+    if (!allowsMulti) {
+      const hierarchyIds =
+        await this.deps.organizationRepository.getFullTreeOrgIds(
+          organizationId
+        );
+
+      const pendingOrgs =
+        await this.deps.organizationRepository.findPendingRequestsByUserId(
+          userId
+        );
+
+      for (const pendingOrg of pendingOrgs) {
+        if (hierarchyIds.includes(pendingOrg.id)) {
+          return failure(OrganizationErrors.PENDING_HIERARCHY_REQUEST);
+        }
       }
     }
 

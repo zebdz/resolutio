@@ -120,6 +120,22 @@ class MockOrganizationRepository {
   }
 
   async removeAdmin(): Promise<void> {}
+  async searchOrganizationsWithStats() {
+    return { organizations: [], totalCount: 0 };
+  }
+  async searchByNameFuzzy() {
+    return [];
+  }
+  async getFullTreeOrgIds() {
+    return [];
+  }
+  async getRootAllowMultiTreeMembership() {
+    return false;
+  }
+  async findUsersWithMultipleMembershipsInOrgs() {
+    return [];
+  }
+  async setAllowMultiTreeMembership() {}
 }
 
 class MockUserRepository {

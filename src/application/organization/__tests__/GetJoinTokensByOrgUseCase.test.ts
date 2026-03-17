@@ -104,6 +104,13 @@ class MockOrganizationRepository implements OrganizationRepository {
   async searchByNameFuzzy() {
     return [];
   }
+  async getRootAllowMultiTreeMembership() {
+    return false;
+  }
+  async findUsersWithMultipleMembershipsInOrgs() {
+    return [];
+  }
+  async setAllowMultiTreeMembership() {}
 }
 
 // Mock UserRepository
@@ -210,6 +217,7 @@ function createOrg(id: string, name: string): Organization {
     createdById: 'creator-1',
     createdAt: new Date(),
     archivedAt: null,
+    allowMultiTreeMembership: false,
   });
 }
 

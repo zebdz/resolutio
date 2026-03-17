@@ -200,6 +200,28 @@ class MockOrganizationRepository implements OrganizationRepository {
   async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
     return [];
   }
+  async getRootAllowMultiTreeMembership(orgId: string): Promise<boolean> {
+    const org = this.organizations.get(orgId);
+
+    if (!org) {
+      return false;
+    }
+
+    if (!org.parentId) {
+      return org.allowMultiTreeMembership ?? false;
+    }
+
+    return this.getRootAllowMultiTreeMembership(org.parentId);
+  }
+  async findUsersWithMultipleMembershipsInOrgs(
+    _orgIds: string[]
+  ): Promise<string[]> {
+    return [];
+  }
+  async setAllowMultiTreeMembership(
+    _organizationId: string,
+    _value: boolean | null
+  ): Promise<void> {}
 }
 
 // Mock UserRepository
@@ -883,6 +905,7 @@ describe('HandleJoinRequestUseCase', () => {
       createdById: 'creator-1',
       createdAt: new Date(),
       archivedAt: null,
+      allowMultiTreeMembership: false,
     });
     organizationRepository.addOrganization(org);
 
@@ -935,6 +958,7 @@ describe('HandleJoinRequestUseCase', () => {
       createdById: 'creator-1',
       createdAt: new Date(),
       archivedAt: null,
+      allowMultiTreeMembership: false,
     });
     organizationRepository.addOrganization(org);
 
@@ -989,6 +1013,7 @@ describe('HandleJoinRequestUseCase', () => {
       createdById: 'creator-1',
       createdAt: new Date(),
       archivedAt: null,
+      allowMultiTreeMembership: false,
     });
     organizationRepository.addOrganization(org);
 
@@ -1020,5 +1045,67 @@ describe('HandleJoinRequestUseCase', () => {
     await new Promise((r) => setTimeout(r, 50));
 
     expect(notificationRepository.getSaved()).toHaveLength(0);
+  });
+
+  it('should skip hierarchy removal when tree allows multi-membership', async () => {
+    const parentOrgId = 'org-parent';
+    const childOrgId = 'org-child';
+    const requesterId = 'user-456';
+    const adminId = 'admin-789';
+
+    const parentOrg = Organization.reconstitute({
+      id: parentOrgId,
+      name: 'Parent Org',
+      description: 'Parent desc',
+      parentId: null,
+      createdById: 'creator-1',
+      createdAt: new Date(),
+      archivedAt: null,
+      allowMultiTreeMembership: true,
+    });
+    organizationRepository.addOrganization(parentOrg);
+
+    const childOrg = Organization.reconstitute({
+      id: childOrgId,
+      name: 'Child Org',
+      description: 'Child desc',
+      parentId: parentOrgId,
+      createdById: 'creator-1',
+      createdAt: new Date(),
+      archivedAt: null,
+      allowMultiTreeMembership: null,
+    });
+    organizationRepository.addOrganization(childOrg);
+
+    organizationRepository.addMembership(requesterId, parentOrgId);
+
+    adminRoles.set(childOrgId, new Set([adminId]));
+
+    const key = `${childOrgId}-${requesterId}`;
+    requests.set(key, {
+      id: 'request-1',
+      organizationId: childOrgId,
+      userId: requesterId,
+      status: 'pending',
+      createdAt: new Date(),
+      acceptedAt: null,
+      rejectedAt: null,
+      rejectionReason: null,
+      acceptedByUserId: null,
+      rejectedByUserId: null,
+    });
+
+    const result = await useCase.execute({
+      organizationId: childOrgId,
+      requesterId,
+      adminId,
+      action: 'accept',
+    });
+
+    expect(result.success).toBe(true);
+
+    // User should NOT have been removed from parent
+    const removed = organizationRepository.getRemovedMemberships();
+    expect(removed).toHaveLength(0);
   });
 });
