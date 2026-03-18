@@ -24,6 +24,7 @@ export const CreateOrganizationSchema = z.object({
     .trim(),
   parentId: z.string().optional().nullable(),
   autoJoin: z.boolean().optional().default(true),
+  allowMultiTreeMembership: z.boolean().optional().default(false),
 });
 
 // Use z.input so autoJoin remains optional for callers (use case ignores it)

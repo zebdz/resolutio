@@ -5,6 +5,9 @@ import { OrganizationRepository } from '../../../domain/organization/Organizatio
 // Minimal mock — only the method we care about
 const mockRepo = {
   searchByNameFuzzy: vi.fn(),
+  getRootAllowMultiTreeMembership: vi.fn().mockResolvedValue(false),
+  findUsersWithMultipleMembershipsInOrgs: vi.fn().mockResolvedValue([]),
+  setAllowMultiTreeMembership: vi.fn(),
 } as unknown as OrganizationRepository;
 
 describe('SearchOrganizationsUseCase', () => {

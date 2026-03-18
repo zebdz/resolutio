@@ -119,6 +119,27 @@ class MockOrganizationRepository {
       tree: { id: '', name: '', memberCount: 0, children: [] },
     };
   }
+  async searchOrganizationsWithStats() {
+    return { organizations: [], totalCount: 0 };
+  }
+  async setParentId() {}
+  async findAdminUserIds(): Promise<string[]> {
+    return [];
+  }
+  async removeAdmin(): Promise<void> {}
+  async searchByNameFuzzy() {
+    return [];
+  }
+  async getFullTreeOrgIds() {
+    return [];
+  }
+  async getRootAllowMultiTreeMembership() {
+    return false;
+  }
+  async findUsersWithMultipleMembershipsInOrgs() {
+    return [];
+  }
+  async setAllowMultiTreeMembership() {}
 }
 
 // Mock UserRepository

@@ -144,6 +144,13 @@ export default async function OrganizationModifyPage({
           organizationId={id}
           currentName={organization.name}
           currentDescription={organization.description}
+          isRootOrg={!organization.parentId}
+          currentAllowMultiTreeMembership={
+            organization.allowMultiTreeMembership ?? false
+          }
+          rootOrgMultiMembershipInfo={
+            result.data.rootOrgMultiMembershipSetting ?? undefined
+          }
         />
 
         <Divider />

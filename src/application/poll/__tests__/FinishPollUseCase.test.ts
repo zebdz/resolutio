@@ -89,6 +89,7 @@ describe('FinishPollUseCase', () => {
           createdById: 'user-1',
           createdAt: new Date(),
           archivedAt: null,
+          allowMultiTreeMembership: false,
         })
       ),
     };
@@ -253,6 +254,7 @@ describe('FinishPollUseCase', () => {
       createdById: 'user-1',
       createdAt: new Date(),
       archivedAt: new Date(),
+      allowMultiTreeMembership: false,
     });
     organizationRepository.findById = vi.fn().mockResolvedValue(archivedOrg);
 

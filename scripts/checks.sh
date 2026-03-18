@@ -17,4 +17,7 @@ yarn typecheck
 echo "Running tests..."
 yarn test
 
+echo "Running secret scan..."
+ggshield secret scan pre-commit
+
 echo "All checks passed."

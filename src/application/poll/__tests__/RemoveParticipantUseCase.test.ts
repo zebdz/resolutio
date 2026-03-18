@@ -85,6 +85,7 @@ describe('RemoveParticipantUseCase', () => {
           createdById: 'user-admin',
           createdAt: new Date(),
           archivedAt: null,
+          allowMultiTreeMembership: false,
         })
       ),
     };
@@ -222,6 +223,7 @@ describe('RemoveParticipantUseCase', () => {
         createdById: 'user-admin',
         createdAt: new Date(),
         archivedAt: new Date(),
+        allowMultiTreeMembership: false,
       })
     );
 

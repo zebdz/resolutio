@@ -87,11 +87,19 @@ export class HandleJoinRequestUseCase {
       });
 
       // Remove user from existing memberships in hierarchy orgs
-      await OrganizationMembershipService.removeUserFromHierarchyOrgs(
-        requesterId,
-        organizationId,
-        this.deps.organizationRepository
-      );
+      // (unless tree allows multi-membership)
+      const allowsMulti =
+        await this.deps.organizationRepository.getRootAllowMultiTreeMembership(
+          organizationId
+        );
+
+      if (!allowsMulti) {
+        await OrganizationMembershipService.removeUserFromHierarchyOrgs(
+          requesterId,
+          organizationId,
+          this.deps.organizationRepository
+        );
+      }
     } else {
       await this.deps.prisma.organizationUser.update({
         where: {

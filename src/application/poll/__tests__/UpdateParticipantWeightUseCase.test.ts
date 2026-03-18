@@ -86,6 +86,7 @@ describe('UpdateParticipantWeightUseCase', () => {
           createdById: 'user-admin',
           createdAt: new Date(),
           archivedAt: null,
+          allowMultiTreeMembership: false,
         })
       ),
     };
@@ -256,6 +257,7 @@ describe('UpdateParticipantWeightUseCase', () => {
         createdById: 'user-admin',
         createdAt: new Date(),
         archivedAt: new Date(),
+        allowMultiTreeMembership: false,
       })
     );
 

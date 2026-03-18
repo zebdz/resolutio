@@ -286,6 +286,21 @@ class MockOrganizationRepository {
       tree: { id: '', name: '', memberCount: 0, children: [] },
     };
   }
+  async getFullTreeOrgIds(): Promise<string[]> {
+    return [];
+  }
+  async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
+    return false;
+  }
+  async findUsersWithMultipleMembershipsInOrgs(
+    _orgIds: string[]
+  ): Promise<string[]> {
+    return [];
+  }
+  async setAllowMultiTreeMembership(
+    _organizationId: string,
+    _value: boolean | null
+  ): Promise<void> {}
 }
 
 describe('CreatePollUseCase', () => {

@@ -112,6 +112,7 @@ describe('SubmitDraftUseCase', () => {
           createdById: 'user-1',
           createdAt: new Date(),
           archivedAt: null,
+          allowMultiTreeMembership: false,
         })
       ),
     };
@@ -314,6 +315,7 @@ describe('SubmitDraftUseCase', () => {
         createdById: 'user-1',
         createdAt: new Date(),
         archivedAt: new Date(),
+        allowMultiTreeMembership: false,
       })
     );
 

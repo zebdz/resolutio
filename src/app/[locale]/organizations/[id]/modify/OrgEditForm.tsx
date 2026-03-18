@@ -7,7 +7,13 @@ import { Button } from '@/app/components/catalyst/button';
 import { Input } from '@/app/components/catalyst/input';
 import { Textarea } from '@/app/components/catalyst/textarea';
 import { Heading } from '@/app/components/catalyst/heading';
-import { Field, Label, FieldGroup } from '@/app/components/catalyst/fieldset';
+import {
+  Field,
+  Label,
+  FieldGroup,
+  Description,
+} from '@/app/components/catalyst/fieldset';
+import { SwitchField, Switch } from '@/app/components/catalyst/switch';
 import { AlertBanner } from '@/app/components/catalyst/alert-banner';
 import { updateOrganizationAction } from '@/web/actions/organization';
 
@@ -15,12 +21,21 @@ type Props = {
   organizationId: string;
   currentName: string;
   currentDescription: string;
+  isRootOrg: boolean;
+  currentAllowMultiTreeMembership: boolean;
+  rootOrgMultiMembershipInfo?: {
+    allowed: boolean;
+    rootOrgName: string;
+  };
 };
 
 export function OrgEditForm({
   organizationId,
   currentName,
   currentDescription,
+  isRootOrg,
+  currentAllowMultiTreeMembership,
+  rootOrgMultiMembershipInfo,
 }: Props) {
   const t = useTranslations('organization.modify');
   const router = useRouter();
@@ -30,6 +45,9 @@ export function OrgEditForm({
 
   const [name, setName] = useState(currentName);
   const [description, setDescription] = useState(currentDescription);
+  const [allowMultiTreeMembership, setAllowMultiTreeMembership] = useState(
+    currentAllowMultiTreeMembership
+  );
 
   async function handleSubmit(formData: FormData) {
     setError(null);
@@ -90,7 +108,43 @@ export function OrgEditForm({
               disabled={isPending}
             />
           </Field>
+
+          {isRootOrg ? (
+            <SwitchField>
+              <Label>{t('allowMultiTreeMembershipLabel')}</Label>
+              <Description>
+                {t('allowMultiTreeMembershipDescription')}
+              </Description>
+              <Switch
+                checked={allowMultiTreeMembership}
+                onChange={(val: boolean) => {
+                  setAllowMultiTreeMembership(val);
+                  setError(null);
+                  setSuccess(null);
+                }}
+                color="brand-green"
+                disabled={isPending}
+              />
+            </SwitchField>
+          ) : rootOrgMultiMembershipInfo ? (
+            <div className="text-sm text-zinc-600 dark:text-zinc-400">
+              {t('allowMultiTreeMembershipInherited', {
+                status: rootOrgMultiMembershipInfo.allowed
+                  ? t('allowed')
+                  : t('disallowed'),
+                rootOrgName: rootOrgMultiMembershipInfo.rootOrgName,
+              })}
+            </div>
+          ) : null}
         </FieldGroup>
+
+        {isRootOrg && (
+          <input
+            type="hidden"
+            name="allowMultiTreeMembership"
+            value={allowMultiTreeMembership ? 'true' : 'false'}
+          />
+        )}
 
         <div className="flex justify-end">
           <Button type="submit" disabled={isPending}>

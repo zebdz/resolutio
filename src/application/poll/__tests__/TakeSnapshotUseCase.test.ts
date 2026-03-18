@@ -65,6 +65,7 @@ describe('TakeSnapshotUseCase', () => {
           createdById: 'admin-1',
           createdAt: new Date(),
           archivedAt: null,
+          allowMultiTreeMembership: false,
         })
       ),
     };
@@ -111,6 +112,7 @@ describe('TakeSnapshotUseCase', () => {
         createdById: 'admin-1',
         createdAt: new Date(),
         archivedAt: new Date(),
+        allowMultiTreeMembership: false,
       })
     );
 
