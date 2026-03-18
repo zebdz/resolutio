@@ -124,7 +124,7 @@ export class Question {
       return failure(PollDomainCodes.QUESTION_TEXT_EMPTY);
     }
 
-    if (newText.length > 1000) {
+    if (newText.length > QUESTION_TEXT_MAX_LENGTH) {
       return failure(PollDomainCodes.QUESTION_TEXT_TOO_LONG);
     }
 
@@ -134,7 +134,7 @@ export class Question {
   }
 
   public updateDetails(newDetails: string | null): Result<void, string> {
-    if (newDetails && newDetails.length > 5000) {
+    if (newDetails && newDetails.length > QUESTION_DETAILS_MAX_LENGTH) {
       return failure(PollDomainCodes.QUESTION_DETAILS_TOO_LONG);
     }
 

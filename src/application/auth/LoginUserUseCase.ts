@@ -5,11 +5,11 @@ import { SessionRepository, Session } from '@/domain/user/SessionRepository';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { OtpVerification } from '@/domain/otp/OtpVerification';
 import { OtpCode } from '@/domain/otp/OtpCode';
-import { UnauthorizedError } from '@/domain/shared/errors';
 import { Result, success, failure } from '@/domain/shared/Result';
 import { OtpCodeHasher } from './OtpCodeHasher';
 import { OtpDeliveryChannel } from './OtpDeliveryChannel';
 import { OtpErrors } from './OtpErrors';
+import { AuthErrors } from './AuthErrors';
 
 export interface PasswordVerifier {
   verify(password: string, hash: string): Promise<boolean>;
@@ -64,91 +64,83 @@ export class LoginUserUseCase {
     this.otpExpiryMinutes = deps.otpExpiryMinutes ?? 10;
   }
 
-  async execute(input: LoginUserInput): Promise<Result<LoginResult, Error>> {
-    try {
-      // Create phone number value object
-      const phoneNumber = PhoneNumber.create(input.phoneNumber);
+  async execute(input: LoginUserInput): Promise<Result<LoginResult, string>> {
+    // Create phone number value object
+    const phoneNumber = PhoneNumber.create(input.phoneNumber);
 
-      // Find user by phone number
-      const user = await this.userRepository.findByPhoneNumber(phoneNumber);
+    // Find user by phone number
+    const user = await this.userRepository.findByPhoneNumber(phoneNumber);
 
-      if (!user) {
-        return failure(
-          new UnauthorizedError('Invalid phone number or password')
-        );
-      }
+    if (!user) {
+      return failure(AuthErrors.INVALID_CREDENTIALS);
+    }
 
-      // Verify password
-      const isPasswordValid = await this.passwordVerifier.verify(
-        input.password,
-        user.password
+    // Verify password
+    const isPasswordValid = await this.passwordVerifier.verify(
+      input.password,
+      user.password
+    );
+
+    if (!isPasswordValid) {
+      return failure(AuthErrors.INVALID_CREDENTIALS);
+    }
+
+    // Superadmins get shorter session TTL
+    const isSuperAdmin = await this.userRepository.isSuperAdmin(user.id);
+    const ttlMs = isSuperAdmin ? SUPERADMIN_SESSION_TTL_MS : SESSION_TTL_MS;
+    const expiresAt = new Date(Date.now() + ttlMs);
+
+    const session = await this.sessionRepository.create(
+      user.id,
+      expiresAt,
+      input.ipAddress,
+      input.userAgent
+    );
+
+    // Unconfirmed user: send OTP and flag needsConfirmation
+    if (!user.isConfirmed()) {
+      const code = OtpCode.generate();
+      const hashedCode = this.otpCodeHasher.hash(code.getValue());
+      const otpExpiresAt = new Date(
+        Date.now() + this.otpExpiryMinutes * 60 * 1000
       );
 
-      if (!isPasswordValid) {
-        return failure(
-          new UnauthorizedError('Invalid phone number or password')
-        );
-      }
+      const otpVerification = OtpVerification.create({
+        identifier: phoneNumber.getValue(),
+        channel: this.deliveryChannel.channel,
+        code: hashedCode,
+        clientIp: input.ipAddress || '0.0.0.0',
+        expiresAt: otpExpiresAt,
+        userId: user.id,
+      });
 
-      // Superadmins get shorter session TTL
-      const isSuperAdmin = await this.userRepository.isSuperAdmin(user.id);
-      const ttlMs = isSuperAdmin ? SUPERADMIN_SESSION_TTL_MS : SESSION_TTL_MS;
-      const expiresAt = new Date(Date.now() + ttlMs);
+      const savedOtp = await this.otpRepository.save(otpVerification);
 
-      const session = await this.sessionRepository.create(
-        user.id,
-        expiresAt,
-        input.ipAddress,
-        input.userAgent
+      const deliveryResult = await this.deliveryChannel.send(
+        phoneNumber.getValue(),
+        code.getValue(),
+        user.language
       );
 
-      // Unconfirmed user: send OTP and flag needsConfirmation
-      if (!user.isConfirmed()) {
-        const code = OtpCode.generate();
-        const hashedCode = this.otpCodeHasher.hash(code.getValue());
-        const otpExpiresAt = new Date(
-          Date.now() + this.otpExpiryMinutes * 60 * 1000
-        );
-
-        const otpVerification = OtpVerification.create({
-          identifier: phoneNumber.getValue(),
-          channel: this.deliveryChannel.channel,
-          code: hashedCode,
-          clientIp: input.ipAddress || '0.0.0.0',
-          expiresAt: otpExpiresAt,
-          userId: user.id,
-        });
-
-        const savedOtp = await this.otpRepository.save(otpVerification);
-
-        const deliveryResult = await this.deliveryChannel.send(
-          phoneNumber.getValue(),
-          code.getValue(),
-          user.language
-        );
-
-        if (!deliveryResult.success) {
-          return failure(new Error(OtpErrors.SEND_FAILED));
-        }
-
-        return success({
-          user,
-          session,
-          expiresInSeconds: Math.floor(ttlMs / 1000),
-          needsConfirmation: true,
-          otpId: savedOtp.id,
-          expiresAt: otpExpiresAt,
-          backdoorCode: deliveryResult.backdoorCode,
-        });
+      if (!deliveryResult.success) {
+        return failure(OtpErrors.SEND_FAILED);
       }
 
       return success({
         user,
         session,
         expiresInSeconds: Math.floor(ttlMs / 1000),
+        needsConfirmation: true,
+        otpId: savedOtp.id,
+        expiresAt: otpExpiresAt,
+        backdoorCode: deliveryResult.backdoorCode,
       });
-    } catch (error) {
-      return failure(error as Error);
     }
+
+    return success({
+      user,
+      session,
+      expiresInSeconds: Math.floor(ttlMs / 1000),
+    });
   }
 }

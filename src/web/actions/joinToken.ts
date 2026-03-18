@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import type { ActionResult } from '@/web/actions/organization';
 import {
   prisma,
@@ -75,27 +76,6 @@ const useJoinTokenUseCase = new UseJoinTokenUseCase({
   joinOrganizationUseCase,
 });
 
-function translateErrorCode(
-  errorKey: string,
-  tJoinToken: any,
-  tOrg: any,
-  tDomain: any
-): string {
-  if (errorKey.startsWith('joinToken.errors.')) {
-    return tJoinToken(errorKey.replace('joinToken.', '') as any);
-  }
-
-  if (errorKey.startsWith('organization.errors.')) {
-    return tOrg(errorKey.replace('organization.', '') as any);
-  }
-
-  if (errorKey.startsWith('domain.joinToken.')) {
-    return tDomain(errorKey.replace('domain.', '') as any);
-  }
-
-  return errorKey;
-}
-
 export async function createJoinTokenAction(
   formData: FormData
 ): Promise<ActionResult<{ tokenId: string; token: string }>> {
@@ -106,9 +86,6 @@ export async function createJoinTokenAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tJoinToken = await getTranslations('joinToken');
-  const tOrg = await getTranslations('organization');
-  const tDomain = await getTranslations('domain');
 
   try {
     const user = await getCurrentUser();
@@ -146,7 +123,7 @@ export async function createJoinTokenAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateErrorCode(result.error, tJoinToken, tOrg, tDomain),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -174,9 +151,6 @@ export async function expireJoinTokenAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tJoinToken = await getTranslations('joinToken');
-  const tOrg = await getTranslations('organization');
-  const tDomain = await getTranslations('domain');
 
   try {
     const user = await getCurrentUser();
@@ -196,7 +170,7 @@ export async function expireJoinTokenAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateErrorCode(result.error, tJoinToken, tOrg, tDomain),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -218,9 +192,6 @@ export async function reactivateJoinTokenAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tJoinToken = await getTranslations('joinToken');
-  const tOrg = await getTranslations('organization');
-  const tDomain = await getTranslations('domain');
 
   try {
     const user = await getCurrentUser();
@@ -240,7 +211,7 @@ export async function reactivateJoinTokenAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateErrorCode(result.error, tJoinToken, tOrg, tDomain),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -262,9 +233,6 @@ export async function updateJoinTokenMaxUsesAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tJoinToken = await getTranslations('joinToken');
-  const tOrg = await getTranslations('organization');
-  const tDomain = await getTranslations('domain');
 
   try {
     const user = await getCurrentUser();
@@ -301,7 +269,7 @@ export async function updateJoinTokenMaxUsesAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateErrorCode(result.error, tJoinToken, tOrg, tDomain),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -343,9 +311,6 @@ export async function getJoinTokensByOrgAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tJoinToken = await getTranslations('joinToken');
-  const tOrg = await getTranslations('organization');
-  const tDomain = await getTranslations('domain');
 
   try {
     const user = await getCurrentUser();
@@ -362,7 +327,7 @@ export async function getJoinTokensByOrgAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateErrorCode(result.error, tJoinToken, tOrg, tDomain),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -397,9 +362,6 @@ export async function joinViaTokenAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tJoinToken = await getTranslations('joinToken');
-  const tOrg = await getTranslations('organization');
-  const tDomain = await getTranslations('domain');
 
   try {
     const user = await getCurrentUser();
@@ -419,7 +381,7 @@ export async function joinViaTokenAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateErrorCode(result.error, tJoinToken, tOrg, tDomain),
+        error: await translateErrorCode(result.error),
       };
     }
 

@@ -1,6 +1,7 @@
 'use server';
 
 import { getTranslations } from 'next-intl/server';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { CreateAdminInviteUseCase } from '@/application/invitation/CreateAdminInviteUseCase';
 import { CreateBoardMemberInviteUseCase } from '@/application/invitation/CreateBoardMemberInviteUseCase';
 import { CreateOrgMemberInviteUseCase } from '@/application/invitation/CreateOrgMemberInviteUseCase';
@@ -38,22 +39,6 @@ const userRepository = new PrismaUserRepository(prisma);
 const notificationRepository = new PrismaNotificationRepository(prisma);
 const invitationRepository = new PrismaInvitationRepository(prisma);
 
-function translateInvitationError(errorCode: string, t: any): string {
-  if (errorCode.startsWith('invitation.errors.')) {
-    return t(errorCode.replace('invitation.', '') as any);
-  }
-
-  if (errorCode.startsWith('organization.errors.')) {
-    return t(errorCode.replace('organization.errors.', 'errors.') as any);
-  }
-
-  if (errorCode.startsWith('board.errors.')) {
-    return t(errorCode.replace('board.errors.', 'errors.') as any);
-  }
-
-  return errorCode;
-}
-
 export async function createAdminInviteAction(
   organizationId: string,
   inviteeId: string
@@ -65,7 +50,6 @@ export async function createAdminInviteAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tInv = await getTranslations('invitation');
 
   try {
     const user = await getCurrentUser();
@@ -90,7 +74,7 @@ export async function createAdminInviteAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateInvitationError(result.error, tInv),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -113,7 +97,6 @@ export async function createBoardMemberInviteAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tInv = await getTranslations('invitation');
 
   try {
     const user = await getCurrentUser();
@@ -139,7 +122,7 @@ export async function createBoardMemberInviteAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateInvitationError(result.error, tInv),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -162,7 +145,6 @@ export async function createOrgMemberInviteAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tInv = await getTranslations('invitation');
 
   try {
     const user = await getCurrentUser();
@@ -188,7 +170,7 @@ export async function createOrgMemberInviteAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateInvitationError(result.error, tInv),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -211,7 +193,6 @@ export async function handleInviteAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tInv = await getTranslations('invitation');
 
   try {
     const user = await getCurrentUser();
@@ -238,7 +219,7 @@ export async function handleInviteAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateInvitationError(result.error, tInv),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -260,7 +241,6 @@ export async function revokeInviteAction(
   }
 
   const t = await getTranslations('common.errors');
-  const tInv = await getTranslations('invitation');
 
   try {
     const user = await getCurrentUser();
@@ -284,7 +264,7 @@ export async function revokeInviteAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateInvitationError(result.error, tInv),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -332,10 +312,7 @@ export async function getPendingAdminInvitesAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateInvitationError(
-          result.error,
-          await getTranslations('invitation')
-        ),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -392,10 +369,7 @@ export async function getPendingBoardInvitesAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateInvitationError(
-          result.error,
-          await getTranslations('invitation')
-        ),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -451,10 +425,7 @@ export async function getPendingMemberInvitesAction(
     if (!result.success) {
       return {
         success: false,
-        error: translateInvitationError(
-          result.error,
-          await getTranslations('invitation')
-        ),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -500,7 +471,10 @@ export async function getInviteDetailsAction(invitationId: string) {
     const result = await useCase.execute(invitationId);
 
     if (!result.success) {
-      return { success: false as const, error: t('unexpected') };
+      return {
+        success: false as const,
+        error: await translateErrorCode(result.error),
+      };
     }
 
     return { success: true as const, data: result.value };
@@ -547,7 +521,10 @@ export async function getOrgMembersAction(
     });
 
     if (!result.success) {
-      return { success: false as const, error: t('unexpected') };
+      return {
+        success: false as const,
+        error: await translateErrorCode(result.error),
+      };
     }
 
     return { success: true as const, data: result.value };
@@ -586,7 +563,10 @@ export async function getUserPendingInvitesAction(): Promise<
     const result = await useCase.execute({ actorUserId: user.id });
 
     if (!result.success) {
-      return { success: false, error: t('unexpected') };
+      return {
+        success: false,
+        error: await translateErrorCode(result.error),
+      };
     }
 
     return { success: true, data: result.value };

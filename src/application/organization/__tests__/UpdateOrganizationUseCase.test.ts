@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UpdateOrganizationUseCase } from '../UpdateOrganizationUseCase';
 import { OrganizationErrors } from '../OrganizationErrors';
+import { NotifyOrgNameChangedUseCase } from '../../notification/NotifyOrgNameChangedUseCase';
 import { Organization } from '../../../domain/organization/Organization';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../../domain/user/UserRepository';
@@ -567,6 +568,54 @@ describe('UpdateOrganizationUseCase', () => {
       expect(
         organizationRepository.getSetAllowMultiTreeMembershipCalls()
       ).toHaveLength(0);
+    });
+  });
+
+  describe('org name change notification', () => {
+    it('should fire notification when name changes', async () => {
+      const executeSpy = vi
+        .spyOn(NotifyOrgNameChangedUseCase.prototype, 'execute')
+        .mockResolvedValue(undefined);
+
+      organizationRepository.addOrganization(makeOrg('org-1', 'Old Name'));
+      organizationRepository.setAdmin('org-1', 'admin-1');
+
+      const result = await useCase.execute({
+        organizationId: 'org-1',
+        userId: 'admin-1',
+        name: 'New Name',
+        description: 'Test description',
+      });
+
+      expect(result.success).toBe(true);
+      expect(executeSpy).toHaveBeenCalledWith({
+        organizationId: 'org-1',
+        oldName: 'Old Name',
+        newName: 'New Name',
+      });
+
+      executeSpy.mockRestore();
+    });
+
+    it('should not fire notification when name stays the same', async () => {
+      const executeSpy = vi
+        .spyOn(NotifyOrgNameChangedUseCase.prototype, 'execute')
+        .mockResolvedValue(undefined);
+
+      organizationRepository.addOrganization(makeOrg('org-1', 'Same Name'));
+      organizationRepository.setAdmin('org-1', 'admin-1');
+
+      const result = await useCase.execute({
+        organizationId: 'org-1',
+        userId: 'admin-1',
+        name: 'Same Name',
+        description: 'New description',
+      });
+
+      expect(result.success).toBe(true);
+      expect(executeSpy).not.toHaveBeenCalled();
+
+      executeSpy.mockRestore();
     });
   });
 });

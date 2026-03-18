@@ -82,7 +82,7 @@ export class Answer {
       return failure(PollDomainCodes.ANSWER_TEXT_EMPTY);
     }
 
-    if (newText.length > 1000) {
+    if (newText.length > ANSWER_TEXT_MAX_LENGTH) {
       return failure(PollDomainCodes.ANSWER_TEXT_TOO_LONG);
     }
 

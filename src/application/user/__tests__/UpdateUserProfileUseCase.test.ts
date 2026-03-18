@@ -79,25 +79,21 @@ describe('UpdateUserProfileUseCase', () => {
       expect(result.success).toBe(false);
 
       if (!result.success) {
-        expect(result.error.message).toContain('not found');
+        expect(result.error).toBe(UserDomainCodes.USER_NOT_FOUND);
       }
 
       expect(userRepository.save).not.toHaveBeenCalled();
     });
 
-    it('should return failure when invalid language provided', async () => {
+    it('should throw when invalid language provided', async () => {
       vi.mocked(userRepository.findById).mockResolvedValue(existingUser);
 
-      const result = await useCase.execute({
-        userId: 'user-123',
-        language: 'invalid' as any,
-      });
-
-      expect(result.success).toBe(false);
-
-      if (!result.success) {
-        expect(result.error.message).toContain('Language');
-      }
+      await expect(
+        useCase.execute({
+          userId: 'user-123',
+          language: 'invalid' as any,
+        })
+      ).rejects.toThrow('Language');
     });
 
     it('should handle no updates gracefully', async () => {
@@ -146,7 +142,7 @@ describe('UpdateUserProfileUseCase', () => {
       expect(result.success).toBe(false);
 
       if (!result.success) {
-        expect(result.error.message).toBe(UserDomainCodes.NICKNAME_TAKEN);
+        expect(result.error).toBe(UserDomainCodes.NICKNAME_TAKEN);
       }
     });
 
@@ -231,7 +227,7 @@ describe('UpdateUserProfileUseCase', () => {
       expect(result.success).toBe(false);
 
       if (!result.success) {
-        expect(result.error.message).toBe(UserDomainCodes.NICKNAME_INVALID);
+        expect(result.error).toBe(UserDomainCodes.NICKNAME_INVALID);
       }
     });
   });

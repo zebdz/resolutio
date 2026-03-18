@@ -48,6 +48,11 @@ const TYPE_CONFIG: Record<string, TypeConfigEntry> = {
     url: (id) => `/organizations/${id}`,
     actionKey: 'viewOrganization',
   },
+  org_name_changed: {
+    dataKey: 'organizationId',
+    url: (id) => `/organizations/${id}`,
+    actionKey: 'viewOrganization',
+  },
   poll_activated: {
     dataKey: 'pollId',
     url: (id) => `/polls/${id}/vote`,

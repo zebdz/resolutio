@@ -5,6 +5,7 @@ import { OrganizationMembershipService } from '../../domain/organization/Organiz
 import { Result, success, failure } from '../../domain/shared/Result';
 import { OrganizationErrors } from './OrganizationErrors';
 import { NotifyMultiMembershipSettingChangedUseCase } from '../notification/NotifyMultiMembershipSettingChangedUseCase';
+import { NotifyOrgNameChangedUseCase } from '../notification/NotifyOrgNameChangedUseCase';
 
 export interface UpdateOrganizationInput {
   organizationId: string;
@@ -66,6 +67,8 @@ export class UpdateOrganizationUseCase {
       }
     }
 
+    const oldName = organization.name;
+
     const nameResult = organization.updateName(input.name);
 
     if (!nameResult.success) {
@@ -79,6 +82,22 @@ export class UpdateOrganizationUseCase {
     }
 
     await this.organizationRepository.update(organization);
+
+    // Notify members if name changed (fire-and-forget)
+    if (oldName !== organization.name) {
+      new NotifyOrgNameChangedUseCase({
+        organizationRepository: this.organizationRepository,
+        notificationRepository: this.notificationRepository,
+      })
+        .execute({
+          organizationId: input.organizationId,
+          oldName,
+          newName: organization.name,
+        })
+        .catch((err) =>
+          console.error('Failed to notify org name change:', err)
+        );
+    }
 
     // Handle allowMultiTreeMembership toggle (root orgs only)
     if (input.allowMultiTreeMembership !== undefined) {

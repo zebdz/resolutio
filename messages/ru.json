@@ -58,6 +58,11 @@
       "errors": {
         "alreadyConfirmed": "Ваш телефон уже подтверждён."
       }
+    },
+    "errors": {
+      "accountNotConfirmed": "Ваш аккаунт ещё не подтверждён",
+      "invalidCredentials": "Неверный номер телефона или пароль",
+      "phoneExists": "Номер телефона уже зарегистрирован"
     }
   },
   "otp": {
@@ -901,6 +906,10 @@
       "multiMembershipSettingChanged": {
         "title": "Настройка членства в организации изменена",
         "body": "Настройка множественного членства для {organizationName} была {allowed, select, true {включена} other {отключена}}"
+      },
+      "orgNameChanged": {
+        "title": "Организация переименована",
+        "body": "Организация \"{oldName}\" была переименована в \"{newName}\""
       }
     },
     "page": {
@@ -944,24 +953,26 @@
   "domain": {
     "organization": {
       "organizationNameEmpty": "Название организации не может быть пустым",
-      "organizationNameTooLong": "Название организации не может превышать 255 символов",
+      "organizationNameTooLong": "Название организации не может превышать {maxLength} символов",
       "organizationDescriptionEmpty": "Описание организации не может быть пустым",
-      "organizationDescriptionTooLong": "Описание организации не может превышать 1000 символов",
+      "organizationDescriptionTooLong": "Описание организации не может превышать {maxLength} символов",
       "organizationAlreadyArchived": "Организация уже архивирована",
-      "organizationNotArchived": "Организация не архивирована"
+      "organizationNotArchived": "Организация не архивирована",
+      "organizationNameTooShort": "Название организации должно содержать не менее {minLength, plural, =1 {1 символа} other {# символов}}",
+      "organizationNameInvalidChars": "Название организации может содержать только буквы, цифры, пробелы, дефисы и кавычки"
     },
     "invitation": {
       "notPending": "Приглашение больше не ожидает ответа"
     },
     "joinParentRequest": {
       "messageEmpty": "Сообщение не может быть пустым",
-      "messageTooLong": "Сообщение не может превышать 2000 символов",
+      "messageTooLong": "Сообщение не может превышать {maxLength} символов",
       "notPending": "Запрос на присоединение к родителю не ожидает рассмотрения",
       "rejectionReasonRequired": "Причина отклонения обязательна"
     },
     "board": {
       "boardNameEmpty": "Название доски не может быть пустым",
-      "boardNameTooLong": "Название доски не может превышать 255 символов",
+      "boardNameTooLong": "Название доски не может превышать {maxLength} символов",
       "boardAlreadyArchived": "Доска уже архивирована"
     },
     "otp": {
@@ -969,21 +980,21 @@
     },
     "poll": {
       "answerTextEmpty": "Текст ответа не может быть пустым",
-      "answerTextTooLong": "Текст ответа не может превышать 1000 символов",
+      "answerTextTooLong": "Текст ответа не может превышать {maxLength} символов",
       "answerOrderNegative": "Порядок ответа должен быть положительным числом",
       "answerAlreadyArchived": "Ответ уже архивирован",
       "questionTextEmpty": "Текст вопроса не может быть пустым",
-      "questionTextTooLong": "Текст вопроса не может превышать 1000 символов",
-      "questionDetailsTooLong": "Детали вопроса не могут превышать 5000 символов",
+      "questionTextTooLong": "Текст вопроса не может превышать {maxLength} символов",
+      "questionDetailsTooLong": "Детали вопроса не могут превышать {maxLength} символов",
       "questionPageNegative": "Страница вопроса должна быть положительным числом",
       "questionOrderNegative": "Порядок вопроса должен быть положительным числом",
       "questionAlreadyArchived": "Вопрос уже архивирован",
       "questionNoAnswers": "Вопрос должен иметь хотя бы один ответ",
       "questionCannotRemoveLastAnswer": "Нельзя удалить последний ответ у вопроса",
       "titleEmpty": "Название голосования не может быть пустым",
-      "titleTooLong": "Название голосования не может превышать 500 символов",
+      "titleTooLong": "Название голосования не может превышать {maxLength} символов",
       "descriptionEmpty": "Описание голосования не может быть пустым",
-      "descriptionTooLong": "Описание голосования не может превышать 5000 символов",
+      "descriptionTooLong": "Описание голосования не может превышать {maxLength} символов",
       "invalidDates": "Дата начала должна быть раньше даты окончания",
       "cannotUpdateFinished": "Нельзя обновлять завершённое голосование",
       "alreadyActive": "Голосование уже активно",
@@ -1039,7 +1050,7 @@
     },
     "joinToken": {
       "descriptionEmpty": "Описание токена обязательно",
-      "descriptionTooLong": "Описание токена слишком длинное (макс. 500 символов)",
+      "descriptionTooLong": "Описание токена слишком длинное (макс. {maxLength} символов)",
       "maxUsesInvalid": "Максимальное число использований должно быть положительным числом",
       "alreadyExpired": "Токен уже истёк",
       "notExpired": "Токен не истёк",

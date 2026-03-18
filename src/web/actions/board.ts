@@ -1,6 +1,7 @@
 'use server';
 
 import { getTranslations } from 'next-intl/server';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { CreateBoardUseCase } from '@/application/board/CreateBoardUseCase';
 import { ArchiveBoardUseCase } from '@/application/board/ArchiveBoardUseCase';
 import { RemoveBoardMemberUseCase } from '@/application/board/RemoveBoardMemberUseCase';
@@ -99,12 +100,9 @@ export async function createBoardAction(
     });
 
     if (!result.success) {
-      const errorParts = result.error.split('.');
-      const tError = await getTranslations(errorParts.shift());
-
       return {
         success: false,
-        error: tError(errorParts.join('.')),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -163,12 +161,9 @@ export async function archiveBoardAction(
     });
 
     if (!result.success) {
-      const errorParts = result.error.split('.');
-      const tError = await getTranslations(errorParts.shift());
-
       return {
         success: false,
-        error: tError(errorParts.join('.')),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -232,12 +227,9 @@ export async function removeBoardMemberAction(
     });
 
     if (!result.success) {
-      const errorParts = result.error.split('.');
-      const tError = await getTranslations(errorParts.shift());
-
       return {
         success: false,
-        error: tError(errorParts.join('.')),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -300,7 +292,7 @@ export async function getBoardDetailsAction(boardId: string): Promise<
     if (!board) {
       return {
         success: false,
-        error: 'board.errors.notFound',
+        error: await translateErrorCode('board.errors.notFound'),
       };
     }
 
@@ -316,7 +308,7 @@ export async function getBoardDetailsAction(boardId: string): Promise<
       if (!isAdmin) {
         return {
           success: false,
-          error: 'organization.errors.notAdmin',
+          error: await translateErrorCode('organization.errors.notAdmin'),
         };
       }
     }

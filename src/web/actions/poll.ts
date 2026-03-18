@@ -37,6 +37,7 @@ import {
 import { getCurrentUser } from '../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { QuestionType } from '@/domain/poll/QuestionType';
 import { PollState } from '@/domain/poll/PollState';
 import { PollSearchFilters } from '@/domain/poll/PollRepository';
@@ -207,12 +208,9 @@ export async function createPollAction(
     });
 
     if (!result.success) {
-      const errorParts = result.error.split('.');
-      const tError = await getTranslations(errorParts.shift());
-
       return {
         success: false,
-        error: tError(errorParts.join('.')),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -302,12 +300,9 @@ export async function addQuestionAction(
     });
 
     if (!result.success) {
-      const parts = result.error.split('.');
-      const tError = await getTranslations(parts.shift());
-
       return {
         success: false,
-        error: tError(parts.join('.')),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -372,12 +367,9 @@ export async function updateQuestionOrderAction(input: {
     });
 
     if (!result.success) {
-      const errorParts = result.error.split('.');
-      const tError = await getTranslations(errorParts.shift());
-
       return {
         success: false,
-        error: tError(errorParts.join('.')),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -418,12 +410,9 @@ export async function getUserPollsAction(): Promise<ActionResult<any[]>> {
     const result = await pollRepository.getPollsByUserId(user.id);
 
     if (!result.success) {
-      const errorParts = result.error.split('.');
-      const tError = await getTranslations(errorParts.shift());
-
       return {
         success: false,
-        error: tError(errorParts.join('.')),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -507,11 +496,9 @@ export async function getPollsByBoardIdAction(
       const isMember = await boardRepository.isUserMember(user.id, boardId);
 
       if (!isMember) {
-        const tBoard = await getTranslations('board.errors');
-
         return {
           success: false,
-          error: tBoard('notMember'),
+          error: await translateErrorCode('board.errors.notMember'),
         };
       }
     }
@@ -519,12 +506,9 @@ export async function getPollsByBoardIdAction(
     const result = await pollRepository.getPollsByBoardId(boardId);
 
     if (!result.success) {
-      const errorParts = result.error.split('.');
-      const tError = await getTranslations(errorParts.shift());
-
       return {
         success: false,
-        error: tError(errorParts.join('.')),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -569,22 +553,16 @@ export async function getPollByIdAction(
     if (!result.success) {
       console.error(`getPollByIdAction error: ${result.error}`);
 
-      const errorParts = result.error.split('.');
-      const namespace = errorParts.shift();
-      const tError = namespace ? await getTranslations(namespace) : null;
-
       return {
         success: false,
-        error: tError ? tError(errorParts.join('.')) : t('generic'),
+        error: await translateErrorCode(result.error),
       };
     }
 
     if (!result.value) {
-      const tPoll = await getTranslations('poll.errors');
-
       return {
         success: false,
-        error: tPoll('pollNotFound'),
+        error: await translateErrorCode('poll.errors.pollNotFound'),
       };
     }
 
@@ -604,11 +582,9 @@ export async function getPollByIdAction(
       );
 
       if (!isMember && !isAdmin) {
-        const tOrg = await getTranslations('organization.errors');
-
         return {
           success: false,
-          error: tOrg('notMember'),
+          error: await translateErrorCode('organization.errors.notMember'),
         };
       }
     }
@@ -680,12 +656,9 @@ export async function updatePollAction(
     });
 
     if (!result.success) {
-      const errorParts = result.error.split('.');
-      const tError = await getTranslations(errorParts.shift());
-
       return {
         success: false,
-        error: tError(errorParts.join('.')),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -731,18 +704,16 @@ export async function canEditPollAction(
     if (!pollResult.success) {
       return {
         success: false,
-        error: pollResult.error,
+        error: await translateErrorCode(pollResult.error),
       };
     }
 
     const poll = pollResult.value;
 
     if (!poll) {
-      const tPoll = await getTranslations('poll.errors');
-
       return {
         success: false,
-        error: tPoll('pollNotFound'),
+        error: await translateErrorCode('poll.errors.pollNotFound'),
       };
     }
 
@@ -765,7 +736,7 @@ export async function canEditPollAction(
     if (!hasVotesResult.success) {
       return {
         success: false,
-        error: hasVotesResult.error,
+        error: await translateErrorCode(hasVotesResult.error),
       };
     }
 
@@ -777,7 +748,7 @@ export async function canEditPollAction(
     if (!canEditResult.success) {
       return {
         success: false,
-        error: canEditResult.error,
+        error: await translateErrorCode(canEditResult.error),
       };
     }
 
@@ -852,7 +823,7 @@ export async function updateQuestionAction(data: {
     if (!result.success) {
       return {
         success: false,
-        error: result.error,
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -896,7 +867,7 @@ export async function deleteQuestionAction(
     if (!result.success) {
       return {
         success: false,
-        error: result.error,
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -944,7 +915,7 @@ export async function updateAnswerAction(data: {
     if (!result.success) {
       return {
         success: false,
-        error: result.error,
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -992,7 +963,7 @@ export async function createAnswerAction(data: {
     if (!result.success) {
       return {
         success: false,
-        error: result.error,
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -1039,7 +1010,7 @@ export async function deleteAnswerAction(
     if (!result.success) {
       return {
         success: false,
-        error: result.error,
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -1084,11 +1055,9 @@ export async function activatePollAction(
     });
 
     if (!result.success) {
-      const errorT = await getTranslations();
-
       return {
         success: false,
-        error: errorT(result.error as any),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -1133,11 +1102,9 @@ export async function deactivatePollAction(
     });
 
     if (!result.success) {
-      const errorT = await getTranslations();
-
       return {
         success: false,
-        error: errorT(result.error as any),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -1182,11 +1149,9 @@ export async function finishPollAction(
     });
 
     if (!result.success) {
-      const errorT = await getTranslations();
-
       return {
         success: false,
-        error: errorT(result.error as any),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -1231,11 +1196,9 @@ export async function takeSnapshotAction(
     });
 
     if (!result.success) {
-      const errorT = await getTranslations();
-
       return {
         success: false,
-        error: errorT(result.error as any),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -1281,11 +1244,9 @@ export async function discardSnapshotAction(
     });
 
     if (!result.success) {
-      const errorT = await getTranslations();
-
       return {
         success: false,
-        error: errorT(result.error as any),
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -1336,11 +1297,9 @@ export async function canManagePollAction(
     const poll = pollResult.value;
 
     if (!poll) {
-      const tPoll = await getTranslations('poll.errors');
-
       return {
         success: false,
-        error: tPoll('pollNotFound'),
+        error: await translateErrorCode('poll.errors.pollNotFound'),
       };
     }
 
@@ -1430,10 +1389,10 @@ export async function searchPollsAction(
     );
 
     if (!result.success) {
-      const errorParts = result.error.split('.');
-      const tError = await getTranslations(errorParts.shift());
-
-      return { success: false, error: tError(errorParts.join('.')) };
+      return {
+        success: false,
+        error: await translateErrorCode(result.error),
+      };
     }
 
     // Enrich with canVote + hasFinishedVoting + org/board names

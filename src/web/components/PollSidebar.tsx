@@ -134,7 +134,7 @@ function QuestionItem({
         <button
           type="button"
           onClick={handleDelete}
-          className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+          className="cursor-pointer sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
           aria-label="Delete question"
         >
           <TrashIcon className="w-4 h-4 text-red-500" />
@@ -206,7 +206,7 @@ function PageGroup({
           <button
             type="button"
             onClick={handleAddQuestion}
-            className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+            className="cursor-pointer p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
             aria-label={`${t('addQuestion')} to ${t('page')} ${pageNumber}`}
             title={t('addQuestion')}
           >
@@ -217,7 +217,7 @@ function PageGroup({
           <button
             type="button"
             onClick={handlePageDelete}
-            className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+            className="cursor-pointer sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
             aria-label={`${t('delete')} ${t('page')} ${pageNumber}`}
           >
             <TrashIcon className="w-4 h-4 text-red-500" />

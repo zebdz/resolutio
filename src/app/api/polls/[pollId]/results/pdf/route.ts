@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/web/lib/session';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { GetPollResultsUseCase } from '@/application/poll/GetPollResultsUseCase';
 import type { QuestionType } from '@/src/domain/poll/QuestionType';
 import {
@@ -69,7 +70,10 @@ export async function GET(
     });
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 403 });
+      return NextResponse.json(
+        { error: await translateErrorCode(result.error) },
+        { status: 403 }
+      );
     }
 
     const { poll, results, totalParticipants, totalParticipantWeight } =
