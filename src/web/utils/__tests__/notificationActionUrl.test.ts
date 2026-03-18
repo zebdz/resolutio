@@ -171,6 +171,16 @@ describe('getNotificationActionUrl', () => {
         actionKey: 'viewOrganization',
       });
     });
+
+    it('org_name_changed → /organizations/{id}', () => {
+      const result = getNotificationActionUrl('org_name_changed', {
+        organizationId: 'org-10',
+      });
+      expect(result).toEqual({
+        href: '/organizations/org-10',
+        actionKey: 'viewOrganization',
+      });
+    });
   });
 
   describe('returns null for missing/invalid data', () => {

@@ -1,7 +1,9 @@
 import { Result, success, failure } from '../shared/Result';
 import { OrganizationDomainCodes } from './OrganizationDomainCodes';
 
+export const ORGANIZATION_NAME_MIN_LENGTH = 1;
 export const ORGANIZATION_NAME_MAX_LENGTH = 255;
+export const ORGANIZATION_NAME_PATTERN = /^[\p{L}\p{N}\s\-"]+$/u;
 export const ORGANIZATION_DESCRIPTION_MAX_LENGTH = 2000;
 
 export interface OrganizationProps {
@@ -26,12 +28,10 @@ export class Organization {
     allowMultiTreeMembership?: boolean
   ): Result<Organization, string> {
     // Validate name
-    if (!name || name.trim().length === 0) {
-      return failure(OrganizationDomainCodes.ORGANIZATION_NAME_EMPTY);
-    }
+    const nameValidation = Organization.validateName(name);
 
-    if (name.length > ORGANIZATION_NAME_MAX_LENGTH) {
-      return failure(OrganizationDomainCodes.ORGANIZATION_NAME_TOO_LONG);
+    if (!nameValidation.success) {
+      return failure(nameValidation.error);
     }
 
     // Validate description
@@ -57,6 +57,26 @@ export class Organization {
     });
 
     return success(organization);
+  }
+
+  private static validateName(name: string): Result<void, string> {
+    if (!name || name.trim().length === 0) {
+      return failure(OrganizationDomainCodes.ORGANIZATION_NAME_EMPTY);
+    }
+
+    if (name.trim().length < ORGANIZATION_NAME_MIN_LENGTH) {
+      return failure(OrganizationDomainCodes.ORGANIZATION_NAME_TOO_SHORT);
+    }
+
+    if (name.trim().length > ORGANIZATION_NAME_MAX_LENGTH) {
+      return failure(OrganizationDomainCodes.ORGANIZATION_NAME_TOO_LONG);
+    }
+
+    if (!ORGANIZATION_NAME_PATTERN.test(name.trim())) {
+      return failure(OrganizationDomainCodes.ORGANIZATION_NAME_INVALID_CHARS);
+    }
+
+    return success(undefined);
   }
 
   public static reconstitute(props: OrganizationProps): Organization {
@@ -121,12 +141,10 @@ export class Organization {
   }
 
   public updateName(name: string): Result<void, string> {
-    if (!name || name.trim().length === 0) {
-      return failure(OrganizationDomainCodes.ORGANIZATION_NAME_EMPTY);
-    }
+    const validation = Organization.validateName(name);
 
-    if (name.length > ORGANIZATION_NAME_MAX_LENGTH) {
-      return failure(OrganizationDomainCodes.ORGANIZATION_NAME_TOO_LONG);
+    if (!validation.success) {
+      return validation;
     }
 
     this.props.name = name.trim();

@@ -906,6 +906,10 @@
       "multiMembershipSettingChanged": {
         "title": "Organization membership setting changed",
         "body": "The multi-membership setting for {organizationName} has been {allowed, select, true {enabled} other {disabled}}"
+      },
+      "orgNameChanged": {
+        "title": "Organization renamed",
+        "body": "Organization \"{oldName}\" has been renamed to \"{newName}\""
       }
     },
     "page": {
@@ -949,15 +953,17 @@
   "domain": {
     "organization": {
       "organizationNameEmpty": "Organization name cannot be empty",
-      "organizationNameTooLong": "Organization name cannot exceed 255 characters",
+      "organizationNameTooLong": "Organization name cannot exceed {maxLength} characters",
       "organizationDescriptionEmpty": "Organization description cannot be empty",
-      "organizationDescriptionTooLong": "Organization description cannot exceed 1000 characters",
+      "organizationDescriptionTooLong": "Organization description cannot exceed {maxLength} characters",
       "organizationAlreadyArchived": "Organization is already archived",
-      "organizationNotArchived": "Organization is not archived"
+      "organizationNotArchived": "Organization is not archived",
+      "organizationNameTooShort": "Organization name must be at least {minLength, plural, =1 {1 character} other {# characters}}",
+      "organizationNameInvalidChars": "Organization name can only contain letters, numbers, spaces, hyphens, and double quotes"
     },
     "joinParentRequest": {
       "messageEmpty": "Message cannot be empty",
-      "messageTooLong": "Message cannot exceed 2000 characters",
+      "messageTooLong": "Message cannot exceed {maxLength} characters",
       "notPending": "Join parent request is not pending",
       "rejectionReasonRequired": "Rejection reason is required"
     },
@@ -966,7 +972,7 @@
     },
     "board": {
       "boardNameEmpty": "Board name cannot be empty",
-      "boardNameTooLong": "Board name cannot exceed 255 characters",
+      "boardNameTooLong": "Board name cannot exceed {maxLength} characters",
       "boardAlreadyArchived": "Board is already archived"
     },
     "otp": {
@@ -974,21 +980,21 @@
     },
     "poll": {
       "answerTextEmpty": "Answer text cannot be empty",
-      "answerTextTooLong": "Answer text cannot exceed 1000 characters",
+      "answerTextTooLong": "Answer text cannot exceed {maxLength} characters",
       "answerOrderNegative": "Answer order must be a positive number",
       "answerAlreadyArchived": "Answer is already archived",
       "questionTextEmpty": "Question text cannot be empty",
-      "questionTextTooLong": "Question text cannot exceed 1000 characters",
-      "questionDetailsTooLong": "Question details cannot exceed 5000 characters",
+      "questionTextTooLong": "Question text cannot exceed {maxLength} characters",
+      "questionDetailsTooLong": "Question details cannot exceed {maxLength} characters",
       "questionPageNegative": "Question page must be a positive number",
       "questionOrderNegative": "Question order must be a positive number",
       "questionAlreadyArchived": "Question is already archived",
       "questionNoAnswers": "Question must have at least one answer",
       "questionCannotRemoveLastAnswer": "Cannot remove the last answer from a question",
       "titleEmpty": "Poll title cannot be empty",
-      "titleTooLong": "Poll title cannot exceed 500 characters",
+      "titleTooLong": "Poll title cannot exceed {maxLength} characters",
       "descriptionEmpty": "Poll description cannot be empty",
-      "descriptionTooLong": "Poll description cannot exceed 5000 characters",
+      "descriptionTooLong": "Poll description cannot exceed {maxLength} characters",
       "invalidDates": "Start date must be before end date",
       "cannotUpdateFinished": "Cannot update a finished poll",
       "alreadyActive": "Poll is already active",
@@ -1044,7 +1050,7 @@
     },
     "joinToken": {
       "descriptionEmpty": "Token description is required",
-      "descriptionTooLong": "Token description is too long (max 500 characters)",
+      "descriptionTooLong": "Token description is too long (max {maxLength} characters)",
       "maxUsesInvalid": "Max uses must be a positive number",
       "alreadyExpired": "Token is already expired",
       "notExpired": "Token is not expired",

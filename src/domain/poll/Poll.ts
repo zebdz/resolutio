@@ -186,7 +186,7 @@ export class Poll {
       return failure(PollDomainCodes.POLL_TITLE_EMPTY);
     }
 
-    if (newTitle.length > 500) {
+    if (newTitle.length > POLL_TITLE_MAX_LENGTH) {
       return failure(PollDomainCodes.POLL_TITLE_TOO_LONG);
     }
 
@@ -204,7 +204,7 @@ export class Poll {
       return failure(PollDomainCodes.POLL_DESCRIPTION_EMPTY);
     }
 
-    if (newDescription.length > 5000) {
+    if (newDescription.length > POLL_DESCRIPTION_MAX_LENGTH) {
       return failure(PollDomainCodes.POLL_DESCRIPTION_TOO_LONG);
     }
 

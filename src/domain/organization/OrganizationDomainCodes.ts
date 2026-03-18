@@ -11,6 +11,9 @@ export const OrganizationDomainCodes = {
   ORGANIZATION_ALREADY_ARCHIVED:
     'domain.organization.organizationAlreadyArchived',
   ORGANIZATION_NOT_ARCHIVED: 'domain.organization.organizationNotArchived',
+  ORGANIZATION_NAME_TOO_SHORT: 'domain.organization.organizationNameTooShort',
+  ORGANIZATION_NAME_INVALID_CHARS:
+    'domain.organization.organizationNameInvalidChars',
 } as const;
 
 export type OrganizationDomainCode =

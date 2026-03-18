@@ -63,6 +63,53 @@ describe('Organization.updateName', () => {
     }
   });
 
+  it('should succeed with single character name', () => {
+    const org = makeOrg();
+    const result = org.updateName('A');
+
+    expect(result.success).toBe(true);
+    expect(org.name).toBe('A');
+  });
+
+  it('should fail when name contains special characters', () => {
+    const org = makeOrg();
+    const result = org.updateName('Org@Name!');
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error).toBe(
+        OrganizationDomainCodes.ORGANIZATION_NAME_INVALID_CHARS
+      );
+    }
+
+    expect(org.name).toBe('Test Org');
+  });
+
+  it('should allow unicode letters', () => {
+    const org = makeOrg();
+    const result = org.updateName('Организация');
+
+    expect(result.success).toBe(true);
+    expect(org.name).toBe('Организация');
+  });
+
+  it('should allow hyphens and double quotes', () => {
+    const org = makeOrg();
+    const result = org.updateName('Org "Name" - Test');
+
+    expect(result.success).toBe(true);
+    expect(org.name).toBe('Org "Name" - Test');
+  });
+
+  it('should allow digits in name', () => {
+    const org = makeOrg();
+    const result = org.updateName('Org 123');
+
+    expect(result.success).toBe(true);
+    expect(org.name).toBe('Org 123');
+  });
+
   it('should fail when longer than 255 chars', () => {
     const org = makeOrg();
     const result = org.updateName('a'.repeat(256));
@@ -202,5 +249,31 @@ describe('Organization.allowMultiTreeMembership', () => {
   it('should include allowMultiTreeMembership in toJSON', () => {
     const org = makeOrg({ allowMultiTreeMembership: true });
     expect(org.toJSON().allowMultiTreeMembership).toBe(true);
+  });
+});
+
+describe('Organization.create name validation', () => {
+  it('should succeed with single character name', () => {
+    const result = Organization.create('A', 'Valid desc', 'user-1');
+
+    expect(result.success).toBe(true);
+  });
+
+  it('should fail when name contains special characters', () => {
+    const result = Organization.create('Org@Name!', 'Valid desc', 'user-1');
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error).toBe(
+        OrganizationDomainCodes.ORGANIZATION_NAME_INVALID_CHARS
+      );
+    }
+  });
+
+  it('should succeed with valid unicode name', () => {
+    const result = Organization.create('Организация', 'Valid desc', 'user-1');
+
+    expect(result.success).toBe(true);
   });
 });
