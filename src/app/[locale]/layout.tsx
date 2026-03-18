@@ -3,6 +3,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { Nunito } from 'next/font/google';
 import { Toaster } from 'sonner';
+import { ToastClickDismiss } from '@/web/components/ToastClickDismiss';
 import { routing } from '@/src/i18n/routing';
 import '../globals.css';
 
@@ -40,6 +41,7 @@ export default async function LocaleLayout({
         <NextIntlClientProvider messages={messages}>
           {children}
           <Toaster />
+          <ToastClickDismiss />
         </NextIntlClientProvider>
       </body>
     </html>
