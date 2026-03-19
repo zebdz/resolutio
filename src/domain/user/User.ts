@@ -1,6 +1,8 @@
 import { PhoneNumber } from './PhoneNumber';
 import { Nickname } from './Nickname';
 import { UserDomainCodes } from './UserDomainCodes';
+import { SharedDomainCodes } from '../shared/SharedDomainCodes';
+import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
 import {
   Locale,
   defaultLocale,
@@ -100,7 +102,8 @@ export class User {
       language?: Language;
       consentGivenAt?: Date;
       nickname?: Nickname;
-    }
+    },
+    profanityChecker?: ProfanityChecker
   ): User {
     // Validate required fields
     if (!props.firstName?.trim()) {
@@ -131,6 +134,21 @@ export class User {
         !NAME_REGEX.test(props.middleName))
     ) {
       throw new Error(UserDomainCodes.MIDDLE_NAME_INVALID);
+    }
+
+    if (profanityChecker?.containsProfanity(props.firstName)) {
+      throw new Error(SharedDomainCodes.CONTAINS_PROFANITY);
+    }
+
+    if (profanityChecker?.containsProfanity(props.lastName)) {
+      throw new Error(SharedDomainCodes.CONTAINS_PROFANITY);
+    }
+
+    if (
+      props.middleName &&
+      profanityChecker?.containsProfanity(props.middleName)
+    ) {
+      throw new Error(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     if (!props.password?.trim()) {
@@ -285,7 +303,14 @@ export class User {
     });
   }
 
-  updateMiddleName(middleName: string | undefined): User {
+  updateMiddleName(
+    middleName: string | undefined,
+    profanityChecker?: ProfanityChecker
+  ): User {
+    if (middleName && profanityChecker?.containsProfanity(middleName)) {
+      throw new Error(SharedDomainCodes.CONTAINS_PROFANITY);
+    }
+
     return new User({
       ...this.props,
       middleName,

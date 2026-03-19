@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ParticipantWeightHistory } from '../ParticipantWeightHistory';
+import { SharedDomainCodes } from '../../shared/SharedDomainCodes';
+import { ProfanityChecker } from '../../shared/profanity/ProfanityChecker';
 
 describe('ParticipantWeightHistory Domain', () => {
   describe('create', () => {
@@ -61,6 +63,71 @@ describe('ParticipantWeightHistory Domain', () => {
       if (result.success) {
         expect(result.value.reason).toBeNull();
       }
+    });
+  });
+
+  describe('profanity check', () => {
+    const mockProfanityChecker: ProfanityChecker = {
+      containsProfanity: (text: string) => text.includes('badword'),
+    };
+
+    it('should reject reason with profanity', () => {
+      const result = ParticipantWeightHistory.create(
+        'participant-1',
+        'poll-1',
+        'user-1',
+        1.0,
+        2.5,
+        'admin-1',
+        'badword reason',
+        mockProfanityChecker
+      );
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      }
+    });
+
+    it('should pass clean reason with profanityChecker', () => {
+      const result = ParticipantWeightHistory.create(
+        'participant-1',
+        'poll-1',
+        'user-1',
+        1.0,
+        2.5,
+        'admin-1',
+        'Clean reason',
+        mockProfanityChecker
+      );
+      expect(result.success).toBe(true);
+    });
+
+    it('should pass null reason with profanityChecker', () => {
+      const result = ParticipantWeightHistory.create(
+        'participant-1',
+        'poll-1',
+        'user-1',
+        1.0,
+        2.5,
+        'admin-1',
+        null,
+        mockProfanityChecker
+      );
+      expect(result.success).toBe(true);
+    });
+
+    it('should pass without profanityChecker (backward compat)', () => {
+      const result = ParticipantWeightHistory.create(
+        'participant-1',
+        'poll-1',
+        'user-1',
+        1.0,
+        2.5,
+        'admin-1',
+        'Any reason'
+      );
+      expect(result.success).toBe(true);
     });
   });
 

@@ -68,6 +68,7 @@ export function OrgPendingRequestsList({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dialogError, setDialogError] = useState<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
@@ -130,6 +131,7 @@ export function OrgPendingRequestsList({
   const handleRejectClick = (request: OrgPendingRequest) => {
     setSelectedRequest(request);
     setRejectionReason('');
+    setDialogError(null);
     setIsRejectDialogOpen(true);
   };
 
@@ -157,6 +159,8 @@ export function OrgPendingRequestsList({
       setSelectedRequest(null);
       setRejectionReason('');
       await fetchPage(currentPage, pageSize);
+    } else if (result.fieldErrors?.rejectionReason) {
+      setDialogError(result.fieldErrors.rejectionReason[0]);
     } else {
       setError(result.error);
     }
@@ -348,10 +352,17 @@ export function OrgPendingRequestsList({
             <Textarea
               id="rejectionReason"
               value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
+              invalid={!!dialogError}
+              onChange={(e) => {
+                setRejectionReason(e.target.value);
+                setDialogError(null);
+              }}
               placeholder={t('rejectionReasonPlaceholder')}
               rows={4}
             />
+            {dialogError && (
+              <p className="text-sm text-red-600">{dialogError}</p>
+            )}
           </div>
         </DialogBody>
         <DialogActions>

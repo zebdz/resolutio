@@ -3,11 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
 import { RequestJoinParentUseCase } from '@/application/organization/RequestJoinParentUseCase';
-import { RequestJoinParentSchema } from '@/application/organization/RequestJoinParentSchema';
+import { createRequestJoinParentSchema } from '@/application/organization/RequestJoinParentSchema';
 import { CancelJoinParentRequestUseCase } from '@/application/organization/CancelJoinParentRequestUseCase';
 import { CancelJoinParentRequestSchema } from '@/application/organization/CancelJoinParentRequestSchema';
 import { HandleJoinParentRequestUseCase } from '@/application/organization/HandleJoinParentRequestUseCase';
-import { HandleJoinParentRequestSchema } from '@/application/organization/HandleJoinParentRequestSchema';
+import { createHandleJoinParentRequestSchema } from '@/application/organization/HandleJoinParentRequestSchema';
+import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChecker';
 import { GetChildOrgJoinParentRequestUseCase } from '@/application/organization/GetChildOrgJoinParentRequestUseCase';
 import { GetIncomingJoinParentRequestsUseCase } from '@/application/organization/GetIncomingJoinParentRequestsUseCase';
 import { GetAllJoinParentRequestsUseCase } from '@/application/organization/GetAllJoinParentRequestsUseCase';
@@ -31,6 +32,7 @@ const joinParentRequestRepository = new PrismaJoinParentRequestRepository(
   prisma
 );
 const notificationRepository = new PrismaNotificationRepository(prisma);
+const profanityChecker = LeoProfanityChecker.getInstance();
 
 // Use cases
 const requestJoinParentUseCase = new RequestJoinParentUseCase({
@@ -38,6 +40,7 @@ const requestJoinParentUseCase = new RequestJoinParentUseCase({
   joinParentRequestRepository,
   userRepository,
   notificationRepository,
+  profanityChecker,
 });
 
 const cancelJoinParentRequestUseCase = new CancelJoinParentRequestUseCase({
@@ -51,6 +54,7 @@ const handleJoinParentRequestUseCase = new HandleJoinParentRequestUseCase({
   joinParentRequestRepository,
   userRepository,
   notificationRepository,
+  profanityChecker,
 });
 
 const getChildOrgJoinParentRequestUseCase =
@@ -98,7 +102,8 @@ export async function requestJoinParentAction(
       message: formData.get('message') as string,
     };
 
-    const validation = RequestJoinParentSchema.safeParse(input);
+    const validation =
+      createRequestJoinParentSchema(profanityChecker).safeParse(input);
 
     if (!validation.success) {
       const fieldErrors = await translateZodFieldErrors(
@@ -198,7 +203,8 @@ export async function handleJoinParentRequestAction(
       rejectionReason: (formData.get('rejectionReason') as string) || undefined,
     };
 
-    const validation = HandleJoinParentRequestSchema.safeParse(input);
+    const validation =
+      createHandleJoinParentRequestSchema(profanityChecker).safeParse(input);
 
     if (!validation.success) {
       const fieldErrors = await translateZodFieldErrors(

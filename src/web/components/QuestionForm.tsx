@@ -49,6 +49,7 @@ interface QuestionFormProps {
   onTypeChange: (type: QuestionType) => void;
   onAnswersChange: (answers: Answer[]) => void;
   disabled?: boolean;
+  fieldErrors?: Record<string, string[]>;
 }
 
 export function QuestionForm({
@@ -64,6 +65,7 @@ export function QuestionForm({
   onTypeChange,
   onAnswersChange,
   disabled = false,
+  fieldErrors,
 }: QuestionFormProps) {
   const t = useTranslations('poll');
 
@@ -148,11 +150,15 @@ export function QuestionForm({
         <Label>{t('questionText')}</Label>
         <Input
           value={text}
+          invalid={!!fieldErrors?.text}
           onChange={(e) => onTextChange(e.target.value)}
           placeholder={t('questionText')}
           disabled={disabled}
           required
         />
+        {fieldErrors?.text && (
+          <p className="text-sm text-red-600">{fieldErrors.text[0]}</p>
+        )}
       </Field>
 
       {/* Question Details */}
@@ -160,16 +166,23 @@ export function QuestionForm({
         <Label>{t('questionDetails')}</Label>
         <Textarea
           value={details}
+          invalid={!!fieldErrors?.details}
           onChange={(e) => onDetailsChange(e.target.value)}
           placeholder={t('questionDetails')}
           disabled={disabled}
           rows={3}
         />
+        {fieldErrors?.details && (
+          <p className="text-sm text-red-600">{fieldErrors.details[0]}</p>
+        )}
       </Field>
 
       {/* Answers */}
       <Field>
         <Label>{t('answers')}</Label>
+        {fieldErrors?.answers && (
+          <p className="text-sm text-red-600">{fieldErrors.answers[0]}</p>
+        )}
         <div className="space-y-2">
           <DndContext
             sensors={sensors}
@@ -180,17 +193,23 @@ export function QuestionForm({
               items={answers.map((a) => a.id)}
               strategy={verticalListSortingStrategy}
             >
-              {answers.map((answer) => (
-                <AnswerInput
-                  key={answer.id}
-                  id={answer.id}
-                  text={answer.text}
-                  order={answer.order}
-                  onChange={(text) => handleAnswerChange(answer.id, text)}
-                  onDelete={() => handleAnswerDelete(answer.id)}
-                  disabled={disabled}
-                />
-              ))}
+              {answers.map((answer, index) => {
+                const answerError = fieldErrors?.[`answers.${index}`]?.[0];
+
+                return (
+                  <AnswerInput
+                    key={answer.id}
+                    id={answer.id}
+                    text={answer.text}
+                    order={answer.order}
+                    onChange={(text) => handleAnswerChange(answer.id, text)}
+                    onDelete={() => handleAnswerDelete(answer.id)}
+                    disabled={disabled}
+                    invalid={!!answerError}
+                    error={answerError}
+                  />
+                );
+              })}
             </SortableContext>
           </DndContext>
 

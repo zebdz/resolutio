@@ -14,6 +14,8 @@ interface AnswerInputProps {
   onChange: (text: string) => void;
   onDelete: () => void;
   disabled?: boolean;
+  invalid?: boolean;
+  error?: string;
 }
 
 export function AnswerInput({
@@ -23,6 +25,8 @@ export function AnswerInput({
   onChange,
   onDelete,
   disabled = false,
+  invalid,
+  error,
 }: AnswerInputProps) {
   const t = useTranslations('poll');
 
@@ -74,10 +78,12 @@ export function AnswerInput({
       <div className="flex-1">
         <Input
           value={text}
+          invalid={invalid}
           onChange={(e) => onChange(e.target.value)}
           placeholder={`${t('answer')} ${order + 1}`}
           disabled={disabled}
         />
+        {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
       </div>
 
       {/* Delete button */}

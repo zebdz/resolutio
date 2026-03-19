@@ -15,7 +15,8 @@ import {
   PrismaNotificationRepository,
 } from '@/infrastructure/index';
 import { CreateJoinTokenUseCase } from '@/application/organization/CreateJoinTokenUseCase';
-import { CreateJoinTokenSchema } from '@/application/organization/CreateJoinTokenSchema';
+import { createJoinTokenSchema } from '@/application/organization/CreateJoinTokenSchema';
+import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChecker';
 import { ExpireJoinTokenUseCase } from '@/application/organization/ExpireJoinTokenUseCase';
 import { ReactivateJoinTokenUseCase } from '@/application/organization/ReactivateJoinTokenUseCase';
 import { UpdateJoinTokenMaxUsesUseCase } from '@/application/organization/UpdateJoinTokenMaxUsesUseCase';
@@ -30,12 +31,14 @@ const userRepository = new PrismaUserRepository(prisma);
 const joinTokenRepository = new PrismaJoinTokenRepository(prisma);
 const invitationRepository = new PrismaInvitationRepository(prisma);
 const notificationRepository = new PrismaNotificationRepository(prisma);
+const profanityChecker = LeoProfanityChecker.getInstance();
 
 // Use cases
 const createJoinTokenUseCase = new CreateJoinTokenUseCase({
   organizationRepository,
   joinTokenRepository,
   userRepository,
+  profanityChecker,
 });
 
 const expireJoinTokenUseCase = new ExpireJoinTokenUseCase({
@@ -101,7 +104,7 @@ export async function createJoinTokenAction(
       maxUses: maxUsesRaw ? parseInt(maxUsesRaw, 10) : null,
     };
 
-    const validation = CreateJoinTokenSchema.safeParse(input);
+    const validation = createJoinTokenSchema(profanityChecker).safeParse(input);
 
     if (!validation.success) {
       const fieldErrors = await translateZodFieldErrors(

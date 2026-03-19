@@ -3,6 +3,8 @@ import { Question, QuestionProps } from './Question';
 import { Answer } from './Answer';
 import { PollDomainCodes } from './PollDomainCodes';
 import { PollState } from './PollState';
+import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
+import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 
 export const POLL_TITLE_MAX_LENGTH = 500;
 export const POLL_DESCRIPTION_MAX_LENGTH = 500;
@@ -33,7 +35,8 @@ export class Poll {
     boardId: string | null,
     createdBy: string,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
+    profanityChecker?: ProfanityChecker
   ): Result<Poll, string> {
     // Validate title
     if (!title || title.trim().length === 0) {
@@ -56,6 +59,14 @@ export class Poll {
     // Validate dates
     if (startDate >= endDate) {
       return failure(PollDomainCodes.POLL_INVALID_DATES);
+    }
+
+    if (profanityChecker?.containsProfanity(title.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
+    }
+
+    if (profanityChecker?.containsProfanity(description.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     const poll = new Poll({
@@ -177,7 +188,10 @@ export class Poll {
     return success(true);
   }
 
-  public updateTitle(newTitle: string): Result<void, string> {
+  public updateTitle(
+    newTitle: string,
+    profanityChecker?: ProfanityChecker
+  ): Result<void, string> {
     if (this.isFinished() || this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED);
     }
@@ -190,12 +204,19 @@ export class Poll {
       return failure(PollDomainCodes.POLL_TITLE_TOO_LONG);
     }
 
+    if (profanityChecker?.containsProfanity(newTitle.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
+    }
+
     this.props.title = newTitle.trim();
 
     return success(undefined);
   }
 
-  public updateDescription(newDescription: string): Result<void, string> {
+  public updateDescription(
+    newDescription: string,
+    profanityChecker?: ProfanityChecker
+  ): Result<void, string> {
     if (this.isFinished() || this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED);
     }
@@ -206,6 +227,10 @@ export class Poll {
 
     if (newDescription.length > POLL_DESCRIPTION_MAX_LENGTH) {
       return failure(PollDomainCodes.POLL_DESCRIPTION_TOO_LONG);
+    }
+
+    if (profanityChecker?.containsProfanity(newDescription.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     this.props.description = newDescription.trim();
@@ -371,7 +396,8 @@ export class Poll {
   public addAnswerToQuestion(
     questionId: string,
     text: string,
-    order: number
+    order: number,
+    profanityChecker?: ProfanityChecker
   ): Result<Answer, string> {
     if (this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_ADD_ANSWER_ACTIVE);
@@ -388,7 +414,12 @@ export class Poll {
     }
 
     // Create the answer
-    const answerResult = Answer.create(text, order, questionId);
+    const answerResult = Answer.create(
+      text,
+      order,
+      questionId,
+      profanityChecker
+    );
 
     if (!answerResult.success) {
       return failure(answerResult.error);

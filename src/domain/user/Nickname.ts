@@ -1,5 +1,7 @@
 import { randomBytes } from 'crypto';
 import { UserDomainCodes } from './UserDomainCodes';
+import { SharedDomainCodes } from '../shared/SharedDomainCodes';
+import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
 
 export const NICKNAME_MIN_LENGTH = 5;
 export const NICKNAME_MAX_LENGTH = 30;
@@ -7,7 +9,10 @@ export const NICKNAME_MAX_LENGTH = 30;
 export class Nickname {
   private constructor(private readonly value: string) {}
 
-  static create(nickname: string): Nickname {
+  static create(
+    nickname: string,
+    profanityChecker?: ProfanityChecker
+  ): Nickname {
     if (!nickname || nickname.length < NICKNAME_MIN_LENGTH) {
       throw new Error(UserDomainCodes.NICKNAME_INVALID);
     }
@@ -34,6 +39,10 @@ export class Nickname {
     // No consecutive underscores
     if (/_{2,}/.test(nickname)) {
       throw new Error(UserDomainCodes.NICKNAME_INVALID);
+    }
+
+    if (profanityChecker?.containsProfanity(nickname)) {
+      throw new Error(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     return new Nickname(nickname);

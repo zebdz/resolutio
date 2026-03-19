@@ -266,6 +266,7 @@ describe('UpdateOrganizationUseCase', () => {
       organizationRepository,
       userRepository,
       notificationRepository,
+      profanityChecker: { containsProfanity: () => false },
     });
   });
 

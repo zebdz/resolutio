@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { JoinToken, JoinTokenProps } from '../JoinToken';
 import { JoinTokenDomainCodes } from '../JoinTokenDomainCodes';
+import { SharedDomainCodes } from '../../shared/SharedDomainCodes';
+import { ProfanityChecker } from '../../shared/profanity/ProfanityChecker';
 
 const TOKEN_CHARSET = 'abcdefghjkmnpqrstuvwxyz23456789';
 
@@ -282,5 +284,42 @@ describe('JoinToken.toJSON', () => {
     const json = token.toJSON();
 
     expect(json).toEqual(props);
+  });
+});
+
+const mockProfanityChecker: ProfanityChecker = {
+  containsProfanity: (text: string) => text.includes('badword'),
+};
+
+describe('JoinToken profanity check', () => {
+  it('should reject description with profanity', () => {
+    const result = JoinToken.create(
+      'org-1',
+      'user-1',
+      'badword invite',
+      null,
+      mockProfanityChecker
+    );
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+    }
+  });
+
+  it('should pass clean description with profanityChecker', () => {
+    const result = JoinToken.create(
+      'org-1',
+      'user-1',
+      'Clean invite link',
+      null,
+      mockProfanityChecker
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it('should pass without profanityChecker (backward compat)', () => {
+    const result = JoinToken.create('org-1', 'user-1', 'Any description');
+    expect(result.success).toBe(true);
   });
 });

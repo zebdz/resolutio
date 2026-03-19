@@ -1055,6 +1055,9 @@
       "alreadyExpired": "Токен уже истёк",
       "notExpired": "Токен не истёк",
       "tokenExhausted": "Токен достиг максимального числа использований"
+    },
+    "shared": {
+      "containsProfanity": "Содержит ненормативную лексику"
     }
   },
   "phone": {

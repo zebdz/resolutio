@@ -6,6 +6,7 @@ import { QuestionRepository } from '../../domain/poll/QuestionRepository';
 import { AnswerRepository } from '../../domain/poll/AnswerRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { QuestionType } from '../../domain/poll/QuestionType';
+import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 import { PollErrors } from './PollErrors';
 
 export interface AddQuestionInput {
@@ -24,7 +25,8 @@ export class AddQuestionUseCase {
     private pollRepository: PollRepository,
     private questionRepository: QuestionRepository,
     private answerRepository: AnswerRepository,
-    private userRepository: UserRepository
+    private userRepository: UserRepository,
+    private profanityChecker?: ProfanityChecker
   ) {}
 
   async execute(input: AddQuestionInput): Promise<Result<Question, string>> {
@@ -61,7 +63,8 @@ export class AddQuestionUseCase {
       input.page,
       input.order,
       input.questionType,
-      input.details
+      input.details,
+      this.profanityChecker
     );
 
     if (!questionResult.success) {
@@ -81,7 +84,12 @@ export class AddQuestionUseCase {
 
     // 6. Create and persist answers
     for (let i = 0; i < input.answers.length; i++) {
-      const answerResult = Answer.create(input.answers[i], i, question.id);
+      const answerResult = Answer.create(
+        input.answers[i],
+        i,
+        question.id,
+        this.profanityChecker
+      );
 
       if (!answerResult.success) {
         return failure(answerResult.error);

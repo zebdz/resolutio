@@ -28,7 +28,7 @@ import {
   getSessionCookie,
   deleteSessionCookie,
 } from '../lib/session';
-import { RegisterUserSchema } from '@/application/auth/RegisterUserSchema';
+import { registerUserSchema } from '@/application/auth/RegisterUserSchema';
 import { LoginUserSchema } from '@/application/auth/LoginUserSchema';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
@@ -42,6 +42,7 @@ import {
 } from '@/web/actions/rateLimit';
 import { getClientIp } from '@/web/lib/clientIp';
 import { registerSuperadminAccess } from '@/infrastructure/rateLimit/superadminWhitelist';
+import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChecker';
 
 // Helper function to check if error is a Prisma connection error
 function isDatabaseConnectionError(error: unknown): boolean {
@@ -96,6 +97,7 @@ const deliveryChannel = new StubSmsOtpDeliveryChannel();
 const captchaVerifier = new TurnstileCaptchaVerifier(
   process.env.TURNSTILE_SECRET_KEY || ''
 );
+const profanityChecker = LeoProfanityChecker.getInstance();
 
 // Use cases
 const registerUserUseCase = new RegisterUserUseCase({
@@ -105,6 +107,7 @@ const registerUserUseCase = new RegisterUserUseCase({
   sessionRepository,
   otpCodeHasher,
   deliveryChannel,
+  profanityChecker,
   expiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '10', 10),
 });
 const loginUserUseCase = new LoginUserUseCase({
@@ -158,7 +161,7 @@ export async function registerAction(
     };
 
     // Validate with Zod
-    const validation = RegisterUserSchema.safeParse(input);
+    const validation = registerUserSchema(profanityChecker).safeParse(input);
 
     if (!validation.success) {
       const fieldErrors = await translateZodFieldErrors(

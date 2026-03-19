@@ -4,6 +4,12 @@ import { Question } from '../Question';
 import { Answer } from '../Answer';
 import { PollDomainCodes } from '../PollDomainCodes';
 import { PollState } from '../PollState';
+import { ProfanityChecker } from '../../shared/profanity/ProfanityChecker';
+import { SharedDomainCodes } from '../../shared/SharedDomainCodes';
+
+const mockProfanityChecker: ProfanityChecker = {
+  containsProfanity: (text: string) => text.includes('badword'),
+};
 
 // Helper: create a question with an answer (required for poll activation)
 function createQuestionWithAnswer(pollId: string): Question {
@@ -995,6 +1001,435 @@ describe('Poll Domain', () => {
 
         poll.takeSnapshot();
         expect(poll.isDraft()).toBe(false);
+      });
+    });
+  });
+
+  describe('Poll profanity checks', () => {
+    describe('create', () => {
+      it('should reject profane title', () => {
+        const result = Poll.create(
+          'badword title',
+          'Clean description',
+          'org-1',
+          'board-1',
+          'user-1',
+          new Date('2026-01-15'),
+          new Date('2026-02-15'),
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      });
+
+      it('should reject profane description', () => {
+        const result = Poll.create(
+          'Clean title',
+          'badword description',
+          'org-1',
+          'board-1',
+          'user-1',
+          new Date('2026-01-15'),
+          new Date('2026-02-15'),
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      });
+
+      it('should allow clean text with profanity checker', () => {
+        const result = Poll.create(
+          'Clean title',
+          'Clean description',
+          'org-1',
+          'board-1',
+          'user-1',
+          new Date('2026-01-15'),
+          new Date('2026-02-15'),
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(true);
+      });
+
+      it('should skip profanity check when checker not provided', () => {
+        const result = Poll.create(
+          'badword title',
+          'badword description',
+          'org-1',
+          'board-1',
+          'user-1',
+          new Date('2026-01-15'),
+          new Date('2026-02-15')
+        );
+
+        expect(result.success).toBe(true);
+      });
+    });
+
+    describe('updateTitle', () => {
+      it('should reject profane title', () => {
+        const pollResult = Poll.create(
+          'Clean title',
+          'Clean description',
+          'org-1',
+          'board-1',
+          'user-1',
+          new Date('2026-01-15'),
+          new Date('2026-02-15')
+        );
+        const poll = pollResult.value;
+
+        const result = poll.updateTitle('badword title', mockProfanityChecker);
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      });
+
+      it('should allow clean title with profanity checker', () => {
+        const pollResult = Poll.create(
+          'Clean title',
+          'Clean description',
+          'org-1',
+          'board-1',
+          'user-1',
+          new Date('2026-01-15'),
+          new Date('2026-02-15')
+        );
+        const poll = pollResult.value;
+
+        const result = poll.updateTitle(
+          'New clean title',
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(true);
+      });
+    });
+
+    describe('updateDescription', () => {
+      it('should reject profane description', () => {
+        const pollResult = Poll.create(
+          'Clean title',
+          'Clean description',
+          'org-1',
+          'board-1',
+          'user-1',
+          new Date('2026-01-15'),
+          new Date('2026-02-15')
+        );
+        const poll = pollResult.value;
+
+        const result = poll.updateDescription(
+          'badword description',
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      });
+
+      it('should allow clean description with profanity checker', () => {
+        const pollResult = Poll.create(
+          'Clean title',
+          'Clean description',
+          'org-1',
+          'board-1',
+          'user-1',
+          new Date('2026-01-15'),
+          new Date('2026-02-15')
+        );
+        const poll = pollResult.value;
+
+        const result = poll.updateDescription(
+          'New clean description',
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(true);
+      });
+    });
+
+    describe('addAnswerToQuestion', () => {
+      it('should reject profane answer text via Answer.create', () => {
+        const pollResult = Poll.create(
+          'Clean title',
+          'Clean description',
+          'org-1',
+          'board-1',
+          'user-1',
+          new Date('2026-01-15'),
+          new Date('2026-02-15')
+        );
+        const poll = pollResult.value;
+
+        const questionResult = Question.create(
+          'Test Question',
+          poll.id,
+          1,
+          0,
+          'single-choice'
+        );
+        const question = questionResult.value;
+        (question as any).props.id = 'question-1';
+        poll.addQuestion(question);
+
+        const result = poll.addAnswerToQuestion(
+          'question-1',
+          'badword answer',
+          1,
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      });
+
+      it('should allow clean answer text with profanity checker', () => {
+        const pollResult = Poll.create(
+          'Clean title',
+          'Clean description',
+          'org-1',
+          'board-1',
+          'user-1',
+          new Date('2026-01-15'),
+          new Date('2026-02-15')
+        );
+        const poll = pollResult.value;
+
+        const questionResult = Question.create(
+          'Test Question',
+          poll.id,
+          1,
+          0,
+          'single-choice'
+        );
+        const question = questionResult.value;
+        (question as any).props.id = 'question-1';
+        poll.addQuestion(question);
+
+        const result = poll.addAnswerToQuestion(
+          'question-1',
+          'Clean answer',
+          1,
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(true);
+      });
+    });
+  });
+
+  describe('Question profanity checks', () => {
+    describe('create', () => {
+      it('should reject profane question text', () => {
+        const result = Question.create(
+          'badword question',
+          'poll-1',
+          1,
+          0,
+          'single-choice',
+          undefined,
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      });
+
+      it('should reject profane question details', () => {
+        const result = Question.create(
+          'Clean question',
+          'poll-1',
+          1,
+          0,
+          'single-choice',
+          'badword details',
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      });
+
+      it('should allow clean text with profanity checker', () => {
+        const result = Question.create(
+          'Clean question',
+          'poll-1',
+          1,
+          0,
+          'single-choice',
+          'Clean details',
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(true);
+      });
+
+      it('should skip profanity check when checker not provided', () => {
+        const result = Question.create(
+          'badword question',
+          'poll-1',
+          1,
+          0,
+          'single-choice',
+          'badword details'
+        );
+
+        expect(result.success).toBe(true);
+      });
+    });
+
+    describe('updateText', () => {
+      it('should reject profane text', () => {
+        const questionResult = Question.create(
+          'Clean question',
+          'poll-1',
+          1,
+          0,
+          'single-choice'
+        );
+        const question = questionResult.value;
+
+        const result = question.updateText(
+          'badword text',
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      });
+
+      it('should allow clean text with profanity checker', () => {
+        const questionResult = Question.create(
+          'Clean question',
+          'poll-1',
+          1,
+          0,
+          'single-choice'
+        );
+        const question = questionResult.value;
+
+        const result = question.updateText(
+          'New clean text',
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(true);
+      });
+    });
+
+    describe('updateDetails', () => {
+      it('should reject profane details', () => {
+        const questionResult = Question.create(
+          'Clean question',
+          'poll-1',
+          1,
+          0,
+          'single-choice'
+        );
+        const question = questionResult.value;
+
+        const result = question.updateDetails(
+          'badword details',
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      });
+
+      it('should allow null details with profanity checker', () => {
+        const questionResult = Question.create(
+          'Clean question',
+          'poll-1',
+          1,
+          0,
+          'single-choice',
+          'Some details'
+        );
+        const question = questionResult.value;
+
+        const result = question.updateDetails(null, mockProfanityChecker);
+
+        expect(result.success).toBe(true);
+      });
+
+      it('should allow clean details with profanity checker', () => {
+        const questionResult = Question.create(
+          'Clean question',
+          'poll-1',
+          1,
+          0,
+          'single-choice'
+        );
+        const question = questionResult.value;
+
+        const result = question.updateDetails(
+          'Clean details',
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(true);
+      });
+    });
+  });
+
+  describe('Answer profanity checks', () => {
+    describe('create', () => {
+      it('should reject profane answer text', () => {
+        const result = Answer.create(
+          'badword answer',
+          0,
+          'question-1',
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      });
+
+      it('should allow clean text with profanity checker', () => {
+        const result = Answer.create(
+          'Clean answer',
+          0,
+          'question-1',
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(true);
+      });
+
+      it('should skip profanity check when checker not provided', () => {
+        const result = Answer.create('badword answer', 0, 'question-1');
+
+        expect(result.success).toBe(true);
+      });
+    });
+
+    describe('updateText', () => {
+      it('should reject profane text', () => {
+        const answerResult = Answer.create('Clean answer', 0, 'question-1');
+        const answer = answerResult.value;
+
+        const result = answer.updateText('badword text', mockProfanityChecker);
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      });
+
+      it('should allow clean text with profanity checker', () => {
+        const answerResult = Answer.create('Clean answer', 0, 'question-1');
+        const answer = answerResult.value;
+
+        const result = answer.updateText(
+          'New clean text',
+          mockProfanityChecker
+        );
+
+        expect(result.success).toBe(true);
       });
     });
   });

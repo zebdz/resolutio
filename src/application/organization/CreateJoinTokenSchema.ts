@@ -1,23 +1,31 @@
 import { z } from 'zod';
 import { JOIN_TOKEN_DESCRIPTION_MAX_LENGTH } from '../../domain/organization/JoinToken';
 import { JoinTokenDomainCodes } from '../../domain/organization/JoinTokenDomainCodes';
+import { SharedDomainCodes } from '../../domain/shared/SharedDomainCodes';
+import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 
-export const CreateJoinTokenSchema = z.object({
-  organizationId: z.string().min(1),
-  description: z
-    .string()
-    .min(1, JoinTokenDomainCodes.DESCRIPTION_EMPTY)
-    .max(
-      JOIN_TOKEN_DESCRIPTION_MAX_LENGTH,
-      JoinTokenDomainCodes.DESCRIPTION_TOO_LONG
-    )
-    .trim(),
-  maxUses: z
-    .number()
-    .int()
-    .positive(JoinTokenDomainCodes.MAX_USES_INVALID)
-    .nullable()
-    .optional(),
-});
+export const createJoinTokenSchema = (profanityChecker: ProfanityChecker) =>
+  z.object({
+    organizationId: z.string().min(1),
+    description: z
+      .string()
+      .min(1, JoinTokenDomainCodes.DESCRIPTION_EMPTY)
+      .max(
+        JOIN_TOKEN_DESCRIPTION_MAX_LENGTH,
+        JoinTokenDomainCodes.DESCRIPTION_TOO_LONG
+      )
+      .trim()
+      .refine((val) => !profanityChecker.containsProfanity(val), {
+        message: SharedDomainCodes.CONTAINS_PROFANITY,
+      }),
+    maxUses: z
+      .number()
+      .int()
+      .positive(JoinTokenDomainCodes.MAX_USES_INVALID)
+      .nullable()
+      .optional(),
+  });
 
-export type CreateJoinTokenInput = z.infer<typeof CreateJoinTokenSchema>;
+export type CreateJoinTokenInput = z.input<
+  ReturnType<typeof createJoinTokenSchema>
+>;

@@ -41,6 +41,9 @@ export function OrgEditForm({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<
+    Record<string, string[]> | undefined
+  >();
   const [success, setSuccess] = useState<string | null>(null);
 
   const [name, setName] = useState(currentName);
@@ -51,6 +54,7 @@ export function OrgEditForm({
 
   async function handleSubmit(formData: FormData) {
     setError(null);
+    setFieldErrors(undefined);
     setSuccess(null);
 
     startTransition(async () => {
@@ -58,6 +62,7 @@ export function OrgEditForm({
 
       if (!result.success) {
         setError(result.error);
+        setFieldErrors(result.fieldErrors);
       } else {
         setSuccess(t('updateSuccess'));
         router.refresh();
@@ -74,7 +79,9 @@ export function OrgEditForm({
       <form action={handleSubmit} className="space-y-6">
         <input type="hidden" name="organizationId" value={organizationId} />
 
-        {error && <AlertBanner color="red">{error}</AlertBanner>}
+        {error && !fieldErrors && (
+          <AlertBanner color="red">{error}</AlertBanner>
+        )}
         {success && <AlertBanner color="green">{success}</AlertBanner>}
 
         <FieldGroup>
@@ -83,14 +90,19 @@ export function OrgEditForm({
             <Input
               name="name"
               value={name}
+              invalid={!!fieldErrors?.name}
               onChange={(e) => {
                 setName(e.target.value);
                 setError(null);
+                setFieldErrors(undefined);
                 setSuccess(null);
               }}
               placeholder={t('namePlaceholder')}
               disabled={isPending}
             />
+            {fieldErrors?.name && (
+              <p className="text-sm text-red-600">{fieldErrors.name[0]}</p>
+            )}
           </Field>
 
           <Field>
@@ -98,15 +110,22 @@ export function OrgEditForm({
             <Textarea
               name="description"
               value={description}
+              invalid={!!fieldErrors?.description}
               onChange={(e) => {
                 setDescription(e.target.value);
                 setError(null);
+                setFieldErrors(undefined);
                 setSuccess(null);
               }}
               placeholder={t('descriptionPlaceholder')}
               rows={4}
               disabled={isPending}
             />
+            {fieldErrors?.description && (
+              <p className="text-sm text-red-600">
+                {fieldErrors.description[0]}
+              </p>
+            )}
           </Field>
 
           {isRootOrg ? (
@@ -120,6 +139,7 @@ export function OrgEditForm({
                 onChange={(val: boolean) => {
                   setAllowMultiTreeMembership(val);
                   setError(null);
+                  setFieldErrors(undefined);
                   setSuccess(null);
                 }}
                 color="brand-green"

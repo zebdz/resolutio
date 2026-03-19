@@ -5,6 +5,7 @@ import { AnswerRepository } from '../../domain/poll/AnswerRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { Answer } from '../../domain/poll/Answer';
+import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 import { PollErrors } from './PollErrors';
 
 export interface CreateAnswerInput {
@@ -20,7 +21,8 @@ export class CreateAnswerUseCase {
     private questionRepository: QuestionRepository,
     private answerRepository: AnswerRepository,
     private voteRepository: VoteRepository,
-    private userRepository: UserRepository
+    private userRepository: UserRepository,
+    private profanityChecker?: ProfanityChecker
   ) {}
 
   async execute(input: CreateAnswerInput): Promise<Result<Answer, string>> {
@@ -74,7 +76,8 @@ export class CreateAnswerUseCase {
     const addAnswerResult = poll.addAnswerToQuestion(
       input.questionId,
       input.text,
-      input.order
+      input.order,
+      this.profanityChecker
     );
 
     if (!addAnswerResult.success) {

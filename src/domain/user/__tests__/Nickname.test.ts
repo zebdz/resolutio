@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { Nickname } from '../Nickname';
 import { UserDomainCodes } from '../UserDomainCodes';
+import { SharedDomainCodes } from '../../shared/SharedDomainCodes';
+import { ProfanityChecker } from '../../shared/profanity/ProfanityChecker';
 
 describe('Nickname', () => {
   describe('create', () => {
@@ -56,6 +58,29 @@ describe('Nickname', () => {
 
     it('should throw for empty string', () => {
       expect(() => Nickname.create('')).toThrow();
+    });
+
+    describe('profanity checks', () => {
+      const profaneChecker: ProfanityChecker = {
+        containsProfanity: (text: string) =>
+          text.toLowerCase().includes('badword'),
+      };
+
+      it('should throw when nickname contains profanity', () => {
+        expect(() => Nickname.create('badword123', profaneChecker)).toThrow(
+          SharedDomainCodes.CONTAINS_PROFANITY
+        );
+      });
+
+      it('should not throw when nickname is clean', () => {
+        const nickname = Nickname.create('clean_nick', profaneChecker);
+        expect(nickname.getValue()).toBe('clean_nick');
+      });
+
+      it('should not check profanity when checker is not provided', () => {
+        const nickname = Nickname.create('john_doe');
+        expect(nickname.getValue()).toBe('john_doe');
+      });
     });
 
     it('should throw domain code, not hardcoded English', () => {

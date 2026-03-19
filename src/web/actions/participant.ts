@@ -20,6 +20,8 @@ import { User } from '@/domain/user/User';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
 import { z } from 'zod';
+import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChecker';
+import { SharedDomainCodes } from '@/domain/shared/SharedDomainCodes';
 
 // Action result type for client-side handling
 export type ActionResult<T = void> =
@@ -33,6 +35,7 @@ const voteRepository = new PrismaVoteRepository(prisma);
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 const boardRepository = new PrismaBoardRepository(prisma);
+const profanityChecker = LeoProfanityChecker.getInstance();
 
 // Use cases
 const getParticipantsUseCase = new GetParticipantsUseCase(
@@ -49,7 +52,8 @@ const updateParticipantWeightUseCase = new UpdateParticipantWeightUseCase(
   voteRepository,
   organizationRepository,
   userRepository,
-  boardRepository
+  boardRepository,
+  profanityChecker
 );
 const removeParticipantUseCase = new RemoveParticipantUseCase(
   pollRepository,
@@ -71,7 +75,12 @@ const getWeightHistoryUseCase = new GetWeightHistoryUseCase(
 const UpdateWeightSchema = z.object({
   participantId: z.string(),
   newWeight: z.number().positive(),
-  reason: z.string().optional(),
+  reason: z
+    .string()
+    .refine((val) => !profanityChecker.containsProfanity(val), {
+      message: SharedDomainCodes.CONTAINS_PROFANITY,
+    })
+    .optional(),
 });
 
 /**

@@ -9,6 +9,7 @@ import { UserRepository } from '../../domain/user/UserRepository';
 import { PollErrors } from './PollErrors';
 import { OrganizationErrors } from '../organization/OrganizationErrors';
 import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
+import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 
 export interface UpdateParticipantWeightInput {
   participantId: string;
@@ -24,7 +25,8 @@ export class UpdateParticipantWeightUseCase {
     private voteRepository: VoteRepository,
     private organizationRepository: OrganizationRepository,
     private userRepository: UserRepository,
-    private boardRepository: BoardRepository
+    private boardRepository: BoardRepository,
+    private profanityChecker?: ProfanityChecker
   ) {}
 
   async execute(
@@ -130,7 +132,8 @@ export class UpdateParticipantWeightUseCase {
       oldWeight,
       newWeight,
       adminUserId,
-      reason || null
+      reason || null,
+      this.profanityChecker
     );
 
     if (!historyResult.success) {

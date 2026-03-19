@@ -1,4 +1,6 @@
 import { Result, success, failure } from '../shared/Result';
+import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
+import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 import { OrganizationDomainCodes } from './OrganizationDomainCodes';
 
 export const ORGANIZATION_NAME_MIN_LENGTH = 1;
@@ -25,7 +27,8 @@ export class Organization {
     description: string,
     createdById: string,
     parentId: string | null = null,
-    allowMultiTreeMembership?: boolean
+    allowMultiTreeMembership?: boolean,
+    profanityChecker?: ProfanityChecker
   ): Result<Organization, string> {
     // Validate name
     const nameValidation = Organization.validateName(name);
@@ -41,6 +44,15 @@ export class Organization {
 
     if (description.length > ORGANIZATION_DESCRIPTION_MAX_LENGTH) {
       return failure(OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_TOO_LONG);
+    }
+
+    // Profanity check
+    if (profanityChecker?.containsProfanity(name.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
+    }
+
+    if (profanityChecker?.containsProfanity(description.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     const organization = new Organization({
@@ -140,11 +152,18 @@ export class Organization {
     return success(undefined);
   }
 
-  public updateName(name: string): Result<void, string> {
+  public updateName(
+    name: string,
+    profanityChecker?: ProfanityChecker
+  ): Result<void, string> {
     const validation = Organization.validateName(name);
 
     if (!validation.success) {
       return validation;
+    }
+
+    if (profanityChecker?.containsProfanity(name.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     this.props.name = name.trim();
@@ -152,13 +171,20 @@ export class Organization {
     return success(undefined);
   }
 
-  public updateDescription(description: string): Result<void, string> {
+  public updateDescription(
+    description: string,
+    profanityChecker?: ProfanityChecker
+  ): Result<void, string> {
     if (!description || description.trim().length === 0) {
       return failure(OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_EMPTY);
     }
 
     if (description.length > ORGANIZATION_DESCRIPTION_MAX_LENGTH) {
       return failure(OrganizationDomainCodes.ORGANIZATION_DESCRIPTION_TOO_LONG);
+    }
+
+    if (profanityChecker?.containsProfanity(description.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     this.props.description = description.trim();

@@ -47,6 +47,7 @@ export function ParentRequestsList({
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dialogError, setDialogError] = useState<string | null>(null);
 
   const handleAccept = async (request: ParentRequest) => {
     setIsProcessing(true);
@@ -70,6 +71,7 @@ export function ParentRequestsList({
   const handleRejectClick = (request: ParentRequest) => {
     setSelectedRequest(request);
     setRejectionReason('');
+    setDialogError(null);
     setIsRejectDialogOpen(true);
   };
 
@@ -93,6 +95,8 @@ export function ParentRequestsList({
       setIsRejectDialogOpen(false);
       setSelectedRequest(null);
       setRejectionReason('');
+    } else if (result.fieldErrors?.rejectionReason) {
+      setDialogError(result.fieldErrors.rejectionReason[0]);
     } else {
       setError(result.error);
     }
@@ -200,11 +204,18 @@ export function ParentRequestsList({
             <Textarea
               id="rejectionReason"
               value={rejectionReason}
-              onChange={(e) => setRejectionReason(e.target.value)}
+              invalid={!!dialogError}
+              onChange={(e) => {
+                setRejectionReason(e.target.value);
+                setDialogError(null);
+              }}
               placeholder={t('rejectionReasonPlaceholder')}
               rows={4}
               required
             />
+            {dialogError && (
+              <p className="text-sm text-red-600">{dialogError}</p>
+            )}
           </div>
         </DialogBody>
         <DialogActions>

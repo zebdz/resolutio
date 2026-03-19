@@ -3,6 +3,7 @@ import { PollRepository } from '../../domain/poll/PollRepository';
 import { QuestionRepository } from '../../domain/poll/QuestionRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
+import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 import { PollErrors } from './PollErrors';
 import { QuestionType } from '../../domain/poll/QuestionType';
 
@@ -19,7 +20,8 @@ export class UpdateQuestionUseCase {
     private pollRepository: PollRepository,
     private questionRepository: QuestionRepository,
     private voteRepository: VoteRepository,
-    private userRepository: UserRepository
+    private userRepository: UserRepository,
+    private profanityChecker?: ProfanityChecker
   ) {}
 
   async execute(input: UpdateQuestionInput): Promise<Result<void, string>> {
@@ -80,7 +82,7 @@ export class UpdateQuestionUseCase {
 
     // Update question properties
     if (input.text !== undefined) {
-      const textResult = question.updateText(input.text);
+      const textResult = question.updateText(input.text, this.profanityChecker);
 
       if (!textResult.success) {
         return failure(textResult.error);
@@ -88,7 +90,10 @@ export class UpdateQuestionUseCase {
     }
 
     if (input.details !== undefined) {
-      const detailsResult = question.updateDetails(input.details);
+      const detailsResult = question.updateDetails(
+        input.details,
+        this.profanityChecker
+      );
 
       if (!detailsResult.success) {
         return failure(detailsResult.error);

@@ -1,6 +1,7 @@
 import { Organization } from '../../domain/organization/Organization';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
+import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { CreateOrganizationInput } from './CreateOrganizationSchema';
 import { OrganizationErrors } from './OrganizationErrors';
@@ -8,6 +9,7 @@ import { OrganizationErrors } from './OrganizationErrors';
 export interface CreateOrganizationDependencies {
   organizationRepository: OrganizationRepository;
   userRepository: UserRepository;
+  profanityChecker: ProfanityChecker;
 }
 
 export class CreateOrganizationUseCase {
@@ -60,7 +62,8 @@ export class CreateOrganizationUseCase {
       description,
       userId,
       parentId,
-      input.allowMultiTreeMembership
+      input.allowMultiTreeMembership,
+      this.deps.profanityChecker
     );
 
     if (!organizationResult.success) {

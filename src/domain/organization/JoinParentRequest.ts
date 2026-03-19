@@ -1,5 +1,7 @@
 import { Result, success, failure } from '../shared/Result';
 import { JoinParentRequestDomainCodes } from './JoinParentRequestDomainCodes';
+import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
+import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 
 export const JOIN_PARENT_REQUEST_MESSAGE_MAX_LENGTH = 500;
 export const REJECTION_REASON_MAX_LENGTH = 500;
@@ -24,7 +26,8 @@ export class JoinParentRequest {
     childOrgId: string,
     parentOrgId: string,
     requestingAdminId: string,
-    message: string
+    message: string,
+    profanityChecker?: ProfanityChecker
   ): Result<JoinParentRequest, string> {
     if (!message || message.trim().length === 0) {
       return failure(JoinParentRequestDomainCodes.MESSAGE_EMPTY);
@@ -32,6 +35,10 @@ export class JoinParentRequest {
 
     if (message.length > JOIN_PARENT_REQUEST_MESSAGE_MAX_LENGTH) {
       return failure(JoinParentRequestDomainCodes.MESSAGE_TOO_LONG);
+    }
+
+    if (profanityChecker?.containsProfanity(message.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     const request = new JoinParentRequest({
@@ -110,13 +117,21 @@ export class JoinParentRequest {
     return success(undefined);
   }
 
-  public reject(adminId: string, reason: string): Result<void, string> {
+  public reject(
+    adminId: string,
+    reason: string,
+    profanityChecker?: ProfanityChecker
+  ): Result<void, string> {
     if (!this.isPending()) {
       return failure(JoinParentRequestDomainCodes.NOT_PENDING);
     }
 
     if (!reason || reason.trim().length === 0) {
       return failure(JoinParentRequestDomainCodes.REJECTION_REASON_REQUIRED);
+    }
+
+    if (profanityChecker?.containsProfanity(reason.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     this.props.status = 'rejected';

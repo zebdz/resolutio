@@ -1,5 +1,7 @@
 import { Result, success, failure } from '../shared/Result';
 import { BoardDomainCodes } from './BoardDomainCodes';
+import { SharedDomainCodes } from '../shared/SharedDomainCodes';
+import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
 
 export const BOARD_NAME_MAX_LENGTH = 255;
 
@@ -16,7 +18,8 @@ export class Board {
 
   public static create(
     name: string,
-    organizationId: string
+    organizationId: string,
+    profanityChecker?: ProfanityChecker
   ): Result<Board, string> {
     // Validate name
     if (!name || name.trim().length === 0) {
@@ -25,6 +28,10 @@ export class Board {
 
     if (name.length > BOARD_NAME_MAX_LENGTH) {
       return failure(BoardDomainCodes.BOARD_NAME_TOO_LONG);
+    }
+
+    if (profanityChecker?.containsProfanity(name.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     const board = new Board({
