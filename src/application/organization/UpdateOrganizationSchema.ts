@@ -7,8 +7,9 @@ import { OrganizationDomainCodes } from '../../domain/organization/OrganizationD
 import { SharedDomainCodes } from '../../domain/shared/SharedDomainCodes';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 
-export const createOrganizationSchema = (profanityChecker: ProfanityChecker) =>
+export const updateOrganizationSchema = (profanityChecker: ProfanityChecker) =>
   z.object({
+    organizationId: z.string().min(1),
     name: z
       .string()
       .min(1, OrganizationDomainCodes.ORGANIZATION_NAME_EMPTY)
@@ -31,12 +32,5 @@ export const createOrganizationSchema = (profanityChecker: ProfanityChecker) =>
       .refine((val) => !profanityChecker.containsProfanity(val), {
         message: SharedDomainCodes.CONTAINS_PROFANITY,
       }),
-    parentId: z.string().optional().nullable(),
-    autoJoin: z.boolean().optional().default(true),
-    allowMultiTreeMembership: z.boolean().optional().default(false),
+    allowMultiTreeMembership: z.boolean().optional(),
   });
-
-// Use z.input so autoJoin remains optional for callers (use case ignores it)
-export type CreateOrganizationInput = z.input<
-  ReturnType<typeof createOrganizationSchema>
->;

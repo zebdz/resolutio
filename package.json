@@ -1,6 +1,6 @@
 {
   "name": "resolutio",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
@@ -48,6 +48,7 @@
     "d3-hierarchy": "^3.1.2",
     "d3-selection": "^3.0.0",
     "d3-shape": "^3.2.0",
+    "leo-profanity": "^1.9.0",
     "motion": "^12.23.26",
     "next": "16.0.7",
     "next-intl": "^4.5.8",

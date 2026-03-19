@@ -4,6 +4,7 @@ import { QuestionRepository } from '../../domain/poll/QuestionRepository';
 import { AnswerRepository } from '../../domain/poll/AnswerRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
+import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 import { PollErrors } from './PollErrors';
 
 export interface UpdateAnswerInput {
@@ -19,7 +20,8 @@ export class UpdateAnswerUseCase {
     private questionRepository: QuestionRepository,
     private answerRepository: AnswerRepository,
     private voteRepository: VoteRepository,
-    private userRepository: UserRepository
+    private userRepository: UserRepository,
+    private profanityChecker?: ProfanityChecker
   ) {}
 
   async execute(input: UpdateAnswerInput): Promise<Result<void, string>> {
@@ -95,7 +97,7 @@ export class UpdateAnswerUseCase {
 
     // Update answer properties
     if (input.text !== undefined) {
-      const textResult = answer.updateText(input.text);
+      const textResult = answer.updateText(input.text, this.profanityChecker);
 
       if (!textResult.success) {
         return failure(textResult.error);

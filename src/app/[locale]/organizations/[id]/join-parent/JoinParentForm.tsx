@@ -27,6 +27,9 @@ export function JoinParentForm({
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<
+    Record<string, string[]> | undefined
+  >();
 
   const [selected, setSelected] = useState<OrgOption | null>(null);
   const [query, setQuery] = useState('');
@@ -88,6 +91,7 @@ export function JoinParentForm({
     event.preventDefault();
     setIsSubmitting(true);
     setError(null);
+    setFieldErrors(undefined);
 
     const formData = new FormData(event.currentTarget);
     formData.append('childOrgId', childOrgId);
@@ -99,6 +103,7 @@ export function JoinParentForm({
       router.back();
     } else {
       setError(result.error);
+      setFieldErrors(result.fieldErrors);
       setIsSubmitting(false);
     }
   };
@@ -140,7 +145,7 @@ export function JoinParentForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {error && (
+      {error && !fieldErrors && (
         <div className="rounded-md bg-red-50 p-4 dark:bg-red-900/10">
           <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
         </div>
@@ -249,8 +254,13 @@ export function JoinParentForm({
           rows={4}
           placeholder={t('messagePlaceholder')}
           required
+          invalid={!!fieldErrors?.message}
+          onChange={() => setFieldErrors(undefined)}
           disabled={isSubmitting}
         />
+        {fieldErrors?.message && (
+          <p className="text-sm text-red-600">{fieldErrors.message[0]}</p>
+        )}
       </Field>
 
       <div className="flex flex-wrap gap-4">

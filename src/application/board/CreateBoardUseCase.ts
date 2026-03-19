@@ -2,6 +2,7 @@ import { Board } from '../../domain/board/Board';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
+import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { OrganizationErrors } from '../organization/OrganizationErrors';
 
@@ -15,17 +16,20 @@ export interface CreateBoardDependencies {
   boardRepository: BoardRepository;
   organizationRepository: OrganizationRepository;
   userRepository: UserRepository;
+  profanityChecker?: ProfanityChecker;
 }
 
 export class CreateBoardUseCase {
   private boardRepository: BoardRepository;
   private organizationRepository: OrganizationRepository;
   private userRepository: UserRepository;
+  private profanityChecker?: ProfanityChecker;
 
   constructor(dependencies: CreateBoardDependencies) {
     this.boardRepository = dependencies.boardRepository;
     this.organizationRepository = dependencies.organizationRepository;
     this.userRepository = dependencies.userRepository;
+    this.profanityChecker = dependencies.profanityChecker;
   }
 
   async execute(input: CreateBoardInput): Promise<
@@ -67,7 +71,11 @@ export class CreateBoardUseCase {
     }
 
     // Create the board entity
-    const boardResult = Board.create(input.name, input.organizationId);
+    const boardResult = Board.create(
+      input.name,
+      input.organizationId,
+      this.profanityChecker
+    );
 
     if (!boardResult.success) {
       return failure(boardResult.error);

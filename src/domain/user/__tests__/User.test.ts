@@ -8,6 +8,8 @@ import {
 import { PhoneNumber } from '../PhoneNumber';
 import { Nickname } from '../Nickname';
 import { UserDomainCodes } from '../UserDomainCodes';
+import { SharedDomainCodes } from '../../shared/SharedDomainCodes';
+import { ProfanityChecker } from '../../shared/profanity/ProfanityChecker';
 
 describe('User', () => {
   const validProps = {
@@ -173,6 +175,44 @@ describe('User', () => {
         expect(NAME_REGEX).toBeInstanceOf(RegExp);
       });
     });
+
+    describe('profanity checks', () => {
+      const profaneChecker: ProfanityChecker = {
+        containsProfanity: (text: string) =>
+          text.toLowerCase().includes('badword'),
+      };
+
+      it('should throw when firstName contains profanity', () => {
+        const props = { ...validProps, firstName: 'Badword' };
+        expect(() => User.create(props, profaneChecker)).toThrow(
+          SharedDomainCodes.CONTAINS_PROFANITY
+        );
+      });
+
+      it('should throw when lastName contains profanity', () => {
+        const props = { ...validProps, lastName: 'Badword' };
+        expect(() => User.create(props, profaneChecker)).toThrow(
+          SharedDomainCodes.CONTAINS_PROFANITY
+        );
+      });
+
+      it('should throw when middleName contains profanity', () => {
+        const props = { ...validProps, middleName: 'Badword' };
+        expect(() => User.create(props, profaneChecker)).toThrow(
+          SharedDomainCodes.CONTAINS_PROFANITY
+        );
+      });
+
+      it('should not throw when middleName is undefined', () => {
+        const { middleName, ...propsNoMiddle } = validProps;
+        expect(() => User.create(propsNoMiddle, profaneChecker)).not.toThrow();
+      });
+
+      it('should not check profanity when checker is not provided', () => {
+        const user = User.create(validProps);
+        expect(user.firstName).toBe('John');
+      });
+    });
   });
 
   describe('getFullName', () => {
@@ -266,6 +306,32 @@ describe('User', () => {
       const updatedUser = user.updateMiddleName(undefined);
 
       expect(updatedUser.middleName).toBeUndefined();
+    });
+
+    it('should throw when middleName contains profanity', () => {
+      const checker: ProfanityChecker = {
+        containsProfanity: (text: string) =>
+          text.toLowerCase().includes('badword'),
+      };
+      const user = User.create(validProps);
+      expect(() => user.updateMiddleName('Badword', checker)).toThrow(
+        SharedDomainCodes.CONTAINS_PROFANITY
+      );
+    });
+
+    it('should not throw when middleName is undefined with checker', () => {
+      const checker: ProfanityChecker = {
+        containsProfanity: () => true,
+      };
+      const user = User.create(validProps);
+      const updated = user.updateMiddleName(undefined, checker);
+      expect(updated.middleName).toBeUndefined();
+    });
+
+    it('should not check profanity when checker is not provided', () => {
+      const user = User.create(validProps);
+      const updated = user.updateMiddleName('AnyName');
+      expect(updated.middleName).toBe('AnyName');
     });
   });
 

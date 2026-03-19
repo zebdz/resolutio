@@ -1,4 +1,6 @@
-import { Result, success } from '../shared/Result';
+import { Result, success, failure } from '../shared/Result';
+import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
+import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 
 export interface ParticipantWeightHistoryProps {
   id: string;
@@ -22,8 +24,13 @@ export class ParticipantWeightHistory {
     oldWeight: number,
     newWeight: number,
     changedBy: string,
-    reason: string | null = null
+    reason: string | null = null,
+    profanityChecker?: ProfanityChecker
   ): Result<ParticipantWeightHistory, string> {
+    if (reason && profanityChecker?.containsProfanity(reason)) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
+    }
+
     const history = new ParticipantWeightHistory({
       id: '',
       participantId,

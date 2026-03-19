@@ -20,6 +20,12 @@ interface Participant {
   weight: number;
 }
 
+interface SaveResult {
+  success: boolean;
+  error?: string;
+  fieldErrors?: Record<string, string[]>;
+}
+
 interface EditWeightDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -28,7 +34,7 @@ interface EditWeightDialogProps {
     participantId: string,
     newWeight: number,
     reason: string
-  ) => Promise<void>;
+  ) => Promise<SaveResult>;
   isLoading: boolean;
 }
 
@@ -43,23 +49,39 @@ export default function EditWeightDialog({
   const [weight, setWeight] = useState(participant.weight.toString());
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<
+    Record<string, string[]> | undefined
+  >();
 
   const handleSave = async () => {
     const weightNum = parseFloat(weight);
 
     if (isNaN(weightNum) || weightNum < 0) {
       setError(t('invalidWeight'));
+      setFieldErrors(undefined);
 
       return;
     }
 
     if (!reason.trim()) {
-      setError(t('reasonRequired'));
+      setError('');
+      setFieldErrors({ reason: [t('reasonRequired')] });
 
       return;
     }
 
-    await onSave(participant.id, weightNum, reason);
+    setFieldErrors(undefined);
+    setError('');
+
+    const result = await onSave(participant.id, weightNum, reason);
+
+    if (!result.success) {
+      if (result.fieldErrors) {
+        setFieldErrors(result.fieldErrors);
+      } else if (result.error) {
+        setError(result.error);
+      }
+    }
   };
 
   return (
@@ -78,6 +100,7 @@ export default function EditWeightDialog({
               onChange={(e) => {
                 setWeight(e.target.value);
                 setError('');
+                setFieldErrors(undefined);
               }}
               disabled={isLoading}
             />
@@ -87,17 +110,22 @@ export default function EditWeightDialog({
             <Label>{t('editWeightReason')}</Label>
             <Textarea
               value={reason}
+              invalid={!!fieldErrors?.reason}
               onChange={(e) => {
                 setReason(e.target.value);
                 setError('');
+                setFieldErrors(undefined);
               }}
               rows={3}
               disabled={isLoading}
               placeholder={t('editWeightReasonPlaceholder')}
             />
+            {fieldErrors?.reason && (
+              <p className="text-sm text-red-600">{fieldErrors.reason[0]}</p>
+            )}
           </Field>
 
-          {error && (
+          {error && !fieldErrors && (
             <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           )}
         </div>

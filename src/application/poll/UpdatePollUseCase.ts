@@ -2,6 +2,7 @@ import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
+import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 import { PollErrors } from './PollErrors';
 
 export interface UpdatePollInput {
@@ -17,7 +18,8 @@ export class UpdatePollUseCase {
   constructor(
     private pollRepository: PollRepository,
     private voteRepository: VoteRepository,
-    private userRepository: UserRepository
+    private userRepository: UserRepository,
+    private profanityChecker?: ProfanityChecker
   ) {}
 
   async execute(input: UpdatePollInput): Promise<Result<void, string>> {
@@ -71,13 +73,16 @@ export class UpdatePollUseCase {
     }
 
     // 4. Update poll properties
-    const titleResult = poll.updateTitle(input.title);
+    const titleResult = poll.updateTitle(input.title, this.profanityChecker);
 
     if (!titleResult.success) {
       return failure(titleResult.error);
     }
 
-    const descriptionResult = poll.updateDescription(input.description);
+    const descriptionResult = poll.updateDescription(
+      input.description,
+      this.profanityChecker
+    );
 
     if (!descriptionResult.success) {
       return failure(descriptionResult.error);

@@ -7,6 +7,7 @@ import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { OtpVerification } from '@/domain/otp/OtpVerification';
 import { OtpCode } from '@/domain/otp/OtpCode';
 import { Result, success, failure } from '@/domain/shared/Result';
+import { ProfanityChecker } from '@/domain/shared/profanity/ProfanityChecker';
 import { OtpCodeHasher } from './OtpCodeHasher';
 import { OtpDeliveryChannel } from './OtpDeliveryChannel';
 import { OtpErrors } from './OtpErrors';
@@ -47,6 +48,7 @@ interface Dependencies {
   sessionRepository: SessionRepository;
   otpCodeHasher: OtpCodeHasher;
   deliveryChannel: OtpDeliveryChannel;
+  profanityChecker?: ProfanityChecker;
   expiryMinutes?: number;
 }
 
@@ -57,6 +59,7 @@ export class RegisterUserUseCase {
   private readonly sessionRepository: SessionRepository;
   private readonly otpCodeHasher: OtpCodeHasher;
   private readonly deliveryChannel: OtpDeliveryChannel;
+  private readonly profanityChecker?: ProfanityChecker;
   private readonly expiryMinutes: number;
 
   constructor(deps: Dependencies) {
@@ -66,6 +69,7 @@ export class RegisterUserUseCase {
     this.sessionRepository = deps.sessionRepository;
     this.otpCodeHasher = deps.otpCodeHasher;
     this.deliveryChannel = deps.deliveryChannel;
+    this.profanityChecker = deps.profanityChecker;
     this.expiryMinutes = deps.expiryMinutes ?? 10;
   }
 
@@ -133,16 +137,19 @@ export class RegisterUserUseCase {
         nickname = Nickname.generate();
       }
 
-      const user = User.create({
-        firstName: input.firstName,
-        lastName: input.lastName,
-        middleName: input.middleName,
-        phoneNumber,
-        password: hashedPassword,
-        language: input.language || 'ru',
-        consentGivenAt: new Date(),
-        nickname,
-      });
+      const user = User.create(
+        {
+          firstName: input.firstName,
+          lastName: input.lastName,
+          middleName: input.middleName,
+          phoneNumber,
+          password: hashedPassword,
+          language: input.language || 'ru',
+          consentGivenAt: new Date(),
+          nickname,
+        },
+        this.profanityChecker
+      );
 
       savedUser = await this.userRepository.save(user);
     }

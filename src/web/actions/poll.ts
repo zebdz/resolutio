@@ -16,11 +16,15 @@ import { DeactivatePollUseCase } from '@/application/poll/DeactivatePollUseCase'
 import { DiscardSnapshotUseCase } from '@/application/poll/DiscardSnapshotUseCase';
 import { FinishPollUseCase } from '@/application/poll/FinishPollUseCase';
 import {
-  CreatePollSchema,
-  UpdatePollSchema,
-  AddQuestionSchema,
+  createPollSchema,
+  updatePollSchema,
+  addQuestionSchema,
+  updateQuestionSchema,
+  addAnswerSchema,
+  updateAnswerSchema,
   UpdateQuestionOrderSchema,
 } from '@/application/poll/PollSchemas';
+import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChecker';
 import {
   prisma,
   PrismaPollRepository,
@@ -59,28 +63,34 @@ const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 const notificationRepository = new PrismaNotificationRepository(prisma);
 
+const profanityChecker = LeoProfanityChecker.getInstance();
+
 // Use cases
 const createPollUseCase = new CreatePollUseCase(
   pollRepository,
   boardRepository,
-  organizationRepository
+  organizationRepository,
+  profanityChecker
 );
 const updatePollUseCase = new UpdatePollUseCase(
   pollRepository,
   voteRepository,
-  userRepository
+  userRepository,
+  profanityChecker
 );
 const addQuestionUseCase = new AddQuestionUseCase(
   pollRepository,
   questionRepository,
   answerRepository,
-  userRepository
+  userRepository,
+  profanityChecker
 );
 const updateQuestionUseCase = new UpdateQuestionUseCase(
   pollRepository,
   questionRepository,
   voteRepository,
-  userRepository
+  userRepository,
+  profanityChecker
 );
 const deleteQuestionUseCase = new DeleteQuestionUseCase(
   pollRepository,
@@ -93,14 +103,16 @@ const createAnswerUseCase = new CreateAnswerUseCase(
   questionRepository,
   answerRepository,
   voteRepository,
-  userRepository
+  userRepository,
+  profanityChecker
 );
 const updateAnswerUseCase = new UpdateAnswerUseCase(
   pollRepository,
   questionRepository,
   answerRepository,
   voteRepository,
-  userRepository
+  userRepository,
+  profanityChecker
 );
 const deleteAnswerUseCase = new DeleteAnswerUseCase(
   pollRepository,
@@ -187,7 +199,7 @@ export async function createPollAction(
     };
 
     // Validate with Zod
-    const validation = CreatePollSchema.safeParse(input);
+    const validation = createPollSchema(profanityChecker).safeParse(input);
 
     if (!validation.success) {
       const fieldErrors = await translateZodFieldErrors(
@@ -279,7 +291,8 @@ export async function addQuestionAction(
     };
 
     // Validate with Zod
-    const validation = AddQuestionSchema.safeParse(parsedInput);
+    const validation =
+      addQuestionSchema(profanityChecker).safeParse(parsedInput);
 
     if (!validation.success) {
       const fieldErrors = await translateZodFieldErrors(
@@ -635,7 +648,7 @@ export async function updatePollAction(
     };
 
     // Validate with Zod
-    const validation = UpdatePollSchema.safeParse(input);
+    const validation = updatePollSchema(profanityChecker).safeParse(input);
 
     if (!validation.success) {
       const fieldErrors = await translateZodFieldErrors(
@@ -812,6 +825,20 @@ export async function updateQuestionAction(data: {
       };
     }
 
+    const validation = updateQuestionSchema(profanityChecker).safeParse(data);
+
+    if (!validation.success) {
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
+
+      return {
+        success: false,
+        error: t('validationFailed'),
+        fieldErrors,
+      };
+    }
+
     const result = await updateQuestionUseCase.execute({
       questionId: data.questionId,
       userId: user.id,
@@ -905,6 +932,20 @@ export async function updateAnswerAction(data: {
       };
     }
 
+    const validation = updateAnswerSchema(profanityChecker).safeParse(data);
+
+    if (!validation.success) {
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
+
+      return {
+        success: false,
+        error: t('validationFailed'),
+        fieldErrors,
+      };
+    }
+
     const result = await updateAnswerUseCase.execute({
       answerId: data.answerId,
       userId: user.id,
@@ -950,6 +991,20 @@ export async function createAnswerAction(data: {
       return {
         success: false,
         error: t('unauthorized'),
+      };
+    }
+
+    const validation = addAnswerSchema(profanityChecker).safeParse(data);
+
+    if (!validation.success) {
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
+
+      return {
+        success: false,
+        error: t('validationFailed'),
+        fieldErrors,
       };
     }
 

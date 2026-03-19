@@ -1,6 +1,8 @@
 import { randomBytes } from 'crypto';
 import { Result, success, failure } from '../shared/Result';
 import { JoinTokenDomainCodes } from './JoinTokenDomainCodes';
+import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
+import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 
 export const JOIN_TOKEN_DESCRIPTION_MAX_LENGTH = 500;
 
@@ -37,7 +39,8 @@ export class JoinToken {
     organizationId: string,
     createdById: string,
     description: string,
-    maxUses?: number | null
+    maxUses?: number | null,
+    profanityChecker?: ProfanityChecker
   ): Result<JoinToken, string> {
     if (!description || description.trim().length === 0) {
       return failure(JoinTokenDomainCodes.DESCRIPTION_EMPTY);
@@ -45,6 +48,10 @@ export class JoinToken {
 
     if (description.length > JOIN_TOKEN_DESCRIPTION_MAX_LENGTH) {
       return failure(JoinTokenDomainCodes.DESCRIPTION_TOO_LONG);
+    }
+
+    if (profanityChecker?.containsProfanity(description.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     const resolvedMaxUses = maxUses === undefined ? null : maxUses;

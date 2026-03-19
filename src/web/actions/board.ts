@@ -5,7 +5,7 @@ import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { CreateBoardUseCase } from '@/application/board/CreateBoardUseCase';
 import { ArchiveBoardUseCase } from '@/application/board/ArchiveBoardUseCase';
 import { RemoveBoardMemberUseCase } from '@/application/board/RemoveBoardMemberUseCase';
-import { CreateBoardSchema } from '@/application/board/CreateBoardSchema';
+import { createBoardSchema } from '@/application/board/CreateBoardSchema';
 import { ArchiveBoardSchema } from '@/application/board/ArchiveBoardSchema';
 import { RemoveBoardMemberSchema } from '@/application/board/RemoveBoardMemberSchema';
 import {
@@ -18,6 +18,7 @@ import {
 import { getCurrentUser } from '../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
+import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChecker';
 
 // Action result type for client-side handling
 export type ActionResult<T = void> =
@@ -29,12 +30,14 @@ const organizationRepository = new PrismaOrganizationRepository(prisma);
 const boardRepository = new PrismaBoardRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 const notificationRepository = new PrismaNotificationRepository(prisma);
+const profanityChecker = LeoProfanityChecker.getInstance();
 
 // Use cases
 const createBoardUseCase = new CreateBoardUseCase({
   boardRepository,
   organizationRepository,
   userRepository,
+  profanityChecker,
 });
 
 const archiveBoardUseCase = new ArchiveBoardUseCase({
@@ -79,7 +82,7 @@ export async function createBoardAction(
     };
 
     // Validate with Zod
-    const validation = CreateBoardSchema.safeParse(input);
+    const validation = createBoardSchema(profanityChecker).safeParse(input);
 
     if (!validation.success) {
       const fieldErrors = await translateZodFieldErrors(

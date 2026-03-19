@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { CreateOrganizationSchema } from '../CreateOrganizationSchema';
+import { createOrganizationSchema } from '../CreateOrganizationSchema';
+import { ProfanityChecker } from '../../../domain/shared/profanity/ProfanityChecker';
+
+const mockProfanityChecker: ProfanityChecker = {
+  containsProfanity: () => false,
+};
+
+const CreateOrganizationSchema = createOrganizationSchema(mockProfanityChecker);
 
 describe('CreateOrganizationSchema', () => {
   const validInput = {
@@ -50,6 +57,18 @@ describe('CreateOrganizationSchema', () => {
       autoJoin: true,
     });
 
+    expect(result.success).toBe(false);
+  });
+
+  it('should reject name with profanity', () => {
+    const profaneChecker: ProfanityChecker = {
+      containsProfanity: (text: string) => text.includes('badword'),
+    };
+    const schema = createOrganizationSchema(profaneChecker);
+    const result = schema.safeParse({
+      name: 'badword org',
+      description: 'Valid desc',
+    });
     expect(result.success).toBe(false);
   });
 });

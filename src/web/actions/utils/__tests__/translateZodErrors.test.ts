@@ -3,11 +3,17 @@ import { UpdateUserProfileSchema } from '@/src/application/user/UpdateUserProfil
 import { CompletePrivacySetupSchema } from '@/src/application/user/CompletePrivacySetupSchema';
 import { RegisterUserSchema } from '@/application/auth/RegisterUserSchema';
 import { LoginUserSchema } from '@/application/auth/LoginUserSchema';
-import { CreateOrganizationSchema } from '@/application/organization/CreateOrganizationSchema';
+import { createOrganizationSchema } from '@/application/organization/CreateOrganizationSchema';
+import { ProfanityChecker } from '@/domain/shared/profanity/ProfanityChecker';
 import { CreateBoardSchema } from '@/application/board/CreateBoardSchema';
 import { UserDomainCodes } from '@/domain/user/UserDomainCodes';
 import { OrganizationDomainCodes } from '@/domain/organization/OrganizationDomainCodes';
 import { BoardDomainCodes } from '@/domain/board/BoardDomainCodes';
+
+const noopProfanityChecker: ProfanityChecker = {
+  containsProfanity: () => false,
+};
+const CreateOrganizationSchema = createOrganizationSchema(noopProfanityChecker);
 
 /**
  * These tests verify that Zod schemas produce domain codes (not hardcoded English strings)
