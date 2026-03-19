@@ -1,6 +1,7 @@
 import { User } from '@/src/domain/user/User';
 import { Nickname } from '@/src/domain/user/Nickname';
 import type { UserRepository } from '@/src/domain/user/UserRepository';
+import { ProfanityChecker } from '@/src/domain/shared/profanity/ProfanityChecker';
 import { Result, success, failure } from '@/src/domain/shared/Result';
 import { UserDomainCodes } from '@/src/domain/user/UserDomainCodes';
 
@@ -12,7 +13,14 @@ export interface CompletePrivacySetupInput {
 }
 
 export class CompletePrivacySetupUseCase {
-  constructor(private readonly userRepository: UserRepository) {}
+  private readonly profanityChecker?: ProfanityChecker;
+
+  constructor(
+    private readonly userRepository: UserRepository,
+    profanityChecker?: ProfanityChecker
+  ) {
+    this.profanityChecker = profanityChecker;
+  }
 
   async execute(
     input: CompletePrivacySetupInput
@@ -30,7 +38,7 @@ export class CompletePrivacySetupUseCase {
       let nickname: Nickname;
 
       try {
-        nickname = Nickname.create(input.nickname);
+        nickname = Nickname.create(input.nickname, this.profanityChecker);
       } catch {
         return failure(UserDomainCodes.NICKNAME_INVALID);
       }

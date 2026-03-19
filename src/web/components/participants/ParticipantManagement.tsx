@@ -79,11 +79,13 @@ export default function ParticipantManagement({
         );
         toast.success(t('weightUpdated'));
         setEditWeightOpen(false);
-      } else {
-        toast.error(result.error);
       }
+
+      return result;
     } catch (error) {
       toast.error(t('updateWeightError'));
+
+      return { success: false as const, error: t('updateWeightError') };
     } finally {
       setIsLoading(false);
     }

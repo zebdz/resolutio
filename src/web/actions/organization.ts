@@ -3,7 +3,7 @@
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { CreateOrganizationUseCase } from '@/application/organization/CreateOrganizationUseCase';
-import { CreateOrganizationSchema } from '@/application/organization/CreateOrganizationSchema';
+import { createOrganizationSchema } from '@/application/organization/CreateOrganizationSchema';
 import { SearchOrganizationsUseCase } from '@/application/organization/SearchOrganizationsUseCase';
 import { ArchiveOrganizationUseCase } from '@/application/organization/ArchiveOrganizationUseCase';
 import { ArchiveOrganizationSchema } from '@/application/organization/ArchiveOrganizationSchema';
@@ -14,7 +14,7 @@ import { GetAdminOrganizationsUseCase } from '@/application/organization/GetAdmi
 import { GetUserOrganizationsUseCase } from '@/application/organization/GetUserOrganizationsUseCase';
 import { GetPendingRequestsUseCase } from '@/application/organization/GetPendingRequestsUseCase';
 import { HandleJoinRequestUseCase } from '@/application/organization/HandleJoinRequestUseCase';
-import { HandleJoinRequestSchema } from '@/application/organization/HandleJoinRequestSchema';
+import { createHandleJoinRequestSchema } from '@/application/organization/HandleJoinRequestSchema';
 import { JoinOrganizationUseCase } from '@/application/organization/JoinOrganizationUseCase';
 import { JoinOrganizationSchema } from '@/application/organization/JoinOrganizationSchema';
 import { GetOrganizationDetailsUseCase } from '@/application/organization/GetOrganizationDetailsUseCase';
@@ -22,6 +22,7 @@ import { GetOrganizationPendingRequestsUseCase } from '@/application/organizatio
 import { CancelJoinRequestUseCase } from '@/application/organization/CancelJoinRequestUseCase';
 import { CancelJoinRequestSchema } from '@/application/organization/CancelJoinRequestSchema';
 import { UpdateOrganizationUseCase } from '@/application/organization/UpdateOrganizationUseCase';
+import { updateOrganizationSchema } from '@/application/organization/UpdateOrganizationSchema';
 import { RemoveOrgAdminUseCase } from '@/application/organization/RemoveOrgAdminUseCase';
 import { GetOrgAdminsPaginatedUseCase } from '@/application/organization/GetOrgAdminsPaginatedUseCase';
 import {
@@ -37,6 +38,7 @@ import { getCurrentUser } from '../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
+import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChecker';
 
 // Action result type for client-side handling
 export type ActionResult<T = void> =
@@ -49,11 +51,13 @@ const boardRepository = new PrismaBoardRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 const notificationRepository = new PrismaNotificationRepository(prisma);
 const invitationRepository = new PrismaInvitationRepository(prisma);
+const profanityChecker = LeoProfanityChecker.getInstance();
 
 // Use cases
 const createOrganizationUseCase = new CreateOrganizationUseCase({
   organizationRepository,
   userRepository,
+  profanityChecker,
 });
 
 const listOrganizationsUseCase = new ListOrganizationsUseCase({
@@ -121,6 +125,7 @@ const updateOrganizationUseCase = new UpdateOrganizationUseCase({
   organizationRepository,
   userRepository,
   notificationRepository,
+  profanityChecker,
 });
 
 const removeOrgAdminUseCase = new RemoveOrgAdminUseCase({
@@ -171,7 +176,8 @@ export async function createOrganizationAction(
     };
 
     // Validate with Zod
-    const validation = CreateOrganizationSchema.safeParse(input);
+    const validation =
+      createOrganizationSchema(profanityChecker).safeParse(input);
 
     if (!validation.success) {
       const fieldErrors = await translateZodFieldErrors(
@@ -771,7 +777,8 @@ export async function handleJoinRequestAction(
         formData.get('rejectionReason') || (undefined as string | undefined),
     };
 
-    const validation = HandleJoinRequestSchema.safeParse(input);
+    const validation =
+      createHandleJoinRequestSchema(profanityChecker).safeParse(input);
 
     if (!validation.success) {
       const fieldErrors = await translateZodFieldErrors(
@@ -1304,16 +1311,32 @@ export async function updateOrganizationAction(
         ? allowMultiTreeMembershipRaw === 'true'
         : undefined;
 
-    if (!organizationId) {
-      return { success: false, error: t('validationFailed') };
-    }
-
-    const result = await updateOrganizationUseCase.execute({
+    // Validate with Zod (catches profanity with field-level errors)
+    const validation = updateOrganizationSchema(profanityChecker).safeParse({
       organizationId,
-      userId: user.id,
       name: name || '',
       description: description || '',
       allowMultiTreeMembership,
+    });
+
+    if (!validation.success) {
+      const fieldErrors = await translateZodFieldErrors(
+        validation.error.issues
+      );
+
+      return {
+        success: false,
+        error: t('validationFailed'),
+        fieldErrors,
+      };
+    }
+
+    const result = await updateOrganizationUseCase.execute({
+      organizationId: validation.data.organizationId,
+      userId: user.id,
+      name: validation.data.name,
+      description: validation.data.description,
+      allowMultiTreeMembership: validation.data.allowMultiTreeMembership,
     });
 
     if (!result.success) {

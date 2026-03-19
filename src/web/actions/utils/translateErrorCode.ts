@@ -21,6 +21,7 @@ import {
   NICKNAME_MIN_LENGTH,
   NICKNAME_MAX_LENGTH,
 } from '@/domain/user/Nickname';
+import { SharedDomainCodes } from '@/domain/shared/SharedDomainCodes';
 
 // Maps error codes to ICU message parameters (limit values from domain constants)
 const ERROR_CODE_PARAMS: Record<string, Record<string, string | number>> = {
@@ -52,6 +53,7 @@ const ERROR_CODE_PARAMS: Record<string, Record<string, string | number>> = {
     minLength: NICKNAME_MIN_LENGTH,
     maxLength: NICKNAME_MAX_LENGTH,
   },
+  [SharedDomainCodes.CONTAINS_PROFANITY]: {},
 };
 
 /**

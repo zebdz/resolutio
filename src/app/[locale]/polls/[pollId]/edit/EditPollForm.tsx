@@ -75,6 +75,13 @@ export function EditPollForm() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<
+    Record<string, string[]> | undefined
+  >();
+  const [questionFieldErrors, setQuestionFieldErrors] = useState<{
+    questionId: string;
+    errors: Record<string, string[]>;
+  } | null>(null);
   const [canEdit, setCanEdit] = useState(false);
   const [canManage, setCanManage] = useState(false);
 
@@ -273,6 +280,8 @@ export function EditPollForm() {
     try {
       setIsSaving(true);
       setError(null);
+      setFieldErrors(undefined);
+      setQuestionFieldErrors(null);
 
       // Validate
       if (!pollData.title.trim()) {
@@ -328,6 +337,7 @@ export function EditPollForm() {
 
       if (!pollResult.success) {
         setError(pollResult.error);
+        setFieldErrors(pollResult.fieldErrors);
 
         return;
       }
@@ -380,7 +390,21 @@ export function EditPollForm() {
           const addResult = await addQuestionAction(formData);
 
           if (!addResult.success) {
-            setError(addResult.error);
+            if (addResult.fieldErrors) {
+              const fieldMessages = [
+                ...new Set(
+                  Object.values(addResult.fieldErrors).flatMap((msgs) => msgs)
+                ),
+              ].join('; ');
+              setError(fieldMessages);
+              setQuestionFieldErrors({
+                questionId: question.id,
+                errors: addResult.fieldErrors,
+              });
+              setActiveQuestionId(question.id);
+            } else {
+              setError(addResult.error);
+            }
 
             return;
           }
@@ -406,7 +430,23 @@ export function EditPollForm() {
             });
 
             if (!updateResult.success) {
-              setError(updateResult.error);
+              if (updateResult.fieldErrors) {
+                const fieldMessages = [
+                  ...new Set(
+                    Object.values(updateResult.fieldErrors).flatMap(
+                      (msgs) => msgs
+                    )
+                  ),
+                ].join('; ');
+                setError(fieldMessages);
+                setQuestionFieldErrors({
+                  questionId: question.id,
+                  errors: updateResult.fieldErrors,
+                });
+                setActiveQuestionId(question.id);
+              } else {
+                setError(updateResult.error);
+              }
 
               return;
             }
@@ -457,7 +497,23 @@ export function EditPollForm() {
                 });
 
                 if (!createAnswerResult.success) {
-                  setError(createAnswerResult.error);
+                  if (createAnswerResult.fieldErrors) {
+                    const fieldMessages = [
+                      ...new Set(
+                        Object.values(createAnswerResult.fieldErrors).flatMap(
+                          (msgs) => msgs
+                        )
+                      ),
+                    ].join('; ');
+                    setError(fieldMessages);
+                    setQuestionFieldErrors({
+                      questionId: question.id,
+                      errors: { [`answers.${i}`]: [fieldMessages] },
+                    });
+                    setActiveQuestionId(question.id);
+                  } else {
+                    setError(createAnswerResult.error);
+                  }
 
                   return;
                 }
@@ -482,7 +538,23 @@ export function EditPollForm() {
                   });
 
                   if (!updateAnswerResult.success) {
-                    setError(updateAnswerResult.error);
+                    if (updateAnswerResult.fieldErrors) {
+                      const fieldMessages = [
+                        ...new Set(
+                          Object.values(updateAnswerResult.fieldErrors).flatMap(
+                            (msgs) => msgs
+                          )
+                        ),
+                      ].join('; ');
+                      setError(fieldMessages);
+                      setQuestionFieldErrors({
+                        questionId: question.id,
+                        errors: { [`answers.${i}`]: [fieldMessages] },
+                      });
+                      setActiveQuestionId(question.id);
+                    } else {
+                      setError(updateAnswerResult.error);
+                    }
 
                     return;
                   }
@@ -598,7 +670,7 @@ export function EditPollForm() {
       </div>
 
       {/* Error Message */}
-      {error && (
+      {error && !fieldErrors && (
         <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-200">
           {error}
         </div>
@@ -620,25 +692,35 @@ export function EditPollForm() {
           <Label>{t('pollTitle')}</Label>
           <Input
             value={pollData.title}
-            onChange={(e) =>
-              setPollData({ ...pollData, title: e.target.value })
-            }
+            invalid={!!fieldErrors?.title}
+            onChange={(e) => {
+              setPollData({ ...pollData, title: e.target.value });
+              setFieldErrors(undefined);
+            }}
             placeholder={t('pollTitle')}
             required
           />
+          {fieldErrors?.title && (
+            <p className="text-sm text-red-600">{fieldErrors.title[0]}</p>
+          )}
         </Field>
 
         <Field>
           <Label>{t('pollDescription')}</Label>
           <Textarea
             value={pollData.description}
-            onChange={(e) =>
-              setPollData({ ...pollData, description: e.target.value })
-            }
+            invalid={!!fieldErrors?.description}
+            onChange={(e) => {
+              setPollData({ ...pollData, description: e.target.value });
+              setFieldErrors(undefined);
+            }}
             placeholder={t('pollDescription')}
             required
             rows={3}
           />
+          {fieldErrors?.description && (
+            <p className="text-sm text-red-600">{fieldErrors.description[0]}</p>
+          )}
         </Field>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -721,6 +803,11 @@ export function EditPollForm() {
               }
               onAnswersChange={(answers) =>
                 handleQuestionUpdate(activeQuestion.id, { answers })
+              }
+              fieldErrors={
+                questionFieldErrors?.questionId === activeQuestion.id
+                  ? questionFieldErrors.errors
+                  : undefined
               }
             />
           ) : questions.length === 0 ? (

@@ -246,6 +246,7 @@ describe('CreateOrganizationUseCase', () => {
     useCase = new CreateOrganizationUseCase({
       organizationRepository,
       userRepository,
+      profanityChecker: { containsProfanity: () => false },
     });
   });
 

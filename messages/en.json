@@ -1055,6 +1055,9 @@
       "alreadyExpired": "Token is already expired",
       "notExpired": "Token is not expired",
       "tokenExhausted": "Token has reached its maximum number of uses"
+    },
+    "shared": {
+      "containsProfanity": "Contains inappropriate language"
     }
   },
   "phone": {

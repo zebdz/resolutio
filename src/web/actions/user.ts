@@ -4,8 +4,8 @@ import { getTranslations } from 'next-intl/server';
 import { UpdateUserProfileUseCase } from '@/src/application/user/UpdateUserProfileUseCase';
 import { CompletePrivacySetupUseCase } from '@/src/application/user/CompletePrivacySetupUseCase';
 import { prisma, PrismaUserRepository } from '@/infrastructure/index';
-import { UpdateUserProfileSchema } from '@/src/application/user/UpdateUserProfileSchema';
-import { CompletePrivacySetupSchema } from '@/src/application/user/CompletePrivacySetupSchema';
+import { updateUserProfileSchema } from '@/src/application/user/UpdateUserProfileSchema';
+import { completePrivacySetupSchema } from '@/src/application/user/CompletePrivacySetupSchema';
 import { getCurrentUser } from '../lib/session';
 import {
   checkRateLimit,
@@ -20,6 +20,7 @@ import {
   NICKNAME_MIN_LENGTH,
   NICKNAME_MAX_LENGTH,
 } from '@/src/domain/user/Nickname';
+import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChecker';
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
@@ -27,9 +28,14 @@ export type ActionResult<T = void> =
 
 // Initialize dependencies
 const userRepository = new PrismaUserRepository(prisma);
-const updateUserProfileUseCase = new UpdateUserProfileUseCase(userRepository);
+const profanityChecker = LeoProfanityChecker.getInstance();
+const updateUserProfileUseCase = new UpdateUserProfileUseCase(
+  userRepository,
+  profanityChecker
+);
 const completePrivacySetupUseCase = new CompletePrivacySetupUseCase(
-  userRepository
+  userRepository,
+  profanityChecker
 );
 
 export async function updateProfileAction(
@@ -75,7 +81,8 @@ export async function updateProfileAction(
     };
 
     // Validate with Zod
-    const validation = UpdateUserProfileSchema.safeParse(input);
+    const validation =
+      updateUserProfileSchema(profanityChecker).safeParse(input);
 
     if (!validation.success) {
       const fieldErrors = await translateZodFieldErrors(
@@ -146,7 +153,8 @@ export async function completePrivacySetupAction(
       allowFindByPhone: allowFindByPhoneValue === 'true',
     };
 
-    const validation = CompletePrivacySetupSchema.safeParse(input);
+    const validation =
+      completePrivacySetupSchema(profanityChecker).safeParse(input);
 
     if (!validation.success) {
       const fieldErrors = await translateZodFieldErrors(

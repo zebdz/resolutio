@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { Organization } from '../Organization';
 import { OrganizationDomainCodes } from '../OrganizationDomainCodes';
+import { SharedDomainCodes } from '../../shared/SharedDomainCodes';
+import { ProfanityChecker } from '../../shared/profanity/ProfanityChecker';
 
 function makeOrg(
   overrides?: Partial<Parameters<typeof Organization.reconstitute>[0]>
@@ -275,5 +277,93 @@ describe('Organization.create name validation', () => {
     const result = Organization.create('Организация', 'Valid desc', 'user-1');
 
     expect(result.success).toBe(true);
+  });
+});
+
+const mockProfanityChecker: ProfanityChecker = {
+  containsProfanity: (text: string) => text.includes('badword'),
+};
+
+describe('Organization profanity check', () => {
+  describe('create', () => {
+    it('should reject name with profanity', () => {
+      const result = Organization.create(
+        'badword org',
+        'Valid desc',
+        'user-1',
+        null,
+        undefined,
+        mockProfanityChecker
+      );
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      }
+    });
+
+    it('should reject description with profanity', () => {
+      const result = Organization.create(
+        'Valid Org',
+        'has badword here',
+        'user-1',
+        null,
+        undefined,
+        mockProfanityChecker
+      );
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      }
+    });
+
+    it('should pass clean text with profanityChecker', () => {
+      const result = Organization.create(
+        'Clean Org',
+        'Clean desc',
+        'user-1',
+        null,
+        undefined,
+        mockProfanityChecker
+      );
+      expect(result.success).toBe(true);
+    });
+
+    it('should pass without profanityChecker (backward compat)', () => {
+      const result = Organization.create('Any Org', 'Any desc', 'user-1');
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('updateName', () => {
+    it('should reject name with profanity', () => {
+      const org = makeOrg();
+      const result = org.updateName('badword name', mockProfanityChecker);
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      }
+
+      expect(org.name).toBe('Test Org');
+    });
+  });
+
+  describe('updateDescription', () => {
+    it('should reject description with profanity', () => {
+      const org = makeOrg();
+      const result = org.updateDescription(
+        'badword text',
+        mockProfanityChecker
+      );
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+      }
+
+      expect(org.description).toBe('A test organization');
+    });
   });
 });

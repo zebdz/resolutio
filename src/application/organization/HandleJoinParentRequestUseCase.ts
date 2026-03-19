@@ -7,12 +7,14 @@ import { HandleJoinParentRequestInput } from './HandleJoinParentRequestSchema';
 import { OrganizationErrors } from './OrganizationErrors';
 import { NotifyOrgJoinedParentUseCase } from '../notification/NotifyOrgJoinedParentUseCase';
 import { NotifyJoinParentRequestRejectedUseCase } from '../notification/NotifyJoinParentRequestRejectedUseCase';
+import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 
 export interface HandleJoinParentRequestDependencies {
   organizationRepository: OrganizationRepository;
   joinParentRequestRepository: JoinParentRequestRepository;
   userRepository: UserRepository;
   notificationRepository: NotificationRepository;
+  profanityChecker?: ProfanityChecker;
 }
 
 export class HandleJoinParentRequestUseCase {
@@ -129,7 +131,7 @@ export class HandleJoinParentRequestUseCase {
       }
 
       // 5b. Reject the request
-      request.reject(adminUserId, rejectionReason);
+      request.reject(adminUserId, rejectionReason, this.deps.profanityChecker);
       await this.deps.joinParentRequestRepository.update(request);
 
       // 6b. Notify child org admins + members

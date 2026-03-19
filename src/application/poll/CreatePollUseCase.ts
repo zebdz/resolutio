@@ -3,6 +3,7 @@ import { Poll } from '../../domain/poll/Poll';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 import { PollErrors } from './PollErrors';
 
 export interface CreatePollInput {
@@ -19,7 +20,8 @@ export class CreatePollUseCase {
   constructor(
     private pollRepository: PollRepository,
     private boardRepository: BoardRepository,
-    private organizationRepository: OrganizationRepository
+    private organizationRepository: OrganizationRepository,
+    private profanityChecker?: ProfanityChecker
   ) {}
 
   async execute(input: CreatePollInput): Promise<Result<Poll, string>> {
@@ -59,7 +61,8 @@ export class CreatePollUseCase {
       input.boardId,
       input.createdBy,
       input.startDate,
-      input.endDate
+      input.endDate,
+      this.profanityChecker
     );
 
     if (!pollResult.success) {

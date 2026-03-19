@@ -2,6 +2,8 @@ import { Result, success, failure } from '../shared/Result';
 import { QuestionType, isValidQuestionType } from './QuestionType';
 import { Answer, AnswerProps } from './Answer';
 import { PollDomainCodes } from './PollDomainCodes';
+import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
+import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 
 export const QUESTION_TEXT_MAX_LENGTH = 500;
 export const QUESTION_DETAILS_MAX_LENGTH = 500;
@@ -28,7 +30,8 @@ export class Question {
     page: number = 1,
     order: number = 0,
     questionType: QuestionType = 'single-choice',
-    details?: string
+    details?: string,
+    profanityChecker?: ProfanityChecker
   ): Result<Question, string> {
     if (!text || text.trim().length === 0) {
       return failure(PollDomainCodes.QUESTION_TEXT_EMPTY);
@@ -52,6 +55,14 @@ export class Question {
 
     if (!isValidQuestionType(questionType)) {
       return failure(PollDomainCodes.QUESTION_INVALID_TYPE);
+    }
+
+    if (profanityChecker?.containsProfanity(text.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
+    }
+
+    if (details && profanityChecker?.containsProfanity(details.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     const question = new Question({
@@ -119,7 +130,10 @@ export class Question {
     return this.props.archivedAt !== null;
   }
 
-  public updateText(newText: string): Result<void, string> {
+  public updateText(
+    newText: string,
+    profanityChecker?: ProfanityChecker
+  ): Result<void, string> {
     if (!newText || newText.trim().length === 0) {
       return failure(PollDomainCodes.QUESTION_TEXT_EMPTY);
     }
@@ -128,14 +142,25 @@ export class Question {
       return failure(PollDomainCodes.QUESTION_TEXT_TOO_LONG);
     }
 
+    if (profanityChecker?.containsProfanity(newText.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
+    }
+
     this.props.text = newText.trim();
 
     return success(undefined);
   }
 
-  public updateDetails(newDetails: string | null): Result<void, string> {
+  public updateDetails(
+    newDetails: string | null,
+    profanityChecker?: ProfanityChecker
+  ): Result<void, string> {
     if (newDetails && newDetails.length > QUESTION_DETAILS_MAX_LENGTH) {
       return failure(PollDomainCodes.QUESTION_DETAILS_TOO_LONG);
+    }
+
+    if (newDetails && profanityChecker?.containsProfanity(newDetails.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     this.props.details = newDetails?.trim() || null;

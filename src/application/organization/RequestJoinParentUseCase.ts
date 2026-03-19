@@ -7,12 +7,14 @@ import { Result, success, failure } from '../../domain/shared/Result';
 import { RequestJoinParentInput } from './RequestJoinParentSchema';
 import { OrganizationErrors } from './OrganizationErrors';
 import { NotifyJoinParentRequestReceivedUseCase } from '../notification/NotifyJoinParentRequestReceivedUseCase';
+import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 
 export interface RequestJoinParentDependencies {
   organizationRepository: OrganizationRepository;
   joinParentRequestRepository: JoinParentRequestRepository;
   userRepository: UserRepository;
   notificationRepository: NotificationRepository;
+  profanityChecker?: ProfanityChecker;
 }
 
 export class RequestJoinParentUseCase {
@@ -88,7 +90,8 @@ export class RequestJoinParentUseCase {
       childOrgId,
       parentOrgId,
       adminUserId,
-      message
+      message,
+      this.deps.profanityChecker
     );
 
     if (!requestResult.success) {

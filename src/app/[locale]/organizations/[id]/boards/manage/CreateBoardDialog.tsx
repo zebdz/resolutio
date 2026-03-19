@@ -29,6 +29,9 @@ export default function CreateBoardDialog({
   const [boardName, setBoardName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<
+    Record<string, string[]> | undefined
+  >();
 
   const handleCreate = async () => {
     if (!boardName.trim()) {
@@ -37,6 +40,7 @@ export default function CreateBoardDialog({
 
     setIsCreating(true);
     setError(null);
+    setFieldErrors(undefined);
 
     const formData = new FormData();
     formData.append('name', boardName);
@@ -51,13 +55,21 @@ export default function CreateBoardDialog({
       router.refresh();
     } else {
       setError(result.error);
+      setFieldErrors(result.fieldErrors);
       setIsCreating(false);
     }
   };
 
   return (
     <>
-      <Button color="brand-green" onClick={() => setIsOpen(true)}>
+      <Button
+        color="brand-green"
+        onClick={() => {
+          setIsOpen(true);
+          setError(null);
+          setFieldErrors(undefined);
+        }}
+      >
         {t('createBoard')}
       </Button>
 
@@ -72,13 +84,20 @@ export default function CreateBoardDialog({
             <Input
               name="boardName"
               value={boardName}
-              onChange={(e) => setBoardName(e.target.value)}
+              invalid={!!fieldErrors?.name}
+              onChange={(e) => {
+                setBoardName(e.target.value);
+                setFieldErrors(undefined);
+              }}
               placeholder={t('boardName')}
               disabled={isCreating}
               autoFocus
             />
+            {fieldErrors?.name && (
+              <p className="text-sm text-red-600">{fieldErrors.name[0]}</p>
+            )}
           </Field>
-          {error && (
+          {error && !fieldErrors && (
             <div className="mt-2 text-sm text-red-600 dark:text-red-400">
               {error}
             </div>

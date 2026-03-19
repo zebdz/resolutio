@@ -5,11 +5,13 @@ import { JoinToken, JoinTokenProps } from '../../domain/organization/JoinToken';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { CreateJoinTokenInput } from './CreateJoinTokenSchema';
 import { OrganizationErrors } from './OrganizationErrors';
+import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 
 export interface CreateJoinTokenDependencies {
   organizationRepository: OrganizationRepository;
   joinTokenRepository: JoinTokenRepository;
   userRepository: UserRepository;
+  profanityChecker?: ProfanityChecker;
 }
 
 export class CreateJoinTokenUseCase {
@@ -54,7 +56,8 @@ export class CreateJoinTokenUseCase {
       organizationId,
       actorUserId,
       description,
-      maxUses ?? null
+      maxUses ?? null,
+      this.deps.profanityChecker
     );
 
     if (!createResult.success) {

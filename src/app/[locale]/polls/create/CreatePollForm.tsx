@@ -89,6 +89,13 @@ export function CreatePollForm() {
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<
+    Record<string, string[]> | undefined
+  >();
+  const [questionFieldErrors, setQuestionFieldErrors] = useState<{
+    questionId: string;
+    errors: Record<string, string[]>;
+  } | null>(null);
 
   // Load organizations and boards
   useEffect(() => {
@@ -243,6 +250,8 @@ export function CreatePollForm() {
     try {
       setIsSaving(true);
       setError(null);
+      setFieldErrors(undefined);
+      setQuestionFieldErrors(null);
 
       // Validate
       if (!pollData.organizationId) {
@@ -309,6 +318,7 @@ export function CreatePollForm() {
 
       if (!pollResult.success) {
         setError(pollResult.error);
+        setFieldErrors(pollResult.fieldErrors);
 
         return;
       }
@@ -343,7 +353,50 @@ export function CreatePollForm() {
         const questionResult = await addQuestionAction(questionFormData);
 
         if (!questionResult.success) {
-          setError(questionResult.error);
+          if (questionResult.fieldErrors) {
+            const uniqueMessages = [
+              ...new Set(
+                Object.values(questionResult.fieldErrors).flatMap(
+                  (msgs) => msgs
+                )
+              ),
+            ];
+            setError(uniqueMessages.join('; '));
+
+            // Remap answers.N indices from filtered array back to original
+            const remappedErrors: Record<string, string[]> = {};
+            const originalAnswers = question.answers || [];
+            const validIndices = originalAnswers
+              .map((a, i) => (a.text.trim() ? i : -1))
+              .filter((i) => i !== -1);
+
+            for (const [key, msgs] of Object.entries(
+              questionResult.fieldErrors
+            )) {
+              const match = key.match(/^answers\.(\d+)$/);
+
+              if (match) {
+                const filteredIdx = parseInt(match[1], 10);
+                const originalIdx = validIndices[filteredIdx];
+
+                if (originalIdx !== undefined) {
+                  remappedErrors[`answers.${originalIdx}`] = msgs;
+                } else {
+                  remappedErrors[key] = msgs;
+                }
+              } else {
+                remappedErrors[key] = msgs;
+              }
+            }
+
+            setQuestionFieldErrors({
+              questionId: question.id,
+              errors: remappedErrors,
+            });
+            setActiveQuestionId(question.id);
+          } else {
+            setError(questionResult.error);
+          }
 
           return;
         }
@@ -425,7 +478,7 @@ export function CreatePollForm() {
       </div>
 
       {/* Error Message */}
-      {error && (
+      {error && !fieldErrors && (
         <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-200">
           {error}
         </div>
@@ -488,25 +541,35 @@ export function CreatePollForm() {
           <Label>{t('pollTitle')}</Label>
           <Input
             value={pollData.title}
-            onChange={(e) =>
-              setPollData({ ...pollData, title: e.target.value })
-            }
+            invalid={!!fieldErrors?.title}
+            onChange={(e) => {
+              setPollData({ ...pollData, title: e.target.value });
+              setFieldErrors(undefined);
+            }}
             placeholder={t('pollTitle')}
             required
           />
+          {fieldErrors?.title && (
+            <p className="text-sm text-red-600">{fieldErrors.title[0]}</p>
+          )}
         </Field>
 
         <Field>
           <Label>{t('pollDescription')}</Label>
           <Textarea
             value={pollData.description}
-            onChange={(e) =>
-              setPollData({ ...pollData, description: e.target.value })
-            }
+            invalid={!!fieldErrors?.description}
+            onChange={(e) => {
+              setPollData({ ...pollData, description: e.target.value });
+              setFieldErrors(undefined);
+            }}
             placeholder={t('pollDescription')}
             required
             rows={3}
           />
+          {fieldErrors?.description && (
+            <p className="text-sm text-red-600">{fieldErrors.description[0]}</p>
+          )}
         </Field>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -589,6 +652,11 @@ export function CreatePollForm() {
               }
               onAnswersChange={(answers) =>
                 handleQuestionUpdate(activeQuestion.id, { answers })
+              }
+              fieldErrors={
+                questionFieldErrors?.questionId === activeQuestion.id
+                  ? questionFieldErrors.errors
+                  : undefined
               }
             />
           ) : questions.length === 0 ? (

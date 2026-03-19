@@ -1,5 +1,7 @@
 import { Result, success, failure } from '../shared/Result';
 import { PollDomainCodes } from './PollDomainCodes';
+import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
+import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 
 export const ANSWER_TEXT_MAX_LENGTH = 500;
 
@@ -18,7 +20,8 @@ export class Answer {
   public static create(
     text: string,
     order: number,
-    questionId: string
+    questionId: string,
+    profanityChecker?: ProfanityChecker
   ): Result<Answer, string> {
     if (!text || text.trim().length === 0) {
       return failure(PollDomainCodes.ANSWER_TEXT_EMPTY);
@@ -30,6 +33,10 @@ export class Answer {
 
     if (order < 0) {
       return failure(PollDomainCodes.ANSWER_INVALID_ORDER);
+    }
+
+    if (profanityChecker?.containsProfanity(text.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     const answer = new Answer({
@@ -77,13 +84,20 @@ export class Answer {
     return this.props.archivedAt !== null;
   }
 
-  public updateText(newText: string): Result<void, string> {
+  public updateText(
+    newText: string,
+    profanityChecker?: ProfanityChecker
+  ): Result<void, string> {
     if (!newText || newText.trim().length === 0) {
       return failure(PollDomainCodes.ANSWER_TEXT_EMPTY);
     }
 
     if (newText.length > ANSWER_TEXT_MAX_LENGTH) {
       return failure(PollDomainCodes.ANSWER_TEXT_TOO_LONG);
+    }
+
+    if (profanityChecker?.containsProfanity(newText.trim())) {
+      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     this.props.text = newText.trim();
