@@ -202,6 +202,7 @@ class MockOtpCodeHasher implements OtpCodeHasher {
 class MockOtpDeliveryChannel implements OtpDeliveryChannel {
   channel: OtpChannel = 'sms';
   shouldSucceed = true;
+  returnBackdoorCode = true;
   lastSentCode: string | null = null;
 
   async send(
@@ -215,7 +216,10 @@ class MockOtpDeliveryChannel implements OtpDeliveryChannel {
       return { success: false };
     }
 
-    return { success: true, backdoorCode: code };
+    return {
+      success: true,
+      backdoorCode: this.returnBackdoorCode ? code : undefined,
+    };
   }
 }
 
@@ -286,6 +290,18 @@ describe('RegisterUserUseCase', () => {
       expect(result.value.expiresAt).toBeInstanceOf(Date);
       expect(result.value.backdoorCode).toBeTruthy();
       expect(result.value.expiresInSeconds).toBeGreaterThan(0);
+    }
+  });
+
+  it('should not return backdoorCode when delivery channel omits it', async () => {
+    deliveryChannel.returnBackdoorCode = false;
+
+    const result = await useCase.execute(validInput);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.backdoorCode).toBeUndefined();
     }
   });
 
