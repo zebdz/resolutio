@@ -4,6 +4,7 @@ import {
   PROFANITY_CUSTOM_BLOCKED,
   PROFANITY_WHITELISTED,
   PROFANITY_STEMS,
+  PROFANITY_INFIXES,
 } from '@/domain/shared/profanity/profanityConfig';
 
 export class LeoProfanityChecker implements ProfanityChecker {
@@ -49,6 +50,14 @@ export class LeoProfanityChecker implements ProfanityChecker {
     b: 'в',
     m: 'м',
     t: 'т',
+  };
+
+  // Digit→Cyrillic substitution map (most common profanity evasion substitutions)
+  private static readonly DIGIT_SUBS: Record<string, string> = {
+    '0': 'о',
+    '3': 'е', // ху3вый → хуевый
+    '4': 'а', // муд4к → мудак
+    '6': 'б', // 6лять → блять
   };
 
   containsProfanity(text: string): boolean {
@@ -109,6 +118,11 @@ export class LeoProfanityChecker implements ProfanityChecker {
       return LeoProfanityChecker.HOMOGLYPHS[lower] ?? ch;
     });
 
+    // Digit→Cyrillic (0→о, 3→з, 4→а, 6→б, 9→д)
+    result = result.replace(/[0-9]/g, (ch) => {
+      return LeoProfanityChecker.DIGIT_SUBS[ch] ?? ch;
+    });
+
     return result;
   }
 
@@ -117,10 +131,18 @@ export class LeoProfanityChecker implements ProfanityChecker {
     const words = lower.split(/\s+/);
 
     for (const word of words) {
-      if (!word) {continue;}
+      if (!word) {
+        continue;
+      }
 
       for (const stem of PROFANITY_STEMS) {
         if (word.startsWith(stem)) {
+          return true;
+        }
+      }
+
+      for (const infix of PROFANITY_INFIXES) {
+        if (word.includes(infix)) {
           return true;
         }
       }
