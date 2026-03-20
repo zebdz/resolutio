@@ -785,4 +785,150 @@ describe('LeoProfanityChecker', () => {
       expect(checker.containsProfanity('email: test@example.com')).toBe(false);
     });
   });
+
+  // ===== Missing stems and misspellings =====
+
+  describe('missing stems and common misspellings', () => {
+    // хуе- derivatives missing from stems
+    it('should detect хуемое', () => {
+      expect(checker.containsProfanity('хуемое')).toBe(true);
+    });
+
+    it('should detect хуеный', () => {
+      expect(checker.containsProfanity('хуеный')).toBe(true);
+    });
+
+    // хер as standalone (in custom blocked, not as stem)
+    it('should detect хер', () => {
+      expect(checker.containsProfanity('хер')).toBe(true);
+    });
+
+    it('should NOT flag Херсон', () => {
+      expect(checker.containsProfanity('Херсон')).toBe(false);
+    });
+
+    it('should NOT flag херувим', () => {
+      expect(checker.containsProfanity('херувим')).toBe(false);
+    });
+
+    // пизд- prefixed derivatives
+    it('should detect пиздос', () => {
+      expect(checker.containsProfanity('пиздос')).toBe(true);
+    });
+
+    it('should detect пиздосня', () => {
+      expect(checker.containsProfanity('пиздосня')).toBe(true);
+    });
+
+    it('should detect распиздяй', () => {
+      expect(checker.containsProfanity('распиздяй')).toBe(true);
+    });
+
+    it('should detect распиздел', () => {
+      expect(checker.containsProfanity('распиздел')).toBe(true);
+    });
+
+    it('should detect роспиздня', () => {
+      expect(checker.containsProfanity('роспиздня')).toBe(true);
+    });
+
+    it('should detect роспиздел', () => {
+      expect(checker.containsProfanity('роспиздел')).toBe(true);
+    });
+
+    it('should detect роспиздяй', () => {
+      expect(checker.containsProfanity('роспиздяй')).toBe(true);
+    });
+
+    // еб- derivatives
+    it('should detect ебан', () => {
+      expect(checker.containsProfanity('ебан')).toBe(true);
+    });
+
+    it('should detect уебан', () => {
+      expect(checker.containsProfanity('уебан')).toBe(true);
+    });
+
+    it('should detect долбое (е-variant)', () => {
+      expect(checker.containsProfanity('долбое')).toBe(true);
+    });
+
+    it('should detect далбое (misspelling)', () => {
+      expect(checker.containsProfanity('далбое')).toBe(true);
+    });
+
+    it('should detect ебобо', () => {
+      expect(checker.containsProfanity('ебобо')).toBe(true);
+    });
+
+    // педераст and misspellings
+    it('should detect педарас', () => {
+      expect(checker.containsProfanity('педарас')).toBe(true);
+    });
+
+    it('should detect педорас', () => {
+      expect(checker.containsProfanity('педорас')).toBe(true);
+    });
+
+    it('should detect педораст', () => {
+      expect(checker.containsProfanity('педораст')).toBe(true);
+    });
+
+    it('should detect педараст', () => {
+      expect(checker.containsProfanity('педараст')).toBe(true);
+    });
+
+    it('should detect педераст', () => {
+      expect(checker.containsProfanity('педераст')).toBe(true);
+    });
+
+    it('should detect пидераст', () => {
+      expect(checker.containsProfanity('пидераст')).toBe(true);
+    });
+
+    it('should detect педираст', () => {
+      expect(checker.containsProfanity('педираст')).toBe(true);
+    });
+
+    it('should detect пидираст', () => {
+      expect(checker.containsProfanity('пидираст')).toBe(true);
+    });
+
+    // пезда/пизда misspellings and -лиз compounds
+    it('should detect пезда', () => {
+      expect(checker.containsProfanity('пезда')).toBe(true);
+    });
+
+    it('should detect пездализ', () => {
+      expect(checker.containsProfanity('пездализ')).toBe(true);
+    });
+
+    it('should detect пиздолиз', () => {
+      expect(checker.containsProfanity('пиздолиз')).toBe(true);
+    });
+
+    it('should detect пиздализ', () => {
+      expect(checker.containsProfanity('пиздализ')).toBe(true);
+    });
+
+    it('should detect пездолиз', () => {
+      expect(checker.containsProfanity('пездолиз')).toBe(true);
+    });
+
+    it('should detect пездолис', () => {
+      expect(checker.containsProfanity('пездолис')).toBe(true);
+    });
+
+    it('should detect пездалис', () => {
+      expect(checker.containsProfanity('пездалис')).toBe(true);
+    });
+
+    it('should detect пиздолис', () => {
+      expect(checker.containsProfanity('пиздолис')).toBe(true);
+    });
+
+    it('should detect пиздалис', () => {
+      expect(checker.containsProfanity('пиздалис')).toBe(true);
+    });
+  });
 });
