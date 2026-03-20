@@ -52,6 +52,9 @@ next-env.d.ts
 
 deploy.tar.gz
 
+# Application logs
+/logs
+
 /generated/
 
 /plans

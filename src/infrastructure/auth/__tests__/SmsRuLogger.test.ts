@@ -1,0 +1,135 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import fs from 'fs/promises';
+import path from 'path';
+import { SmsRuLogger } from '../SmsRuLogger';
+
+describe('SmsRuLogger', () => {
+  const testLogsDir = path.join(process.cwd(), 'logs-test-' + Date.now());
+  let logger: SmsRuLogger;
+
+  beforeEach(() => {
+    logger = new SmsRuLogger(testLogsDir);
+  });
+
+  afterEach(async () => {
+    await fs.rm(testLogsDir, { recursive: true, force: true });
+  });
+
+  it('should create logs directory on first write', async () => {
+    await logger.logSuccess({
+      phone: '79255070602',
+      locale: 'ru',
+      statusCode: 100,
+      smsId: '000-100',
+      balance: 4122.56,
+      testMode: false,
+    });
+
+    const exists = await fs
+      .access(testLogsDir)
+      .then(() => true)
+      .catch(() => false);
+    expect(exists).toBe(true);
+  });
+
+  it('should write success entry to sms-ru.log as JSON line', async () => {
+    await logger.logSuccess({
+      phone: '79255070602',
+      locale: 'ru',
+      statusCode: 100,
+      smsId: '000-100',
+      balance: 4122.56,
+      testMode: false,
+    });
+
+    const content = await fs.readFile(
+      path.join(testLogsDir, 'sms-ru.log'),
+      'utf-8'
+    );
+    const entry = JSON.parse(content.trim());
+    expect(entry.phone).toBe('79255070602');
+    expect(entry.statusCode).toBe(100);
+    expect(entry.smsId).toBe('000-100');
+    expect(entry.balance).toBe(4122.56);
+    expect(entry.testMode).toBe(false);
+    expect(entry.timestamp).toBeDefined();
+    expect(entry.timestamp_msk).toBeDefined();
+  });
+
+  it('should write error entry to both sms-ru.log and sms-ru.error.log', async () => {
+    await logger.logError({
+      phone: '79255070602',
+      locale: 'ru',
+      statusCode: 201,
+      error: 'Insufficient balance',
+      retryAttempt: 0,
+      testMode: false,
+    });
+
+    const mainLog = await fs.readFile(
+      path.join(testLogsDir, 'sms-ru.log'),
+      'utf-8'
+    );
+    const errorLog = await fs.readFile(
+      path.join(testLogsDir, 'sms-ru.error.log'),
+      'utf-8'
+    );
+
+    const mainEntry = JSON.parse(mainLog.trim());
+    const errorEntry = JSON.parse(errorLog.trim());
+
+    expect(mainEntry.statusCode).toBe(201);
+    expect(mainEntry.error).toBe('Insufficient balance');
+    expect(errorEntry.statusCode).toBe(201);
+    expect(errorEntry.retryAttempt).toBe(0);
+  });
+
+  it('should include timestamp_msk in Moscow timezone (UTC+3)', async () => {
+    await logger.logSuccess({
+      phone: '79255070602',
+      locale: 'en',
+      statusCode: 100,
+      smsId: '000-200',
+      balance: 100,
+      testMode: true,
+    });
+
+    const content = await fs.readFile(
+      path.join(testLogsDir, 'sms-ru.log'),
+      'utf-8'
+    );
+    const entry = JSON.parse(content.trim());
+    // Human-readable Moscow time, e.g. "20.03.2026, 15:34:56"
+    expect(entry.timestamp_msk).toMatch(
+      /^\d{2}\.\d{2}\.\d{4}, \d{2}:\d{2}:\d{2}$/
+    );
+  });
+
+  it('should append multiple entries', async () => {
+    await logger.logSuccess({
+      phone: '79255070601',
+      locale: 'ru',
+      statusCode: 100,
+      smsId: '000-1',
+      balance: 100,
+      testMode: false,
+    });
+    await logger.logSuccess({
+      phone: '79255070602',
+      locale: 'en',
+      statusCode: 100,
+      smsId: '000-2',
+      balance: 99,
+      testMode: false,
+    });
+
+    const content = await fs.readFile(
+      path.join(testLogsDir, 'sms-ru.log'),
+      'utf-8'
+    );
+    const lines = content.trim().split('\n');
+    expect(lines).toHaveLength(2);
+    expect(JSON.parse(lines[0]).phone).toBe('79255070601');
+    expect(JSON.parse(lines[1]).phone).toBe('79255070602');
+  });
+});
