@@ -33,7 +33,6 @@ function isRetryableStatusCode(code: number): boolean {
   return (RETRYABLE_STATUS_CODES as readonly number[]).includes(code);
 }
 
- 
 interface SmsRuResponse {
   status: string;
   status_code: number;
@@ -115,10 +114,13 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
         times: 2,
         schedule: Schedule.exponential('500 millis'),
         while: (error) => {
-          if (error._tag === 'SmsRuNetworkError') {return true;}
+          if (error._tag === 'SmsRuNetworkError') {
+            return true;
+          }
 
-          if (error._tag === 'SmsRuApiError')
-            {return isRetryableStatusCode(error.statusCode);}
+          if (error._tag === 'SmsRuApiError') {
+            return isRetryableStatusCode(error.statusCode);
+          }
 
           return false;
         },

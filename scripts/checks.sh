@@ -1,13 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Capture the list of staged files (excluding deleted ones via --diff-filter=d) before formatting, then only re-stage those specific files after yarn fl.
+# Scope format+lint+re-stage to staged files only (excluding deleted ones).
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=d)
 
-echo "Running format + lint..."
-yarn fl
-
 if [ -n "$STAGED_FILES" ]; then
+  LINT_FILES=$(echo "$STAGED_FILES" | grep -E '\.(js|jsx|ts|tsx|mjs|cjs)$' || true)
+  FORMAT_FILES=$(echo "$STAGED_FILES" | grep -v -E '\.(sh|lock)$' || true)
+
+  if [ -n "$LINT_FILES" ]; then
+    echo "Running lint on staged files..."
+    echo "$LINT_FILES" | xargs npx eslint --fix
+  fi
+
+  if [ -n "$FORMAT_FILES" ]; then
+    echo "Running format on staged files..."
+    echo "$FORMAT_FILES" | xargs npx prettier --write
+  fi
+
   echo "$STAGED_FILES" | xargs git add
 fi
 
