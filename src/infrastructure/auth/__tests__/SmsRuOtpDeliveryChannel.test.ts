@@ -145,26 +145,23 @@ describe('SmsRuOtpDeliveryChannel', () => {
     expect(bodyStr).toMatch(/%D0%/i);
   });
 
-  it('should return failure on non-retryable sms.ru error', async () => {
-    globalThis.fetch = mockFetchResponse(
-      smsRuError(201, 'Insufficient balance')
-    );
+  it.each([
+    [200, 'Invalid api_id'],
+    [201, 'Insufficient balance'],
+    [202, 'Invalid phone number'],
+    [209, 'Phone in stop-list'],
+  ])(
+    'should NOT retry on non-retryable error (%i)',
+    async (statusCode, statusText) => {
+      const mockFetch = mockFetchResponse(smsRuError(statusCode, statusText));
+      globalThis.fetch = mockFetch;
 
-    const result = await channel.send('79255070602', '123456', 'ru');
+      const result = await channel.send('79255070602', '123456', 'ru');
 
-    expect(result.success).toBe(false);
-  });
-
-  it('should NOT retry on non-retryable error (201)', async () => {
-    const mockFetch = mockFetchResponse(
-      smsRuError(201, 'Insufficient balance')
-    );
-    globalThis.fetch = mockFetch;
-
-    await channel.send('79255070602', '123456', 'ru');
-
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-  });
+      expect(result.success).toBe(false);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('should return failure on network error after retries', async () => {
     globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
@@ -174,29 +171,32 @@ describe('SmsRuOtpDeliveryChannel', () => {
     expect(result.success).toBe(false);
   });
 
-  it('should retry on retryable sms.ru error (220)', async () => {
-    const phone = '79255070602';
-    const mockFetch = vi
-      .fn()
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(smsRuError(220, 'Service unavailable')), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify(smsRuSuccess(phone)), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      );
-    globalThis.fetch = mockFetch;
+  it.each([220, 500])(
+    'should retry on retryable sms.ru error (%i)',
+    async (retryableCode) => {
+      const phone = '79255070602';
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify(smsRuError(retryableCode, 'Retryable error')),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          )
+        )
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify(smsRuSuccess(phone)), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        );
+      globalThis.fetch = mockFetch;
 
-    const result = await channel.send(phone, '123456', 'ru');
+      const result = await channel.send(phone, '123456', 'ru');
 
-    expect(result.success).toBe(true);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-  });
+      expect(result.success).toBe(true);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    }
+  );
 
   describe('test mode', () => {
     beforeEach(() => {
