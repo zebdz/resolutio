@@ -784,6 +784,14 @@ describe('LeoProfanityChecker', () => {
     it('should NOT flag clean mixed-script text', () => {
       expect(checker.containsProfanity('email: test@example.com')).toBe(false);
     });
+
+    it('should detect xуeть (Latin x and e)', () => {
+      expect(checker.containsProfanity('xуeть')).toBe(true);
+    });
+
+    it('should detect ааааxуeть (Latin x and e with prefix)', () => {
+      expect(checker.containsProfanity('ааааxуeть')).toBe(true);
+    });
   });
 
   // ===== Missing stems and misspellings =====
@@ -838,6 +846,32 @@ describe('LeoProfanityChecker', () => {
 
     it('should detect роспиздяй', () => {
       expect(checker.containsProfanity('роспиздяй')).toBe(true);
+    });
+
+    // пизд- with other prefixes (via infix matching)
+    it('should detect допиздел', () => {
+      expect(checker.containsProfanity('допиздел')).toBe(true);
+    });
+
+    it('should detect напиздел', () => {
+      expect(checker.containsProfanity('напиздел')).toBe(true);
+    });
+
+    it('should detect отпиздил', () => {
+      expect(checker.containsProfanity('отпиздил')).toBe(true);
+    });
+
+    it('should detect запиздел', () => {
+      expect(checker.containsProfanity('запиздел')).toBe(true);
+    });
+
+    // еб- prefixed (via infix matching)
+    it('should detect доебал', () => {
+      expect(checker.containsProfanity('доебал')).toBe(true);
+    });
+
+    it('should detect отъебал', () => {
+      expect(checker.containsProfanity('отъебал')).toBe(true);
     });
 
     // еб- derivatives
@@ -929,6 +963,260 @@ describe('LeoProfanityChecker', () => {
 
     it('should detect пиздалис', () => {
       expect(checker.containsProfanity('пиздалис')).toBe(true);
+    });
+
+    it('should detect пиздас', () => {
+      expect(checker.containsProfanity('пиздас')).toBe(true);
+    });
+  });
+
+  // ===== Words from manual testing sessions =====
+
+  describe('infix matching: prefixed profanity', () => {
+    it('should detect допиздел', () => {
+      expect(checker.containsProfanity('допиздел')).toBe(true);
+    });
+
+    it('should detect напиздел', () => {
+      expect(checker.containsProfanity('напиздел')).toBe(true);
+    });
+
+    it('should detect отпиздил', () => {
+      expect(checker.containsProfanity('отпиздил')).toBe(true);
+    });
+
+    it('should detect запиздел', () => {
+      expect(checker.containsProfanity('запиздел')).toBe(true);
+    });
+
+    it('should detect доебал', () => {
+      expect(checker.containsProfanity('доебал')).toBe(true);
+    });
+
+    it('should detect отъебал', () => {
+      expect(checker.containsProfanity('отъебал')).toBe(true);
+    });
+
+    it('should detect выебу', () => {
+      expect(checker.containsProfanity('выебу')).toBe(true);
+    });
+
+    it('should detect вротвыебу', () => {
+      expect(checker.containsProfanity('вротвыебу')).toBe(true);
+    });
+
+    it('should detect разъибал', () => {
+      expect(checker.containsProfanity('разъибал')).toBe(true);
+    });
+
+    it('should detect абъибал', () => {
+      expect(checker.containsProfanity('абъибал')).toBe(true);
+    });
+  });
+
+  describe('misspellings: ибан/ебон variants', () => {
+    it('should detect ибануть', () => {
+      expect(checker.containsProfanity('ибануть')).toBe(true);
+    });
+
+    it('should detect ибанутый', () => {
+      expect(checker.containsProfanity('ибанутый')).toBe(true);
+    });
+
+    it('should detect ебонуть', () => {
+      expect(checker.containsProfanity('ебонуть')).toBe(true);
+    });
+
+    it('should detect ебонутый', () => {
+      expect(checker.containsProfanity('ебонутый')).toBe(true);
+    });
+
+    it('should detect ебонутая', () => {
+      expect(checker.containsProfanity('ебонутая')).toBe(true);
+    });
+  });
+
+  describe('compound animal profanity', () => {
+    // овц- с е
+    it('should detect овцееб', () => {
+      expect(checker.containsProfanity('овцееб')).toBe(true);
+    });
+
+    it('should detect авцееб', () => {
+      expect(checker.containsProfanity('авцееб')).toBe(true);
+    });
+
+    // овц- с ё
+    it('should detect овцеёб', () => {
+      expect(checker.containsProfanity('овцеёб')).toBe(true);
+    });
+
+    // осл- с е
+    it('should detect ослоеб', () => {
+      expect(checker.containsProfanity('ослоеб')).toBe(true);
+    });
+
+    it('should detect аслоеб', () => {
+      expect(checker.containsProfanity('аслоеб')).toBe(true);
+    });
+
+    it('should detect аслаеб', () => {
+      expect(checker.containsProfanity('аслаеб')).toBe(true);
+    });
+
+    // осл- с ё
+    it('should detect ослоёб', () => {
+      expect(checker.containsProfanity('ослоёб')).toBe(true);
+    });
+
+    // козл- с е
+    it('should detect козлоеб', () => {
+      expect(checker.containsProfanity('козлоеб')).toBe(true);
+    });
+
+    it('should detect козлаеб', () => {
+      expect(checker.containsProfanity('козлаеб')).toBe(true);
+    });
+
+    // козл- с ё
+    it('should detect козлоёб', () => {
+      expect(checker.containsProfanity('козлоёб')).toBe(true);
+    });
+
+    it('should detect козлаёб', () => {
+      expect(checker.containsProfanity('козлаёб')).toBe(true);
+    });
+
+    // казл- с е
+    it('should detect казлоеб', () => {
+      expect(checker.containsProfanity('казлоеб')).toBe(true);
+    });
+
+    it('should detect казлаеб', () => {
+      expect(checker.containsProfanity('казлаеб')).toBe(true);
+    });
+
+    // казл- с ё
+    it('should detect казлоёб', () => {
+      expect(checker.containsProfanity('казлоёб')).toBe(true);
+    });
+
+    it('should detect казлаёб', () => {
+      expect(checker.containsProfanity('казлаёб')).toBe(true);
+    });
+
+    it('should detect авциеб', () => {
+      expect(checker.containsProfanity('авциеб')).toBe(true);
+    });
+  });
+
+  describe('хер compound profanity', () => {
+    it('should detect херосос', () => {
+      expect(checker.containsProfanity('херосос')).toBe(true);
+    });
+
+    it('should detect херососка', () => {
+      expect(checker.containsProfanity('херососка')).toBe(true);
+    });
+
+    it('should detect херасос', () => {
+      expect(checker.containsProfanity('херасос')).toBe(true);
+    });
+
+    it('should detect херасоска', () => {
+      expect(checker.containsProfanity('херасоска')).toBe(true);
+    });
+  });
+
+  describe('хуи- derivatives', () => {
+    it('should detect хуиверт', () => {
+      expect(checker.containsProfanity('хуиверт')).toBe(true);
+    });
+
+    it('should detect хуйсгоры', () => {
+      expect(checker.containsProfanity('хуйсгоры')).toBe(true);
+    });
+  });
+
+  describe('хуесо standalone', () => {
+    it('should detect хуесо', () => {
+      expect(checker.containsProfanity('хуесо')).toBe(true);
+    });
+  });
+
+  // ===== манда/монда =====
+
+  describe('манда/монда derivatives', () => {
+    it('should detect манда', () => {
+      expect(checker.containsProfanity('манда')).toBe(true);
+    });
+
+    it('should detect мандавошка', () => {
+      expect(checker.containsProfanity('мандавошка')).toBe(true);
+    });
+
+    it('should detect мандовошка', () => {
+      expect(checker.containsProfanity('мандовошка')).toBe(true);
+    });
+
+    it('should detect мондавошка', () => {
+      expect(checker.containsProfanity('мондавошка')).toBe(true);
+    });
+
+    it('should detect мондовошка', () => {
+      expect(checker.containsProfanity('мондовошка')).toBe(true);
+    });
+
+    it('should detect мандолиз', () => {
+      expect(checker.containsProfanity('мандолиз')).toBe(true);
+    });
+
+    it('should detect мондализ', () => {
+      expect(checker.containsProfanity('мондализ')).toBe(true);
+    });
+
+    it('should NOT flag мандарин', () => {
+      expect(checker.containsProfanity('мандарин')).toBe(false);
+    });
+
+    it('should NOT flag мандат', () => {
+      expect(checker.containsProfanity('мандат')).toBe(false);
+    });
+  });
+
+  // ===== Digit substitution (0 for о) =====
+
+  describe('obfuscation: digit substitution', () => {
+    it('should detect хуев0й (0 for о)', () => {
+      expect(checker.containsProfanity('хуев0й')).toBe(true);
+    });
+
+    it('should detect г0вно (0 for о)', () => {
+      expect(checker.containsProfanity('г0вно')).toBe(true);
+    });
+
+    it('should detect пид0р (0 for о)', () => {
+      expect(checker.containsProfanity('пид0р')).toBe(true);
+    });
+
+    it('should detect муд4к (4 for а)', () => {
+      expect(checker.containsProfanity('муд4к')).toBe(true);
+    });
+
+    it('should detect 6лять (6 for б)', () => {
+      expect(checker.containsProfanity('6лять')).toBe(true);
+    });
+
+    it('should detect ху3вый (3 for е/з)', () => {
+      expect(checker.containsProfanity('ху3вый')).toBe(true);
+    });
+
+    it('should NOT flag clean text with digits', () => {
+      expect(checker.containsProfanity('организация 123')).toBe(false);
+    });
+
+    it('should NOT flag year', () => {
+      expect(checker.containsProfanity('2026')).toBe(false);
     });
   });
 });
