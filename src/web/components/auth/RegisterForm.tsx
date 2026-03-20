@@ -261,26 +261,6 @@ export function RegisterForm({ locale }: Props) {
 
       <FieldGroup>
         <Field>
-          <Label>{t('register.firstName')}</Label>
-          <Input
-            name="firstName"
-            type="text"
-            autoComplete="given-name"
-            value={formValues.firstName}
-            onChange={handleInputChange}
-            onBlur={handleBlur}
-            required
-            disabled={isPending}
-            invalid={!!fieldErrors.firstName}
-          />
-          {fieldErrors.firstName && (
-            <Text className="text-sm text-red-600">
-              {fieldErrors.firstName[0]}
-            </Text>
-          )}
-        </Field>
-
-        <Field>
           <Label>{t('register.lastName')}</Label>
           <Input
             name="lastName"
@@ -296,6 +276,26 @@ export function RegisterForm({ locale }: Props) {
           {fieldErrors.lastName && (
             <Text className="text-sm text-red-600">
               {fieldErrors.lastName[0]}
+            </Text>
+          )}
+        </Field>
+
+        <Field>
+          <Label>{t('register.firstName')}</Label>
+          <Input
+            name="firstName"
+            type="text"
+            autoComplete="given-name"
+            value={formValues.firstName}
+            onChange={handleInputChange}
+            onBlur={handleBlur}
+            required
+            disabled={isPending}
+            invalid={!!fieldErrors.firstName}
+          />
+          {fieldErrors.firstName && (
+            <Text className="text-sm text-red-600">
+              {fieldErrors.firstName[0]}
             </Text>
           )}
         </Field>
