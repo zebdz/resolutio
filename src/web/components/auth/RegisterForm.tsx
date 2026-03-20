@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useRouter } from '@/src/i18n/routing';
 import { Button } from '@/app/components/catalyst/button';
 import { Input } from '@/app/components/catalyst/input';
@@ -31,6 +31,7 @@ export function RegisterForm({ locale }: Props) {
   const t = useTranslations('auth');
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [showPassword, setShowPassword] = useState(false);
@@ -224,6 +225,8 @@ export function RegisterForm({ locale }: Props) {
         if (result.fieldErrors) {
           setFieldErrors(result.fieldErrors);
         }
+
+        formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else {
         // Store OTP data for confirm-phone page
         if (typeof window !== 'undefined') {
@@ -244,6 +247,7 @@ export function RegisterForm({ locale }: Props) {
 
   return (
     <form
+      ref={formRef}
       onSubmit={(e) => {
         e.preventDefault();
         handleSubmit();
