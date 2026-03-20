@@ -118,6 +118,8 @@ jobs:
           OTP_CODE_SECRET: ${{ secrets.OTP_CODE_SECRET }}
           OTP_EXPIRY_MINUTES: ${{ vars.OTP_EXPIRY_MINUTES || '10' }}
           OTP_MAX_ATTEMPTS: ${{ vars.OTP_MAX_ATTEMPTS || '5' }}
+          SMS_RU_API_ID: ${{ secrets.SMS_RU_API_ID }}
+          SMS_RU_TEST_MODE: ${{ inputs.branch == 'beta' && 'true' || 'false' }}
           PORT: ${{ inputs.port }}
         run: |
           # Create .env file for deployment
@@ -126,6 +128,8 @@ jobs:
           echo "OTP_CODE_SECRET=$OTP_CODE_SECRET" >> .env
           echo "OTP_EXPIRY_MINUTES=$OTP_EXPIRY_MINUTES" >> .env
           echo "OTP_MAX_ATTEMPTS=$OTP_MAX_ATTEMPTS" >> .env
+          echo "SMS_RU_API_ID=$SMS_RU_API_ID" >> .env
+          echo "SMS_RU_TEST_MODE=$SMS_RU_TEST_MODE" >> .env
           echo "PORT=$PORT" >> .env
 
           tar -czf deploy.tar.gz \
