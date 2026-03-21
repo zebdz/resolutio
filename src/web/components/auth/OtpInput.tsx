@@ -11,6 +11,44 @@ type Props = {
   length?: number;
 };
 
+export type OtpChangeResult =
+  | { type: 'multi'; value: string; focusIndex: number }
+  | { type: 'single'; value: string; focusIndex: number | null }
+  | { type: 'ignore' };
+
+export function processOtpInput(
+  inputValue: string,
+  index: number,
+  currentDigits: string[],
+  maxLength: number
+): OtpChangeResult {
+  const sanitized = inputValue.replace(/\D/g, '');
+
+  if (!sanitized && inputValue !== '') {
+    return { type: 'ignore' };
+  }
+
+  if (sanitized.length > 1) {
+    const filled = sanitized.slice(0, maxLength);
+
+    return {
+      type: 'multi',
+      value: filled,
+      focusIndex: Math.min(filled.length, maxLength - 1),
+    };
+  }
+
+  const newDigits = [...currentDigits];
+  newDigits[index] = sanitized;
+  const newValue = newDigits.join('').replace(/\s/g, '');
+
+  return {
+    type: 'single',
+    value: newValue,
+    focusIndex: sanitized && index < maxLength - 1 ? index + 1 : null,
+  };
+}
+
 export function OtpInput({
   value,
   onChange,
@@ -32,18 +70,17 @@ export function OtpInput({
   );
 
   const handleChange = useCallback(
-    (index: number, char: string) => {
-      if (!/^\d?$/.test(char)) {
+    (index: number, inputValue: string) => {
+      const result = processOtpInput(inputValue, index, digits, length);
+
+      if (result.type === 'ignore') {
         return;
       }
 
-      const newDigits = [...digits];
-      newDigits[index] = char;
-      const newValue = newDigits.join('').replace(/\s/g, '');
-      onChange(newValue);
+      onChange(result.value);
 
-      if (char && index < length - 1) {
-        focusInput(index + 1);
+      if (result.focusIndex !== null) {
+        focusInput(result.focusIndex);
       }
     },
     [digits, onChange, length, focusInput]
