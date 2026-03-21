@@ -5,6 +5,7 @@ export const AuthErrors = {
   ACCOUNT_NOT_CONFIRMED: 'auth.errors.accountNotConfirmed',
   INVALID_CREDENTIALS: 'auth.errors.invalidCredentials',
   PHONE_EXISTS: 'auth.errors.phoneExists',
+  MISSING_IP: 'auth.errors.missingIp',
 } as const;
 
 export type AuthError = (typeof AuthErrors)[keyof typeof AuthErrors];

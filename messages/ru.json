@@ -62,7 +62,8 @@
     "errors": {
       "accountNotConfirmed": "Ваш аккаунт ещё не подтверждён",
       "invalidCredentials": "Неверный номер телефона или пароль",
-      "phoneExists": "Номер телефона уже зарегистрирован"
+      "phoneExists": "Номер телефона уже зарегистрирован",
+      "missingIp": "Не удалось определить ваш IP-адрес"
     }
   },
   "otp": {
@@ -1268,7 +1269,34 @@
       "historyEmpty": "Нет записей",
       "statusBlocked": "Заблокирован",
       "statusUnblocked": "Разблокирован",
-      "changedBy": "{name}"
+      "changedBy": "{name}",
+      "createdAtLabel": "Зарегистрирован",
+      "allowFindByNameLabel": "Поиск по имени",
+      "allowFindByPhoneLabel": "Поиск по телефону",
+      "blockStatusLabel": "Статус",
+      "organizationLabel": "Организация",
+      "dateFromLabel": "Зарегистрирован с",
+      "dateToLabel": "Зарегистрирован по",
+      "filterAll": "Все",
+      "filterYes": "Да",
+      "filterNo": "Нет",
+      "filterBlocked": "Заблокирован",
+      "filterUnblocked": "Разблокирован",
+      "totalUsers": "Найдено пользователей: {count}",
+      "pageOf": "Страница {current} из {total}",
+      "previous": "Назад",
+      "next": "Далее",
+      "orgSearchPlaceholder": "Поиск организаций...",
+      "pollsButton": "Голосования",
+      "pollsDialogTitle": "Голосования: {name}",
+      "pollsEmpty": "Нет участия в голосованиях",
+      "pollsLoading": "Загрузка...",
+      "orgCount": "{count} орг.",
+      "pollCount": "{count} гол.",
+      "privacyEnabled": "Да",
+      "privacyDisabled": "Нет",
+      "loadMore": "Загрузить ещё",
+      "clearFilters": "Сбросить все фильтры"
     },
     "blockedIps": {
       "title": "Заблокированные IP",

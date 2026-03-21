@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { RequestConfirmationOtpUseCase } from '../RequestConfirmationOtpUseCase';
 import { OtpErrors } from '../OtpErrors';
+import { AuthErrors } from '../AuthErrors';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { OtpVerification, OtpChannel } from '@/domain/otp/OtpVerification';
 import { OtpCodeHasher } from '../OtpCodeHasher';
@@ -190,6 +191,21 @@ describe('RequestConfirmationOtpUseCase', () => {
       deliveryChannel,
       userRepository,
     });
+  });
+
+  it('should fail when clientIp is empty', async () => {
+    userRepository.addUser(makeUser());
+
+    const result = await useCase.execute({
+      userId: 'user-1',
+      clientIp: '',
+    });
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error).toBe(AuthErrors.MISSING_IP);
+    }
   });
 
   it('should fail when user not found', async () => {

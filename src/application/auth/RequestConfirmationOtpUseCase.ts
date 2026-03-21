@@ -6,6 +6,7 @@ import { Result, success, failure } from '@/domain/shared/Result';
 import { OtpCodeHasher } from './OtpCodeHasher';
 import { OtpDeliveryChannel } from './OtpDeliveryChannel';
 import { OtpErrors } from './OtpErrors';
+import { AuthErrors } from './AuthErrors';
 import { getRetryAfter, THROTTLE_WINDOW_HOURS } from './OtpThrottleCalculator';
 
 export interface RequestConfirmationOtpInput {
@@ -46,6 +47,10 @@ export class RequestConfirmationOtpUseCase {
   async execute(
     input: RequestConfirmationOtpInput
   ): Promise<Result<RequestConfirmationOtpResult, string>> {
+    if (!input.clientIp) {
+      return failure(AuthErrors.MISSING_IP);
+    }
+
     try {
       // 1. Find user
       const user = await this.userRepository.findById(input.userId);

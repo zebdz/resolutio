@@ -260,6 +260,22 @@ describe('RegisterUserUseCase', () => {
     clientIp: '127.0.0.1',
   };
 
+  it('should fail when clientIp is empty and not create a session', async () => {
+    const result = await useCase.execute({
+      ...validInput,
+      clientIp: '',
+    });
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error).toBe(AuthErrors.MISSING_IP);
+    }
+
+    // No session should have been created
+    expect(await sessionRepository.findById('session-1')).toBeNull();
+  });
+
   it('should fail when consentGiven is false', async () => {
     const result = await useCase.execute({
       ...validInput,
