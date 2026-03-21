@@ -7,6 +7,7 @@ export interface SmsRuSuccessLogEntry {
   statusCode: number;
   smsId: string;
   balance: number;
+  cost: number;
   testMode: boolean;
 }
 
@@ -16,6 +17,22 @@ export interface SmsRuErrorLogEntry {
   statusCode: number;
   error: string;
   retryAttempt: number;
+  testMode: boolean;
+}
+
+export interface SmsRuCostExceededLogEntry {
+  phone: string;
+  locale: string;
+  cost: number;
+  maxCost: number;
+  testMode: boolean;
+}
+
+export interface SmsRuUndeliverableLogEntry {
+  phone: string;
+  locale: string;
+  statusCode: number;
+  statusText: string;
   testMode: boolean;
 }
 
@@ -41,7 +58,25 @@ export class SmsRuLogger {
     await this.append(this.errorLogFile, line);
   }
 
-  private formatLine(entry: SmsRuSuccessLogEntry | SmsRuErrorLogEntry): string {
+  async logCostExceeded(entry: SmsRuCostExceededLogEntry): Promise<void> {
+    const line = this.formatLine(entry);
+    await this.append(this.logFile, line);
+    await this.append(this.errorLogFile, line);
+  }
+
+  async logUndeliverable(entry: SmsRuUndeliverableLogEntry): Promise<void> {
+    const line = this.formatLine(entry);
+    await this.append(this.logFile, line);
+    await this.append(this.errorLogFile, line);
+  }
+
+  private formatLine(
+    entry:
+      | SmsRuSuccessLogEntry
+      | SmsRuErrorLogEntry
+      | SmsRuCostExceededLogEntry
+      | SmsRuUndeliverableLogEntry
+  ): string {
     const now = new Date();
     const timestamp = now.toISOString();
     const timestamp_msk = this.toMoscowTime(now);
