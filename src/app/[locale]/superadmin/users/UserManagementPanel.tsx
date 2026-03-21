@@ -37,6 +37,9 @@ export function UserManagementPanel() {
   const [unblockReason, setUnblockReason] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unblockDialogError, setUnblockDialogError] = useState<string | null>(
+    null
+  );
   const [searchTimer, setSearchTimer] = useState<ReturnType<
     typeof setTimeout
   > | null>(null);
@@ -76,7 +79,7 @@ export function UserManagementPanel() {
 
   const handleBlock = async (reason: string) => {
     if (!blockTarget) {
-      return;
+      return { success: false as const, error: 'No target' };
     }
 
     const result = await blockUserAction({
@@ -92,6 +95,8 @@ export function UserManagementPanel() {
         await doSearch(query);
       }
     }
+
+    return result;
   };
 
   const handleUnblock = async () => {
@@ -100,13 +105,13 @@ export function UserManagementPanel() {
     }
 
     if (!unblockReason.trim()) {
-      setError(t('reasonRequired'));
+      setUnblockDialogError(t('reasonRequired'));
 
       return;
     }
 
     setIsLoading(true);
-    setError(null);
+    setUnblockDialogError(null);
     const result = await unblockUserAction({
       userId: unblockTarget.id,
       reason: unblockReason.trim(),
@@ -120,8 +125,10 @@ export function UserManagementPanel() {
       if (query.length >= 3) {
         await doSearch(query);
       }
+    } else if (result.fieldErrors?.reason) {
+      setUnblockDialogError(result.fieldErrors.reason[0]);
     } else {
-      setError(result.error);
+      setUnblockDialogError(result.error);
     }
 
     setIsLoading(false);
@@ -187,7 +194,11 @@ export function UserManagementPanel() {
                       </span>
                       <Button
                         color="brand-green"
-                        onClick={() => setUnblockTarget(user)}
+                        onClick={() => {
+                          setUnblockTarget(user);
+                          setUnblockDialogError(null);
+                          setUnblockReason('');
+                        }}
                         className="text-xs"
                       >
                         {t('unblockUser')}
@@ -257,7 +268,14 @@ export function UserManagementPanel() {
       />
 
       {/* Unblock confirm dialog */}
-      <Dialog open={!!unblockTarget} onClose={() => setUnblockTarget(null)}>
+      <Dialog
+        open={!!unblockTarget}
+        onClose={() => {
+          setUnblockTarget(null);
+          setUnblockDialogError(null);
+          setUnblockReason('');
+        }}
+      >
         <DialogTitle>{t('unblockConfirmTitle')}</DialogTitle>
         <DialogDescription>
           {t('unblockConfirmDescription', {
@@ -269,13 +287,17 @@ export function UserManagementPanel() {
             <label className="text-sm font-medium">{t('reasonLabel')}</label>
             <Textarea
               value={unblockReason}
-              onChange={(e) => setUnblockReason(e.target.value)}
+              invalid={!!unblockDialogError}
+              onChange={(e) => {
+                setUnblockReason(e.target.value);
+                setUnblockDialogError(null);
+              }}
               placeholder={t('unblockReasonPlaceholder')}
               rows={3}
             />
-            {error && (
+            {unblockDialogError && (
               <div className="text-sm text-red-600 dark:text-red-400">
-                {error}
+                {unblockDialogError}
               </div>
             )}
           </div>

@@ -112,8 +112,8 @@ export const PROFANITY_CUSTOM_BLOCKED: string[] = [
 // This catches all declensions/conjugations without enumerating every form.
 // Stems are chosen to be long enough to avoid false positives on legitimate words.
 export const PROFANITY_STEMS: string[] = [
-  // хуй derivatives — stems for words starting with хуй/хуё
-  'хуёв', // хуёвый, хуёвая...
+  // NOTE: all stems are checked against ё→е normalized text, so only е-forms needed here.
+  // ё-forms are handled by the library or by ё→е normalization + е-stems.
 
   // NOTE: хуй/хуе/хуи moved to PROFANITY_INFIXES — they're safe as substrings
   // and need to catch prefixed forms (аааахуеть, нахуярить, etc.)
@@ -180,9 +180,8 @@ export const PROFANITY_STEMS: string[] = [
   'мондов', // мондовошка...
   'мондал', // мондализ...
 
-  // епт/ёпт
+  // епт (ёпт removed — dead; library catches ёпт directly, ё→е normalization + this stem catches епт)
   'епт', // епт
-  'ёпт', // ёпт
 
   // пизд- (stem for words starting with пизд)
   'пизд', // пизда, пиздец, пиздас, пиздос, пиздолиз, пиздалис...
@@ -198,7 +197,7 @@ export const PROFANITY_STEMS: string[] = [
   // долбое/далбое/долбан/долбае
   'долбое', // долбоеб (also auto-generated from ё, but stem catches долбое*)
   'далбое', // далбоеб (misspelling)
-  'далбоё', // далбоёб (misspelling with ё)
+  // NOTE: далбоё removed — dead (stems checked on ё→е normalized text; далбое covers it)
   'долбан', // долбаный, долбанный...
   'долбае', // долбаеб...
 
@@ -213,12 +212,8 @@ export const PROFANITY_STEMS: string[] = [
   'козлаеб', // misspelling
   'казлоеб', // misspelling
   'казлаеб', // misspelling
-  'овцеёб', // с ё
-  'ослоёб', // с ё
-  'козлоёб', // с ё
-  'козлаёб', // misspelling с ё
-  'казлоёб', // misspelling с ё
-  'казлаёб', // misspelling с ё
+  // NOTE: ё-variants (овцеёб, ослоёб, козлоёб, etc.) removed — dead code.
+  // Stems are checked on ё→е normalized text; е-variants above cover them.
 
   // Extended insult stems (no legitimate words start with these)
   'сволоч', // сволочь, сволочи, сволочей...

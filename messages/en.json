@@ -1224,6 +1224,7 @@
       "userActive": "Active",
       "cancel": "Cancel",
       "confirm": "Confirm",
+      "blockFailed": "Failed to block user",
       "events": "Events",
       "eventTime": "Time",
       "blockIp": "Block IP",

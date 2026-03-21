@@ -764,7 +764,7 @@ describe('LeoProfanityChecker', () => {
 
     // Multiple substitutions
     it('should detect xyeвый (Latin x, y, e)', () => {
-      expect(checker.containsProfanity('xye вый')).toBe(true);
+      expect(checker.containsProfanity('xyeвый')).toBe(true);
     });
 
     // Combined with separator obfuscation

@@ -5,10 +5,15 @@ import { prisma } from '@/infrastructure/index';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { requireSuperadmin } from '@/web/actions/superadminAuth';
 import { isError } from '@/web/actions/superadminAuthUtils';
+import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChecker';
+import { SharedDomainCodes } from '@/domain/shared/SharedDomainCodes';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
+
+const profanityChecker = LeoProfanityChecker.getInstance();
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
-  | { success: false; error: string };
+  | { success: false; error: string; fieldErrors?: Record<string, string[]> };
 
 export interface SuspiciousKeySummary {
   key: string;
@@ -280,6 +285,16 @@ export async function blockUserAction(input: {
     return { success: false, error: t('reasonRequired') };
   }
 
+  if (profanityChecker.containsProfanity(input.reason)) {
+    const msg = await translateErrorCode(SharedDomainCodes.CONTAINS_PROFANITY);
+
+    return {
+      success: false,
+      error: msg,
+      fieldErrors: { reason: [msg] },
+    };
+  }
+
   await prisma.userBlockStatus.create({
     data: {
       userId: input.userId,
@@ -316,6 +331,16 @@ export async function unblockUserAction(input: {
 
   if (!input.reason.trim()) {
     return { success: false, error: t('reasonRequired') };
+  }
+
+  if (profanityChecker.containsProfanity(input.reason)) {
+    const msg = await translateErrorCode(SharedDomainCodes.CONTAINS_PROFANITY);
+
+    return {
+      success: false,
+      error: msg,
+      fieldErrors: { reason: [msg] },
+    };
   }
 
   await prisma.userBlockStatus.create({
