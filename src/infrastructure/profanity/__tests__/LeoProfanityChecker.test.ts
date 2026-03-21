@@ -1232,6 +1232,14 @@ describe('LeoProfanityChecker', () => {
       expect(checker.containsProfanity('эпидемия')).toBe(false);
     });
 
+    it('should NOT flag педиатр', () => {
+      expect(checker.containsProfanity('педиатр')).toBe(false);
+    });
+
+    it('should NOT flag педикюр', () => {
+      expect(checker.containsProfanity('педикюр')).toBe(false);
+    });
+
     // ебен infix
     it('should NOT flag ребенок', () => {
       expect(checker.containsProfanity('ребенок')).toBe(false);
@@ -1480,6 +1488,18 @@ describe('LeoProfanityChecker', () => {
 
     it('should detect Пидр', () => {
       expect(checker.containsProfanity('Пидр')).toBe(true);
+    });
+
+    it('should detect педик', () => {
+      expect(checker.containsProfanity('педик')).toBe(true);
+    });
+
+    it('should detect педике (предложный)', () => {
+      expect(checker.containsProfanity('педике')).toBe(true);
+    });
+
+    it('should detect педиках (предложный мн.ч.)', () => {
+      expect(checker.containsProfanity('педиках')).toBe(true);
     });
 
     it('should detect Конча', () => {

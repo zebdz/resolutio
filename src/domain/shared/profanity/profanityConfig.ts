@@ -87,6 +87,18 @@ export const PROFANITY_CUSTOM_BLOCKED: string[] = [
   'калич',
   'калеч',
 
+  // педик — can't use as stem (would catch педикюр)
+  'педик',
+  'педика',
+  'педику',
+  'педиком',
+  'педике',
+  'педики',
+  'педиков',
+  'педикам',
+  'педиками',
+  'педиках',
+
   // stripped forms from symbol-obfuscated words (П#дор→Пдор, Пи£да→Пида)
   'пдор',
   'пида', // stripped from Пи£да
