@@ -1219,4 +1219,456 @@ describe('LeoProfanityChecker', () => {
       expect(checker.containsProfanity('2026')).toBe(false);
     });
   });
+
+  // ===== False positive checks =====
+
+  describe('false positives: legitimate words must NOT be flagged', () => {
+    // пид infix
+    it('should NOT flag пиджак', () => {
+      expect(checker.containsProfanity('пиджак')).toBe(false);
+    });
+
+    it('should NOT flag эпидемия', () => {
+      expect(checker.containsProfanity('эпидемия')).toBe(false);
+    });
+
+    // ебен infix
+    it('should NOT flag ребенок', () => {
+      expect(checker.containsProfanity('ребенок')).toBe(false);
+    });
+
+    it('should NOT flag жеребенок', () => {
+      expect(checker.containsProfanity('жеребенок')).toBe(false);
+    });
+
+    // ебат infix
+    it('should NOT flag хлебать', () => {
+      expect(checker.containsProfanity('хлебать')).toBe(false);
+    });
+
+    // анал custom blocked
+    it('should NOT flag анализ', () => {
+      expect(checker.containsProfanity('анализ')).toBe(false);
+    });
+
+    it('should NOT flag анналы', () => {
+      expect(checker.containsProfanity('анналы')).toBe(false);
+    });
+
+    it('should NOT flag аналитика', () => {
+      expect(checker.containsProfanity('аналитика')).toBe(false);
+    });
+
+    it('should NOT flag аналог', () => {
+      expect(checker.containsProfanity('аналог')).toBe(false);
+    });
+
+    // трах custom blocked
+    it('should NOT flag трахея', () => {
+      expect(checker.containsProfanity('трахея')).toBe(false);
+    });
+
+    // хер custom blocked
+    it('should NOT flag Херсон', () => {
+      expect(checker.containsProfanity('Херсон')).toBe(false);
+    });
+
+    it('should NOT flag херувим', () => {
+      expect(checker.containsProfanity('херувим')).toBe(false);
+    });
+
+    // манда custom blocked
+    it('should NOT flag мандарин', () => {
+      expect(checker.containsProfanity('мандарин')).toBe(false);
+    });
+
+    it('should NOT flag мандат', () => {
+      expect(checker.containsProfanity('мандат')).toBe(false);
+    });
+
+    // дурак excluded
+    it('should NOT flag дурак', () => {
+      expect(checker.containsProfanity('дурак')).toBe(false);
+    });
+
+    // конч- family
+    it('should NOT flag кончить', () => {
+      expect(checker.containsProfanity('кончить')).toBe(false);
+    });
+
+    it('should NOT flag закончить', () => {
+      expect(checker.containsProfanity('закончить')).toBe(false);
+    });
+
+    it('should NOT flag окончание', () => {
+      expect(checker.containsProfanity('окончание')).toBe(false);
+    });
+
+    // наркотик
+    it('should NOT flag наркотик', () => {
+      expect(checker.containsProfanity('наркотик')).toBe(false);
+    });
+
+    // калечить
+    it('should NOT flag калечить', () => {
+      expect(checker.containsProfanity('калечить')).toBe(false);
+    });
+
+    it('should NOT flag покалечить', () => {
+      expect(checker.containsProfanity('покалечить')).toBe(false);
+    });
+
+    // болванка
+    it('should NOT flag болванка', () => {
+      expect(checker.containsProfanity('болванка')).toBe(false);
+    });
+
+    // уродливый
+    it('should NOT flag уродливый', () => {
+      expect(checker.containsProfanity('уродливый')).toBe(false);
+    });
+
+    // сдохнуть
+    it('should NOT flag сдохла', () => {
+      expect(checker.containsProfanity('сдохла')).toBe(false);
+    });
+
+    // бухгалтер
+    it('should NOT flag бухгалтер', () => {
+      expect(checker.containsProfanity('бухгалтер')).toBe(false);
+    });
+
+    // кабинет (contains минет!)
+    it('should NOT flag кабинет', () => {
+      expect(checker.containsProfanity('кабинет')).toBe(false);
+    });
+
+    // рецепт (contains епт!)
+    it('should NOT flag рецепт', () => {
+      expect(checker.containsProfanity('рецепт')).toBe(false);
+    });
+
+    // идиома (starts with идиот stem prefix)
+    it('should NOT flag идиома', () => {
+      expect(checker.containsProfanity('идиома')).toBe(false);
+    });
+
+    // товар (NOT тварь)
+    it('should NOT flag товар', () => {
+      expect(checker.containsProfanity('товар')).toBe(false);
+    });
+
+    it('should NOT flag товарищ', () => {
+      expect(checker.containsProfanity('товарищ')).toBe(false);
+    });
+
+    // поцелуй (contains целк... no, целу is different)
+    it('should NOT flag поцелуй', () => {
+      expect(checker.containsProfanity('поцелуй')).toBe(false);
+    });
+
+    // рептилия
+    it('should NOT flag рептилия', () => {
+      expect(checker.containsProfanity('рептилия')).toBe(false);
+    });
+
+    // победа, лебедь, требовать (contain еб)
+    it('should NOT flag победа', () => {
+      expect(checker.containsProfanity('победа')).toBe(false);
+    });
+
+    it('should NOT flag лебедь', () => {
+      expect(checker.containsProfanity('лебедь')).toBe(false);
+    });
+
+    it('should NOT flag требовать', () => {
+      expect(checker.containsProfanity('требовать')).toBe(false);
+    });
+
+    it('should NOT flag потребность', () => {
+      expect(checker.containsProfanity('потребность')).toBe(false);
+    });
+
+    it('should NOT flag небо', () => {
+      expect(checker.containsProfanity('небо')).toBe(false);
+    });
+
+    it('should NOT flag хлеб', () => {
+      expect(checker.containsProfanity('хлеб')).toBe(false);
+    });
+
+    it('should NOT flag ребята', () => {
+      expect(checker.containsProfanity('ребята')).toBe(false);
+    });
+
+    // пожар (contains жоп? No — жоп infix, пожар contains ожа not жоп)
+    it('should NOT flag пожар', () => {
+      expect(checker.containsProfanity('пожар')).toBe(false);
+    });
+
+    // себя, тебя
+    it('should NOT flag себя', () => {
+      expect(checker.containsProfanity('себя')).toBe(false);
+    });
+
+    it('should NOT flag тебя', () => {
+      expect(checker.containsProfanity('тебя')).toBe(false);
+    });
+
+    // дебит/дебиторский (starts with дебил stem? дебит starts with деби, not дебил)
+    it('should NOT flag дебит', () => {
+      expect(checker.containsProfanity('дебит')).toBe(false);
+    });
+
+    it('should NOT flag дебиторский', () => {
+      expect(checker.containsProfanity('дебиторский')).toBe(false);
+    });
+  });
+
+  // ===== Extended word list from manual testing =====
+
+  describe('extended word list', () => {
+    // special char substitution
+    it('should detect Г@ндон', () => {
+      expect(checker.containsProfanity('Г@ндон')).toBe(true);
+    });
+
+    it('should detect П#дор', () => {
+      expect(checker.containsProfanity('П#дор')).toBe(true);
+    });
+
+    it('should detect Еб$ть', () => {
+      expect(checker.containsProfanity('Еб$ть')).toBe(true);
+    });
+
+    it('should detect Пидо₽осня', () => {
+      expect(checker.containsProfanity('Пидо₽осня')).toBe(true);
+    });
+
+    it('should detect $ука', () => {
+      expect(checker.containsProfanity('$ука')).toBe(true);
+    });
+
+    it('should detect Гандо#', () => {
+      expect(checker.containsProfanity('Гандо#')).toBe(true);
+    });
+
+    it('should detect Пи£да', () => {
+      expect(checker.containsProfanity('Пи£да')).toBe(true);
+    });
+
+    it('should detect Ху€$о$', () => {
+      expect(checker.containsProfanity('Ху€$о$')).toBe(true);
+    });
+
+    // stems/infixes needed
+    it('should detect членсоска', () => {
+      expect(checker.containsProfanity('членсоска')).toBe(true);
+    });
+
+    it('should detect Писька', () => {
+      expect(checker.containsProfanity('Писька')).toBe(true);
+    });
+
+    it('should detect Писюн', () => {
+      expect(checker.containsProfanity('Писюн')).toBe(true);
+    });
+
+    it('should detect Ебень', () => {
+      expect(checker.containsProfanity('Ебень')).toBe(true);
+    });
+
+    it('should detect Пидр', () => {
+      expect(checker.containsProfanity('Пидр')).toBe(true);
+    });
+
+    it('should detect Конча', () => {
+      expect(checker.containsProfanity('Конча')).toBe(true);
+    });
+
+    it('should detect Конченый', () => {
+      expect(checker.containsProfanity('Конченый')).toBe(true);
+    });
+
+    it('should detect Ублюдок', () => {
+      expect(checker.containsProfanity('Ублюдок')).toBe(true);
+    });
+
+    it('should detect Тварь', () => {
+      expect(checker.containsProfanity('Тварь')).toBe(true);
+    });
+
+    it('should detect Утырок', () => {
+      expect(checker.containsProfanity('Утырок')).toBe(true);
+    });
+
+    it('should detect Чмырь', () => {
+      expect(checker.containsProfanity('Чмырь')).toBe(true);
+    });
+
+    it('should detect Долбаный', () => {
+      expect(checker.containsProfanity('Долбаный')).toBe(true);
+    });
+
+    it('should detect Долбанный', () => {
+      expect(checker.containsProfanity('Долбанный')).toBe(true);
+    });
+
+    it('should detect Сиськи', () => {
+      expect(checker.containsProfanity('Сиськи')).toBe(true);
+    });
+
+    it('should detect Сиськa', () => {
+      expect(checker.containsProfanity('Сиськa')).toBe(true);
+    });
+
+    it('should detect Сисечки', () => {
+      expect(checker.containsProfanity('Сисечки')).toBe(true);
+    });
+
+    it('should detect Сисечка', () => {
+      expect(checker.containsProfanity('Сисечка')).toBe(true);
+    });
+
+    it('should detect Болван', () => {
+      expect(checker.containsProfanity('Болван')).toBe(true);
+    });
+
+    it('should detect Идиот', () => {
+      expect(checker.containsProfanity('Идиот')).toBe(true);
+    });
+
+    it('should detect Сволочь', () => {
+      expect(checker.containsProfanity('Сволочь')).toBe(true);
+    });
+
+    it('should detect Гавно', () => {
+      expect(checker.containsProfanity('Гавно')).toBe(true);
+    });
+
+    it('should detect Анал', () => {
+      expect(checker.containsProfanity('Анал')).toBe(true);
+    });
+
+    it('should detect Вонючка', () => {
+      expect(checker.containsProfanity('Вонючка')).toBe(true);
+    });
+
+    it('should detect ванючка', () => {
+      expect(checker.containsProfanity('ванючка')).toBe(true);
+    });
+
+    it('should detect Дебил', () => {
+      expect(checker.containsProfanity('Дебил')).toBe(true);
+    });
+
+    it('should detect Бухло', () => {
+      expect(checker.containsProfanity('Бухло')).toBe(true);
+    });
+
+    it('should detect Какашка', () => {
+      expect(checker.containsProfanity('Какашка')).toBe(true);
+    });
+
+    it('should detect Задница', () => {
+      expect(checker.containsProfanity('Задница')).toBe(true);
+    });
+
+    it('should detect Дегенерат', () => {
+      expect(checker.containsProfanity('Дегенерат')).toBe(true);
+    });
+
+    it('should detect Еблан', () => {
+      expect(checker.containsProfanity('Еблан')).toBe(true);
+    });
+
+    it('should detect Сдохни', () => {
+      expect(checker.containsProfanity('Сдохни')).toBe(true);
+    });
+
+    it('should detect Наркота', () => {
+      expect(checker.containsProfanity('Наркота')).toBe(true);
+    });
+
+    it('should detect Дура', () => {
+      expect(checker.containsProfanity('Дура')).toBe(true);
+    });
+
+    it('should detect Дурь', () => {
+      expect(checker.containsProfanity('Дурь')).toBe(true);
+    });
+
+    it('should detect Целка', () => {
+      expect(checker.containsProfanity('Целка')).toBe(true);
+    });
+
+    it('should detect Тупица', () => {
+      expect(checker.containsProfanity('Тупица')).toBe(true);
+    });
+
+    it('should detect Урод', () => {
+      expect(checker.containsProfanity('Урод')).toBe(true);
+    });
+
+    it('should detect уродина', () => {
+      expect(checker.containsProfanity('уродина')).toBe(true);
+    });
+
+    it('should detect Шпехаться', () => {
+      expect(checker.containsProfanity('Шпехаться')).toBe(true);
+    });
+
+    it('should detect Перепих', () => {
+      expect(checker.containsProfanity('Перепих')).toBe(true);
+    });
+
+    it('should detect Калич', () => {
+      expect(checker.containsProfanity('Калич')).toBe(true);
+    });
+
+    it('should detect калеч', () => {
+      expect(checker.containsProfanity('калеч')).toBe(true);
+    });
+
+    it('should detect Косожопый', () => {
+      expect(checker.containsProfanity('Косожопый')).toBe(true);
+    });
+
+    it('should detect Жирдяй', () => {
+      expect(checker.containsProfanity('Жирдяй')).toBe(true);
+    });
+
+    it('should detect Долбаеб', () => {
+      expect(checker.containsProfanity('Долбаеб')).toBe(true);
+    });
+
+    it('should detect Фуфло', () => {
+      expect(checker.containsProfanity('Фуфло')).toBe(true);
+    });
+
+    it('should detect Трахать', () => {
+      expect(checker.containsProfanity('Трахать')).toBe(true);
+    });
+
+    it('should detect трах', () => {
+      expect(checker.containsProfanity('трах')).toBe(true);
+    });
+
+    // multi-word phrases
+    it('should detect Твою мать', () => {
+      expect(checker.containsProfanity('Твою мать')).toBe(true);
+    });
+
+    it('should detect твоюмать', () => {
+      expect(checker.containsProfanity('твоюмать')).toBe(true);
+    });
+
+    it('should detect Твою ж мать', () => {
+      expect(checker.containsProfanity('Твою ж мать')).toBe(true);
+    });
+
+    it('should detect твоюжмать', () => {
+      expect(checker.containsProfanity('твоюжмать')).toBe(true);
+    });
+  });
 });
