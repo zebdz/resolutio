@@ -88,8 +88,23 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
   async send(
     recipient: string,
     code: string,
-    locale: string
+    locale: string,
+    clientIp: string
   ): Promise<OtpDeliveryResult> {
+    if (!clientIp) {
+      this.logger.logError({
+        phone: recipient,
+        locale,
+        clientIp: '',
+        statusCode: 0,
+        error: 'Missing client IP — aborting SMS send',
+        retryAttempt: 0,
+        testMode: this.testMode,
+      });
+
+      return { success: false };
+    }
+
     const message = buildMessage(code, locale);
 
     const params: Record<string, string> = {
@@ -97,6 +112,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
       to: recipient,
       msg: message,
       json: '1',
+      ip: clientIp,
     };
 
     if (this.testMode) {
@@ -109,7 +125,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
     const program = pipe(
       costCheck,
       Effect.flatMap((costResult) =>
-        this.buildSendSms(params, recipient, locale, code, costResult)
+        this.buildSendSms(params, recipient, locale, code, costResult, clientIp)
       ),
       Effect.catchAll(
         (
@@ -126,6 +142,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
               cost: error.cost,
               maxCost: error.maxCost,
               testMode: this.testMode,
+              clientIp,
             });
           } else if (error._tag === 'SmsRuUndeliverableError') {
             this.logger.logUndeliverable({
@@ -134,6 +151,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
               statusCode: error.statusCode,
               statusText: error.statusText,
               testMode: this.testMode,
+              clientIp,
             });
           } else {
             const statusCode =
@@ -153,6 +171,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
               error: `Cost check failed: ${errorMessage}`,
               retryAttempt: 0,
               testMode: this.testMode,
+              clientIp,
             });
           }
 
@@ -170,7 +189,8 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
     recipient: string,
     locale: string,
     code: string,
-    costResult: CostCheckResult
+    costResult: CostCheckResult,
+    clientIp: string
   ): Effect.Effect<
     OtpDeliveryResult,
     SmsRuApiError | SmsRuNetworkError,
@@ -233,6 +253,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
           balance: data.balance ?? 0,
           cost: costResult.cost,
           testMode: this.testMode,
+          clientIp,
         });
 
         return this.testMode
@@ -260,6 +281,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
             error: errorMessage,
             retryAttempt: 0,
             testMode: this.testMode,
+            clientIp,
           });
 
           return Effect.succeed({ success: false });

@@ -14,7 +14,8 @@ export class StubSmsOtpDeliveryChannel implements OtpDeliveryChannel {
   async send(
     _recipient: string,
     code: string,
-    _locale: string
+    _locale: string,
+    _clientIp: string
   ): Promise<OtpDeliveryResult> {
     // In production this would call sms.ru API
     return { success: true, backdoorCode: code };

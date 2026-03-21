@@ -101,7 +101,8 @@ export class RequestConfirmationOtpUseCase {
       const deliveryResult = await this.deliveryChannel.send(
         phone,
         code.getValue(),
-        user.language
+        user.language,
+        input.clientIp
       );
 
       if (!deliveryResult.success) {

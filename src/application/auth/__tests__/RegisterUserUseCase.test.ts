@@ -208,7 +208,8 @@ class MockOtpDeliveryChannel implements OtpDeliveryChannel {
   async send(
     _recipient: string,
     code: string,
-    _locale: string
+    _locale: string,
+    _clientIp: string
   ): Promise<OtpDeliveryResult> {
     this.lastSentCode = code;
 

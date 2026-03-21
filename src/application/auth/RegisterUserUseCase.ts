@@ -188,7 +188,8 @@ export class RegisterUserUseCase {
     const deliveryResult = await this.deliveryChannel.send(
       phoneNumber.getValue(),
       code.getValue(),
-      savedUser.language
+      savedUser.language,
+      input.clientIp
     );
 
     if (!deliveryResult.success) {

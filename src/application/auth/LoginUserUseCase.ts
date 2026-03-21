@@ -123,7 +123,8 @@ export class LoginUserUseCase {
       const deliveryResult = await this.deliveryChannel.send(
         phoneNumber.getValue(),
         code.getValue(),
-        user.language
+        user.language,
+        input.ipAddress
       );
 
       if (!deliveryResult.success) {

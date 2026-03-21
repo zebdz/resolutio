@@ -114,6 +114,7 @@ function mockCostThenSend(costBody: object, sendBody: object) {
 describe('SmsRuOtpDeliveryChannel', () => {
   let channel: SmsRuOtpDeliveryChannel;
   const originalFetch = globalThis.fetch;
+  const TEST_IP = '192.168.1.100';
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -135,6 +136,46 @@ describe('SmsRuOtpDeliveryChannel', () => {
     expect(() => new SmsRuOtpDeliveryChannel({ apiId: '' })).toThrow();
   });
 
+  describe('ip validation', () => {
+    it('should abort and return failure when clientIp is empty string', async () => {
+      const phone = '79255070602';
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch;
+
+      const result = await channel.send(phone, '123456', 'ru', '');
+
+      expect(result.success).toBe(false);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should abort and return failure when clientIp is null', async () => {
+      const phone = '79255070602';
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch;
+
+      const result = await channel.send(phone, '123456', 'ru', null as any);
+
+      expect(result.success).toBe(false);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('should abort and return failure when clientIp is undefined', async () => {
+      const phone = '79255070602';
+      const mockFetch = vi.fn();
+      globalThis.fetch = mockFetch;
+
+      const result = await channel.send(
+        phone,
+        '123456',
+        'ru',
+        undefined as any
+      );
+
+      expect(result.success).toBe(false);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
   it('should return success when sms.ru returns status_code 100', async () => {
     const phone = '79255070602';
     globalThis.fetch = mockCostThenSend(
@@ -142,7 +183,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
       smsRuSuccess(phone)
     );
 
-    const result = await channel.send(phone, '123456', 'ru');
+    const result = await channel.send(phone, '123456', 'ru', TEST_IP);
 
     expect(result.success).toBe(true);
     expect(result.backdoorCode).toBeUndefined();
@@ -156,7 +197,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
     );
     globalThis.fetch = mockFetch;
 
-    await channel.send(phone, '123456', 'ru');
+    await channel.send(phone, '123456', 'ru', TEST_IP);
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     // Send call is the second one (after cost check)
@@ -181,7 +222,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
     );
     globalThis.fetch = mockFetch;
 
-    await channel.send(phone, '123456', 'ru');
+    await channel.send(phone, '123456', 'ru', TEST_IP);
 
     // Send call is the second one (after cost check)
     const bodyStr = decodeFetchBody(mockFetch.mock.calls[1][1]?.body);
@@ -200,7 +241,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
     );
     globalThis.fetch = mockFetch;
 
-    await channel.send(phone, '654321', 'en');
+    await channel.send(phone, '654321', 'en', TEST_IP);
 
     // Send call is the second one (after cost check)
     const bodyStr = decodeFetchBody(mockFetch.mock.calls[1][1]?.body);
@@ -216,7 +257,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
     );
     globalThis.fetch = mockFetch;
 
-    await channel.send(phone, '111111', 'de');
+    await channel.send(phone, '111111', 'de', TEST_IP);
 
     // Send call is the second one (after cost check)
     const bodyStr = decodeFetchBody(mockFetch.mock.calls[1][1]?.body);
@@ -240,7 +281,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
       );
       globalThis.fetch = mockFetch;
 
-      const result = await channel.send(phone, '123456', 'ru');
+      const result = await channel.send(phone, '123456', 'ru', TEST_IP);
 
       expect(result.success).toBe(false);
       // cost check + one send attempt
@@ -263,7 +304,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
       .mockRejectedValue(new Error('Network error'));
     globalThis.fetch = mockFetch;
 
-    const result = await channel.send(phone, '123456', 'ru');
+    const result = await channel.send(phone, '123456', 'ru', TEST_IP);
 
     expect(result.success).toBe(false);
   });
@@ -297,13 +338,32 @@ describe('SmsRuOtpDeliveryChannel', () => {
         );
       globalThis.fetch = mockFetch;
 
-      const result = await channel.send(phone, '123456', 'ru');
+      const result = await channel.send(phone, '123456', 'ru', TEST_IP);
 
       expect(result.success).toBe(true);
       // cost check + failed send + retry send
       expect(mockFetch).toHaveBeenCalledTimes(3);
     }
   );
+
+  it('should include ip param in sms.ru API requests', async () => {
+    const phone = '79255070602';
+    const mockFetch = mockCostThenSend(
+      smsRuCostSuccess(phone, 1.77),
+      smsRuSuccess(phone)
+    );
+    globalThis.fetch = mockFetch;
+
+    await channel.send(phone, '123456', 'ru', '203.0.113.42');
+
+    // Cost check should include ip
+    const costBody = decodeFetchBody(mockFetch.mock.calls[0][1]?.body);
+    expect(costBody).toContain('ip=203.0.113.42');
+
+    // Send should include ip
+    const sendBody = decodeFetchBody(mockFetch.mock.calls[1][1]?.body);
+    expect(sendBody).toContain('ip=203.0.113.42');
+  });
 
   describe('test mode', () => {
     beforeEach(() => {
@@ -321,7 +381,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
       );
       globalThis.fetch = mockFetch;
 
-      await channel.send(phone, '123456', 'ru');
+      await channel.send(phone, '123456', 'ru', TEST_IP);
 
       // Send call is the second one (after cost check)
       const bodyStr = decodeFetchBody(mockFetch.mock.calls[1][1]?.body);
@@ -335,7 +395,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
         smsRuSuccess(phone)
       );
 
-      const result = await channel.send(phone, '123456', 'ru');
+      const result = await channel.send(phone, '123456', 'ru', TEST_IP);
 
       expect(result.success).toBe(true);
       expect(result.backdoorCode).toBe('123456');
@@ -350,13 +410,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
         smsRuSuccess(phone)
       );
 
-      await channel.send(phone, '123456', 'ru');
+      await channel.send(phone, '123456', 'ru', TEST_IP);
 
       const loggerInstance = vi.mocked(SmsRuLogger).mock.instances[0];
       expect(loggerInstance.logSuccess).toHaveBeenCalledWith(
         expect.objectContaining({
           phone,
           locale: 'ru',
+          clientIp: TEST_IP,
           statusCode: 100,
           smsId: '000-123',
           balance: 4122.56,
@@ -373,13 +434,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
         smsRuError(201, 'Insufficient balance')
       );
 
-      await channel.send(phone, '123456', 'ru');
+      await channel.send(phone, '123456', 'ru', TEST_IP);
 
       const loggerInstance = vi.mocked(SmsRuLogger).mock.instances[0];
       expect(loggerInstance.logError).toHaveBeenCalledWith(
         expect.objectContaining({
           phone,
           locale: 'ru',
+          clientIp: TEST_IP,
           statusCode: 201,
           error: 'Insufficient balance',
         })
@@ -406,7 +468,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
       );
       globalThis.fetch = mockFetch;
 
-      await guardedChannel.send(phone, '123456', 'ru');
+      await guardedChannel.send(phone, '123456', 'ru', TEST_IP);
 
       expect(mockFetch).toHaveBeenCalledTimes(2);
       // First call should be to /sms/cost
@@ -426,7 +488,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
         smsRuSuccess(phone)
       );
 
-      const result = await guardedChannel.send(phone, '123456', 'ru');
+      const result = await guardedChannel.send(phone, '123456', 'ru', TEST_IP);
 
       expect(result.success).toBe(true);
     });
@@ -436,7 +498,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
       const mockFetch = mockFetchResponse(smsRuCostSuccess(phone, 8.5));
       globalThis.fetch = mockFetch;
 
-      const result = await guardedChannel.send(phone, '123456', 'en');
+      const result = await guardedChannel.send(phone, '123456', 'en', TEST_IP);
 
       expect(result.success).toBe(false);
       // Should only call cost API, not send
@@ -448,7 +510,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
       const mockFetch = mockFetchResponse(smsRuCostUndeliverable(phone));
       globalThis.fetch = mockFetch;
 
-      const result = await guardedChannel.send(phone, '123456', 'en');
+      const result = await guardedChannel.send(phone, '123456', 'en', TEST_IP);
 
       expect(result.success).toBe(false);
       expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -460,7 +522,12 @@ describe('SmsRuOtpDeliveryChannel', () => {
         .mockRejectedValueOnce(new Error('Network error'));
       globalThis.fetch = mockFetch;
 
-      const result = await guardedChannel.send('79255070602', '123456', 'ru');
+      const result = await guardedChannel.send(
+        '79255070602',
+        '123456',
+        'ru',
+        TEST_IP
+      );
 
       expect(result.success).toBe(false);
       // Only cost check attempted, no send
@@ -471,7 +538,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
       const phone = '44712345678';
       globalThis.fetch = mockFetchResponse(smsRuCostSuccess(phone, 8.5));
 
-      await guardedChannel.send(phone, '123456', 'en');
+      await guardedChannel.send(phone, '123456', 'en', TEST_IP);
 
       // guardedChannel is instances[1] (parent beforeEach creates channel at [0])
       const loggerInstance = vi.mocked(SmsRuLogger).mock.instances[1];
@@ -479,6 +546,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
         expect.objectContaining({
           phone,
           locale: 'en',
+          clientIp: TEST_IP,
           cost: 8.5,
           maxCost: 2.5,
           testMode: false,
@@ -490,7 +558,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
       const phone = '44712345678';
       globalThis.fetch = mockFetchResponse(smsRuCostUndeliverable(phone));
 
-      await guardedChannel.send(phone, '123456', 'en');
+      await guardedChannel.send(phone, '123456', 'en', TEST_IP);
 
       // guardedChannel is instances[1] (parent beforeEach creates channel at [0])
       const loggerInstance = vi.mocked(SmsRuLogger).mock.instances[1];
@@ -498,6 +566,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
         expect.objectContaining({
           phone,
           locale: 'en',
+          clientIp: TEST_IP,
           statusCode: 207,
           statusText: 'No delivery route for this number',
           testMode: false,
@@ -512,13 +581,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
         smsRuSuccess(phone)
       );
 
-      await guardedChannel.send(phone, '123456', 'ru');
+      await guardedChannel.send(phone, '123456', 'ru', TEST_IP);
 
       // guardedChannel is instances[1] (parent beforeEach creates channel at [0])
       const loggerInstance = vi.mocked(SmsRuLogger).mock.instances[1];
       expect(loggerInstance.logSuccess).toHaveBeenCalledWith(
         expect.objectContaining({
           phone,
+          clientIp: TEST_IP,
           cost: 1.77,
         })
       );
@@ -529,7 +599,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
       const mockFetch = mockFetchResponse(smsRuCostMissingCost(phone));
       globalThis.fetch = mockFetch;
 
-      const result = await guardedChannel.send(phone, '123456', 'ru');
+      const result = await guardedChannel.send(phone, '123456', 'ru', TEST_IP);
 
       expect(result.success).toBe(false);
       // Only cost check, no send
@@ -545,7 +615,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
       globalThis.fetch = mockFetch;
 
       // Use the channel without maxCost
-      await channel.send(phone, '123456', 'ru');
+      await channel.send(phone, '123456', 'ru', TEST_IP);
 
       // Cost check + send = 2 calls
       expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -568,7 +638,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
       globalThis.fetch = mockFetch;
 
       // Use the channel without maxCost
-      await channel.send(phone, '123456', 'en');
+      await channel.send(phone, '123456', 'en', TEST_IP);
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
 

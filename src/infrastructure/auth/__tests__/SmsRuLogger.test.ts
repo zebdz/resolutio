@@ -24,6 +24,7 @@ describe('SmsRuLogger', () => {
       balance: 4122.56,
       cost: 1.77,
       testMode: false,
+      clientIp: '10.0.0.1',
     });
 
     const exists = await fs
@@ -42,6 +43,7 @@ describe('SmsRuLogger', () => {
       balance: 4122.56,
       cost: 1.77,
       testMode: false,
+      clientIp: '10.0.0.1',
     });
 
     const content = await fs.readFile(
@@ -54,6 +56,7 @@ describe('SmsRuLogger', () => {
     expect(entry.smsId).toBe('000-100');
     expect(entry.balance).toBe(4122.56);
     expect(entry.testMode).toBe(false);
+    expect(entry.clientIp).toBe('10.0.0.1');
     expect(entry.timestamp).toBeDefined();
     expect(entry.timestamp_msk).toBeDefined();
   });
@@ -66,6 +69,7 @@ describe('SmsRuLogger', () => {
       error: 'Insufficient balance',
       retryAttempt: 0,
       testMode: false,
+      clientIp: '10.0.0.1',
     });
 
     const mainLog = await fs.readFile(
@@ -95,6 +99,7 @@ describe('SmsRuLogger', () => {
       balance: 100,
       cost: 1.77,
       testMode: true,
+      clientIp: '10.0.0.1',
     });
 
     const content = await fs.readFile(
@@ -117,6 +122,7 @@ describe('SmsRuLogger', () => {
       balance: 100,
       cost: 1.77,
       testMode: false,
+      clientIp: '10.0.0.1',
     });
     await logger.logSuccess({
       phone: '79255070602',
@@ -124,7 +130,9 @@ describe('SmsRuLogger', () => {
       statusCode: 100,
       smsId: '000-2',
       balance: 99,
+      cost: 1.5,
       testMode: false,
+      clientIp: '10.0.0.1',
     });
 
     const content = await fs.readFile(
@@ -144,6 +152,7 @@ describe('SmsRuLogger', () => {
       cost: 8.5,
       maxCost: 2.5,
       testMode: false,
+      clientIp: '10.0.0.1',
     });
 
     const mainLog = await fs.readFile(
@@ -172,6 +181,7 @@ describe('SmsRuLogger', () => {
       statusCode: 207,
       statusText: 'No delivery route for this number',
       testMode: false,
+      clientIp: '10.0.0.1',
     });
 
     const mainLog = await fs.readFile(
