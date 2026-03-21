@@ -18,7 +18,7 @@ export interface PasswordVerifier {
 export interface LoginUserInput {
   phoneNumber: string;
   password: string;
-  ipAddress?: string;
+  ipAddress: string;
   userAgent?: string;
 }
 
@@ -65,6 +65,10 @@ export class LoginUserUseCase {
   }
 
   async execute(input: LoginUserInput): Promise<Result<LoginResult, string>> {
+    if (!input.ipAddress) {
+      return failure(AuthErrors.MISSING_IP);
+    }
+
     // Create phone number value object
     const phoneNumber = PhoneNumber.create(input.phoneNumber);
 
@@ -109,7 +113,7 @@ export class LoginUserUseCase {
         identifier: phoneNumber.getValue(),
         channel: this.deliveryChannel.channel,
         code: hashedCode,
-        clientIp: input.ipAddress || '0.0.0.0',
+        clientIp: input.ipAddress,
         expiresAt: otpExpiresAt,
         userId: user.id,
       });
@@ -119,7 +123,8 @@ export class LoginUserUseCase {
       const deliveryResult = await this.deliveryChannel.send(
         phoneNumber.getValue(),
         code.getValue(),
-        user.language
+        user.language,
+        input.ipAddress
       );
 
       if (!deliveryResult.success) {

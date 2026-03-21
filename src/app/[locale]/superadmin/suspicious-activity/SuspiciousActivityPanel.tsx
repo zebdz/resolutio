@@ -71,6 +71,7 @@ export function SuspiciousActivityPanel() {
   } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dialogError, setDialogError] = useState<string | null>(null);
 
   // Filter state
   const [search, setSearch] = useState('');
@@ -180,6 +181,7 @@ export function SuspiciousActivityPanel() {
       first: formatDate(item.firstEventAt),
       last: formatDate(item.lastEventAt),
     });
+    setDialogError(null);
     setBlockTarget({ userId: item.userId, name, reason });
   };
 
@@ -189,13 +191,13 @@ export function SuspiciousActivityPanel() {
     }
 
     if (!blockTarget.reason.trim()) {
-      setError(t('reasonRequired'));
+      setDialogError(t('reasonRequired'));
 
       return;
     }
 
     setIsLoading(true);
-    setError(null);
+    setDialogError(null);
     const result = await blockUserAction({
       userId: blockTarget.userId,
       reason: blockTarget.reason,
@@ -205,6 +207,7 @@ export function SuspiciousActivityPanel() {
       console.log(
         `[SuspiciousActivity] Blocked user ${blockTarget.userId}: ${blockTarget.reason}`
       );
+      setDialogError(null);
       setBlockTarget(null);
       await fetchSummary(1, {
         search,
@@ -214,8 +217,10 @@ export function SuspiciousActivityPanel() {
         maxBlocked,
       });
       pageRef.current = 1;
+    } else if (result.fieldErrors?.reason) {
+      setDialogError(result.fieldErrors.reason[0]);
     } else {
-      setError(result.error);
+      setDialogError(result.error);
     }
 
     setIsLoading(false);
@@ -231,6 +236,7 @@ export function SuspiciousActivityPanel() {
       item.resolvedUser.lastName,
       item.resolvedUser.middleName
     );
+    setDialogError(null);
     setUnblockTarget({ userId: item.userId, name, reason: '' });
   };
 
@@ -240,13 +246,13 @@ export function SuspiciousActivityPanel() {
     }
 
     if (!unblockTarget.reason.trim()) {
-      setError(t('reasonRequired'));
+      setDialogError(t('reasonRequired'));
 
       return;
     }
 
     setIsLoading(true);
-    setError(null);
+    setDialogError(null);
     const result = await unblockUserAction({
       userId: unblockTarget.userId,
       reason: unblockTarget.reason,
@@ -256,6 +262,7 @@ export function SuspiciousActivityPanel() {
       console.log(
         `[SuspiciousActivity] Unblocked user ${unblockTarget.userId}`
       );
+      setDialogError(null);
       setUnblockTarget(null);
       await fetchSummary(1, {
         search,
@@ -265,8 +272,10 @@ export function SuspiciousActivityPanel() {
         maxBlocked,
       });
       pageRef.current = 1;
+    } else if (result.fieldErrors?.reason) {
+      setDialogError(result.fieldErrors.reason[0]);
     } else {
-      setError(result.error);
+      setDialogError(result.error);
     }
 
     setIsLoading(false);
@@ -511,7 +520,13 @@ export function SuspiciousActivityPanel() {
       )}
 
       {/* Block dialog with editable reason */}
-      <Dialog open={!!blockTarget} onClose={() => setBlockTarget(null)}>
+      <Dialog
+        open={!!blockTarget}
+        onClose={() => {
+          setBlockTarget(null);
+          setDialogError(null);
+        }}
+      >
         <DialogTitle>{t('blockConfirmTitle')}</DialogTitle>
         <DialogDescription>
           {t('blockConfirmDescription', { name: blockTarget?.name ?? '' })}
@@ -521,16 +536,18 @@ export function SuspiciousActivityPanel() {
             <label className="text-sm font-medium">{t('reasonLabel')}</label>
             <Textarea
               value={blockTarget?.reason ?? ''}
-              onChange={(e) =>
+              invalid={!!dialogError}
+              onChange={(e) => {
                 setBlockTarget((prev) =>
                   prev ? { ...prev, reason: e.target.value } : null
-                )
-              }
+                );
+                setDialogError(null);
+              }}
               rows={3}
             />
-            {error && (
+            {dialogError && (
               <div className="text-sm text-red-600 dark:text-red-400">
-                {error}
+                {dialogError}
               </div>
             )}
           </div>
@@ -608,7 +625,13 @@ export function SuspiciousActivityPanel() {
       </Dialog>
 
       {/* Unblock dialog */}
-      <Dialog open={!!unblockTarget} onClose={() => setUnblockTarget(null)}>
+      <Dialog
+        open={!!unblockTarget}
+        onClose={() => {
+          setUnblockTarget(null);
+          setDialogError(null);
+        }}
+      >
         <DialogTitle>{t('unblockConfirmTitle')}</DialogTitle>
         <DialogDescription>
           {t('unblockConfirmDescription', {
@@ -620,16 +643,18 @@ export function SuspiciousActivityPanel() {
             <label className="text-sm font-medium">{t('reasonLabel')}</label>
             <Textarea
               value={unblockTarget?.reason ?? ''}
-              onChange={(e) =>
+              invalid={!!dialogError}
+              onChange={(e) => {
                 setUnblockTarget((prev) =>
                   prev ? { ...prev, reason: e.target.value } : null
-                )
-              }
+                );
+                setDialogError(null);
+              }}
               rows={3}
             />
-            {error && (
+            {dialogError && (
               <div className="text-sm text-red-600 dark:text-red-400">
-                {error}
+                {dialogError}
               </div>
             )}
           </div>

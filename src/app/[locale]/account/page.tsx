@@ -48,14 +48,14 @@ export default async function AccountPage() {
           </Heading>
           <div className="rounded-lg bg-white p-6 shadow ring-1 ring-zinc-950/5 dark:bg-zinc-900 dark:ring-white/10">
             <DescriptionList>
+              <DescriptionTerm>{t('lastName')}</DescriptionTerm>
+              <DescriptionDetails>{user.lastName}</DescriptionDetails>
+
               <DescriptionTerm>{t('firstName')}</DescriptionTerm>
               <DescriptionDetails>{user.firstName}</DescriptionDetails>
 
               <DescriptionTerm>{t('middleName')}</DescriptionTerm>
               <DescriptionDetails>{user.middleName || '—'}</DescriptionDetails>
-
-              <DescriptionTerm>{t('lastName')}</DescriptionTerm>
-              <DescriptionDetails>{user.lastName}</DescriptionDetails>
 
               <DescriptionTerm>{t('phoneNumber')}</DescriptionTerm>
               <DescriptionDetails>

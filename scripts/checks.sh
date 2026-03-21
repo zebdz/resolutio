@@ -6,7 +6,7 @@ STAGED_FILES=$(git diff --cached --name-only --diff-filter=d)
 
 if [ -n "$STAGED_FILES" ]; then
   LINT_FILES=$(echo "$STAGED_FILES" | grep -E '\.(js|jsx|ts|tsx|mjs|cjs)$' || true)
-  FORMAT_FILES=$(echo "$STAGED_FILES" | grep -v -E '\.(sh|lock)$' || true)
+  FORMAT_FILES=$(echo "$STAGED_FILES" | grep -E '\.(js|jsx|ts|tsx|mjs|cjs|json|css|scss|md|yml|yaml|html)$' || true)
 
   if [ -n "$LINT_FILES" ]; then
     echo "Running lint on staged files..."

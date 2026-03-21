@@ -97,6 +97,9 @@ const deliveryChannel = process.env.SMS_RU_API_ID
   ? new SmsRuOtpDeliveryChannel({
       apiId: process.env.SMS_RU_API_ID,
       testMode: process.env.SMS_RU_TEST_MODE === 'true',
+      maxCost: process.env.SMS_RU_MAX_COST_RUBLES
+        ? Number(process.env.SMS_RU_MAX_COST_RUBLES)
+        : undefined,
     })
   : new StubSmsOtpDeliveryChannel();
 

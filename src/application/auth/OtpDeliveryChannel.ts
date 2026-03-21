@@ -10,6 +10,7 @@ export interface OtpDeliveryChannel {
   send(
     recipient: string,
     code: string,
-    locale: string
+    locale: string,
+    clientIp: string
   ): Promise<OtpDeliveryResult>;
 }

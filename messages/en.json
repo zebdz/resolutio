@@ -62,7 +62,8 @@
     "errors": {
       "accountNotConfirmed": "Your account is not yet confirmed",
       "invalidCredentials": "Invalid phone number or password",
-      "phoneExists": "Phone number already registered"
+      "phoneExists": "Phone number already registered",
+      "missingIp": "Unable to determine your IP address"
     }
   },
   "otp": {
@@ -1224,6 +1225,7 @@
       "userActive": "Active",
       "cancel": "Cancel",
       "confirm": "Confirm",
+      "blockFailed": "Failed to block user",
       "events": "Events",
       "eventTime": "Time",
       "blockIp": "Block IP",
@@ -1267,7 +1269,34 @@
       "historyEmpty": "No history entries",
       "statusBlocked": "Blocked",
       "statusUnblocked": "Unblocked",
-      "changedBy": "by {name}"
+      "changedBy": "by {name}",
+      "createdAtLabel": "Registered",
+      "allowFindByNameLabel": "Find by name",
+      "allowFindByPhoneLabel": "Find by phone",
+      "blockStatusLabel": "Status",
+      "organizationLabel": "Organization",
+      "dateFromLabel": "Member since from",
+      "dateToLabel": "Member since to",
+      "filterAll": "All",
+      "filterYes": "Yes",
+      "filterNo": "No",
+      "filterBlocked": "Blocked",
+      "filterUnblocked": "Unblocked",
+      "totalUsers": "{count} users found",
+      "pageOf": "Page {current} of {total}",
+      "previous": "Previous",
+      "next": "Next",
+      "orgSearchPlaceholder": "Search organizations...",
+      "pollsButton": "Polls",
+      "pollsDialogTitle": "Polls: {name}",
+      "pollsEmpty": "No poll participation",
+      "pollsLoading": "Loading...",
+      "orgCount": "{count} orgs",
+      "pollCount": "{count} polls",
+      "privacyEnabled": "Yes",
+      "privacyDisabled": "No",
+      "loadMore": "Load more",
+      "clearFilters": "Clear all filters"
     },
     "blockedIps": {
       "title": "Blocked IPs",

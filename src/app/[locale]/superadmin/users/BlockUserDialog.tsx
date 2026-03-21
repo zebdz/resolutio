@@ -12,12 +12,18 @@ import {
   DialogTitle,
 } from '@/app/components/catalyst/dialog';
 
+interface BlockResult {
+  success: boolean;
+  error?: string;
+  fieldErrors?: Record<string, string[]>;
+}
+
 interface BlockUserDialogProps {
   isOpen: boolean;
   onClose: () => void;
   userName: string;
   initialReason?: string;
-  onConfirm: (reason: string) => Promise<void>;
+  onConfirm: (reason: string) => Promise<BlockResult>;
 }
 
 export function BlockUserDialog({
@@ -43,10 +49,17 @@ export function BlockUserDialog({
     setError(null);
 
     try {
-      await onConfirm(reason);
-      setReason('');
+      const result = await onConfirm(reason);
+
+      if (result.success) {
+        setReason('');
+      } else if (result.fieldErrors?.reason) {
+        setError(result.fieldErrors.reason[0]);
+      } else if (result.error) {
+        setError(result.error);
+      }
     } catch {
-      setError('Failed to block user');
+      setError(t('blockFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -69,7 +82,11 @@ export function BlockUserDialog({
           <label className="text-sm font-medium">{t('reasonLabel')}</label>
           <Textarea
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
+            invalid={!!error}
+            onChange={(e) => {
+              setReason(e.target.value);
+              setError(null);
+            }}
             placeholder={t('reasonPlaceholder')}
             rows={3}
           />

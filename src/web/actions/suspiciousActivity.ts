@@ -5,10 +5,15 @@ import { prisma } from '@/infrastructure/index';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { requireSuperadmin } from '@/web/actions/superadminAuth';
 import { isError } from '@/web/actions/superadminAuthUtils';
+import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChecker';
+import { SharedDomainCodes } from '@/domain/shared/SharedDomainCodes';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
+
+const profanityChecker = LeoProfanityChecker.getInstance();
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
-  | { success: false; error: string };
+  | { success: false; error: string; fieldErrors?: Record<string, string[]> };
 
 export interface SuspiciousKeySummary {
   key: string;
@@ -38,6 +43,26 @@ export interface AdminUserResult {
   blockStatus: { blocked: boolean; reason?: string; blockedAt?: Date } | null;
 }
 
+export interface SerializedAdminUserResult {
+  id: string;
+  firstName: string;
+  lastName: string;
+  middleName: string | null;
+  phoneNumber: string;
+  nickname: string;
+  createdAt: string;
+  allowFindByName: boolean;
+  allowFindByPhone: boolean;
+  organizations: { id: string; name: string }[];
+  organizationCount: number;
+  pollCount: number;
+  blockStatus: {
+    blocked: boolean;
+    reason?: string;
+    blockedAt?: string;
+  } | null;
+}
+
 async function getBlockStatusForUser(
   userId: string
 ): Promise<{ blocked: boolean; reason?: string; blockedAt?: Date } | null> {
@@ -60,6 +85,19 @@ async function getBlockStatusForUser(
   }
 
   return { blocked: false };
+}
+
+async function getBlockedUserIds(): Promise<string[]> {
+  const result = await prisma.$queryRaw<{ user_id: string }[]>`
+    SELECT user_id FROM (
+      SELECT DISTINCT ON (user_id) user_id, status
+      FROM user_block_statuses
+      ORDER BY user_id, created_at DESC
+    ) latest
+    WHERE status = 'blocked'
+  `;
+
+  return result.map((r) => r.user_id);
 }
 
 export async function getSuspiciousActivitySummaryAction(input: {
@@ -280,6 +318,16 @@ export async function blockUserAction(input: {
     return { success: false, error: t('reasonRequired') };
   }
 
+  if (profanityChecker.containsProfanity(input.reason)) {
+    const msg = await translateErrorCode(SharedDomainCodes.CONTAINS_PROFANITY);
+
+    return {
+      success: false,
+      error: msg,
+      fieldErrors: { reason: [msg] },
+    };
+  }
+
   await prisma.userBlockStatus.create({
     data: {
       userId: input.userId,
@@ -316,6 +364,16 @@ export async function unblockUserAction(input: {
 
   if (!input.reason.trim()) {
     return { success: false, error: t('reasonRequired') };
+  }
+
+  if (profanityChecker.containsProfanity(input.reason)) {
+    const msg = await translateErrorCode(SharedDomainCodes.CONTAINS_PROFANITY);
+
+    return {
+      success: false,
+      error: msg,
+      fieldErrors: { reason: [msg] },
+    };
   }
 
   await prisma.userBlockStatus.create({
@@ -453,4 +511,356 @@ export async function searchUsersForAdminAction(input: {
   );
 
   return { success: true, data: results };
+}
+
+export async function listUsersForAdminAction(input: {
+  page: number;
+  pageSize: number;
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  allowFindByName?: 'yes' | 'no';
+  allowFindByPhone?: 'yes' | 'no';
+  blockStatus?: 'blocked' | 'unblocked';
+  organizationId?: string;
+}): Promise<
+  ActionResult<{
+    users: SerializedAdminUserResult[];
+    totalCount: number;
+    totalPages: number;
+  }>
+> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const auth = await requireSuperadmin();
+
+  if (isError(auth)) {
+    return auth;
+  }
+
+  const page = input.page ?? 1;
+  const pageSize = input.pageSize ?? 10;
+
+  // Build WHERE clauses
+  const whereAnd: any[] = [];
+
+  if (input.search?.trim()) {
+    const search = input.search.trim();
+    whereAnd.push({
+      OR: [
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { middleName: { contains: search, mode: 'insensitive' } },
+        { nickname: { contains: search, mode: 'insensitive' } },
+        { phoneNumber: { contains: search, mode: 'insensitive' } },
+      ],
+    });
+  }
+
+  if (input.dateFrom && !isNaN(Date.parse(input.dateFrom))) {
+    whereAnd.push({ createdAt: { gte: new Date(input.dateFrom) } });
+  }
+
+  if (input.dateTo && !isNaN(Date.parse(input.dateTo))) {
+    whereAnd.push({
+      createdAt: { lte: new Date(input.dateTo + 'T23:59:59.999Z') },
+    });
+  }
+
+  if (input.allowFindByName === 'yes') {
+    whereAnd.push({ allowFindByName: true });
+  } else if (input.allowFindByName === 'no') {
+    whereAnd.push({ allowFindByName: false });
+  }
+
+  if (input.allowFindByPhone === 'yes') {
+    whereAnd.push({ allowFindByPhone: true });
+  } else if (input.allowFindByPhone === 'no') {
+    whereAnd.push({ allowFindByPhone: false });
+  }
+
+  // Block status filter: get blocked user IDs, then filter
+  if (input.blockStatus) {
+    const blockedIds = await getBlockedUserIds();
+
+    if (input.blockStatus === 'blocked') {
+      whereAnd.push({
+        id: { in: blockedIds.length > 0 ? blockedIds : ['__none__'] },
+      });
+    } else {
+      if (blockedIds.length > 0) {
+        whereAnd.push({ id: { notIn: blockedIds } });
+      }
+    }
+  }
+
+  // Organization filter: get member user IDs
+  if (input.organizationId) {
+    const members = await prisma.organizationUser.findMany({
+      where: {
+        organizationId: input.organizationId,
+        status: 'accepted',
+      },
+      select: { userId: true },
+    });
+    const memberIds = members.map((m) => m.userId);
+    whereAnd.push({
+      id: { in: memberIds.length > 0 ? memberIds : ['__none__'] },
+    });
+  }
+
+  const where = whereAnd.length > 0 ? { AND: whereAnd } : {};
+
+  // Fetch users + count in parallel
+  const [users, totalCount] = await Promise.all([
+    prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        middleName: true,
+        phoneNumber: true,
+        nickname: true,
+        createdAt: true,
+        allowFindByName: true,
+        allowFindByPhone: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.user.count({ where }),
+  ]);
+
+  const userIds = users.map((u) => u.id);
+
+  // Batch enrichment queries (only if there are users)
+  const [blockStatuses, orgMemberships, pollCounts] =
+    userIds.length > 0
+      ? await Promise.all([
+          // Latest block status per user
+          prisma.userBlockStatus.findMany({
+            where: { userId: { in: userIds } },
+            orderBy: { createdAt: 'desc' },
+            distinct: ['userId'],
+            select: {
+              userId: true,
+              status: true,
+              reason: true,
+              createdAt: true,
+            },
+          }),
+          // Org memberships
+          prisma.organizationUser.findMany({
+            where: { userId: { in: userIds }, status: 'accepted' },
+            select: {
+              userId: true,
+              organization: { select: { id: true, name: true } },
+            },
+          }),
+          // Poll participation counts (using poll_participants, the authoritative participation record)
+          prisma.pollParticipant.groupBy({
+            by: ['userId'],
+            where: { userId: { in: userIds } },
+            _count: { _all: true },
+          }),
+        ])
+      : [[], [], []];
+
+  // Build lookup maps
+  const blockStatusMap = new Map(
+    blockStatuses.map((bs) => [
+      bs.userId,
+      bs.status === 'blocked'
+        ? {
+            blocked: true as const,
+            reason: bs.reason ?? undefined,
+            blockedAt: bs.createdAt.toISOString(),
+          }
+        : { blocked: false as const },
+    ])
+  );
+
+  const orgMap = new Map<string, { id: string; name: string }[]>();
+
+  for (const m of orgMemberships) {
+    const existing = orgMap.get(m.userId) ?? [];
+    existing.push(m.organization);
+    orgMap.set(m.userId, existing);
+  }
+
+  const pollCountMap = new Map(
+    pollCounts.map((pc) => [pc.userId, pc._count._all])
+  );
+
+  // Serialize
+  const serializedUsers: SerializedAdminUserResult[] = users.map((user) => {
+    const orgs = orgMap.get(user.id) ?? [];
+
+    return {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      middleName: user.middleName,
+      phoneNumber: user.phoneNumber,
+      nickname: user.nickname,
+      createdAt: user.createdAt.toISOString(),
+      allowFindByName: user.allowFindByName,
+      allowFindByPhone: user.allowFindByPhone,
+      organizations: orgs,
+      organizationCount: orgs.length,
+      pollCount: pollCountMap.get(user.id) ?? 0,
+      blockStatus: blockStatusMap.get(user.id) ?? null,
+    };
+  });
+
+  return {
+    success: true,
+    data: {
+      users: serializedUsers,
+      totalCount,
+      totalPages: Math.ceil(totalCount / pageSize),
+    },
+  };
+}
+
+export async function searchOrganizationsForFilterAction(input: {
+  query: string;
+}): Promise<ActionResult<{ id: string; name: string }[]>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const auth = await requireSuperadmin();
+
+  if (isError(auth)) {
+    return auth;
+  }
+
+  if (input.query.length < 2) {
+    return { success: true, data: [] };
+  }
+
+  const orgs = await prisma.organization.findMany({
+    where: {
+      name: { contains: input.query, mode: 'insensitive' },
+      archivedAt: null,
+    },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+    take: 20,
+  });
+
+  return { success: true, data: orgs };
+}
+
+export interface UserPollResult {
+  id: string;
+  title: string;
+  state: string;
+  createdAt: string;
+  organizationId: string;
+  organizationName: string;
+}
+
+const POLLS_PAGE_SIZE = 10;
+
+export async function getUserPollsForAdminAction(input: {
+  userId: string;
+  page?: number;
+}): Promise<ActionResult<{ polls: UserPollResult[]; totalCount: number }>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const auth = await requireSuperadmin();
+
+  if (isError(auth)) {
+    return auth;
+  }
+
+  if (!input.userId) {
+    return { success: true, data: { polls: [], totalCount: 0 } };
+  }
+
+  const page = input.page ?? 1;
+  const offset = (page - 1) * POLLS_PAGE_SIZE;
+
+  const [polls, countResult] = await Promise.all([
+    prisma.$queryRaw<
+      {
+        id: string;
+        title: string;
+        state: string;
+        created_at: Date;
+        organization_id: string;
+        organization_name: string;
+      }[]
+    >`
+      SELECT p.id, p.title, p.state, p.created_at, p.organization_id, o.name as organization_name
+      FROM poll_participants pp
+      JOIN polls p ON pp.poll_id = p.id
+      JOIN organizations o ON p.organization_id = o.id
+      WHERE pp.user_id = ${input.userId}
+      ORDER BY p.created_at DESC
+      LIMIT ${POLLS_PAGE_SIZE}
+      OFFSET ${offset}
+    `,
+    prisma.$queryRaw<[{ count: bigint }]>`
+      SELECT COUNT(*) as count
+      FROM poll_participants pp
+      WHERE pp.user_id = ${input.userId}
+    `,
+  ]);
+
+  return {
+    success: true,
+    data: {
+      polls: polls.map((p) => ({
+        id: p.id,
+        title: p.title,
+        state: p.state,
+        createdAt: p.created_at.toISOString(),
+        organizationId: p.organization_id,
+        organizationName: p.organization_name,
+      })),
+      totalCount: Number(countResult[0].count),
+    },
+  };
+}
+
+export async function getOrganizationNameAction(input: {
+  organizationId: string;
+}): Promise<ActionResult<{ id: string; name: string } | null>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const auth = await requireSuperadmin();
+
+  if (isError(auth)) {
+    return auth;
+  }
+
+  if (!input.organizationId) {
+    return { success: true, data: null };
+  }
+
+  const org = await prisma.organization.findUnique({
+    where: { id: input.organizationId },
+    select: { id: true, name: true },
+  });
+
+  return { success: true, data: org };
 }

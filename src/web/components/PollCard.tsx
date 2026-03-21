@@ -4,11 +4,8 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/app/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
-import {
-  ClockIcon,
-  CalendarIcon,
-  PencilIcon,
-} from '@heroicons/react/24/outline';
+import { PencilIcon } from '@heroicons/react/24/outline';
+import { PollStateBadge } from '@/web/components/PollStateBadge';
 import {
   takeSnapshotAction,
   discardSnapshotAction,
@@ -44,7 +41,6 @@ export function PollCard({
   const isActive = poll.state === 'ACTIVE';
   const isDraft = poll.state === 'DRAFT';
   const isReady = poll.state === 'READY';
-  const isUpcoming = isDraft || isReady;
   const isFinished = poll.state === 'FINISHED';
   const isCreator = poll.createdBy === userId;
   const isOrgArchived = poll.isOrgArchived;
@@ -193,23 +189,7 @@ export function PollCard({
             {poll.title}
           </h3>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            {isActive && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-green-700 bg-green-50 dark:text-green-400 dark:bg-green-900/20 rounded-full">
-                <ClockIcon className="w-3 h-3" />
-                {t('active')}
-              </span>
-            )}
-            {isUpcoming && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/20 rounded-full">
-                <CalendarIcon className="w-3 h-3" />
-                {t('upcoming')}
-              </span>
-            )}
-            {isFinished && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-zinc-500 bg-zinc-50 dark:text-zinc-400 dark:bg-zinc-800 rounded-full">
-                {t('finished')}
-              </span>
-            )}
+            <PollStateBadge state={poll.state} />
             {isOrgArchived && (
               <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-pink-700 bg-pink-200 dark:text-pink-400 dark:bg-pink-900/40 rounded-full">
                 {t('orgArchived')}

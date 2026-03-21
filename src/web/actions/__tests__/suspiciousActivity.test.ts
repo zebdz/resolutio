@@ -14,6 +14,7 @@ const { mockIsSuperAdmin, mockPrisma } = vi.hoisted(() => {
       userBlockStatus: {
         create: fn().mockResolvedValue({}),
         findFirst: fn().mockResolvedValue(null),
+        findMany: fn().mockResolvedValue([]),
       },
       user: {
         findMany: fn().mockResolvedValue([]),
