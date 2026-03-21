@@ -151,7 +151,8 @@ class MockOtpDeliveryChannel implements OtpDeliveryChannel {
   async send(
     _recipient: string,
     code: string,
-    _locale: string
+    _locale: string,
+    _clientIp: string
   ): Promise<OtpDeliveryResult> {
     if (!this.shouldSucceed) {
       return { success: false };
@@ -263,10 +264,30 @@ describe('LoginUserUseCase', () => {
     });
   });
 
+  it('should reject login when ipAddress is empty', async () => {
+    const user = createTestUser({ confirmedAt: new Date() });
+    userRepository.addUser(user);
+
+    const result = await useCase.execute({
+      phoneNumber: '+79161234567',
+      password: 'securepass',
+      ipAddress: '',
+    });
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error).toBe(AuthErrors.MISSING_IP);
+    }
+
+    expect(sessionRepository.lastCreatedExpiresAt).toBeNull();
+  });
+
   it('should reject invalid credentials (user not found)', async () => {
     const result = await useCase.execute({
       phoneNumber: '+79161234567',
       password: 'wrongpass',
+      ipAddress: '127.0.0.1',
     });
 
     expect(result.success).toBe(false);
@@ -283,6 +304,7 @@ describe('LoginUserUseCase', () => {
     const result = await useCase.execute({
       phoneNumber: '+79161234567',
       password: 'wrongpass',
+      ipAddress: '127.0.0.1',
     });
 
     expect(result.success).toBe(false);
@@ -300,6 +322,7 @@ describe('LoginUserUseCase', () => {
     const result = await useCase.execute({
       phoneNumber: '+79161234567',
       password: 'securepass',
+      ipAddress: '127.0.0.1',
     });
 
     expect(result.success).toBe(true);
@@ -326,6 +349,7 @@ describe('LoginUserUseCase', () => {
     const result = await useCase.execute({
       phoneNumber: '+79161234567',
       password: 'securepass',
+      ipAddress: '127.0.0.1',
     });
 
     expect(result.success).toBe(true);
@@ -405,6 +429,7 @@ describe('LoginUserUseCase', () => {
     const result = await useCase.execute({
       phoneNumber: '+79161234567',
       password: 'securepass',
+      ipAddress: '127.0.0.1',
     });
 
     expect(result.success).toBe(true);

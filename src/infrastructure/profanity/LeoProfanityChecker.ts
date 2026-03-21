@@ -5,6 +5,7 @@ import {
   PROFANITY_WHITELISTED,
   PROFANITY_STEMS,
   PROFANITY_INFIXES,
+  PROFANITY_PHRASES,
 } from '@/domain/shared/profanity/profanityConfig';
 
 export class LeoProfanityChecker implements ProfanityChecker {
@@ -60,6 +61,14 @@ export class LeoProfanityChecker implements ProfanityChecker {
     '6': 'б', // 6лять → блять
   };
 
+  // Special char→Cyrillic substitution map (visual resemblance)
+  private static readonly SPECIAL_CHAR_SUBS: Record<string, string> = {
+    '@': 'а',
+    $: 'с',
+    '₽': 'р',
+    '€': 'е',
+  };
+
   containsProfanity(text: string): boolean {
     if (leoProfanity.check(text)) {
       return true;
@@ -77,7 +86,23 @@ export class LeoProfanityChecker implements ProfanityChecker {
       return true;
     }
 
-    // Strip non-letter characters to catch obfuscation
+    // Strip non-letter characters from ORIGINAL text to catch cases where
+    // special chars replace letters ambiguously (Еб$ть → Ебть, $ could be а or с)
+    const originalLettersOnly = text.replace(/[^\p{L}]/gu, '');
+
+    if (originalLettersOnly !== text.replace(/\s/g, '')) {
+      const normalizedStripped = this.normalize(originalLettersOnly);
+
+      if (leoProfanity.check(normalizedStripped)) {
+        return true;
+      }
+
+      if (this.containsProfaneStem(normalizedStripped)) {
+        return true;
+      }
+    }
+
+    // Strip non-letter characters from normalized text to catch obfuscation
     // like х.у.е.в.ы.й, б*л*я*т*ь
     const lettersOnly = normalized.replace(/[^\p{L}]/gu, '');
 
@@ -104,6 +129,15 @@ export class LeoProfanityChecker implements ProfanityChecker {
       }
     }
 
+    // Phrase matching: check collapsed normalized text for multi-word phrases
+    const collapsedLower = normalized.replace(/\s/g, '').toLowerCase();
+
+    for (const phrase of PROFANITY_PHRASES) {
+      if (collapsedLower.includes(phrase)) {
+        return true;
+      }
+    }
+
     return false;
   }
 
@@ -118,9 +152,14 @@ export class LeoProfanityChecker implements ProfanityChecker {
       return LeoProfanityChecker.HOMOGLYPHS[lower] ?? ch;
     });
 
-    // Digit→Cyrillic (0→о, 3→з, 4→а, 6→б, 9→д)
+    // Digit→Cyrillic (0→о, 3→е, 4→а, 6→б)
     result = result.replace(/[0-9]/g, (ch) => {
       return LeoProfanityChecker.DIGIT_SUBS[ch] ?? ch;
+    });
+
+    // Special char→Cyrillic (@→а, $→с, ₽→р, €→е)
+    result = result.replace(/[@$₽€]/g, (ch) => {
+      return LeoProfanityChecker.SPECIAL_CHAR_SUBS[ch] ?? ch;
     });
 
     return result;

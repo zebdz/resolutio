@@ -76,7 +76,12 @@ export class RegisterUserUseCase {
   async execute(
     input: RegisterUserInput
   ): Promise<Result<RegisterResult, string>> {
-    // 1. Validate consent
+    // 1. Validate IP
+    if (!input.clientIp) {
+      return failure(AuthErrors.MISSING_IP);
+    }
+
+    // 2. Validate consent
     if (!input.consentGiven) {
       return failure(AuthErrors.CONSENT_NOT_GIVEN);
     }
@@ -183,7 +188,8 @@ export class RegisterUserUseCase {
     const deliveryResult = await this.deliveryChannel.send(
       phoneNumber.getValue(),
       code.getValue(),
-      savedUser.language
+      savedUser.language,
+      input.clientIp
     );
 
     if (!deliveryResult.success) {

@@ -6,7 +6,9 @@
 // This list only contains words NOT covered by stems or the library.
 export const PROFANITY_CUSTOM_BLOCKED: string[] = [
   'хер', // standalone; can't use as stem (would catch херсон, херувим, херес)
-  'манда', // standalone; can't use as stem (would catch мандарин, мандат)
+
+  // манда/монда standalone; can't use as stem (would catch мандарин, мандат)
+  'манда',
   'манды',
   'манде',
   'манду',
@@ -16,6 +18,93 @@ export const PROFANITY_CUSTOM_BLOCKED: string[] = [
   'монде',
   'монду',
   'мондой',
+
+  // анал — can't use as stem (would catch анализ)
+  'анал',
+  'анала',
+  'аналу',
+  'аналом',
+  'анале',
+
+  // трах — can't use as stem (would catch трахея)
+  'трах',
+
+  // конча/конченый — can't use конч- stem (would catch кончить, кончилось)
+  'конча',
+  'кончи',
+  'конченый',
+  'конченая',
+  'конченое',
+  'конченые',
+
+  // дура/дурь/дуралей — can't use дур- stem (would catch дурак which user excluded)
+  'дура',
+  'дуры',
+  'дуре',
+  'дуру',
+  'дурой',
+  'дурочка',
+  'дурочки',
+  'дурь',
+  'дури',
+  'дуралей',
+  'дуралея',
+  'дуралею',
+
+  // урод/уродина — can't use урод- stem (уродливый is sometimes neutral)
+  'урод',
+  'урода',
+  'уроду',
+  'уродом',
+  'уроде',
+  'уроды',
+  'уродов',
+  'уродина',
+  'уродины',
+  'уродке',
+
+  // наркота — can't use наркот- stem (наркотик is legitimate)
+  'наркота',
+  'наркоты',
+  'наркоте',
+  'наркоту',
+  'наркотой',
+
+  // сдохни — can't use сдохн- stem (сдохла/сдохнуть used neutrally: "батарейка сдохла")
+  'сдохни',
+  'сдохните',
+
+  // болван — can't use as stem (болванка = blank/dummy in metalworking)
+  'болван',
+  'болвана',
+  'болвану',
+  'болваном',
+  'болване',
+  'болваны',
+  'болванов',
+
+  // калич/калеч — can't use as stem (калечить = to maim, legitimate word)
+  'калич',
+  'калеч',
+
+  // педик — can't use as stem (would catch педикюр)
+  'педик',
+  'педика',
+  'педику',
+  'педиком',
+  'педике',
+  'педики',
+  'педиков',
+  'педикам',
+  'педиками',
+  'педиках',
+
+  // stripped forms from symbol-obfuscated words (П#дор→Пдор, Пи£да→Пида)
+  'пдор',
+  'пида', // stripped from Пи£да
+
+  // words that can't be infixes (false positive risk)
+  'ебень', // can't use ебен infix (ребенок, жеребенок)
 ];
 
 // Profane stems for Russian morphology matching.
@@ -23,8 +112,8 @@ export const PROFANITY_CUSTOM_BLOCKED: string[] = [
 // This catches all declensions/conjugations without enumerating every form.
 // Stems are chosen to be long enough to avoid false positives on legitimate words.
 export const PROFANITY_STEMS: string[] = [
-  // хуй derivatives — stems for words starting with хуй/хуё
-  'хуёв', // хуёвый, хуёвая...
+  // NOTE: all stems are checked against ё→е normalized text, so only е-forms needed here.
+  // ё-forms are handled by the library or by ё→е normalization + е-stems.
 
   // NOTE: хуй/хуе/хуи moved to PROFANITY_INFIXES — they're safe as substrings
   // and need to catch prefixed forms (аааахуеть, нахуярить, etc.)
@@ -40,9 +129,9 @@ export const PROFANITY_STEMS: string[] = [
   'мудач', // мудачье, мудачок...
   'мудил', // мудила, мудило...
 
-  // гандон/гондон
-  'гандон', // гандон, гандона, гандоном, гандонка...
-  'гондон', // гондон, гондона, гондоном, гондонка...
+  // гандон/гондон (shortened to catch stripped forms like Гандо#→Гандо)
+  'гандо', // гандон, гандона, гандоном, гандонка, гандо (stripped)...
+  'гондо', // гондон, гондона, гондоном, гондонка...
 
   // шлюх
   'шлюх', // шлюха, шлюхи, шлюхой, шлюхам...
@@ -52,16 +141,15 @@ export const PROFANITY_STEMS: string[] = [
   'пидар', // пидар, пидара, пидары...
   'пидер', // пидераст...
   'пидир', // пидираст...
+  'пидр', // пидр (shortened slang)
   'педор', // педорас, педораст...
   'педар', // педарас, педараст...
   'педер', // педераст...
   'педир', // педираст...
 
-  // жоп
-  'жоп', // жопа, жопы, жопе, жопу, жопой, жопам...
-
-  // говн
+  // говн/гавн
   'говн', // говно, говна, говном, говнюк, говнище, говняный...
+  'гавн', // гавно (misspelling of говно)...
 
   // дроч
   'дроч', // дрочить, дрочит, дрочила, дрочу...
@@ -80,10 +168,11 @@ export const PROFANITY_STEMS: string[] = [
   'миньет', // миньет, миньета...
   'миннет', // миннет, миннета...
 
-  // членосос
+  // членосос/членсос
   'членосос', // членосос, членососка...
+  'членсос', // членсоска (misspelling)...
 
-  // манда/монда (can't use 'манд' or 'манда' — would flag мандарин, мандат)
+  // манда/монда compounds (can't use 'манд'/'манда' — would flag мандарин, мандат)
   'мандав', // мандавошка...
   'мандов', // мандовошка...
   'мандол', // мандолиз...
@@ -91,9 +180,8 @@ export const PROFANITY_STEMS: string[] = [
   'мондов', // мондовошка...
   'мондал', // мондализ...
 
-  // епт/ёпт
+  // епт (ёпт removed — dead; library catches ёпт directly, ё→е normalization + this stem catches епт)
   'епт', // епт
-  'ёпт', // ёпт
 
   // пизд- (stem for words starting with пизд)
   'пизд', // пизда, пиздец, пиздас, пиздос, пиздолиз, пиздалис...
@@ -101,33 +189,57 @@ export const PROFANITY_STEMS: string[] = [
   // пезд- (misspelling of пизд-)
   'пезд', // пезда, пездализ, пездолиз, пездолис, пездалис...
 
-  // еб- prefixed/derived (ебан, уебан, ебобо)
+  // еб- prefixed/derived
   'ебан', // ебан, ебаный, ебанат...
   'уебан', // уебан, уебаны...
   'ебоб', // ебобо...
 
-  // долбое/далбое (е-variant and misspelling of долбоёб)
+  // долбое/далбое/долбан/долбае
   'долбое', // долбоеб (also auto-generated from ё, but stem catches долбое*)
   'далбое', // далбоеб (misspelling)
-  'далбоё', // далбоёб (misspelling with ё)
+  // NOTE: далбоё removed — dead (stems checked on ё→е normalized text; далбое covers it)
+  'долбан', // долбаный, долбанный...
+  'долбае', // долбаеб...
 
   // *еб compound words (animal + еб)
   'овцееб', // овцоёб written with е
   'авцееб', // misspelling
   'авциеб', // misspelling
-  'ослоеб', // ослоёб written with е
+  'ослоеб', // ослоёб written с е
   'аслоеб', // misspelling
   'аслаеб', // misspelling
-  'козлоеб', // козлоёб written with е
+  'козлоеб', // козлоёб written с е
   'козлаеб', // misspelling
   'казлоеб', // misspelling
   'казлаеб', // misspelling
-  'овцеёб', // with ё
-  'ослоёб', // with ё
-  'козлоёб', // with ё
-  'козлаёб', // misspelling with ё
-  'казлоёб', // misspelling with ё
-  'казлаёб', // misspelling with ё
+  // NOTE: ё-variants (овцеёб, ослоёб, козлоёб, etc.) removed — dead code.
+  // Stems are checked on ё→е normalized text; е-variants above cover them.
+
+  // Extended insult stems (no legitimate words start with these)
+  'сволоч', // сволочь, сволочи, сволочей...
+  'дебил', // дебил, дебила, дебильный...
+  'тупиц', // тупица, тупицы...
+  'ублюд', // ублюдок, ублюдки...
+  'твар', // тварь, твари, тварей... (no legitimate words start with твар-)
+  'утыр', // утырок, утырка...
+  'чмыр', // чмырь, чмыря...
+  'дегенерат', // дегенерат, дегенерата...
+  'целк', // целка, целки...
+  'бухл', // бухло, бухлишко...
+  'задниц', // задница, задницы...
+  'какашк', // какашка, какашки...
+  'вонючк', // вонючка, вонючки...
+  'ванючк', // ванючка (misspelling)...
+  'фуфл', // фуфло, фуфлыжник...
+  'идиот', // идиот, идиотка, идиотизм...
+  'жирд', // жирдяй, жирдяя...
+  'сиськ', // сиськи, сиськa...
+  'сисечк', // сисечки, сисечка...
+  'письк', // писька, письки...
+  'писюн', // писюн, писюна...
+  'перепих', // перепих, перепиха...
+  'шпехат', // шпехаться...
+  'косожоп', // косожопый...
 ];
 
 // Profane infixes — checked as substrings within words.
@@ -143,9 +255,12 @@ export const PROFANITY_INFIXES: string[] = [
   'пизд', // допиздел, напиздел, отпиздил, распиздяй, роспиздня...
   'пезд', // misspelling variant
   'ебан', // уебан, заебаный...
+  'еблан', // еблан, ебланы...
+  // NOTE: ебен removed — false positive on ребенок, жеребенок
   'ибан', // ибануть, ибанутый (misspelling of ебан)...
   'ибал', // разъибал, абъибал (misspelling of ебал)...
-  'ебат', // заебать, проебать, наебать, доебать...
+  // NOTE: ебат removed — false positive on хлебать. Library covers заебать/проебать/наебать.
+  'доебат', // доебать, доебаться (not in library)
   'ебал', // заебал, проебал, наебал, доебал...
   'ебаш', // заебашить, наебашить...
   'ебас', // ебасить...
@@ -154,7 +269,16 @@ export const PROFANITY_INFIXES: string[] = [
   'ебну', // ебнуть (е-variant)
   'ебон', // ебонуть, ебонутый, ебонутая...
   'выеб', // выебу, выебать, вротвыебу...
+  'ебт', // catches stripped Еб$ть→Ебть ($ used as letter replacement)
+  'жоп', // жопа, косожопый, кривожопый... (moved from stems — infix catches prefixed forms)
+  // NOTE: пид removed — false positive on пиджак, эпидемия. Stems пидор/пидар/пидр cover it.
+  'трахат', // трахать (safe: трахея doesn't contain трахат)
+  'трахну', // трахнуть, трахнул...
 ];
+
+// Profane phrases — checked against the full collapsed text.
+// Catches multi-word expressions.
+export const PROFANITY_PHRASES: string[] = ['твоюмать', 'твоюжмать'];
 
 // False positives to allow
 export const PROFANITY_WHITELISTED: string[] = [];

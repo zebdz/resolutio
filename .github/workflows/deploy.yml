@@ -120,6 +120,7 @@ jobs:
           OTP_MAX_ATTEMPTS: ${{ vars.OTP_MAX_ATTEMPTS || '5' }}
           SMS_RU_API_ID: ${{ secrets.SMS_RU_API_ID }}
           SMS_RU_TEST_MODE: ${{ inputs.branch == 'beta' && 'true' || 'false' }}
+          SMS_RU_MAX_COST_RUBLES: ${{ vars.SMS_RU_MAX_COST_RUBLES || '' }}
           PORT: ${{ inputs.port }}
         run: |
           # Create .env file for deployment
@@ -130,6 +131,7 @@ jobs:
           echo "OTP_MAX_ATTEMPTS=$OTP_MAX_ATTEMPTS" >> .env
           echo "SMS_RU_API_ID=$SMS_RU_API_ID" >> .env
           echo "SMS_RU_TEST_MODE=$SMS_RU_TEST_MODE" >> .env
+          echo "SMS_RU_MAX_COST_RUBLES=$SMS_RU_MAX_COST_RUBLES" >> .env
           echo "PORT=$PORT" >> .env
 
           tar -czf deploy.tar.gz \
