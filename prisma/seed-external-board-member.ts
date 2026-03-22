@@ -37,11 +37,6 @@ async function main() {
   });
 
   if (existing) {
-    await prisma.boardUser.deleteMany({ where: { userId: existing.id } });
-    await prisma.organizationUser.deleteMany({
-      where: { userId: existing.id },
-    });
-    await prisma.session.deleteMany({ where: { userId: existing.id } });
     await prisma.user.delete({ where: { id: existing.id } });
     console.log('Deleted existing external board member');
   }
