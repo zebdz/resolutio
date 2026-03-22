@@ -37,7 +37,8 @@ export class LeoProfanityChecker implements ProfanityChecker {
     return LeoProfanityChecker.instance;
   }
 
-  // Latin→Cyrillic homoglyph map (lowercase only; uppercase handled via toLowerCase)
+  // Latin→Cyrillic visual homoglyph map (letters that look alike)
+  // (lowercase only; uppercase handled via toLowerCase)
   private static readonly HOMOGLYPHS: Record<string, string> = {
     a: 'а',
     c: 'с',
@@ -48,9 +49,70 @@ export class LeoProfanityChecker implements ProfanityChecker {
     y: 'у',
     k: 'к',
     h: 'н',
+    j: 'й', // then й→и normalization handles it
     b: 'в',
     m: 'м',
     t: 'т',
+  };
+
+  // Latin→Cyrillic phonetic transliteration map (letters that sound alike).
+  // Applied as a second stage after HOMOGLYPHS to fill remaining Latin chars,
+  // or directly for mixed-script evasion detection.
+  private static readonly TRANSLITERATION: Record<string, string> = {
+    a: 'а',
+    b: 'б',
+    c: 'с',
+    d: 'д',
+    e: 'е',
+    f: 'ф',
+    g: 'г',
+    h: 'х',
+    i: 'и',
+    k: 'к',
+    l: 'л',
+    m: 'м',
+    n: 'н',
+    o: 'о',
+    p: 'п',
+    r: 'р',
+    s: 'с',
+    t: 'т',
+    u: 'у',
+    v: 'в',
+    x: 'х',
+    y: 'у',
+    z: 'з',
+  };
+
+  // Multi-character Latin→Cyrillic transliteration (digraphs/trigraphs).
+  // Processed left-to-right, longest match first, before single-char transliteration.
+  // Sorted by length descending for matching priority.
+  private static readonly DIGRAPHS: [string, string][] = [
+    ['shch', 'щ'],
+    ['sch', 'щ'],
+    ['ya', 'я'],
+    ['yu', 'ю'],
+    ['yo', 'ё'],
+    ['ye', 'е'],
+    ['zh', 'ж'],
+    ['sh', 'ш'],
+    ['ch', 'ч'],
+    ['ts', 'ц'],
+    ['kh', 'х'],
+  ];
+
+  // Alternative overrides for mixed-script evasion (applied on top of TRANSLITERATION).
+  // Only used when text contains both Cyrillic and Latin characters.
+  private static readonly MIXED_SCRIPT_OVERRIDES: Record<string, string> = {
+    s: 'з', // evasion: Latin s used for Cyrillic з (standard translit: s→с)
+  };
+
+  // Alternative digit substitutions for ambiguous digits.
+  // Primary: 3→е (ху3вый→хуевый). Alt: 3→з (пи3да→пизда).
+  private static readonly ALT_DIGIT_SUBS: Record<string, string> = {
+    '3': 'з', // visual: 3 looks like з (primary: 3→е)
+    '4': 'ч', // visual: 4 looks like ч (primary: 4→а)
+    '9': 'д', // visual: 9 looks like д (no primary mapping)
   };
 
   // Digit→Cyrillic substitution map (most common profanity evasion substitutions)
@@ -74,7 +136,7 @@ export class LeoProfanityChecker implements ProfanityChecker {
       return true;
     }
 
-    // Normalize: ё→е, Latin homoglyphs→Cyrillic
+    // Stage 1: Visual homoglyphs normalization (ё→е, Latin lookalikes→Cyrillic)
     const normalized = this.normalize(text);
 
     if (normalized !== text && leoProfanity.check(normalized)) {
@@ -84,6 +146,93 @@ export class LeoProfanityChecker implements ProfanityChecker {
     // Stem-based matching for Russian morphology
     if (this.containsProfaneStem(normalized)) {
       return true;
+    }
+
+    // Alt-digit normalization: try alternative digit mappings (3→з instead of 3→е).
+    // Catches пи3да → пизда (primary gives пиеда which misses).
+    const altDigitMap = {
+      ...LeoProfanityChecker.DIGIT_SUBS,
+      ...LeoProfanityChecker.ALT_DIGIT_SUBS,
+    };
+    const altDigitNormalized = this.normalize(text, undefined, altDigitMap);
+
+    if (altDigitNormalized !== normalized) {
+      if (leoProfanity.check(altDigitNormalized)) {
+        return true;
+      }
+
+      if (this.containsProfaneStem(altDigitNormalized)) {
+        return true;
+      }
+    }
+
+    // Stage 2: Fill remaining Latin chars with phonetic transliteration.
+    // Applied to the homoglyph-normalized result so already-mapped chars (h→н, b→в)
+    // stay as-is, avoiding false positives like "hue" → "хуе".
+    const fullyNormalized = this.normalize(
+      normalized,
+      LeoProfanityChecker.TRANSLITERATION
+    );
+
+    if (fullyNormalized !== normalized) {
+      if (leoProfanity.check(fullyNormalized)) {
+        return true;
+      }
+
+      if (this.containsProfaneStem(fullyNormalized)) {
+        return true;
+      }
+    }
+
+    // Stage 3: Mixed-script alternative normalization.
+    // When text has both Cyrillic and Latin, try full transliteration (h→х, b→б)
+    // plus overrides (s→з) directly on the original to catch evasion like Пиsда.
+    // Only for mixed-script to avoid false positives on pure English.
+    if (this.isMixedScript(text)) {
+      const altMap = {
+        ...LeoProfanityChecker.TRANSLITERATION,
+        ...LeoProfanityChecker.MIXED_SCRIPT_OVERRIDES,
+      };
+      const altNormalized = this.normalize(text, altMap);
+
+      if (altNormalized !== fullyNormalized && altNormalized !== text) {
+        if (leoProfanity.check(altNormalized)) {
+          return true;
+        }
+
+        if (this.containsProfaneStem(altNormalized)) {
+          return true;
+        }
+      }
+    }
+
+    // Stage 4: Full phonetic transliteration (with digraph support).
+    // Applies digraphs (ya→я, sh→ш) then full TRANSLITERATION (h→х, b→б, p→п).
+    // When digraphs are found: full check (transliteration intent is clear).
+    // When no digraphs: stem-only check (avoids infix false positives like "hue"→"хуе").
+    const digraphed = this.applyDigraphs(text);
+    const fullTranslit = this.normalize(
+      digraphed,
+      LeoProfanityChecker.TRANSLITERATION
+    );
+
+    if (fullTranslit !== fullyNormalized && fullTranslit !== text) {
+      if (digraphed !== text) {
+        // Digraphs found → full check (transliteration intent is clear)
+        if (leoProfanity.check(fullTranslit)) {
+          return true;
+        }
+
+        if (this.containsProfaneStem(fullTranslit)) {
+          return true;
+        }
+      } else {
+        // No digraphs → stem-only check (safe: stems are specific enough
+        // to avoid false positives, unlike infixes e.g. "hue"→"хуе")
+        if (this.containsStemMatch(fullTranslit)) {
+          return true;
+        }
+      }
     }
 
     // Strip non-letter characters from ORIGINAL text to catch cases where
@@ -129,11 +278,16 @@ export class LeoProfanityChecker implements ProfanityChecker {
       }
     }
 
-    // Phrase matching: check collapsed normalized text for multi-word phrases
-    const collapsedLower = normalized.replace(/\s/g, '').toLowerCase();
+    // Phrase matching: check collapsed text for multi-word phrases and symbol patterns.
+    // Check BOTH normalized (for Cyrillic phrases) and original (for # patterns like #опа).
+    const collapsedNormLower = normalized.replace(/\s/g, '').toLowerCase();
+    const collapsedOrigLower = text.replace(/\s/g, '').toLowerCase();
 
     for (const phrase of PROFANITY_PHRASES) {
-      if (collapsedLower.includes(phrase)) {
+      if (
+        collapsedNormLower.includes(phrase) ||
+        collapsedOrigLower.includes(phrase)
+      ) {
         return true;
       }
     }
@@ -141,20 +295,32 @@ export class LeoProfanityChecker implements ProfanityChecker {
     return false;
   }
 
-  private normalize(text: string): string {
-    // ё→е
-    let result = text.replace(/ё/g, 'е').replace(/Ё/g, 'Е');
+  private normalize(
+    text: string,
+    charMap?: Record<string, string>,
+    digitMap?: Record<string, string>
+  ): string {
+    // ё→е, й→и (common evasion substitutions within Cyrillic)
+    let result = text
+      .replace(/ё/g, 'е')
+      .replace(/Ё/g, 'Е')
+      .replace(/й/g, 'и')
+      .replace(/Й/g, 'И');
 
-    // Latin homoglyphs→Cyrillic
+    // Latin→Cyrillic using provided map (or HOMOGLYPHS by default)
+    const map = charMap ?? LeoProfanityChecker.HOMOGLYPHS;
+
     result = result.replace(/[a-zA-Z]/g, (ch) => {
       const lower = ch.toLowerCase();
 
-      return LeoProfanityChecker.HOMOGLYPHS[lower] ?? ch;
+      return map[lower] ?? ch;
     });
 
-    // Digit→Cyrillic (0→о, 3→е, 4→а, 6→б)
+    // Digit→Cyrillic
+    const digits = digitMap ?? LeoProfanityChecker.DIGIT_SUBS;
+
     result = result.replace(/[0-9]/g, (ch) => {
-      return LeoProfanityChecker.DIGIT_SUBS[ch] ?? ch;
+      return digits[ch] ?? ch;
     });
 
     // Special char→Cyrillic (@→а, $→с, ₽→р, €→е)
@@ -163,6 +329,63 @@ export class LeoProfanityChecker implements ProfanityChecker {
     });
 
     return result;
+  }
+
+  // Replace multi-char Latin sequences with Cyrillic (ya→я, sh→ш, etc.).
+  // Scans left-to-right, longest match first. Non-matching chars stay as-is.
+  private applyDigraphs(text: string): string {
+    let result = '';
+    let i = 0;
+
+    while (i < text.length) {
+      let matched = false;
+
+      for (const [digraph, replacement] of LeoProfanityChecker.DIGRAPHS) {
+        const len = digraph.length;
+
+        if (
+          i + len <= text.length &&
+          text.substring(i, i + len).toLowerCase() === digraph
+        ) {
+          result += replacement;
+          i += len;
+          matched = true;
+          break;
+        }
+      }
+
+      if (!matched) {
+        result += text[i];
+        i++;
+      }
+    }
+
+    return result;
+  }
+
+  private isMixedScript(text: string): boolean {
+    return /[\u0400-\u04FF]/.test(text) && /[a-zA-Z]/.test(text);
+  }
+
+  // Stem-only check (no infixes). Used for full transliteration of pure Latin text
+  // where infix matching would cause false positives (e.g. "hue" → "хуе").
+  private containsStemMatch(text: string): boolean {
+    const lower = text.toLowerCase();
+    const words = lower.split(/\s+/);
+
+    for (const word of words) {
+      if (!word) {
+        continue;
+      }
+
+      for (const stem of PROFANITY_STEMS) {
+        if (word.startsWith(stem)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   private containsProfaneStem(text: string): boolean {

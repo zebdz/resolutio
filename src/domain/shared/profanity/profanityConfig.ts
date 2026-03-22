@@ -105,6 +105,30 @@ export const PROFANITY_CUSTOM_BLOCKED: string[] = [
 
   // words that can't be infixes (false positive risk)
   'ебень', // can't use ебен infix (ребенок, жеребенок)
+
+  // Cyrillic words not in library or stems
+  'хрен', // standalone; хренов- derivatives via stem
+  'соси', // imperative singular; can't use stem (сосиска)
+  'сосите', // imperative plural
+
+  // Latin transliterations of common Russian profanity (evasion via Latin script)
+  'hui',
+  'hyi',
+  'huy',
+  'xuy', // хуй
+  'hren', // хрен
+  'xren',
+  'xpen', // хрен (x=х, p=р)
+  'gandon', // гандон
+  'handon', // гандон variant
+  'sosi',
+  'coci', // соси
+  'yeban',
+  'ueban', // (у)ебан
+  'xer', // хер
+  'minet', // минет
+  'uebok',
+  'yebok', // уебок
 ];
 
 // Profane stems for Russian morphology matching.
@@ -191,7 +215,7 @@ export const PROFANITY_STEMS: string[] = [
 
   // еб- prefixed/derived
   'ебан', // ебан, ебаный, ебанат...
-  'уебан', // уебан, уебаны...
+  'уеб', // уебок, уебать, уебу, уебище... (no legitimate words start with уеб)
   'ебоб', // ебобо...
 
   // долбое/далбое/долбан/долбае
@@ -214,6 +238,16 @@ export const PROFANITY_STEMS: string[] = [
   'казлаеб', // misspelling
   // NOTE: ё-variants (овцеёб, ослоёб, козлоёб, etc.) removed — dead code.
   // Stems are checked on ё→е normalized text; е-variants above cover them.
+
+  // бляд/блят (блядь, бляди, блядский, блядство, блятский...)
+  'бляд',
+  'блят', // phonetic variant: блятский, блятская...
+
+  // хрен derivatives (standalone 'хрен' is in CUSTOM_BLOCKED — too short for stem)
+  'хренов', // хреновый, хреново, хреновая, хреновину...
+
+  // хандон (variant of гандон; no legitimate words start with хандо)
+  'хандо', // хандон, хандона, хандоном...
 
   // Extended insult stems (no legitimate words start with these)
   'сволоч', // сволочь, сволочи, сволочей...
@@ -278,7 +312,16 @@ export const PROFANITY_INFIXES: string[] = [
 
 // Profane phrases — checked against the full collapsed text.
 // Catches multi-word expressions.
-export const PROFANITY_PHRASES: string[] = ['твоюмать', 'твоюжмать'];
+export const PROFANITY_PHRASES: string[] = [
+  'твоюмать',
+  'твоюжмать',
+  // # used as ж replacement (can't add #→ж to char subs: "#опрос" false positive)
+  '#опа',
+  '#опу',
+  '#опе',
+  '#опой',
+  '#опы',
+];
 
 // False positives to allow
 export const PROFANITY_WHITELISTED: string[] = [];
