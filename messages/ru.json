@@ -1132,7 +1132,9 @@
       "blockedIpsLink": "Заблокированные IP",
       "blockedIpsDescription": "Просмотр и управление заблокированными IP-адресами",
       "monitorLink": "Монитор лимитов",
-      "monitorDescription": "Мониторинг лимитов запросов в реальном времени"
+      "monitorDescription": "Мониторинг лимитов запросов в реальном времени",
+      "logsLink": "Логи сервера",
+      "logsDescription": "Просмотр, отслеживание, скачивание и архивация логов сервера"
     },
     "organizations": {
       "title": "Управление организациями",
@@ -1350,6 +1352,38 @@
       "noEntries": "Нет активных записей",
       "unlock": "Разблокировать",
       "noData": "Нет данных для этого ключа"
+    },
+    "logs": {
+      "title": "Логи сервера",
+      "subtitle": "Просмотр и управление лог-файлами сервера",
+      "head": "Начало",
+      "tail": "Конец",
+      "follow": "Следить",
+      "pause": "Пауза",
+      "resume": "Продолжить",
+      "download": "Скачать",
+      "archive": "Архивировать",
+      "prettify": "Форматировать JSON",
+      "loadMore": "Загрузить ещё",
+      "top": "В начало",
+      "bottom": "В конец",
+      "lineInfo": "Строки {start}-{end} из {total}",
+      "following": "Отслеживание...",
+      "paused": "На паузе",
+      "emptyFile": "Файл пуст",
+      "noFile": "Файл не существует",
+      "archiveConfirmTitle": "Архивация лог-файла",
+      "archiveConfirmMessage": "Файл {filename} ({size}) будет сжат в zip-архив, а лог-файл очищен. Приложение продолжит запись в новый файл.",
+      "archiveConfirmButton": "Архивировать и очистить",
+      "cancel": "Отмена",
+      "archiveSuccess": "Файл успешно архивирован",
+      "fileNotFound": "Лог-файл не найден",
+      "archiveFailed": "Не удалось архивировать лог-файл",
+      "readFailed": "Не удалось прочитать лог-файл",
+      "connectionError": "Соединение потеряно",
+      "archivedSeparator": "--- Архив ---",
+      "showArchived": "Показать архив",
+      "hideArchived": "Скрыть архив"
     }
   },
   "privacySetup": {
