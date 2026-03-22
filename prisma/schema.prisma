@@ -137,8 +137,8 @@ model OrganizationUser {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   joinToken    OrganizationJoinToken? @relation(fields: [joinTokenId], references: [id])
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  acceptedBy   User?        @relation("AcceptedByAdmin", fields: [acceptedByUserId], references: [id])
-  rejectedBy   User?        @relation("RejectedByAdmin", fields: [rejectedByUserId], references: [id])
+  acceptedBy   User?        @relation("AcceptedByAdmin", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+  rejectedBy   User?        @relation("RejectedByAdmin", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([organizationId, userId])
   @@index([userId])
@@ -210,8 +210,8 @@ model BoardUser {
 
   board         Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
   user          User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  addedByUser   User? @relation("AddedBoardMember", fields: [addedBy], references: [id])
-  removedByUser User? @relation("RemovedBoardMember", fields: [removedBy], references: [id])
+  addedByUser   User? @relation("AddedBoardMember", fields: [addedBy], references: [id], onDelete: SetNull)
+  removedByUser User? @relation("RemovedBoardMember", fields: [removedBy], references: [id], onDelete: SetNull)
 
   @@unique([boardId, userId])
   @@index([userId])
@@ -382,7 +382,7 @@ model OrganizationJoinParentRequest {
   childOrg        Organization @relation("ChildOrgJoinParent", fields: [childOrgId], references: [id], onDelete: Cascade)
   parentOrg       Organization @relation("ParentOrgJoinParent", fields: [parentOrgId], references: [id], onDelete: Cascade)
   requestingAdmin User         @relation("RequestingAdmin", fields: [requestingAdminId], references: [id])
-  handlingAdmin   User?        @relation("HandlingAdmin", fields: [handlingAdminId], references: [id])
+  handlingAdmin   User?        @relation("HandlingAdmin", fields: [handlingAdminId], references: [id], onDelete: SetNull)
 
   @@index([childOrgId])
   @@index([parentOrgId])
@@ -405,7 +405,7 @@ model OtpVerification {
   verifiedAt  DateTime? @map("verified_at")
   createdAt   DateTime  @default(now()) @map("created_at")
 
-  user User @relation(fields: [userId], references: [id])
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([identifier, channel])
   @@index([clientIp])

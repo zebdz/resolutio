@@ -124,9 +124,7 @@ function createRegistry(): LimiterEntry[] {
 export const limiterRegistry: LimiterEntry[] =
   globalForRateLimit.limiterRegistry ?? createRegistry();
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForRateLimit.limiterRegistry = limiterRegistry;
-}
+globalForRateLimit.limiterRegistry = limiterRegistry;
 
 // Derive named exports from the shared registry
 export const middlewareSessionLimiter = limiterRegistry[0].limiter;
