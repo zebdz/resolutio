@@ -32,7 +32,7 @@ Authed and unauthed traffic have fundamentally different trust levels. Session-k
 
 ### Why 120/min for middleware session?
 
-Next.js App Router generates multiple RSC requests per navigation (one per route segment, plus parallel fetches). Pages with many `<Link>` components (e.g., organization lists) also trigger prefetch requests for each visible link. With `prefetch={false}` on high-cardinality lists, 120/min comfortably covers normal browsing. All list-rendered links (organizations, join requests, notifications) use `prefetch={false}` to avoid exhausting this limit.
+Next.js App Router generates multiple RSC requests per navigation (one per route segment, plus parallel fetches). Pages with many `<Link>` components also trigger prefetch requests for each visible link. The `Link` wrapper in `src/i18n/routing.tsx` defaults to `prefetch={false}` globally — navbar/sidebar links alone add ~16 MW hits per page load without this default. With prefetch disabled, 120/min comfortably covers normal browsing. Individual Links can override with `prefetch={true}` if instant navigation is needed.
 
 ### Why 50,000/min for middleware IP?
 
