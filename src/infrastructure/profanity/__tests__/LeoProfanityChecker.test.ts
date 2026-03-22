@@ -1691,4 +1691,59 @@ describe('LeoProfanityChecker', () => {
       expect(checker.containsProfanity('твоюжмать')).toBe(true);
     });
   });
+
+  // ===== Obfuscation: Latin transliteration & mixed-script =====
+
+  describe('obfuscation: Latin transliteration & mixed-script', () => {
+    it.each([
+      ['Xpen', 'хрен (X=х, p=р, e=е, n=н)'],
+      ['Xren', 'хрен (X=х, r=р, e=е, n=н)'],
+      ['Hren', 'хрен (H→х)'],
+      ['Gandon', 'гандон (G=г, a=а, n=н, d=д)'],
+      ['Handon', 'хандон (гандон variant)'],
+      ['Coci', 'соси (C=с, o=о, c=с, i=и)'],
+      ['Sosi', 'соси (S=с, o=о, s=с, i=и)'],
+      ['Hui', 'хуй'],
+      ['Hyi', 'хуй (H→х, y=у, i→и)'],
+      ['Yeban', 'ебан/уебан'],
+      ['Ueban', 'уебан'],
+      ['blyad', 'блядь'],
+      ["blyad'", 'блядь (apostrophe for ь)'],
+      ['pizdabol', 'пиздабол (full translit)'],
+      ['pizdobol', 'пиздобол (full translit)'],
+      ['pezdabol', 'пездабол (full translit)'],
+      ['pezdobol', 'пездобол (full translit)'],
+      ['pezd0bol', 'пезд0бол (translit + digit)'],
+      ['пи3добол', 'пиздобол (digit 3→е→з? no, 3→е)'],
+      ['пe3добол', 'пезд (Latin e + digit 3)'],
+      ['пи3дaбол', 'пиздабол (digit 3 + Latin a)'],
+      ['пe3д@бол', 'пезд (Latin e + digit 3 + @)'],
+      ['пйздабол', 'пиздабол (й used as и evasion)'],
+      ['дро4', 'дроч (digit 4 as ч)'],
+      ['6лятский', 'блятский (digit 6 as б)'],
+      ['xuy', 'хуй'],
+      ['хуj', 'хуй (Latin j for й)'],
+      ['ган9он', 'гандон (digit 9 as д)'],
+      ['Xer', 'хер (X=х, e=е, r=р)'],
+      ['@nal', 'анал (@=а, n=н, l=л)'],
+      ['Minet', 'минет (M=м, i=и, n=н, e=е, t=т)'],
+      ['Пиsдюк', 'пиздюк (Latin s for з)'],
+      ['Пиsда', 'пизда (Latin s for з)'],
+      ['Пи$да', 'пизда ($ evasion, stripped to Пида)'],
+      ['#опа', 'жопа (# for ж)'],
+      ['Droчь', 'дрочь (Latin D=д, r=р, o=о)'],
+      ['droчила', 'дрочила (Latin d=д, r=р, o=о)'],
+      ['€блan', 'еблан (€=е, a=а, n=н)'],
+      ['уебок', 'уебок (Cyrillic)'],
+      ['уёбок', 'уёбок (ё variant)'],
+      ['uebok', 'уебок (Latin)'],
+      ['yebok', 'уебок (Latin, y=у)'],
+    ])('should detect %s — %s', (word) => {
+      expect(checker.containsProfanity(word)).toBe(true);
+    });
+
+    it('should NOT flag "hue" (English color term)', () => {
+      expect(checker.containsProfanity('hue')).toBe(false);
+    });
+  });
 });
