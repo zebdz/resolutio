@@ -23,6 +23,7 @@ export function LoginForm() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
   // Form field values
   const [formValues, setFormValues] = useState({
@@ -70,6 +71,10 @@ export function LoginForm() {
         if (result.fieldErrors) {
           setFieldErrors(result.fieldErrors);
         }
+
+        // Turnstile tokens are single-use; reset widget for a fresh token
+        setCaptchaToken(null);
+        setCaptchaResetKey((prev) => prev + 1);
       } else if (result.data.needsConfirmation) {
         // Store OTP data for confirm-phone page
         if (typeof window !== 'undefined' && result.data.otpId) {
@@ -170,6 +175,7 @@ export function LoginForm() {
       </FieldGroup>
 
       <TurnstileWidget
+        key={captchaResetKey}
         onSuccess={setCaptchaToken}
         onExpire={() => setCaptchaToken(null)}
         onError={() => setCaptchaToken(null)}
