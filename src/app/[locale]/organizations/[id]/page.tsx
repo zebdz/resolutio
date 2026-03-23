@@ -9,7 +9,7 @@ import { getOrganizationDetailsAction } from '@/web/actions/organization';
 import { searchPollsAction } from '@/web/actions/poll';
 import { MembershipSection } from './MembershipSection';
 import { BoardsSection } from './BoardsSection';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { OrgHierarchyTree } from '@/src/web/components/organization/OrgHierarchyTree';
 import { PollsList } from '@/src/web/components/polls/PollsList';
 import {

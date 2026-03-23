@@ -11,7 +11,7 @@ import { createOrgMemberInviteAction } from '@/web/actions/invitation';
 import { searchUsersForOrgAdminAction } from '@/web/actions/organization';
 import { searchUserByPhoneAction } from '@/web/actions/user';
 import { User } from '@/domain/user/User';
-import { PhoneInput } from '@/web/components/phone';
+import { PhoneInput } from '@/src/web/components/shared/phone';
 
 type SearchResult = {
   id: string;

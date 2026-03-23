@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getCurrentUser, getSessionCookie } from '@/web/lib/session';
 import { prisma, PrismaUserRepository } from '@/infrastructure/index';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { registerSuperadminAccess } from '@/infrastructure/rateLimit/superadminWhitelist';
 import { getClientIp } from '@/web/lib/clientIp';
 

@@ -14,7 +14,7 @@ import {
   Checkbox,
   CheckboxField,
 } from '@/src/web/components/catalyst/checkbox';
-import { PhoneInput } from '@/web/components/phone';
+import { PhoneInput } from '@/src/web/components/shared/phone';
 import { Text, TextLink } from '@/src/web/components/catalyst/text';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';

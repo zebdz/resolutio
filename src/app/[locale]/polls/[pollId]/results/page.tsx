@@ -10,7 +10,7 @@ import {
   QuestionResult,
   ProtocolSignWillingnessEntry,
 } from '@/src/application/poll/GetPollResultsUseCase';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { User } from '@/domain/user/User';
 
 interface ResultsPageProps {

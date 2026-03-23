@@ -10,7 +10,7 @@ import { searchUsersForBoardAction } from '@/web/actions/board';
 import { createBoardMemberInviteAction } from '@/web/actions/invitation';
 import { searchUserByPhoneAction } from '@/web/actions/user';
 import { User } from '@/domain/user/User';
-import { PhoneInput } from '@/web/components/phone';
+import { PhoneInput } from '@/src/web/components/shared/phone';
 
 type UserResult = {
   id: string;

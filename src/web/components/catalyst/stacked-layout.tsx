@@ -3,7 +3,7 @@
 import * as Headless from '@headlessui/react';
 import React, { useState } from 'react';
 import { NavbarItem } from './navbar';
-import { getVersion } from '@/src/lib/version';
+import { getVersion } from '@/src/web/lib/version';
 
 function OpenMenuIcon() {
   return (

@@ -6,7 +6,7 @@ import { getParticipantsAction } from '@/web/actions/participant';
 import ParticipantManagement from '@/src/web/components/polls/participants/ParticipantManagement';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { ParticipantWithUser } from '@/src/application/poll/GetParticipantsUseCase';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { User } from '@/domain/user/User';
 
 import {

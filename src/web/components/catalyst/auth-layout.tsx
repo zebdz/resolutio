@@ -1,6 +1,6 @@
 import type React from 'react';
-import { LocaleSwitcher } from '@/web/components/LocaleSwitcher';
-import { getVersion } from '@/src/lib/version';
+import { LocaleSwitcher } from '@/src/web/components/layout/LocaleSwitcher';
+import { getVersion } from '@/src/web/lib/version';
 
 export function AuthLayout({ children }: { children: React.ReactNode }) {
   return (

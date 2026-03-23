@@ -3,7 +3,7 @@ import { Heading } from '@/src/web/components/catalyst/heading';
 import { Text } from '@/src/web/components/catalyst/text';
 import { getPendingRequestsAction } from '@/web/actions/organization';
 import { PendingRequestsList } from './PendingRequestsList';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 
 const DEFAULT_PAGE_SIZE = 10;
 

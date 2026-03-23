@@ -12,7 +12,7 @@ import {
   PrismaOrganizationRepository,
   PrismaUserRepository,
 } from '@/infrastructure/index';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { PollsList } from '@/src/web/components/polls/PollsList';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);

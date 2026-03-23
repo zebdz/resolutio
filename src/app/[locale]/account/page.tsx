@@ -11,7 +11,7 @@ import {
 } from '@/src/web/components/catalyst/description-list';
 import { AccountForm } from '@/web/components/account/AccountForm';
 import { logoutAction } from '@/web/actions/auth';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 
 export async function generateMetadata() {
   const t = await getTranslations('account');

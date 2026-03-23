@@ -8,7 +8,7 @@ import { Heading } from '@/src/web/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
 import { Button } from '@/src/web/components/catalyst/button';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 
 interface VotePageProps {
   params: Promise<{

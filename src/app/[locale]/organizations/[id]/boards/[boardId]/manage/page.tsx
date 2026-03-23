@@ -10,7 +10,7 @@ import InviteMemberSection from './InviteMemberSection';
 import InviteOutsideMemberSection from './InviteOutsideMemberSection';
 import MembersList from './MembersList';
 import PendingBoardInvites from './PendingBoardInvites';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { prisma, PrismaUserRepository } from '@/infrastructure/index';
 
 const userRepository = new PrismaUserRepository(prisma);

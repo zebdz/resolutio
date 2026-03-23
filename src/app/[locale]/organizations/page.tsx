@@ -4,7 +4,7 @@ import { Heading } from '@/src/web/components/catalyst/heading';
 import { Text } from '@/src/web/components/catalyst/text';
 import { searchOrganizationsNotAlreadyMemberOfAction } from '@/web/actions/organization';
 import { OrganizationsList } from './OrganizationsList';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 
 const PAGE_SIZE = 30;
 

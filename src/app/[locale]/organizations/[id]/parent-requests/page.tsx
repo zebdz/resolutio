@@ -5,7 +5,7 @@ import { getIncomingJoinParentRequestsAction } from '@/web/actions/joinParentReq
 import { Button } from '@/src/web/components/catalyst/button';
 import { Heading, Subheading } from '@/src/web/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { ParentRequestsList } from './ParentRequestsList';
 
 type PageProps = {

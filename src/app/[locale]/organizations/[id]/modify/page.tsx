@@ -25,7 +25,7 @@ import { ParentOrgSection } from '../ParentOrgSection';
 import { BoardsSection } from '../BoardsSection';
 import { OrgEditForm } from './OrgEditForm';
 import { AdminManagementSection } from './AdminManagementSection';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { prisma, PrismaUserRepository } from '@/infrastructure/index';
 
 const userRepository = new PrismaUserRepository(prisma);

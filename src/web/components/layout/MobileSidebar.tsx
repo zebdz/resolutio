@@ -21,7 +21,7 @@ import {
   BellIcon,
 } from '@heroicons/react/20/solid';
 import { LocaleSwitcher } from './LocaleSwitcher';
-import { getVersion } from '@/src/lib/version';
+import { getVersion } from '@/src/web/lib/version';
 
 interface MobileSidebarProps {
   isSuperAdmin: boolean;

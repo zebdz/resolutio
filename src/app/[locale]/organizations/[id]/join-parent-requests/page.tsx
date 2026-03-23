@@ -4,7 +4,7 @@ import { getOrganizationDetailsAction } from '@/web/actions/organization';
 import { getAllJoinParentRequestsAction } from '@/web/actions/joinParentRequest';
 import { Heading, Subheading } from '@/src/web/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { IncomingRequestsTable } from './IncomingRequestsTable';
 import { OutgoingRequestsTable } from './OutgoingRequestsTable';
 

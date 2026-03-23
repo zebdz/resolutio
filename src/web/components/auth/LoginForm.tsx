@@ -12,7 +12,7 @@ import {
   Label,
   FieldGroup,
 } from '@/src/web/components/catalyst/fieldset';
-import { PhoneInput } from '@/web/components/phone';
+import { PhoneInput } from '@/src/web/components/shared/phone';
 import { Text } from '@/src/web/components/catalyst/text';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { loginAction } from '@/web/actions/auth';

@@ -7,7 +7,7 @@ import {
 import { Heading, Subheading } from '@/src/web/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
 import { OrgPendingRequestsList } from './OrgPendingRequestsList';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 
 const DEFAULT_PAGE_SIZE = 10;
 

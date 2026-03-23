@@ -6,7 +6,7 @@ import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import CreateBoardDialog from './CreateBoardDialog';
 import ArchiveBoardButton from './ArchiveBoardButton';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 
 type PageProps = {
   params: Promise<{

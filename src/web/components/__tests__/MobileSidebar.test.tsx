@@ -90,7 +90,7 @@ describe('MobileSidebar rendering requirements', () => {
   it('should display version in sidebar footer', async () => {
     // MobileSidebar uses SidebarFooter with getVersion()
     // Verify the version utility returns expected format
-    const { getVersion } = await import('@/src/lib/version');
+    const { getVersion } = await import('@/src/web/lib/version');
     const version = getVersion();
     expect(typeof version).toBe('string');
     expect(version).toMatch(/\(.+\)/); // "version (timestamp)" format
