@@ -10,18 +10,27 @@ import { OrgPendingRequestsList } from './OrgPendingRequestsList';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 
 const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [5, 10, 25, 50];
 
 type PageProps = {
   params: Promise<{
     locale: string;
     id: string;
   }>;
+  searchParams: Promise<{ page?: string; pageSize?: string }>;
 };
 
 export default async function OrganizationPendingRequestsPage({
   params,
+  searchParams,
 }: PageProps) {
   const { id: organizationId, locale } = await params;
+  const sp = await searchParams;
+
+  const page = Math.max(1, parseInt(sp.page ?? '1', 10) || 1);
+  const pageSize = PAGE_SIZE_OPTIONS.includes(Number(sp.pageSize))
+    ? Number(sp.pageSize)
+    : DEFAULT_PAGE_SIZE;
   const t = await getTranslations('organization.pendingRequestsPage');
   const tCommon = await getTranslations('common');
 
@@ -40,8 +49,8 @@ export default async function OrganizationPendingRequestsPage({
   // Get pending requests for this specific organization
   const requestsResult = await getOrganizationPendingRequestsAction(
     organizationId,
-    1,
-    DEFAULT_PAGE_SIZE
+    page,
+    pageSize
   );
 
   if (!requestsResult.success) {
@@ -72,7 +81,8 @@ export default async function OrganizationPendingRequestsPage({
           organizationName={organization.name}
           requests={requestsResult.data.requests}
           totalCount={requestsResult.data.totalCount}
-          defaultPageSize={DEFAULT_PAGE_SIZE}
+          currentPage={page}
+          pageSize={pageSize}
         />
       </div>
     </AuthenticatedLayout>

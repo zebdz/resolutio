@@ -11,18 +11,21 @@ interface SuperadminOrganizationsListProps {
   initialOrganizations: OrganizationItem[];
   initialTotalCount: number;
   userId: string;
+  initialSearch?: string;
 }
 
 export function SuperadminOrganizationsList({
   initialOrganizations,
   initialTotalCount,
   userId,
+  initialSearch,
 }: SuperadminOrganizationsListProps) {
   return (
     <OrganizationsList
       initialOrganizations={initialOrganizations}
       initialTotalCount={initialTotalCount}
       userId={userId}
+      initialSearch={initialSearch}
       searchAction={searchAllOrganizationsAction}
       showArchivedBadge
       renderActions={(org: OrganizationItem, onActionComplete: () => void) => (

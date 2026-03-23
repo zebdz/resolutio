@@ -5,26 +5,47 @@ import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { searchPollsAction } from '@/src/web/actions/poll/poll';
-import { getUserMemberOrganizationsAction } from '@/src/web/actions/organization/organization';
-import { getUserBoardsAction } from '@/src/web/actions/board/board';
+import { getBoardsByOrganizationAction } from '@/src/web/actions/board/board';
 import {
   prisma,
   PrismaOrganizationRepository,
   PrismaUserRepository,
 } from '@/infrastructure/index';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
-import { PollsList } from '@/src/web/components/polls/PollsList';
+import { PollsListUrl } from '@/src/web/components/polls/PollsListUrl';
+import { PollState } from '@/domain/poll/PollState';
+
+const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [5, 10, 25, 50];
+const ORG_WIDE_VALUE = '__org_wide__';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 
-export default async function PollsPage() {
+interface PollsPageProps {
+  searchParams: Promise<{
+    page?: string;
+    pageSize?: string;
+    search?: string;
+    status?: string;
+    orgId?: string;
+    boardId?: string;
+    createdFrom?: string;
+    createdTo?: string;
+    startFrom?: string;
+    startTo?: string;
+  }>;
+}
+
+export default async function PollsPage({ searchParams }: PollsPageProps) {
   const t = await getTranslations('poll');
   const user = await getCurrentUser();
 
   if (!user) {
     return <AuthenticatedLayout>{null}</AuthenticatedLayout>;
   }
+
+  const sp = await searchParams;
 
   const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
 
@@ -34,63 +55,100 @@ export default async function PollsPage() {
   );
   const adminOrgIds = adminOrgs.map((o) => o.id);
 
-  // Org list for dropdown: superadmin sees all, regular user sees member + admin orgs
-  let organizations: Array<{ id: string; name: string }> = [];
+  // Check org membership (lightweight — just count, don't load all orgs)
+  const memberOrgs = await organizationRepository.findMembershipsByUserId(
+    user.id
+  );
+  const hasOrgMembership = isSuperAdmin || memberOrgs.length > 0;
 
-  if (isSuperAdmin) {
-    const allOrgs = await organizationRepository.findAllWithStats();
-    organizations = allOrgs.map((o) => ({
-      id: o.organization.id,
-      name: o.organization.name,
-    }));
+  // Parse filters from URL params
+  const search = sp.search ?? '';
+  const status = sp.status ?? '';
+  const orgId = sp.orgId ?? '';
+  const boardId = sp.boardId ?? '';
+  const createdTo = sp.createdTo ?? '';
+  const startFrom = sp.startFrom ?? '';
+  const startTo = sp.startTo ?? '';
+
+  const rawPage = parseInt(sp.page ?? '1', 10);
+  const page = rawPage > 0 ? rawPage : 1;
+
+  const rawPageSize = parseInt(sp.pageSize ?? String(DEFAULT_PAGE_SIZE), 10);
+  const pageSize = PAGE_SIZE_OPTIONS.includes(rawPageSize)
+    ? rawPageSize
+    : DEFAULT_PAGE_SIZE;
+
+  // Default createdFrom to one week ago when no filters at all
+  const hasAnyFilter =
+    search ||
+    status ||
+    orgId ||
+    boardId ||
+    sp.createdFrom ||
+    createdTo ||
+    startFrom ||
+    startTo;
+
+  let createdFrom: string;
+
+  if (sp.createdFrom !== undefined) {
+    createdFrom = sp.createdFrom;
+  } else if (!hasAnyFilter) {
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    createdFrom = d.toISOString().split('T')[0];
   } else {
-    const [orgsResult, boardsResult] = await Promise.all([
-      getUserMemberOrganizationsAction(),
-      getUserBoardsAction(),
-    ]);
-    const memberOrgs = orgsResult.success ? orgsResult.data : [];
-    const boards = boardsResult.success ? boardsResult.data : [];
-
-    // Merge admin orgs and board-derived orgs that aren't already in member list
-    const orgMap = new Map(memberOrgs.map((o) => [o.id, o]));
-
-    for (const adminOrg of adminOrgs) {
-      if (!orgMap.has(adminOrg.id)) {
-        orgMap.set(adminOrg.id, { id: adminOrg.id, name: adminOrg.name });
-      }
-    }
-
-    for (const board of boards) {
-      if (!orgMap.has(board.organizationId)) {
-        orgMap.set(board.organizationId, {
-          id: board.organizationId,
-          name: board.organizationName,
-        });
-      }
-    }
-
-    organizations = [...orgMap.values()];
+    createdFrom = '';
   }
 
-  const hasOrgMembership = organizations.length > 0;
-
-  // Initial polls: last week
-  const oneWeekAgo = new Date();
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+  // Build search input for server action
+  const isOrgWide = boardId === ORG_WIDE_VALUE;
 
   const pollsResult = await searchPollsAction({
-    createdFrom: oneWeekAgo.toISOString().split('T')[0],
-    page: 1,
-    pageSize: 10,
+    titleSearch: search || undefined,
+    statuses: status ? [status as PollState] : undefined,
+    organizationId: orgId || undefined,
+    boardId: isOrgWide ? undefined : boardId || undefined,
+    orgWideOnly: isOrgWide || undefined,
+    createdFrom: createdFrom || undefined,
+    createdTo: createdTo || undefined,
+    startFrom: startFrom || undefined,
+    startTo: startTo || undefined,
+    page,
+    pageSize,
   });
+
   const polls = pollsResult.success ? pollsResult.data.polls : [];
   const totalCount = pollsResult.success ? pollsResult.data.totalCount : 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  // Resolve org name + boards if orgId is set
+  let selectedOrg: { id: string; name: string } | null = null;
+  let initialBoards: Array<{ id: string; name: string }> = [];
+
+  if (orgId) {
+    const [orgResult, boardsResult] = await Promise.all([
+      prisma.organization.findUnique({
+        where: { id: orgId },
+        select: { id: true, name: true },
+      }),
+      getBoardsByOrganizationAction(orgId),
+    ]);
+
+    if (orgResult) {
+      selectedOrg = orgResult;
+    }
+
+    if (boardsResult.success) {
+      initialBoards = boardsResult.data;
+    }
+  }
 
   return (
     <AuthenticatedLayout>
       <div className="space-y-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
             <Heading className="text-3xl font-bold">
               {isSuperAdmin ? t('allPolls') : t('title')}
@@ -99,7 +157,7 @@ export default async function PollsPage() {
           </div>
           <Link href="/polls/create">
             <Button color="brand-green" disabled={!hasOrgMembership}>
-              <PlusIcon className="h-5 w-5 mr-2" />
+              <PlusIcon className="mr-2 h-5 w-5" />
               {t('createPoll')}
             </Button>
           </Link>
@@ -114,10 +172,24 @@ export default async function PollsPage() {
           </div>
         )}
 
-        <PollsList
-          initialPolls={polls}
-          initialTotalCount={totalCount}
-          organizations={organizations}
+        <PollsListUrl
+          polls={polls}
+          totalCount={totalCount}
+          totalPages={totalPages}
+          currentPage={page}
+          pageSize={pageSize}
+          filters={{
+            search,
+            status,
+            orgId,
+            boardId,
+            createdFrom,
+            createdTo,
+            startFrom,
+            startTo,
+          }}
+          selectedOrg={selectedOrg}
+          initialBoards={initialBoards}
           userId={user.id}
           adminOrgIds={adminOrgIds}
           isSuperAdmin={isSuperAdmin}

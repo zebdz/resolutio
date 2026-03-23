@@ -9,7 +9,7 @@ import {
   ReactNode,
 } from 'react';
 import { useTranslations } from 'next-intl';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Input } from '@/src/web/components/catalyst/input';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Heading } from '@/src/web/components/catalyst/heading';
@@ -45,6 +45,7 @@ interface OrganizationsListProps {
   initialOrganizations: OrganizationItem[];
   initialTotalCount: number;
   userId: string;
+  initialSearch?: string;
   renderActions?: (
     org: OrganizationItem,
     onActionComplete: () => void
@@ -61,6 +62,7 @@ interface OrganizationsListProps {
 export function OrganizationsList({
   initialOrganizations,
   initialTotalCount,
+  initialSearch = '',
   renderActions,
   searchAction,
   showArchivedBadge,
@@ -69,6 +71,7 @@ export function OrganizationsList({
   const tOrg = useTranslations('organization');
   const tSuperadmin = useTranslations('superadmin.organizations');
   const router = useRouter();
+  const pathname = usePathname();
 
   const effectiveSearchAction =
     searchAction ?? searchOrganizationsNotAlreadyMemberOfAction;
@@ -77,7 +80,7 @@ export function OrganizationsList({
     useState<OrganizationItem[]>(initialOrganizations);
   const [totalCount, setTotalCount] = useState(initialTotalCount);
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(initialSearch);
   const [isPending, startTransition] = useTransition();
   const [joiningOrgId, setJoiningOrgId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -133,6 +136,26 @@ export function OrganizationsList({
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
+
+  // Sync search to URL for shareability (doesn't trigger refetch — above effect handles that)
+  useEffect(() => {
+    if (search === initialSearch) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams();
+
+      if (search) {
+        params.set('search', search);
+      }
+
+      const qs = params.toString();
+      router.replace(qs ? `${pathname}?${qs}` : pathname);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [search, initialSearch, pathname, router]);
 
   // Load next page
   const loadMore = useCallback(() => {

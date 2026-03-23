@@ -1,27 +1,21 @@
 'use client';
 
 import { useState, useEffect, useCallback, useTransition } from 'react';
-import { useTranslations } from 'next-intl';
-import { Input } from '@/src/web/components/catalyst/input';
-import { Select } from '@/src/web/components/catalyst/select';
-import { Button } from '@/src/web/components/catalyst/button';
-import { Text } from '@/src/web/components/catalyst/text';
-import { PollCard } from './PollCard';
 import {
   searchPollsAction,
   SearchPollsInput,
 } from '@/src/web/actions/poll/poll';
 import { getBoardsByOrganizationAction } from '@/src/web/actions/board/board';
+import { searchOrganizationsForFilterAction } from '@/src/web/actions/organization/organization';
 import { PollState } from '@/domain/poll/PollState';
+import { PollsListView } from './PollsListView';
 
 const DEFAULT_PAGE_SIZE = 10;
-const PAGE_SIZE_OPTIONS = [5, 10, 25, 50];
 const ORG_WIDE_VALUE = '__org_wide__';
 
 interface PollsListProps {
   initialPolls: any[];
   initialTotalCount: number;
-  organizations?: Array<{ id: string; name: string }>;
   userId: string;
   adminOrgIds: string[];
   isSuperAdmin: boolean;
@@ -39,15 +33,12 @@ function oneWeekAgo(): string {
 export function PollsList({
   initialPolls,
   initialTotalCount,
-  organizations,
   userId,
   adminOrgIds,
   isSuperAdmin,
   fixedOrganizationId,
   initialBoards,
 }: PollsListProps) {
-  const t = useTranslations('poll');
-  const tPagination = useTranslations('common.pagination');
   const [isPending, startTransition] = useTransition();
 
   const [polls, setPolls] = useState(initialPolls);
@@ -66,6 +57,45 @@ export function PollsList({
   const [boards, setBoards] = useState<Array<{ id: string; name: string }>>(
     initialBoards ?? []
   );
+
+  // Org combobox state
+  const [selectedOrg, setSelectedOrg] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const [orgOptions, setOrgOptions] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [orgSearchTimer, setOrgSearchTimer] = useState<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+
+  const handleOrgSearch = (query: string) => {
+    if (orgSearchTimer) {
+      clearTimeout(orgSearchTimer);
+    }
+
+    if (query.length < 2) {
+      setOrgOptions(selectedOrg ? [selectedOrg] : []);
+
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const result = await searchOrganizationsForFilterAction({ query });
+
+      if (result.success) {
+        setOrgOptions(result.data);
+      }
+    }, 300);
+    setOrgSearchTimer(timer);
+  };
+
+  const handleOrganizationChange = (orgId: string) => {
+    const org = orgOptions.find((o) => o.id === orgId) ?? null;
+    setSelectedOrg(org);
+    setOrganizationId(orgId);
+  };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
@@ -178,6 +208,8 @@ export function PollsList({
 
     if (!fixedOrganizationId) {
       setOrganizationId('');
+      setSelectedOrg(null);
+      setOrgOptions([]);
     }
 
     setBoardId('');
@@ -188,216 +220,42 @@ export function PollsList({
     setCurrentPage(1);
   };
 
-  const adminOrgIdSet = new Set(adminOrgIds);
-
-  const from = (currentPage - 1) * pageSize + 1;
-  const to = Math.min(currentPage * pageSize, totalCount);
-
   return (
-    <div className="space-y-6">
-      {/* Filter bar */}
-      <div className="space-y-4 rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-            {t('filters')}
-          </h3>
-          <Button plain onClick={resetFilters}>
-            {t('resetFilters')}
-          </Button>
-        </div>
-
-        {/* Row 1: name + status + (org) + board */}
-        <div
-          className={`grid gap-3 sm:grid-cols-2 ${fixedOrganizationId ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}
-        >
-          <Input
-            type="search"
-            placeholder={t('filterByName')}
-            value={nameSearch}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-              setNameSearch(e.target.value)
-            }
-          />
-
-          <Select
-            value={status}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-              setStatus(e.target.value)
-            }
-          >
-            <option value="">{t('allStatuses')}</option>
-            <option value={PollState.DRAFT}>{t('draft')}</option>
-            <option value={PollState.READY}>{t('ready')}</option>
-            <option value={PollState.ACTIVE}>{t('active')}</option>
-            <option value={PollState.FINISHED}>{t('finished')}</option>
-          </Select>
-
-          {!fixedOrganizationId && (
-            <Select
-              value={organizationId}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                setOrganizationId(e.target.value)
-              }
-            >
-              <option value="">{t('allOrganizations')}</option>
-              {(organizations ?? []).map((org) => (
-                <option key={org.id} value={org.id}>
-                  {org.name}
-                </option>
-              ))}
-            </Select>
-          )}
-
-          <Select
-            value={boardId}
-            onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-              setBoardId(e.target.value)
-            }
-            disabled={!fixedOrganizationId && !organizationId}
-          >
-            <option value="">{t('allBoards')}</option>
-            <option value={ORG_WIDE_VALUE}>{t('orgWidePoll')}</option>
-            {boards.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        {/* Row 2: date filters */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">
-              {t('createdFrom')}
-            </label>
-            <Input
-              type="date"
-              value={createdFrom}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setCreatedFrom(e.target.value)
-              }
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">
-              {t('createdTo')}
-            </label>
-            <Input
-              type="date"
-              value={createdTo}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setCreatedTo(e.target.value)
-              }
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">
-              {t('startsFrom')}
-            </label>
-            <Input
-              type="date"
-              value={startFrom}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setStartFrom(e.target.value)
-              }
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-zinc-500 dark:text-zinc-400">
-              {t('startsTo')}
-            </label>
-            <Input
-              type="date"
-              value={startTo}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setStartTo(e.target.value)
-              }
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Loading indicator */}
-      {isPending && (
-        <div className="text-center text-sm text-zinc-500">...</div>
-      )}
-
-      {/* Poll grid */}
-      {polls.length === 0 ? (
-        <div className="py-12 text-center">
-          <p className="text-zinc-500 dark:text-zinc-400">
-            {t('noFilteredPolls')}
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {polls.map((poll: any) => (
-            <PollCard
-              key={poll.id}
-              poll={poll}
-              userId={userId}
-              canManage={isSuperAdmin || adminOrgIdSet.has(poll.organizationId)}
-              onPollStateChange={fetchPolls}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Pagination */}
-      {totalCount > 0 && (
-        <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
-          <div className="flex items-center gap-2">
-            <Text className="text-sm">{t('pollsPerPage')}</Text>
-            <Select
-              value={String(pageSize)}
-              onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-              className="w-20"
-            >
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          <Text className="text-sm text-zinc-600 dark:text-zinc-400">
-            {tPagination('showing', {
-              from: String(from),
-              to: String(to),
-              total: String(totalCount),
-            })}
-          </Text>
-
-          <div className="flex items-center gap-2">
-            <Button
-              outline
-              className={currentPage <= 1 || isPending ? '' : 'cursor-pointer'}
-              disabled={currentPage <= 1 || isPending}
-              onClick={() => handlePageChange(currentPage - 1)}
-            >
-              {tPagination('previous')}
-            </Button>
-            <Text className="text-sm">
-              {tPagination('page', {
-                page: String(currentPage),
-                totalPages: String(totalPages),
-              })}
-            </Text>
-            <Button
-              outline
-              className={
-                currentPage >= totalPages || isPending ? '' : 'cursor-pointer'
-              }
-              disabled={currentPage >= totalPages || isPending}
-              onClick={() => handlePageChange(currentPage + 1)}
-            >
-              {tPagination('next')}
-            </Button>
-          </div>
-        </div>
-      )}
-    </div>
+    <PollsListView
+      polls={polls}
+      totalCount={totalCount}
+      currentPage={currentPage}
+      pageSize={pageSize}
+      totalPages={totalPages}
+      isPending={isPending}
+      searchValue={nameSearch}
+      status={status}
+      organizationId={organizationId}
+      boardId={boardId}
+      createdFrom={createdFrom}
+      createdTo={createdTo}
+      startFrom={startFrom}
+      startTo={startTo}
+      selectedOrg={selectedOrg}
+      orgOptions={orgOptions}
+      onOrgSearch={handleOrgSearch}
+      boards={boards}
+      fixedOrganizationId={fixedOrganizationId}
+      userId={userId}
+      adminOrgIds={adminOrgIds}
+      isSuperAdmin={isSuperAdmin}
+      onSearchChange={setNameSearch}
+      onStatusChange={setStatus}
+      onOrganizationChange={handleOrganizationChange}
+      onBoardChange={setBoardId}
+      onCreatedFromChange={setCreatedFrom}
+      onCreatedToChange={setCreatedTo}
+      onStartFromChange={setStartFrom}
+      onStartToChange={setStartTo}
+      onPageChange={handlePageChange}
+      onPageSizeChange={handlePageSizeChange}
+      onResetFilters={resetFilters}
+      onPollStateChange={fetchPolls}
+    />
   );
 }

@@ -1608,3 +1608,60 @@ export async function getRootMultiMembershipInfoAction(
     return { success: false, error: t('generic') };
   }
 }
+
+/**
+ * Search organizations by name for filter comboboxes.
+ * Superadmins search all orgs; regular users search their member/admin orgs.
+ * Returns lightweight {id, name}[] — max 20 results.
+ */
+export async function searchOrganizationsForFilterAction(input: {
+  query: string;
+}): Promise<ActionResult<Array<{ id: string; name: string }>>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    if (input.query.length < 2) {
+      return { success: true, data: [] };
+    }
+
+    const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
+
+    const orgs = await prisma.organization.findMany({
+      where: {
+        name: { contains: input.query, mode: 'insensitive' },
+        archivedAt: null,
+        ...(!isSuperAdmin && {
+          OR: [
+            {
+              members: {
+                some: { userId: user.id, status: 'accepted' },
+              },
+            },
+            { admins: { some: { userId: user.id } } },
+          ],
+        }),
+      },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+      take: 20,
+    });
+
+    return { success: true, data: orgs };
+  } catch (error) {
+    console.error('Error searching organizations for filter:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
