@@ -322,4 +322,17 @@ export class PrismaUserRepository implements UserRepository {
       confirmedAt: user.confirmedAt ?? undefined,
     });
   }
+
+  async getBlockedUserIds(): Promise<string[]> {
+    const result = await this.prisma.$queryRaw<{ user_id: string }[]>`
+      SELECT user_id FROM (
+        SELECT DISTINCT ON (user_id) user_id, status
+        FROM user_block_statuses
+        ORDER BY user_id, created_at DESC
+      ) latest
+      WHERE status = 'blocked'
+    `;
+
+    return result.map((r) => r.user_id);
+  }
 }

@@ -1,7 +1,7 @@
 'use server';
 
 import { getTranslations } from 'next-intl/server';
-import { prisma } from '@/infrastructure/index';
+import { prisma, PrismaUserRepository } from '@/infrastructure/index';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { requireSuperadmin } from '@/src/web/actions/superadmin/superadminAuth';
 import { isError } from '@/src/web/actions/superadmin/superadminAuthUtils';
@@ -10,6 +10,7 @@ import { SharedDomainCodes } from '@/domain/shared/SharedDomainCodes';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 
 const profanityChecker = LeoProfanityChecker.getInstance();
+const userRepository = new PrismaUserRepository(prisma);
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
@@ -88,16 +89,7 @@ async function getBlockStatusForUser(
 }
 
 async function getBlockedUserIds(): Promise<string[]> {
-  const result = await prisma.$queryRaw<{ user_id: string }[]>`
-    SELECT user_id FROM (
-      SELECT DISTINCT ON (user_id) user_id, status
-      FROM user_block_statuses
-      ORDER BY user_id, created_at DESC
-    ) latest
-    WHERE status = 'blocked'
-  `;
-
-  return result.map((r) => r.user_id);
+  return userRepository.getBlockedUserIds();
 }
 
 export async function getSuspiciousActivitySummaryAction(input: {
@@ -795,31 +787,24 @@ export async function getUserPollsForAdminAction(input: {
   const page = input.page ?? 1;
   const offset = (page - 1) * POLLS_PAGE_SIZE;
 
-  const [polls, countResult] = await Promise.all([
-    prisma.$queryRaw<
-      {
-        id: string;
-        title: string;
-        state: string;
-        created_at: Date;
-        organization_id: string;
-        organization_name: string;
-      }[]
-    >`
-      SELECT p.id, p.title, p.state, p.created_at, p.organization_id, o.name as organization_name
-      FROM poll_participants pp
-      JOIN polls p ON pp.poll_id = p.id
-      JOIN organizations o ON p.organization_id = o.id
-      WHERE pp.user_id = ${input.userId}
-      ORDER BY p.created_at DESC
-      LIMIT ${POLLS_PAGE_SIZE}
-      OFFSET ${offset}
-    `,
-    prisma.$queryRaw<[{ count: bigint }]>`
-      SELECT COUNT(*) as count
-      FROM poll_participants pp
-      WHERE pp.user_id = ${input.userId}
-    `,
+  const [polls, totalCount] = await Promise.all([
+    prisma.poll.findMany({
+      where: { participants: { some: { userId: input.userId } } },
+      select: {
+        id: true,
+        title: true,
+        state: true,
+        createdAt: true,
+        organizationId: true,
+        organization: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: POLLS_PAGE_SIZE,
+      skip: offset,
+    }),
+    prisma.pollParticipant.count({
+      where: { userId: input.userId },
+    }),
   ]);
 
   return {
@@ -829,11 +814,11 @@ export async function getUserPollsForAdminAction(input: {
         id: p.id,
         title: p.title,
         state: p.state,
-        createdAt: p.created_at.toISOString(),
-        organizationId: p.organization_id,
-        organizationName: p.organization_name,
+        createdAt: p.createdAt.toISOString(),
+        organizationId: p.organizationId,
+        organizationName: p.organization.name,
       })),
-      totalCount: Number(countResult[0].count),
+      totalCount,
     },
   };
 }

@@ -31,4 +31,5 @@ export interface UserRepository {
   getBlockStatus(
     userId: string
   ): Promise<{ blocked: boolean; reason?: string; blockedAt?: Date } | null>;
+  getBlockedUserIds(): Promise<string[]>;
 }

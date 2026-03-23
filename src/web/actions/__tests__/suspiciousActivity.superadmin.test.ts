@@ -14,9 +14,12 @@ vi.mock('next-intl/server', () => ({
   getTranslations: vi.fn().mockResolvedValue((key: string) => key),
 }));
 
-vi.mock('@/infrastructure/index', () => ({
-  prisma: {},
-}));
+vi.mock('@/infrastructure/index', () => {
+  const MockUserRepo = vi.fn();
+  MockUserRepo.prototype.getBlockedUserIds = vi.fn().mockResolvedValue([]);
+
+  return { prisma: {}, PrismaUserRepository: MockUserRepo };
+});
 
 vi.mock('@/infrastructure/profanity/LeoProfanityChecker', () => ({
   LeoProfanityChecker: { getInstance: vi.fn().mockReturnValue({}) },

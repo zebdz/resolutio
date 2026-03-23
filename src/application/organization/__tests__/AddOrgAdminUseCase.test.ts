@@ -173,6 +173,9 @@ class MockUserRepository implements UserRepository {
   async getBlockStatus(): Promise<null> {
     return null;
   }
+  async getBlockedUserIds(): Promise<string[]> {
+    return [];
+  }
 }
 
 function makeOrg(id: string): Organization {
