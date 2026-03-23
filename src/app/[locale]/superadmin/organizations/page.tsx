@@ -5,7 +5,7 @@ import { Heading } from '@/src/web/components/catalyst/heading';
 import { Text } from '@/src/web/components/catalyst/text';
 import { Link } from '@/src/i18n/routing';
 import { SuperadminOrganizationsList } from './SuperadminOrganizationsList';
-import { searchAllOrganizationsAction } from '@/web/actions/organization';
+import { searchAllOrganizationsAction } from '@/src/web/actions/organization/organization';
 
 const PAGE_SIZE = 30;
 

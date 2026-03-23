@@ -5,8 +5,8 @@ import { Text } from '@/src/web/components/catalyst/text';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Divider } from '@/src/web/components/catalyst/divider';
 import { Link } from '@/src/i18n/routing';
-import { getOrganizationDetailsAction } from '@/web/actions/organization';
-import { searchPollsAction } from '@/web/actions/poll';
+import { getOrganizationDetailsAction } from '@/src/web/actions/organization/organization';
+import { searchPollsAction } from '@/src/web/actions/poll/poll';
 import { MembershipSection } from './MembershipSection';
 import { BoardsSection } from './BoardsSection';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
@@ -18,7 +18,7 @@ import {
   PrismaUserRepository,
 } from '@/infrastructure/index';
 import { OrgMembersList } from './OrgMembersList';
-import { getOrgMembersAction } from '@/web/actions/invitation';
+import { getOrgMembersAction } from '@/src/web/actions/invitation/invitation';
 import { User } from '@/domain/user/User';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);

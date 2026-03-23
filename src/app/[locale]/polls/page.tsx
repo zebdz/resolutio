@@ -4,9 +4,9 @@ import { Heading, Subheading } from '@/src/web/components/catalyst/heading';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import { PlusIcon } from '@heroicons/react/20/solid';
-import { searchPollsAction } from '@/web/actions/poll';
-import { getUserMemberOrganizationsAction } from '@/web/actions/organization';
-import { getUserBoardsAction } from '@/web/actions/board';
+import { searchPollsAction } from '@/src/web/actions/poll/poll';
+import { getUserMemberOrganizationsAction } from '@/src/web/actions/organization/organization';
+import { getUserBoardsAction } from '@/src/web/actions/board/board';
 import {
   prisma,
   PrismaOrganizationRepository,

@@ -34,7 +34,7 @@ import {
   PrismaInvitationRepository,
 } from '@/infrastructure/index';
 import { Notification } from '@/domain/notification/Notification';
-import { getCurrentUser } from '../lib/session';
+import { getCurrentUser } from '../../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';

@@ -19,7 +19,7 @@ import { Text, TextLink } from '@/src/web/components/catalyst/text';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import { TurnstileWidget } from './TurnstileWidget';
-import { registerAction } from '@/web/actions/auth';
+import { registerAction } from '@/src/web/actions/auth/auth';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/16/solid';
 import { Locale } from '@/src/i18n/locales';
 import {

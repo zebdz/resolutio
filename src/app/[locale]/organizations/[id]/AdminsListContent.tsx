@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Input } from '@/src/web/components/catalyst/input';
 import { User } from '@/domain/user/User';
-import { getOrgAdminsPaginatedAction } from '@/web/actions/organization';
+import { getOrgAdminsPaginatedAction } from '@/src/web/actions/organization/organization';
 
 export type OrgAdmin = {
   id: string;

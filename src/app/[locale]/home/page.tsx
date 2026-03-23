@@ -4,7 +4,7 @@ import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import { CreateOrganizationButton } from './CreateOrganizationButton';
 import { UserOrganizationsList } from './UserOrganizationsList';
-import { getAdminOrganizationsAction } from '@/web/actions/organization';
+import { getAdminOrganizationsAction } from '@/src/web/actions/organization/organization';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { PendingInvitesSection } from './PendingInvitesSection';
 import { PendingJoinRequestsSection } from './PendingJoinRequestsSection';

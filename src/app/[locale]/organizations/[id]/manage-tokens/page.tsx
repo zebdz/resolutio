@@ -4,8 +4,8 @@ import { getCurrentUser } from '@/web/lib/session';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
-import { getJoinTokensByOrgAction } from '@/web/actions/joinToken';
-import { getOrganizationDetailsAction } from '@/web/actions/organization';
+import { getJoinTokensByOrgAction } from '@/src/web/actions/organization/joinToken';
+import { getOrganizationDetailsAction } from '@/src/web/actions/organization/organization';
 import { prisma, PrismaUserRepository } from '@/infrastructure/index';
 import { ManageTokensClient } from './ManageTokensClient';
 

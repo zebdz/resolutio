@@ -7,8 +7,11 @@ import { Select } from '@/src/web/components/catalyst/select';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Text } from '@/src/web/components/catalyst/text';
 import { PollCard } from './PollCard';
-import { searchPollsAction, SearchPollsInput } from '@/web/actions/poll';
-import { getBoardsByOrganizationAction } from '@/web/actions/board';
+import {
+  searchPollsAction,
+  SearchPollsInput,
+} from '@/src/web/actions/poll/poll';
+import { getBoardsByOrganizationAction } from '@/src/web/actions/board/board';
 import { PollState } from '@/domain/poll/PollState';
 
 const DEFAULT_PAGE_SIZE = 10;

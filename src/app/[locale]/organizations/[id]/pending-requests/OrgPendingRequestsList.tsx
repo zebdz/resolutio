@@ -26,7 +26,7 @@ import {
 import {
   handleJoinRequestAction,
   getOrganizationPendingRequestsAction,
-} from '@/web/actions/organization';
+} from '@/src/web/actions/organization/organization';
 import { User } from '@/src/domain/user/User';
 
 interface OrgPendingRequest {

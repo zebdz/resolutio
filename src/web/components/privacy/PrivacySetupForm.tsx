@@ -13,7 +13,7 @@ import {
 import { Input } from '@/src/web/components/catalyst/input';
 import { Switch, SwitchField } from '@/src/web/components/catalyst/switch';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
-import { completePrivacySetupAction } from '@/web/actions/user';
+import { completePrivacySetupAction } from '@/src/web/actions/user/user';
 import { consumeReturnToClient } from '@/web/lib/returnTo.client';
 
 type Props = {

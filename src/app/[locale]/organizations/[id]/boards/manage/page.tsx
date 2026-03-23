@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { getOrganizationDetailsAction } from '@/web/actions/organization';
+import { getOrganizationDetailsAction } from '@/src/web/actions/organization/organization';
 import { Heading, Subheading } from '@/src/web/components/catalyst/heading';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';

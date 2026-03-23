@@ -15,7 +15,7 @@ import {
 import { PhoneInput } from '@/src/web/components/shared/phone';
 import { Text } from '@/src/web/components/catalyst/text';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
-import { loginAction } from '@/web/actions/auth';
+import { loginAction } from '@/src/web/actions/auth/auth';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/16/solid';
 import { TurnstileWidget } from '@/web/components/auth/TurnstileWidget';
 

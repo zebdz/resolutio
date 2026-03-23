@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockRequireSuperadmin = vi.fn();
 
-vi.mock('@/web/actions/superadminAuth', () => ({
+vi.mock('@/web/actions/superadmin/superadminAuth', () => ({
   requireSuperadmin: mockRequireSuperadmin,
 }));
 
@@ -15,7 +15,7 @@ vi.mock('@/infrastructure/rateLimit/registry', () => ({
 }));
 
 const { getRateLimitMonitorSnapshotAction, getKeyLimiterDetailsAction } =
-  await import('../rateLimitMonitor');
+  await import('../superadmin/rateLimitMonitor');
 
 const AUTH_ERROR = { success: false as const, error: 'Unauthorized' };
 

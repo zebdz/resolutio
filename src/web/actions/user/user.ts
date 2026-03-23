@@ -6,7 +6,7 @@ import { CompletePrivacySetupUseCase } from '@/src/application/user/CompletePriv
 import { prisma, PrismaUserRepository } from '@/infrastructure/index';
 import { updateUserProfileSchema } from '@/src/application/user/UpdateUserProfileSchema';
 import { completePrivacySetupSchema } from '@/src/application/user/CompletePrivacySetupSchema';
-import { getCurrentUser } from '../lib/session';
+import { getCurrentUser } from '../../lib/session';
 import {
   checkRateLimit,
   checkPhoneSearchRateLimit,

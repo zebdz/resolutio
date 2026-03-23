@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockRequireSuperadmin = vi.fn();
 
-vi.mock('@/web/actions/superadminAuth', () => ({
+vi.mock('@/web/actions/superadmin/superadminAuth', () => ({
   requireSuperadmin: mockRequireSuperadmin,
 }));
 
@@ -38,7 +38,7 @@ const {
   searchOrganizationsForFilterAction,
   getUserPollsForAdminAction,
   getOrganizationNameAction,
-} = await import('../suspiciousActivity');
+} = await import('../superadmin/suspiciousActivity');
 
 const AUTH_ERROR = { success: false as const, error: 'Unauthorized' };
 

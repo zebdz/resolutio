@@ -14,8 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/src/web/components/catalyst/table';
-import { cancelJoinParentRequestAction } from '@/web/actions/joinParentRequest';
-import type { EnrichedJoinParentRequest } from '@/web/actions/joinParentRequest';
+import { cancelJoinParentRequestAction } from '@/src/web/actions/organization/joinParentRequest';
+import type { EnrichedJoinParentRequest } from '@/src/web/actions/organization/joinParentRequest';
 import { User } from '@/domain/user/User';
 
 interface OutgoingRequestsTableProps {

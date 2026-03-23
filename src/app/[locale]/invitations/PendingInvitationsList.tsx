@@ -6,7 +6,7 @@ import { Badge } from '@/src/web/components/catalyst/badge';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { Text } from '@/src/web/components/catalyst/text';
-import { handleInviteAction } from '@/web/actions/invitation';
+import { handleInviteAction } from '@/src/web/actions/invitation/invitation';
 import { toast } from 'sonner';
 import type { InviteDetails } from '@/application/invitation/GetInviteDetailsUseCase';
 

@@ -124,7 +124,8 @@ vi.mock('@/web/actions/utils/translateErrorCode', () => ({
   translateErrorCode: vi.fn(),
 }));
 
-const { searchAllOrganizationsAction } = await import('../organization');
+const { searchAllOrganizationsAction } =
+  await import('../organization/organization');
 
 describe('searchAllOrganizationsAction - superadmin enforcement', () => {
   beforeEach(() => {

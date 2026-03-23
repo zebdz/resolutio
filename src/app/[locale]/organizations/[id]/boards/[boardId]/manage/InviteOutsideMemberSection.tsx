@@ -6,9 +6,9 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Field, Label } from '@/src/web/components/catalyst/fieldset';
 import { Input } from '@/src/web/components/catalyst/input';
-import { searchUsersForBoardAction } from '@/web/actions/board';
-import { createBoardMemberInviteAction } from '@/web/actions/invitation';
-import { searchUserByPhoneAction } from '@/web/actions/user';
+import { searchUsersForBoardAction } from '@/src/web/actions/board/board';
+import { createBoardMemberInviteAction } from '@/src/web/actions/invitation/invitation';
+import { searchUserByPhoneAction } from '@/src/web/actions/user/user';
 import { User } from '@/domain/user/User';
 import { PhoneInput } from '@/src/web/components/shared/phone';
 

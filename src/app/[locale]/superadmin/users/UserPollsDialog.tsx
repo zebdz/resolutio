@@ -13,7 +13,7 @@ import {
 import {
   getUserPollsForAdminAction,
   type UserPollResult,
-} from '@/web/actions/suspiciousActivity';
+} from '@/src/web/actions/superadmin/suspiciousActivity';
 import { Link } from '@/src/i18n/routing';
 import { PollStateBadge } from '@/src/web/components/polls/PollStateBadge';
 

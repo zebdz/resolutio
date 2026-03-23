@@ -24,7 +24,7 @@ import {
   searchOrganizationsForFilterAction,
   type SerializedAdminUserResult,
   type UserBlockHistoryEntry,
-} from '@/web/actions/suspiciousActivity';
+} from '@/src/web/actions/superadmin/suspiciousActivity';
 import { BlockUserDialog } from './BlockUserDialog';
 import { BlockHistoryDialog } from './BlockHistoryDialog';
 import { UserPollsDialog } from './UserPollsDialog';
@@ -80,7 +80,7 @@ export function UserManagementPanel({
   const [pollsTarget, setPollsTarget] =
     useState<SerializedAdminUserResult | null>(null);
   const [pollsData, setPollsData] = useState<{
-    polls: import('@/web/actions/suspiciousActivity').UserPollResult[];
+    polls: import('@/src/web/actions/superadmin/suspiciousActivity').UserPollResult[];
     totalCount: number;
   }>({ polls: [], totalCount: 0 });
   const [pollsLoading, setPollsLoading] = useState(false);

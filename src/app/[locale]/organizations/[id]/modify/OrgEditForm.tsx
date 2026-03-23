@@ -15,7 +15,7 @@ import {
 } from '@/src/web/components/catalyst/fieldset';
 import { SwitchField, Switch } from '@/src/web/components/catalyst/switch';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
-import { updateOrganizationAction } from '@/web/actions/organization';
+import { updateOrganizationAction } from '@/src/web/actions/organization/organization';
 
 type Props = {
   organizationId: string;

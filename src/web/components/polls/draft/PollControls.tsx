@@ -15,7 +15,7 @@ import {
   activatePollAction,
   deactivatePollAction,
   finishPollAction,
-} from '@/web/actions/poll';
+} from '@/src/web/actions/poll/poll';
 import { toast } from 'sonner';
 import { Link } from '@/src/i18n/routing';
 import { PollState } from '@/src/domain/poll/PollState';

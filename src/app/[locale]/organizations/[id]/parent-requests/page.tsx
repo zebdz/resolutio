@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { getOrganizationDetailsAction } from '@/web/actions/organization';
-import { getIncomingJoinParentRequestsAction } from '@/web/actions/joinParentRequest';
+import { getOrganizationDetailsAction } from '@/src/web/actions/organization/organization';
+import { getIncomingJoinParentRequestsAction } from '@/src/web/actions/organization/joinParentRequest';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Heading, Subheading } from '@/src/web/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';

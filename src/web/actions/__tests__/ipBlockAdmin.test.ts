@@ -84,7 +84,7 @@ import {
   getIpBlockHistoryAction,
   searchBlockedIpsAction,
   getBlockedIpsAction,
-} from '../ipBlockAdmin';
+} from '../superadmin/ipBlockAdmin';
 
 const mockUser = {
   id: 'admin-1',

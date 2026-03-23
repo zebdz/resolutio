@@ -5,7 +5,7 @@ import { useState, useTransition } from 'react';
 import { useRouter } from '@/src/i18n/routing';
 import { Button } from '@/src/web/components/catalyst/button';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
-import { joinViaTokenAction } from '@/web/actions/joinToken';
+import { joinViaTokenAction } from '@/src/web/actions/organization/joinToken';
 import { toast } from 'sonner';
 
 export function JoinConfirmButton({ token }: { token: string }) {

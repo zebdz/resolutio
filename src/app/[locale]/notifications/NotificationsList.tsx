@@ -28,7 +28,7 @@ import {
   markAllNotificationsReadAction,
   getNotificationsAction,
   deleteNotificationsAction,
-} from '@/web/actions/notification';
+} from '@/src/web/actions/notification/notification';
 import { Link } from '@/src/i18n/routing';
 import { getNotificationActionUrl } from '@/web/utils/notificationActionUrl';
 

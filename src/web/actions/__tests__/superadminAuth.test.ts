@@ -30,7 +30,7 @@ vi.mock('next-intl/server', () => ({
   getTranslations: vi.fn().mockResolvedValue((key: string) => key),
 }));
 
-const { requireSuperadmin } = await import('../superadminAuth');
+const { requireSuperadmin } = await import('../superadmin/superadminAuth');
 
 describe('requireSuperadmin', () => {
   beforeEach(() => {

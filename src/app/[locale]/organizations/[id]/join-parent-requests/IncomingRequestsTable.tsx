@@ -22,8 +22,8 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/src/web/components/catalyst/dialog';
-import { handleJoinParentRequestAction } from '@/web/actions/joinParentRequest';
-import type { EnrichedJoinParentRequest } from '@/web/actions/joinParentRequest';
+import { handleJoinParentRequestAction } from '@/src/web/actions/organization/joinParentRequest';
+import type { EnrichedJoinParentRequest } from '@/src/web/actions/organization/joinParentRequest';
 import { User } from '@/domain/user/User';
 
 interface IncomingRequestsTableProps {

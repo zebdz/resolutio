@@ -15,7 +15,7 @@ import {
   unlockRateLimitKeyAction,
   type LimiterOverview,
   type EnrichedEntry,
-} from '@/web/actions/rateLimitAdmin';
+} from '@/src/web/actions/superadmin/rateLimitAdmin';
 import { ConfirmDialog } from './ConfirmDialog';
 import { User } from '@/domain/user/User';
 

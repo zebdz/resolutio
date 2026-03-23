@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server';
 import {
   getUserVotingProgressAction,
   canUserVoteAction,
-} from '@/web/actions/vote';
+} from '@/src/web/actions/poll/vote';
 import VotingInterface from '@/src/web/components/polls/voting/VotingInterface';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';

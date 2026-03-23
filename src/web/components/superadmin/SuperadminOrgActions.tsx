@@ -6,7 +6,7 @@ import { Button } from '@/src/web/components/catalyst/button';
 import {
   archiveOrganizationAction,
   unarchiveOrganizationAction,
-} from '@/web/actions/organization';
+} from '@/src/web/actions/organization/organization';
 import { ConfirmArchiveDialog } from './ConfirmArchiveDialog';
 
 interface SuperadminOrgActionsProps {

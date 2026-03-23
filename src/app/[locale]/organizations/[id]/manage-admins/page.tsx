@@ -5,11 +5,11 @@ import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLa
 import { CurrentAdminsList } from './CurrentAdminsList';
 import { InviteAdminSection } from './InviteAdminSection';
 import { PendingAdminInvites } from './PendingAdminInvites';
-import { getPendingAdminInvitesAction } from '@/web/actions/invitation';
+import { getPendingAdminInvitesAction } from '@/src/web/actions/invitation/invitation';
 import {
   getOrganizationDetailsAction,
   getOrgAdminsPaginatedAction,
-} from '@/web/actions/organization';
+} from '@/src/web/actions/organization/organization';
 import { getCurrentUser } from '@/web/lib/session';
 import { prisma, PrismaUserRepository } from '@/infrastructure/index';
 

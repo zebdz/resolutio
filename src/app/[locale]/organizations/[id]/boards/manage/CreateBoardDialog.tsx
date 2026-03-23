@@ -13,7 +13,7 @@ import {
 } from '@/src/web/components/catalyst/dialog';
 import { Field, Label } from '@/src/web/components/catalyst/fieldset';
 import { Input } from '@/src/web/components/catalyst/input';
-import { createBoardAction } from '@/web/actions/board';
+import { createBoardAction } from '@/src/web/actions/board/board';
 
 type CreateBoardDialogProps = {
   organizationId: string;

@@ -112,7 +112,7 @@ import { limiterRegistry } from '@/infrastructure/rateLimit/registry';
 import {
   getRateLimitMonitorSnapshotAction,
   getKeyLimiterDetailsAction,
-} from '../rateLimitMonitor';
+} from '../superadmin/rateLimitMonitor';
 
 const mockUser = {
   id: 'user-1',

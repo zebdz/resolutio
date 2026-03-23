@@ -21,7 +21,7 @@ import {
   getIpBlockHistoryAction,
   type BlockedIpEntry,
   type IpBlockHistoryEntry,
-} from '@/web/actions/ipBlockAdmin';
+} from '@/src/web/actions/superadmin/ipBlockAdmin';
 import { User } from '@/domain/user/User';
 
 const PAGE_SIZE = 20;

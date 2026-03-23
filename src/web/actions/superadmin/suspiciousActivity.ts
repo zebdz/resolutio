@@ -3,8 +3,8 @@
 import { getTranslations } from 'next-intl/server';
 import { prisma } from '@/infrastructure/index';
 import { checkRateLimit } from '@/web/actions/rateLimit';
-import { requireSuperadmin } from '@/web/actions/superadminAuth';
-import { isError } from '@/web/actions/superadminAuthUtils';
+import { requireSuperadmin } from '@/src/web/actions/superadmin/superadminAuth';
+import { isError } from '@/src/web/actions/superadmin/superadminAuthUtils';
 import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChecker';
 import { SharedDomainCodes } from '@/domain/shared/SharedDomainCodes';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';

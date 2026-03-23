@@ -5,7 +5,7 @@ import {
   type OrganizationItem,
 } from '../../organizations/OrganizationsList';
 import { SuperadminOrgActions } from '@/web/components/superadmin/SuperadminOrgActions';
-import { searchAllOrganizationsAction } from '@/web/actions/organization';
+import { searchAllOrganizationsAction } from '@/src/web/actions/organization/organization';
 
 interface SuperadminOrganizationsListProps {
   initialOrganizations: OrganizationItem[];

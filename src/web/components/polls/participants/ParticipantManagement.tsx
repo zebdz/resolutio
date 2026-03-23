@@ -6,7 +6,7 @@ import {
   updateParticipantWeightAction,
   removeParticipantAction,
   getWeightHistoryAction,
-} from '@/web/actions/participant';
+} from '@/src/web/actions/organization/participant';
 import {
   Table,
   TableBody,

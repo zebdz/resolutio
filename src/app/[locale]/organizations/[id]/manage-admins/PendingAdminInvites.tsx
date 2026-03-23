@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/src/web/components/catalyst/button';
-import { revokeInviteAction } from '@/web/actions/invitation';
+import { revokeInviteAction } from '@/src/web/actions/invitation/invitation';
 import { User } from '@/domain/user/User';
 
 type PendingInvite = {

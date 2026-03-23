@@ -27,7 +27,7 @@ import {
 import {
   handleJoinRequestAction,
   getPendingRequestsAction,
-} from '@/web/actions/organization';
+} from '@/src/web/actions/organization/organization';
 
 interface PendingRequest {
   organizationId: string;

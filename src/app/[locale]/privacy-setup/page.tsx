@@ -6,7 +6,7 @@ import { Text } from '@/src/web/components/catalyst/text';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Divider } from '@/src/web/components/catalyst/divider';
 import { PrivacySetupForm } from '@/web/components/privacy/PrivacySetupForm';
-import { logoutAction } from '@/web/actions/auth';
+import { logoutAction } from '@/src/web/actions/auth/auth';
 import { consumeReturnToCookieServer } from '@/web/lib/returnTo.server';
 
 export async function generateMetadata() {

@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { Text } from '@/src/web/components/catalyst/text';
-import { searchOrganizationsNotAlreadyMemberOfAction } from '@/web/actions/organization';
+import { searchOrganizationsNotAlreadyMemberOfAction } from '@/src/web/actions/organization/organization';
 import { OrganizationsList } from './OrganizationsList';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 

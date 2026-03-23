@@ -15,7 +15,7 @@ import {
   PrismaUserRepository,
   PrismaBoardRepository,
 } from '@/infrastructure/index';
-import { getCurrentUser } from '../lib/session';
+import { getCurrentUser } from '../../lib/session';
 import { User } from '@/domain/user/User';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';

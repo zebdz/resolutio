@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { getBoardDetailsAction } from '@/web/actions/board';
-import { getPendingBoardInvitesAction } from '@/web/actions/invitation';
+import { getBoardDetailsAction } from '@/src/web/actions/board/board';
+import { getPendingBoardInvitesAction } from '@/src/web/actions/invitation/invitation';
 import { Heading, Subheading } from '@/src/web/components/catalyst/heading';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';

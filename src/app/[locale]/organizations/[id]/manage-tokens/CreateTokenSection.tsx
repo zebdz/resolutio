@@ -12,7 +12,7 @@ import {
 } from '@/src/web/components/catalyst/fieldset';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { Heading } from '@/src/web/components/catalyst/heading';
-import { createJoinTokenAction } from '@/web/actions/joinToken';
+import { createJoinTokenAction } from '@/src/web/actions/organization/joinToken';
 import { toast } from 'sonner';
 
 export function CreateTokenSection({

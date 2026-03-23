@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@/src/web/components/catalyst/dialog';
 import { Textarea } from '@/src/web/components/catalyst/textarea';
-import { removeBoardMemberAction } from '@/web/actions/board';
+import { removeBoardMemberAction } from '@/src/web/actions/board/board';
 import { User } from '@/domain/user/User';
 
 type Member = {

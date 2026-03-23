@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Field, Label } from '@/src/web/components/catalyst/fieldset';
 import { Select } from '@/src/web/components/catalyst/select';
-import { createBoardMemberInviteAction } from '@/web/actions/invitation';
+import { createBoardMemberInviteAction } from '@/src/web/actions/invitation/invitation';
 import { User } from '@/domain/user/User';
 
 type InviteMemberSectionProps = {

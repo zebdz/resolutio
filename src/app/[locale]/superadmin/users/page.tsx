@@ -6,7 +6,7 @@ import { UserManagementPanel } from './UserManagementPanel';
 import {
   listUsersForAdminAction,
   getOrganizationNameAction,
-} from '@/web/actions/suspiciousActivity';
+} from '@/src/web/actions/superadmin/suspiciousActivity';
 
 const PAGE_SIZE = 10;
 

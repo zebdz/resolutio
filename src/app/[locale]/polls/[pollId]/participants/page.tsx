@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
-import { getPollByIdAction } from '@/web/actions/poll';
-import { getParticipantsAction } from '@/web/actions/participant';
+import { getPollByIdAction } from '@/src/web/actions/poll/poll';
+import { getParticipantsAction } from '@/src/web/actions/organization/participant';
 import ParticipantManagement from '@/src/web/components/polls/participants/ParticipantManagement';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { ParticipantWithUser } from '@/src/application/poll/GetParticipantsUseCase';

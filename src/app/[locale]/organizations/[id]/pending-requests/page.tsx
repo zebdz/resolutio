@@ -3,7 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import {
   getOrganizationPendingRequestsAction,
   getOrganizationDetailsAction,
-} from '@/web/actions/organization';
+} from '@/src/web/actions/organization/organization';
 import { Heading, Subheading } from '@/src/web/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
 import { OrgPendingRequestsList } from './OrgPendingRequestsList';

@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
-import { getPollResultsAction } from '@/web/actions/vote';
-import { getPollByIdAction } from '@/web/actions/poll';
+import { getPollResultsAction } from '@/src/web/actions/poll/vote';
+import { getPollByIdAction } from '@/src/web/actions/poll/poll';
 import PollResults from '@/src/web/components/polls/results/PollResults';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import {

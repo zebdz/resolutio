@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
-import { getWeightHistoryAction } from '@/web/actions/participant';
+import { getWeightHistoryAction } from '@/src/web/actions/organization/participant';
 import {
   Dialog,
   DialogActions,

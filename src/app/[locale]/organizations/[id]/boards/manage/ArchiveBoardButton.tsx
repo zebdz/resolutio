@@ -11,7 +11,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/src/web/components/catalyst/dialog';
-import { archiveBoardAction } from '@/web/actions/board';
+import { archiveBoardAction } from '@/src/web/actions/board/board';
 
 type ArchiveBoardButtonProps = {
   boardId: string;

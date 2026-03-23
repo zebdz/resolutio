@@ -11,8 +11,8 @@ import { TurnstileWidget } from './TurnstileWidget';
 import {
   confirmPhoneAction,
   requestConfirmationOtpAction,
-} from '@/web/actions/confirmPhone';
-import { logoutAction } from '@/web/actions/auth';
+} from '@/src/web/actions/auth/confirmPhone';
+import { logoutAction } from '@/src/web/actions/auth/auth';
 
 type Props = {
   maskedPhone: string;

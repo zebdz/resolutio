@@ -1,11 +1,11 @@
 'use server';
 
 import { getTranslations } from 'next-intl/server';
-import { getCurrentUser } from '../lib/session';
+import { getCurrentUser } from '../../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
-import type { ActionResult } from '@/web/actions/organization';
+import type { ActionResult } from '@/src/web/actions/organization/organization';
 import {
   prisma,
   PrismaOrganizationRepository,

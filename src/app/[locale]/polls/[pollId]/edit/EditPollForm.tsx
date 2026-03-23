@@ -20,7 +20,7 @@ import {
   createAnswerAction,
   updateAnswerAction,
   deleteAnswerAction,
-} from '@/web/actions/poll';
+} from '@/src/web/actions/poll/poll';
 import { Link } from '@/src/i18n/routing';
 import { QuestionType } from '@/domain/poll/QuestionType';
 import { PollState } from '@/src/domain/poll/PollState';

@@ -14,9 +14,12 @@ import { QuestionForm } from '@/src/web/components/polls/draft/QuestionForm';
 import { Link } from '@/src/i18n/routing';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { QuestionType } from '@/domain/poll/QuestionType';
-import { createPollAction, addQuestionAction } from '@/web/actions/poll';
-import { getUserBoardsAction } from '@/web/actions/board';
-import { getUserMemberOrganizationsAction } from '@/web/actions/organization';
+import {
+  createPollAction,
+  addQuestionAction,
+} from '@/src/web/actions/poll/poll';
+import { getUserBoardsAction } from '@/src/web/actions/board/board';
+import { getUserMemberOrganizationsAction } from '@/src/web/actions/organization/organization';
 
 interface Answer {
   id: string;

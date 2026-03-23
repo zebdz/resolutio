@@ -8,8 +8,8 @@ import clsx from 'clsx';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Textarea } from '@/src/web/components/catalyst/textarea';
 import { Field, Label } from '@/src/web/components/catalyst/fieldset';
-import { requestJoinParentAction } from '@/web/actions/joinParentRequest';
-import { searchOrganizationsForJoinParentAction } from '@/web/actions/organization';
+import { requestJoinParentAction } from '@/src/web/actions/organization/joinParentRequest';
+import { searchOrganizationsForJoinParentAction } from '@/src/web/actions/organization/organization';
 
 interface JoinParentFormProps {
   childOrgId: string;

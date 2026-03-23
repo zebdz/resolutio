@@ -7,7 +7,7 @@ import {
   getRateLimitOverviewAction,
   resetAllRateLimitsAction,
   type LimiterOverview,
-} from '@/web/actions/rateLimitAdmin';
+} from '@/src/web/actions/superadmin/rateLimitAdmin';
 import { LimiterCard } from './LimiterCard';
 import { ConfirmDialog } from './ConfirmDialog';
 

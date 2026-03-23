@@ -7,9 +7,9 @@ import { Button } from '@/src/web/components/catalyst/button';
 import { Field, Label } from '@/src/web/components/catalyst/fieldset';
 import { Input } from '@/src/web/components/catalyst/input';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
-import { createAdminInviteAction } from '@/web/actions/invitation';
-import { searchUsersForOrgAdminAction } from '@/web/actions/organization';
-import { searchUserByPhoneAction } from '@/web/actions/user';
+import { createAdminInviteAction } from '@/src/web/actions/invitation/invitation';
+import { searchUsersForOrgAdminAction } from '@/src/web/actions/organization/organization';
+import { searchUserByPhoneAction } from '@/src/web/actions/user/user';
 import { User } from '@/domain/user/User';
 import { PhoneInput } from '@/src/web/components/shared/phone';
 

@@ -28,7 +28,7 @@ import {
   setSessionCookie,
   getSessionCookie,
   deleteSessionCookie,
-} from '../lib/session';
+} from '../../lib/session';
 import { registerUserSchema } from '@/application/auth/RegisterUserSchema';
 import { LoginUserSchema } from '@/application/auth/LoginUserSchema';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';

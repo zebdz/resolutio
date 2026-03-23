@@ -14,7 +14,7 @@ import { Input } from '@/src/web/components/catalyst/input';
 import { Select } from '@/src/web/components/catalyst/select';
 import { Switch, SwitchField } from '@/src/web/components/catalyst/switch';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
-import { updateProfileAction } from '@/web/actions/user';
+import { updateProfileAction } from '@/src/web/actions/user/user';
 import { Locale } from '@/src/i18n/locales';
 
 type Props = {

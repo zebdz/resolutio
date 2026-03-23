@@ -24,7 +24,7 @@ import {
   PrismaNotificationRepository,
   PrismaInvitationRepository,
 } from '@/infrastructure/index';
-import { getCurrentUser } from '../lib/session';
+import { getCurrentUser } from '../../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 
 // Action result type

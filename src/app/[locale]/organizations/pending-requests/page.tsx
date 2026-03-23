@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { Text } from '@/src/web/components/catalyst/text';
-import { getPendingRequestsAction } from '@/web/actions/organization';
+import { getPendingRequestsAction } from '@/src/web/actions/organization/organization';
 import { PendingRequestsList } from './PendingRequestsList';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 

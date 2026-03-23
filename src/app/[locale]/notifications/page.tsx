@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
-import { getNotificationsAction } from '@/web/actions/notification';
+import { getNotificationsAction } from '@/src/web/actions/notification/notification';
 import { NotificationsList } from './NotificationsList';
 import { NOTIFICATIONS_PAGE_SIZE } from './constants';
 

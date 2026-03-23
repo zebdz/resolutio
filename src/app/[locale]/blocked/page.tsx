@@ -2,7 +2,7 @@ import { getTranslations } from 'next-intl/server';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { Text } from '@/src/web/components/catalyst/text';
 import { Button } from '@/src/web/components/catalyst/button';
-import { logoutAction } from '@/web/actions/auth';
+import { logoutAction } from '@/src/web/actions/auth/auth';
 
 export async function generateMetadata() {
   const t = await getTranslations('blocked');

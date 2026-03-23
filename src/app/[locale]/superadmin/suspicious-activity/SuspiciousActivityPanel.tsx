@@ -19,8 +19,8 @@ import {
   blockUserAction,
   unblockUserAction,
   type SuspiciousKeySummary,
-} from '@/web/actions/suspiciousActivity';
-import { blockIpAction } from '@/web/actions/ipBlockAdmin';
+} from '@/src/web/actions/superadmin/suspiciousActivity';
+import { blockIpAction } from '@/src/web/actions/superadmin/ipBlockAdmin';
 import { User } from '@/domain/user/User';
 
 const PAGE_SIZE = 20;

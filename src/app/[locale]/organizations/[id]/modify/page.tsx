@@ -9,16 +9,16 @@ import {
   getOrganizationDetailsAction,
   getOrgAdminsPaginatedAction,
   getOrganizationPendingRequestsAction,
-} from '@/web/actions/organization';
+} from '@/src/web/actions/organization/organization';
 import {
   getPendingAdminInvitesAction,
   getPendingMemberInvitesAction,
   getOrgMembersAction,
-} from '@/web/actions/invitation';
+} from '@/src/web/actions/invitation/invitation';
 import {
   getChildOrgJoinParentRequestAction,
   getIncomingJoinParentRequestsAction,
-} from '@/web/actions/joinParentRequest';
+} from '@/src/web/actions/organization/joinParentRequest';
 import { Button } from '@/src/web/components/catalyst/button';
 import { MembershipSection } from '../MembershipSection';
 import { ParentOrgSection } from '../ParentOrgSection';

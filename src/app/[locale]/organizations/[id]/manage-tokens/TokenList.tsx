@@ -20,7 +20,7 @@ import {
   expireJoinTokenAction,
   reactivateJoinTokenAction,
   updateJoinTokenMaxUsesAction,
-} from '@/web/actions/joinToken';
+} from '@/src/web/actions/organization/joinToken';
 import { toast } from 'sonner';
 
 type TokenData = {

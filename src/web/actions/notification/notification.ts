@@ -8,9 +8,9 @@ import { MarkAllNotificationsReadUseCase } from '@/application/notification/Mark
 import { GetUnreadNotificationCountUseCase } from '@/application/notification/GetUnreadNotificationCountUseCase';
 import { DeleteNotificationsUseCase } from '@/application/notification/DeleteNotificationsUseCase';
 import { prisma, PrismaNotificationRepository } from '@/infrastructure/index';
-import { getCurrentUser } from '../lib/session';
+import { getCurrentUser } from '../../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
-import { ActionResult } from './organization';
+import { ActionResult } from '../organization/organization';
 
 const notificationRepository = new PrismaNotificationRepository(prisma);
 

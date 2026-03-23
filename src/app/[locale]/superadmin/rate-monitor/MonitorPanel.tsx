@@ -8,7 +8,7 @@ import {
   getKeyLimiterDetailsAction,
   type MonitorEntry,
   type KeyLimiterDetail,
-} from '@/web/actions/rateLimitMonitor';
+} from '@/src/web/actions/superadmin/rateLimitMonitor';
 import { KeyDetailView } from './KeyDetailView';
 
 const POLL_INTERVAL_MS = 2000;

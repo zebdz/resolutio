@@ -3,7 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { submitDraftAction, finishVotingAction } from '@/web/actions/vote';
+import {
+  submitDraftAction,
+  finishVotingAction,
+} from '@/src/web/actions/poll/vote';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Switch, SwitchField } from '@/src/web/components/catalyst/switch';
 import { Label, Description } from '@/src/web/components/catalyst/fieldset';

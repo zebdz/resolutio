@@ -2,8 +2,8 @@
 
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { limiterRegistry } from '@/infrastructure/rateLimit/registry';
-import { requireSuperadmin } from '@/web/actions/superadminAuth';
-import { isError } from '@/web/actions/superadminAuthUtils';
+import { requireSuperadmin } from '@/src/web/actions/superadmin/superadminAuth';
+import { isError } from '@/src/web/actions/superadmin/superadminAuthUtils';
 
 export type ActionResult<T = void> =
   | { success: true; data: T }

@@ -14,7 +14,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from '@/src/web/components/catalyst/dialog';
-import { handleJoinParentRequestAction } from '@/web/actions/joinParentRequest';
+import { handleJoinParentRequestAction } from '@/src/web/actions/organization/joinParentRequest';
 import { User } from '@/domain/user/User';
 
 interface ParentRequest {

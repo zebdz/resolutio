@@ -12,7 +12,7 @@ import {
   activatePollAction,
   deactivatePollAction,
   finishPollAction,
-} from '@/web/actions/poll';
+} from '@/src/web/actions/poll/poll';
 import { toast } from 'sonner';
 
 interface PollCardProps {
