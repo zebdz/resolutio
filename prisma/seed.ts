@@ -3,6 +3,7 @@ import { PrismaClient, PollState } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { hash } from '@node-rs/argon2';
+import { randomUUID } from 'crypto';
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -337,35 +338,41 @@ const BOARD_NAMES = [
 // ════════════════════════════════════════════════════════════════
 //  MAIN
 // ════════════════════════════════════════════════════════════════
-async function main() {
-  console.log('Seeding database (50x scale)...\n');
+// Usage: yarn db:seed [scale]
+// scale=50 (default) → ~600 users, ~80 orgs, ~500 notifs
+// scale=500          → ~6k users, ~800 orgs, ~5k notifs
+// scale=5000         → ~60k users, ~8k orgs, ~50k notifs
+const SCALE = Math.max(1, parseInt(process.argv[2] ?? '50', 10));
 
-  // ── Clean ────────────────────────────────────────────────────
-  await prisma.voteDraft.deleteMany();
-  await prisma.vote.deleteMany();
-  await prisma.participantWeightHistory.deleteMany();
-  await prisma.pollParticipant.deleteMany();
-  await prisma.answer.deleteMany();
-  await prisma.question.deleteMany();
-  await prisma.poll.deleteMany();
-  await prisma.boardUser.deleteMany();
-  await prisma.board.deleteMany();
-  await prisma.organizationAdminUser.deleteMany();
-  await prisma.organizationUser.deleteMany();
-  await prisma.organizationJoinParentRequest.deleteMany();
-  await prisma.notification.deleteMany();
-  await prisma.session.deleteMany();
-  await prisma.superAdmin.deleteMany();
-  await prisma.otpVerification.deleteMany();
-  await prisma.organization.deleteMany();
-  await prisma.user.deleteMany();
+async function main() {
+  console.log(`Seeding database (scale=${SCALE})...\n`);
+
+  // ── Clean (TRUNCATE CASCADE handles all FK constraints) ─────
+  const client = await pool.connect();
+
+  try {
+    const { rows } = await client.query<{ table_name: string }>(
+      `SELECT table_name FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+       AND table_name != '_prisma_migrations'`
+    );
+    const quoted = rows.map((r) => `"${r.table_name}"`).join(', ');
+
+    if (quoted) {
+      await client.query(`TRUNCATE ${quoted} RESTART IDENTITY CASCADE`);
+    }
+  } finally {
+    client.release();
+  }
+
   console.log('Cleaned existing data');
 
-  // ── 1. Users (600) ──────────────────────────────────────────
+  // ── 1. Users ───────────────────────────────────────────────
+  const USER_COUNT = SCALE * 12;
   const pw = await hash('password123', ARGON2_OPTIONS);
   console.log('Password hashed');
 
-  const usersInput = Array.from({ length: 600 }, (_, i) => ({
+  const usersInput = Array.from({ length: USER_COUNT }, (_, i) => ({
     firstName: FIRST_NAMES[i % FIRST_NAMES.length],
     lastName:
       LAST_NAMES[i % LAST_NAMES.length] +
@@ -375,17 +382,21 @@ async function main() {
     password: pw,
     language: i % 10 === 0 ? ('en' as const) : ('ru' as const),
     consentGivenAt: new Date('2026-03-03'),
-    nickname: `user_${String(i).padStart(4, '0')}`,
+    nickname: `user_${String(i).padStart(6, '0')}`,
   }));
 
-  await prisma.user.createMany({ data: usersInput });
+  for (let i = 0; i < usersInput.length; i += 1000) {
+    await prisma.user.createMany({ data: usersInput.slice(i, i + 1000) });
+  }
+
   const users = await prisma.user.findMany({ orderBy: { phoneNumber: 'asc' } });
   console.log(`Users: ${users.length}`);
 
   await prisma.superAdmin.create({ data: { userId: users[0].id } });
 
-  // ── 2. Organizations (~400) ─────────────────────────────────
-  // 80 roots: first 50 get children, last 30 standalone
+  // ── 2. Organizations ────────────────────────────────────────
+  const ROOT_COUNT = Math.max(4, Math.floor(SCALE * 1.6));
+  const ROOTS_WITH_CHILDREN = Math.max(2, Math.floor(ROOT_COUNT * 0.625));
   const usedOrgNames = new Set<string>();
 
   function orgName(type: string, idx: number): string {
@@ -406,23 +417,45 @@ async function main() {
   const children: Org[] = [];
   const hierarchies: { root: Org; children: Org[] }[] = [];
 
-  for (let i = 0; i < 80; i++) {
+  // Pre-generate root orgs
+  const rootOrgRows: {
+    id: string;
+    name: string;
+    description: string;
+    createdById: string;
+    archivedAt: Date | null;
+  }[] = [];
+
+  for (let i = 0; i < ROOT_COUNT; i++) {
     const type = ORG_TYPES[i % ORG_TYPES.length];
     const name = orgName(type, i);
-    const archived = rand() < 0.05 ? daysAgo(randInt(30, 365)) : null;
-    const org = await prisma.organization.create({
-      data: {
-        name,
-        description: `${name} — описание`,
-        createdById: users[i % users.length].id,
-        archivedAt: archived,
-      },
+    const id = randomUUID();
+    rootOrgRows.push({
+      id,
+      name,
+      description: `${name} — описание`,
+      createdById: users[i % users.length].id,
+      archivedAt: rand() < 0.05 ? daysAgo(randInt(30, 365)) : null,
     });
-    roots.push({ id: org.id, parentId: null });
+    roots.push({ id, parentId: null });
   }
 
-  // Children for first 50 roots
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < rootOrgRows.length; i += 1000) {
+    await prisma.organization.createMany({
+      data: rootOrgRows.slice(i, i + 1000),
+    });
+  }
+
+  // Pre-generate child orgs
+  const childOrgRows: {
+    id: string;
+    name: string;
+    description: string;
+    createdById: string;
+    parentId: string;
+  }[] = [];
+
+  for (let i = 0; i < ROOTS_WITH_CHILDREN; i++) {
     const root = roots[i];
     const nChildren = randInt(2, 6);
     const kids: Org[] = [];
@@ -436,22 +469,28 @@ async function main() {
       }
 
       usedOrgNames.add(name);
-      const org = await prisma.organization.create({
-        data: {
-          name,
-          description: `${name} — подразделение`,
-          createdById: users[(i * 7 + c + 80) % users.length].id,
-          parentId: root.id,
-        },
+      const id = randomUUID();
+      childOrgRows.push({
+        id,
+        name,
+        description: `${name} — подразделение`,
+        createdById: users[(i * 7 + c + 80) % users.length].id,
+        parentId: root.id,
       });
-      children.push({ id: org.id, parentId: root.id });
-      kids.push({ id: org.id, parentId: root.id });
+      children.push({ id, parentId: root.id });
+      kids.push({ id, parentId: root.id });
     }
 
     hierarchies.push({ root, children: kids });
   }
 
-  for (let i = 50; i < 80; i++) {
+  for (let i = 0; i < childOrgRows.length; i += 1000) {
+    await prisma.organization.createMany({
+      data: childOrgRows.slice(i, i + 1000),
+    });
+  }
+
+  for (let i = ROOTS_WITH_CHILDREN; i < ROOT_COUNT; i++) {
     hierarchies.push({ root: roots[i], children: [] });
   }
 
@@ -478,7 +517,10 @@ async function main() {
   const adminDedup = new Set<string>();
 
   for (const h of hierarchies) {
-    const poolSize = randInt(15, 40);
+    const poolSize = randInt(
+      15,
+      Math.min(80, Math.max(20, Math.floor(SCALE * 0.8)))
+    );
     const pool = pickN(users, poolSize);
     const rootCount = randInt(5, 15);
     const rootUsers = pool.slice(0, rootCount);
@@ -506,8 +548,8 @@ async function main() {
       }
 
       memberDedup.add(mk);
-      const pending = rand() < 0.05;
-      const rejected = !pending && rand() < 0.03;
+      const pending = rand() < 0.12;
+      const rejected = !pending && rand() < 0.04;
       memberRows.push({
         organizationId: h.root.id,
         userId: u.id,
@@ -578,7 +620,11 @@ async function main() {
     }
   }
 
-  await prisma.organizationAdminUser.createMany({ data: adminRows });
+  for (let i = 0; i < adminRows.length; i += 1000) {
+    await prisma.organizationAdminUser.createMany({
+      data: adminRows.slice(i, i + 1000),
+    });
+  }
 
   for (let i = 0; i < memberRows.length; i += 500) {
     await prisma.organizationUser.createMany({
@@ -588,23 +634,31 @@ async function main() {
 
   console.log(`Admins: ${adminRows.length}, Members: ${memberRows.length}`);
 
-  // ── 4. Boards (~500) ────────────────────────────────────────
+  // ── 4. Boards (1-3 per org) — batched ───────────────────────
   type Board = { id: string; orgId: string };
   const boards: Board[] = [];
+  const boardRows: { id: string; name: string; organizationId: string }[] = [];
+  const boardDedup = new Set<string>();
 
   for (const org of allOrgs) {
     const n = randInt(1, 3);
 
     for (let b = 0; b < n; b++) {
-      try {
-        const board = await prisma.board.create({
-          data: { name: BOARD_NAMES[b], organizationId: org.id },
-        });
-        boards.push({ id: board.id, orgId: org.id });
-      } catch {
-        // unique constraint — skip
+      const k = `${org.id}:${BOARD_NAMES[b]}`;
+
+      if (boardDedup.has(k)) {
+        continue;
       }
+
+      boardDedup.add(k);
+      const id = randomUUID();
+      boardRows.push({ id, name: BOARD_NAMES[b], organizationId: org.id });
+      boards.push({ id, orgId: org.id });
     }
+  }
+
+  for (let i = 0; i < boardRows.length; i += 1000) {
+    await prisma.board.createMany({ data: boardRows.slice(i, i + 1000) });
   }
 
   console.log(`Boards: ${boards.length}`);
@@ -642,7 +696,7 @@ async function main() {
 
   console.log(`Board members: ${buRows.length}`);
 
-  // ── 6. Polls (~450) ─────────────────────────────────────────
+  // ── 6. Polls (0-2 per board) — batched ──────────────────────
   const stateWeights = [
     [PollState.DRAFT, 0.15],
     [PollState.READY, 0.15],
@@ -678,8 +732,55 @@ async function main() {
     }
   }
 
-  let pollCount = 0;
+  // Build admin lookup for O(1) access
+  const adminByOrg = new Map<string, string>();
+
+  for (const a of adminRows) {
+    if (!adminByOrg.has(a.organizationId)) {
+      adminByOrg.set(a.organizationId, a.userId);
+    }
+  }
+
+  // Pre-generate all data in memory
+  const pollRows: {
+    id: string;
+    title: string;
+    description: string;
+    organizationId: string;
+    boardId: string;
+    startDate: Date;
+    endDate: Date;
+    state: PollState;
+    createdBy: string;
+  }[] = [];
+  const questionRows: {
+    id: string;
+    text: string;
+    pollId: string;
+    page: number;
+    order: number;
+    questionType: string;
+  }[] = [];
+  const answerRows: {
+    id: string;
+    text: string;
+    questionId: string;
+    order: number;
+  }[] = [];
+  const ppRows: {
+    pollId: string;
+    userId: string;
+    userWeight: number;
+    willingToSignProtocol?: boolean;
+  }[] = [];
+  const voteRows: {
+    questionId: string;
+    answerId: string;
+    userId: string;
+    userWeight: number;
+  }[] = [];
   const pollIds: string[] = [];
+  let pollCount = 0;
 
   for (const board of boards) {
     const nPolls = randInt(0, 2);
@@ -689,45 +790,48 @@ async function main() {
       continue;
     }
 
-    const admin = adminRows.find((a) => a.organizationId === board.orgId);
-    const createdBy = admin?.userId ?? mems[0];
+    const createdBy = adminByOrg.get(board.orgId) ?? mems[0];
 
     for (let p = 0; p < nPolls; p++) {
       const topic = POLL_TOPICS[(pollCount + p) % POLL_TOPICS.length];
       const state = pickState();
       const [startDate, endDate] = datePair(state);
+      const pollId = randomUUID();
+      const questionId = randomUUID();
 
-      const poll = await prisma.poll.create({
-        data: {
-          title: `${topic.t} #${pollCount + 1}`,
-          description: `Голосование: ${topic.t}`,
-          organizationId: board.orgId,
-          boardId: board.id,
-          startDate,
-          endDate,
-          state,
-          createdBy,
-        },
+      pollRows.push({
+        id: pollId,
+        title: `${topic.t} #${pollCount + 1}`,
+        description: `Голосование: ${topic.t}`,
+        organizationId: board.orgId,
+        boardId: board.id,
+        startDate,
+        endDate,
+        state,
+        createdBy,
       });
-      pollIds.push(poll.id);
+      pollIds.push(pollId);
 
-      // Question + answers
-      const question = await prisma.question.create({
-        data: {
-          text: topic.q,
-          pollId: poll.id,
-          page: 1,
-          order: 0,
-          questionType: 'single-choice',
-        },
+      questionRows.push({
+        id: questionId,
+        text: topic.q,
+        pollId,
+        page: 1,
+        order: 0,
+        questionType: 'single-choice',
       });
-      const answers = [];
+
+      const ansIds: string[] = [];
 
       for (let a = 0; a < topic.a.length; a++) {
-        const ans = await prisma.answer.create({
-          data: { text: topic.a[a], questionId: question.id, order: a },
+        const ansId = randomUUID();
+        ansIds.push(ansId);
+        answerRows.push({
+          id: ansId,
+          text: topic.a[a],
+          questionId,
+          order: a,
         });
-        answers.push(ans);
       }
 
       // Participants + votes for non-DRAFT
@@ -737,43 +841,31 @@ async function main() {
           randInt(3, Math.min(15, mems.length))
         );
         const participants = pickN(mems, pCount);
+        const voteDedup = new Set<string>();
 
-        const ppData = participants.map((uid) => ({
-          pollId: poll.id,
-          userId: uid,
-          userWeight: rand() < 0.2 ? 1.5 : 1.0,
-          willingToSignProtocol:
-            state === PollState.FINISHED ? rand() < 0.7 : undefined,
-        }));
-        await prisma.pollParticipant.createMany({ data: ppData });
+        for (const uid of participants) {
+          const weight = rand() < 0.2 ? 1.5 : 1.0;
+          ppRows.push({
+            pollId,
+            userId: uid,
+            userWeight: weight,
+            willingToSignProtocol:
+              state === PollState.FINISHED ? rand() < 0.7 : undefined,
+          });
 
-        // Votes for FINISHED
-        if (state === PollState.FINISHED) {
-          const voteDedup = new Set<string>();
-          const voteData: {
-            questionId: string;
-            answerId: string;
-            userId: string;
-            userWeight: number;
-          }[] = [];
+          if (state === PollState.FINISHED) {
+            const vk = `${questionId}:${uid}`;
 
-          for (const pp of ppData) {
-            const vk = `${question.id}:${pp.userId}`;
-
-            if (voteDedup.has(vk)) {
-              continue;
+            if (!voteDedup.has(vk)) {
+              voteDedup.add(vk);
+              voteRows.push({
+                questionId,
+                answerId: ansIds[Math.floor(rand() * ansIds.length)],
+                userId: uid,
+                userWeight: weight,
+              });
             }
-
-            voteDedup.add(vk);
-            voteData.push({
-              questionId: question.id,
-              answerId: pick(answers).id,
-              userId: pp.userId,
-              userWeight: pp.userWeight,
-            });
           }
-
-          await prisma.vote.createMany({ data: voteData });
         }
       }
 
@@ -781,10 +873,38 @@ async function main() {
     }
   }
 
-  console.log(`Polls: ${pollCount}`);
+  // Batch insert all poll data
+  for (let i = 0; i < pollRows.length; i += 1000) {
+    await prisma.poll.createMany({ data: pollRows.slice(i, i + 1000) });
+  }
 
-  // ── 7. Notifications (500) ──────────────────────────────────
-  const notifData = Array.from({ length: 500 }, (_, i) => {
+  for (let i = 0; i < questionRows.length; i += 1000) {
+    await prisma.question.createMany({
+      data: questionRows.slice(i, i + 1000),
+    });
+  }
+
+  for (let i = 0; i < answerRows.length; i += 1000) {
+    await prisma.answer.createMany({ data: answerRows.slice(i, i + 1000) });
+  }
+
+  for (let i = 0; i < ppRows.length; i += 1000) {
+    await prisma.pollParticipant.createMany({
+      data: ppRows.slice(i, i + 1000),
+    });
+  }
+
+  for (let i = 0; i < voteRows.length; i += 1000) {
+    await prisma.vote.createMany({ data: voteRows.slice(i, i + 1000) });
+  }
+
+  console.log(
+    `Polls: ${pollCount}, Questions: ${questionRows.length}, Answers: ${answerRows.length}, Participants: ${ppRows.length}, Votes: ${voteRows.length}`
+  );
+
+  // ── 7. Notifications ────────────────────────────────────────
+  const NOTIF_COUNT = SCALE * 10;
+  const notifData = Array.from({ length: NOTIF_COUNT }, (_, i) => {
     const type = pick(NOTIF_TYPES);
 
     return {
@@ -808,14 +928,23 @@ async function main() {
 
   console.log(`Notifications: ${notifData.length}`);
 
-  // ── 8. Join parent requests (~50) ───────────────────────────
-  // Standalone orgs (idx 50-79) requesting to join other roots (idx 0-49)
-  let jpCount = 0;
+  // ── 8. Join parent requests — batched ────────────────────────
+  const STANDALONE_COUNT = ROOT_COUNT - ROOTS_WITH_CHILDREN;
+  const JP_ITERATIONS = ROOTS_WITH_CHILDREN;
+  const jpRows: {
+    childOrgId: string;
+    parentOrgId: string;
+    requestingAdminId: string;
+    message: string;
+    status: string;
+    rejectionReason: string | null;
+    handledAt: Date | null;
+  }[] = [];
   const jpDedup = new Set<string>();
 
-  for (let i = 0; i < 50; i++) {
-    const childIdx = 50 + (i % 30);
-    const parentIdx = i % 50;
+  for (let i = 0; i < JP_ITERATIONS; i++) {
+    const childIdx = ROOTS_WITH_CHILDREN + (i % STANDALONE_COUNT);
+    const parentIdx = i % ROOTS_WITH_CHILDREN;
     const childOrg = roots[childIdx];
     const parentOrg = roots[parentIdx];
 
@@ -831,7 +960,7 @@ async function main() {
 
     jpDedup.add(k);
 
-    const admin = adminRows.find((a) => a.organizationId === childOrg.id);
+    const admin = adminByOrg.get(childOrg.id);
 
     if (!admin) {
       continue;
@@ -840,32 +969,35 @@ async function main() {
     const status =
       rand() < 0.6 ? 'pending' : rand() < 0.5 ? 'accepted' : 'rejected';
 
-    await prisma.organizationJoinParentRequest.create({
-      data: {
-        childOrgId: childOrg.id,
-        parentOrgId: parentOrg.id,
-        requestingAdminId: admin.userId,
-        message: `Запрос на присоединение #${jpCount + 1}`,
-        status,
-        rejectionReason:
-          status === 'rejected' ? 'Не соответствует критериям' : null,
-        handledAt: status !== 'pending' ? daysAgo(randInt(1, 30)) : null,
-      },
+    jpRows.push({
+      childOrgId: childOrg.id,
+      parentOrgId: parentOrg.id,
+      requestingAdminId: admin,
+      message: `Запрос на присоединение #${jpRows.length + 1}`,
+      status,
+      rejectionReason:
+        status === 'rejected' ? 'Не соответствует критериям' : null,
+      handledAt: status !== 'pending' ? daysAgo(randInt(1, 30)) : null,
     });
-    jpCount++;
   }
 
-  console.log(`Join parent requests: ${jpCount}`);
+  for (let i = 0; i < jpRows.length; i += 1000) {
+    await prisma.organizationJoinParentRequest.createMany({
+      data: jpRows.slice(i, i + 1000),
+    });
+  }
+
+  console.log(`Join parent requests: ${jpRows.length}`);
 
   // ── Summary ──────────────────────────────────────────────────
-  console.log('\n=== Seed Complete (50x scale) ===');
+  console.log(`\n=== Seed Complete (scale=${SCALE}) ===`);
   console.log(`Users: ${users.length}`);
   console.log(`Orgs: ${allOrgs.length}`);
   console.log(`Boards: ${boards.length}`);
   console.log(`Board members: ${buRows.length}`);
   console.log(`Polls: ${pollCount}`);
   console.log(`Notifications: ${notifData.length}`);
-  console.log(`Join parent requests: ${jpCount}`);
+  console.log(`Join parent requests: ${jpRows.length}`);
   console.log('\nPassword for all users: password123');
   console.log('First user (+79161000001) is superadmin');
 }

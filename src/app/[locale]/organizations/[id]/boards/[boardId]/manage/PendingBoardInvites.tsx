@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/app/components/catalyst/button';
-import { revokeInviteAction } from '@/web/actions/invitation';
+import { Button } from '@/src/web/components/catalyst/button';
+import { revokeInviteAction } from '@/src/web/actions/invitation/invitation';
 
 type PendingInvite = {
   id: string;

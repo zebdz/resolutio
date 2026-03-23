@@ -1,11 +1,11 @@
 import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 import { Link } from '@/src/i18n/routing';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { InviteMemberSection } from './InviteMemberSection';
 import { PendingMemberInvites } from './PendingMemberInvites';
-import { getPendingMemberInvitesAction } from '@/web/actions/invitation';
-import { getOrganizationDetailsAction } from '@/web/actions/organization';
+import { getPendingMemberInvitesAction } from '@/src/web/actions/invitation/invitation';
+import { getOrganizationDetailsAction } from '@/src/web/actions/organization/organization';
 import { getCurrentUser } from '@/web/lib/session';
 import { prisma, PrismaUserRepository } from '@/infrastructure/index';
 

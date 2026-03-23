@@ -1,9 +1,9 @@
 import { getTranslations } from 'next-intl/server';
 import Image from 'next/image';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
-import { LocaleSwitcher } from '@/web/components/LocaleSwitcher';
-import { getVersion } from '@/src/lib/version';
+import { LocaleSwitcher } from '@/src/web/components/layout/LocaleSwitcher';
+import { getVersion } from '@/src/web/lib/version';
 
 export async function generateMetadata() {
   const t = await getTranslations('landing');

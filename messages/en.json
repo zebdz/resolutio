@@ -1238,7 +1238,8 @@
       "dateFrom": "From",
       "dateTo": "To",
       "minBlocked": "Min blocked",
-      "maxBlocked": "Max blocked"
+      "maxBlocked": "Max blocked",
+      "clearFilters": "Clear filters"
     },
     "users": {
       "title": "User Management",

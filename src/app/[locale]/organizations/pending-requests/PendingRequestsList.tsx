@@ -2,13 +2,13 @@
 
 import { useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
-import { Badge } from '@/app/components/catalyst/badge';
-import { Button } from '@/app/components/catalyst/button';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { Divider } from '@/app/components/catalyst/divider';
-import { Textarea } from '@/app/components/catalyst/textarea';
-import { Select } from '@/app/components/catalyst/select';
+import { Badge } from '@/src/web/components/catalyst/badge';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Divider } from '@/src/web/components/catalyst/divider';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
+import { Select } from '@/src/web/components/catalyst/select';
 import {
   Table,
   TableBody,
@@ -16,18 +16,18 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/app/components/catalyst/table';
+} from '@/src/web/components/catalyst/table';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
+} from '@/src/web/components/catalyst/dialog';
 import {
   handleJoinRequestAction,
   getPendingRequestsAction,
-} from '@/web/actions/organization';
+} from '@/src/web/actions/organization/organization';
 
 interface PendingRequest {
   organizationId: string;

@@ -136,7 +136,7 @@ import {
   resetRateLimitKeysAction,
   lockRateLimitKeyAction,
   unlockRateLimitKeyAction,
-} from '../rateLimitAdmin';
+} from '../superadmin/rateLimitAdmin';
 
 const mockUser = {
   id: 'user-1',

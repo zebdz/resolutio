@@ -213,6 +213,9 @@ class MockUserRepository implements UserRepository {
   async getBlockStatus(): Promise<null> {
     return null;
   }
+  async getBlockedUserIds(): Promise<string[]> {
+    return [];
+  }
 
   addUser(user: User): void {
     this.users.set(user.id, user);

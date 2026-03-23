@@ -1,15 +1,22 @@
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { redirect } from 'next/navigation';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
 import { Link } from '@/src/i18n/routing';
 import { SuperadminOrganizationsList } from './SuperadminOrganizationsList';
-import { searchAllOrganizationsAction } from '@/web/actions/organization';
+import { searchAllOrganizationsAction } from '@/src/web/actions/organization/organization';
 
 const PAGE_SIZE = 30;
 
-export default async function SuperadminOrganizationsPage() {
+interface SuperadminOrganizationsPageProps {
+  searchParams: Promise<{ search?: string }>;
+}
+
+export default async function SuperadminOrganizationsPage({
+  searchParams,
+}: SuperadminOrganizationsPageProps) {
+  const params = await searchParams;
   const t = await getTranslations('superadmin.organizations');
   const tHub = await getTranslations('superadmin.hub');
   const user = await getCurrentUser();
@@ -19,6 +26,7 @@ export default async function SuperadminOrganizationsPage() {
   }
 
   const result = await searchAllOrganizationsAction({
+    search: params.search || undefined,
     page: 1,
     pageSize: PAGE_SIZE,
   });
@@ -44,9 +52,11 @@ export default async function SuperadminOrganizationsPage() {
       </div>
 
       <SuperadminOrganizationsList
+        key={params.search ?? ''}
         initialOrganizations={organizations}
         initialTotalCount={totalCount}
         userId={user.id}
+        initialSearch={params.search ?? ''}
       />
     </div>
   );

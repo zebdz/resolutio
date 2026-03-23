@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Badge } from '@/app/components/catalyst/badge';
-import { Button } from '@/app/components/catalyst/button';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { handleInviteAction } from '@/web/actions/invitation';
+import { Badge } from '@/src/web/components/catalyst/badge';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { handleInviteAction } from '@/src/web/actions/invitation/invitation';
 import { toast } from 'sonner';
 import type { InviteDetails } from '@/application/invitation/GetInviteDetailsUseCase';
 

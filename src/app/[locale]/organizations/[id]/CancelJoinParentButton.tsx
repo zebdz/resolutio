@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/app/components/catalyst/button';
-import { cancelJoinParentRequestAction } from '@/web/actions/joinParentRequest';
+import { Button } from '@/src/web/components/catalyst/button';
+import { cancelJoinParentRequestAction } from '@/src/web/actions/organization/joinParentRequest';
 
 interface CancelJoinParentButtonProps {
   requestId: string;

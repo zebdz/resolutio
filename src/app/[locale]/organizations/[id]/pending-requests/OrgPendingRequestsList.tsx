@@ -2,12 +2,12 @@
 
 import { useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
-import { Badge } from '@/app/components/catalyst/badge';
-import { Button } from '@/app/components/catalyst/button';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { Textarea } from '@/app/components/catalyst/textarea';
-import { Select } from '@/app/components/catalyst/select';
+import { useRouter, usePathname } from 'next/navigation';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
+import { Select } from '@/src/web/components/catalyst/select';
 import {
   Table,
   TableBody,
@@ -15,18 +15,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/app/components/catalyst/table';
+} from '@/src/web/components/catalyst/table';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
-import {
-  handleJoinRequestAction,
-  getOrganizationPendingRequestsAction,
-} from '@/web/actions/organization';
+} from '@/src/web/components/catalyst/dialog';
+import { handleJoinRequestAction } from '@/src/web/actions/organization/organization';
 import { User } from '@/src/domain/user/User';
 
 interface OrgPendingRequest {
@@ -42,71 +39,64 @@ interface OrgPendingRequestsListProps {
   organizationName: string;
   requests: OrgPendingRequest[];
   totalCount: number;
-  defaultPageSize: number;
+  currentPage: number;
+  pageSize: number;
 }
 
 const PAGE_SIZE_OPTIONS = [5, 10, 25, 50];
+const DEFAULT_PAGE_SIZE = 10;
 
 export function OrgPendingRequestsList({
   organizationId,
   organizationName,
-  requests: initialRequests,
-  totalCount: initialTotalCount,
-  defaultPageSize,
+  requests,
+  totalCount,
+  currentPage,
+  pageSize,
 }: OrgPendingRequestsListProps) {
   const t = useTranslations('organization.pendingRequestsPage');
   const tCommon = useTranslations('common');
   const tPagination = useTranslations('common.pagination');
-  const [requests, setRequests] = useState(initialRequests);
-  const [totalCount, setTotalCount] = useState(initialTotalCount);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(defaultPageSize);
+  const router = useRouter();
+  const pathname = usePathname();
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] =
     useState<OrgPendingRequest | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
-  const fetchPage = useCallback(
-    async (page: number, size: number) => {
-      setIsLoading(true);
-      const result = await getOrganizationPendingRequestsAction(
-        organizationId,
-        page,
-        size
-      );
+  const buildUrl = useCallback(
+    (updates: { page?: number; pageSize?: number }) => {
+      const params = new URLSearchParams();
+      const p = updates.page ?? currentPage;
+      const ps = updates.pageSize ?? pageSize;
 
-      if (result.success) {
-        setRequests(result.data.requests);
-        setTotalCount(result.data.totalCount);
+      if (p > 1) {
+        params.set('page', String(p));
       }
 
-      setIsLoading(false);
+      if (ps !== DEFAULT_PAGE_SIZE) {
+        params.set('pageSize', String(ps));
+      }
+
+      const qs = params.toString();
+
+      return qs ? `${pathname}?${qs}` : pathname;
     },
-    [organizationId]
+    [currentPage, pageSize, pathname]
   );
 
-  const handlePageChange = useCallback(
-    async (page: number) => {
-      setCurrentPage(page);
-      await fetchPage(page, pageSize);
-    },
-    [fetchPage, pageSize]
-  );
+  const handlePageChange = (page: number) => {
+    router.push(buildUrl({ page }));
+  };
 
-  const handlePageSizeChange = useCallback(
-    async (newSize: number) => {
-      setPageSize(newSize);
-      setCurrentPage(1);
-      await fetchPage(1, newSize);
-    },
-    [fetchPage]
-  );
+  const handlePageSizeChange = (newSize: number) => {
+    router.push(buildUrl({ page: 1, pageSize: newSize }));
+  };
 
   const handleAccept = async (request: OrgPendingRequest) => {
     setIsProcessing(true);
@@ -120,7 +110,7 @@ export function OrgPendingRequestsList({
     const result = await handleJoinRequestAction(formData);
 
     if (result.success) {
-      await fetchPage(currentPage, pageSize);
+      router.refresh();
     } else {
       setError(result.error);
     }
@@ -158,7 +148,7 @@ export function OrgPendingRequestsList({
       setIsRejectDialogOpen(false);
       setSelectedRequest(null);
       setRejectionReason('');
-      await fetchPage(currentPage, pageSize);
+      router.refresh();
     } else if (result.fieldErrors?.rejectionReason) {
       setDialogError(result.fieldErrors.rejectionReason[0]);
     } else {
@@ -186,14 +176,14 @@ export function OrgPendingRequestsList({
       <Button
         color="green"
         onClick={() => handleAccept(request)}
-        disabled={isProcessing || isLoading}
+        disabled={isProcessing}
       >
         {t('approve')}
       </Button>
       <Button
         color="red"
         onClick={() => handleRejectClick(request)}
-        disabled={isProcessing || isLoading}
+        disabled={isProcessing}
       >
         {t('reject')}
       </Button>
@@ -231,7 +221,7 @@ export function OrgPendingRequestsList({
       <div className="flex items-center gap-2">
         <Button
           plain
-          disabled={currentPage <= 1 || isLoading}
+          disabled={currentPage <= 1}
           onClick={() => handlePageChange(currentPage - 1)}
         >
           {tPagination('previous')}
@@ -244,7 +234,7 @@ export function OrgPendingRequestsList({
         </Text>
         <Button
           plain
-          disabled={currentPage >= totalPages || isLoading}
+          disabled={currentPage >= totalPages}
           onClick={() => handlePageChange(currentPage + 1)}
         >
           {tPagination('next')}

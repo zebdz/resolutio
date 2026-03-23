@@ -173,6 +173,9 @@ class MockUserRepository implements UserRepository {
   async getBlockStatus(): Promise<null> {
     return null;
   }
+  async getBlockedUserIds(): Promise<string[]> {
+    return [];
+  }
 
   addSuperAdmin(userId: string): void {
     this.superAdmins.add(userId);

@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { Badge } from '@/app/components/catalyst/badge';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { Divider } from '@/app/components/catalyst/divider';
+import { Badge } from '@/src/web/components/catalyst/badge';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Divider } from '@/src/web/components/catalyst/divider';
 import { Link } from '@/src/i18n/routing';
-import { getUserOrganizationsAction } from '@/web/actions/organization';
+import { getUserOrganizationsAction } from '@/src/web/actions/organization/organization';
 
 interface UserOrganization {
   id: string;

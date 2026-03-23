@@ -1,12 +1,12 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { getOrganizationDetailsAction } from '@/web/actions/organization';
-import { Heading, Subheading } from '@/app/components/catalyst/heading';
-import { Button } from '@/app/components/catalyst/button';
+import { getOrganizationDetailsAction } from '@/src/web/actions/organization/organization';
+import { Heading, Subheading } from '@/src/web/components/catalyst/heading';
+import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import CreateBoardDialog from './CreateBoardDialog';
 import ArchiveBoardButton from './ArchiveBoardButton';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 
 type PageProps = {
   params: Promise<{

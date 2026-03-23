@@ -40,6 +40,7 @@ describe('CompletePrivacySetupUseCase', () => {
       unblockUser: vi.fn(),
       confirmUser: vi.fn(),
       getBlockStatus: vi.fn().mockResolvedValue(null),
+      getBlockedUserIds: vi.fn().mockResolvedValue([]),
     };
     useCase = new CompletePrivacySetupUseCase(userRepository);
   });

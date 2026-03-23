@@ -69,7 +69,7 @@ vi.mock('next/navigation', () => ({
   redirect: vi.fn(),
 }));
 
-const { loginAction } = await import('../auth');
+const { loginAction } = await import('../auth/auth');
 
 function makeFormData(phone: string, password: string): FormData {
   const fd = new FormData();

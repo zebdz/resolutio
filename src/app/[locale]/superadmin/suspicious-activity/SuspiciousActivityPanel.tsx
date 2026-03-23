@@ -1,29 +1,47 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/app/components/catalyst/button';
-import { Text } from '@/app/components/catalyst/text';
-import { Textarea } from '@/app/components/catalyst/textarea';
+import { useRouter, usePathname } from 'next/navigation';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
-import { Input } from '@/app/components/catalyst/input';
+} from '@/src/web/components/catalyst/dialog';
+import { Input } from '@/src/web/components/catalyst/input';
 import {
-  getSuspiciousActivitySummaryAction,
   getSuspiciousActivityForKeyAction,
   blockUserAction,
   unblockUserAction,
-  type SuspiciousKeySummary,
-} from '@/web/actions/suspiciousActivity';
-import { blockIpAction } from '@/web/actions/ipBlockAdmin';
+} from '@/src/web/actions/superadmin/suspiciousActivity';
+import { blockIpAction } from '@/src/web/actions/superadmin/ipBlockAdmin';
 import { User } from '@/domain/user/User';
 
-const PAGE_SIZE = 20;
+export interface SerializedSuspiciousKeySummary {
+  key: string;
+  userId: string | null;
+  limiterLabel: string;
+  totalEvents: number;
+  firstEventAt: string;
+  lastEventAt: string;
+  resolvedUser?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    middleName: string | null;
+    phoneNumber: string;
+  };
+  blockStatus?: {
+    blocked: boolean;
+    reason?: string;
+    blockedAt?: string;
+  } | null;
+}
 
 const NON_IP_PREFIXES = [
   'session:',
@@ -37,7 +55,7 @@ function isIpLikeKey(key: string): boolean {
   return !NON_IP_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
-function formatDate(date: Date): string {
+function formatDate(date: string): string {
   return new Date(date).toLocaleDateString();
 }
 
@@ -45,16 +63,54 @@ function formatDateTime(date: Date): string {
   return new Date(date).toLocaleString();
 }
 
-export function SuspiciousActivityPanel() {
+interface SuspiciousActivityFilters {
+  search: string;
+  dateFrom: string;
+  dateTo: string;
+  minBlocked: string;
+  maxBlocked: string;
+}
+
+interface SuspiciousActivityPanelProps {
+  items: SerializedSuspiciousKeySummary[];
+  totalPages: number;
+  currentPage: number;
+  filters: SuspiciousActivityFilters;
+}
+
+export function SuspiciousActivityPanel({
+  items,
+  totalPages,
+  currentPage,
+  filters,
+}: SuspiciousActivityPanelProps) {
   const t = useTranslations('superadmin.suspiciousActivity');
   const tLabels = useTranslations('superadmin.rateLimits.labels');
-  const [items, setItems] = useState<SuspiciousKeySummary[]>([]);
-  const [totalCount, setTotalCount] = useState(0);
-  const pageRef = useRef(1);
+  const tPagination = useTranslations('common.pagination');
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Local state for debounced inputs
+  const [searchValue, setSearchValue] = useState(filters.search);
+  const [searchTimer, setSearchTimer] = useState<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const [minBlockedValue, setMinBlockedValue] = useState(filters.minBlocked);
+  const [minBlockedTimer, setMinBlockedTimer] = useState<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const [maxBlockedValue, setMaxBlockedValue] = useState(filters.maxBlocked);
+  const [maxBlockedTimer, setMaxBlockedTimer] = useState<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+
+  // Expand / events state
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [events, setEvents] = useState<Array<{ id: string; createdAt: Date }>>(
     []
   );
+
+  // Dialog state
   const [blockTarget, setBlockTarget] = useState<{
     userId: string;
     name: string;
@@ -73,80 +129,92 @@ export function SuspiciousActivityPanel() {
   const [error, setError] = useState<string | null>(null);
   const [dialogError, setDialogError] = useState<string | null>(null);
 
-  // Filter state
-  const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [minBlocked, setMinBlocked] = useState('');
-  const [maxBlocked, setMaxBlocked] = useState('');
+  // Build URL with updated params
+  const buildUrl = useCallback(
+    (updates: Partial<SuspiciousActivityFilters> & { page?: number }) => {
+      const params = new URLSearchParams();
+      const merged = { ...filters, ...updates };
 
-  const fetchSummary = useCallback(
-    async (
-      p: number,
-      filters?: {
-        search?: string;
-        dateFrom?: string;
-        dateTo?: string;
-        minBlocked?: string;
-        maxBlocked?: string;
+      if (merged.search) {
+        params.set('search', merged.search);
       }
-    ) => {
-      const result = await getSuspiciousActivitySummaryAction({
-        page: p,
-        pageSize: PAGE_SIZE,
-        search: filters?.search || undefined,
-        dateFrom: filters?.dateFrom || undefined,
-        dateTo: filters?.dateTo || undefined,
-        minBlocked: filters?.minBlocked
-          ? Number(filters.minBlocked)
-          : undefined,
-        maxBlocked: filters?.maxBlocked
-          ? Number(filters.maxBlocked)
-          : undefined,
-      });
 
-      if (result.success) {
-        if (p === 1) {
-          setItems(result.data.items);
-        } else {
-          setItems((prev) => [...prev, ...result.data.items]);
-        }
-
-        setTotalCount(result.data.totalCount);
+      if (merged.dateFrom) {
+        params.set('dateFrom', merged.dateFrom);
       }
+
+      if (merged.dateTo) {
+        params.set('dateTo', merged.dateTo);
+      }
+
+      if (merged.minBlocked) {
+        params.set('minBlocked', merged.minBlocked);
+      }
+
+      if (merged.maxBlocked) {
+        params.set('maxBlocked', merged.maxBlocked);
+      }
+
+      const page = updates.page ?? 1;
+
+      if (page > 1) {
+        params.set('page', String(page));
+      }
+
+      const qs = params.toString();
+
+      return qs ? `${pathname}?${qs}` : pathname;
     },
-    []
+    [filters, pathname]
   );
 
-  // Initial fetch + re-fetch when filters change
-  useEffect(() => {
-    let cancelled = false;
-    pageRef.current = 1;
+  const navigateWithFilter = useCallback(
+    (updates: Partial<SuspiciousActivityFilters>) => {
+      router.push(buildUrl({ ...updates, page: 1 }));
+    },
+    [buildUrl, router]
+  );
 
-    getSuspiciousActivitySummaryAction({
-      page: 1,
-      pageSize: PAGE_SIZE,
-      search: search || undefined,
-      dateFrom: dateFrom || undefined,
-      dateTo: dateTo || undefined,
-      minBlocked: minBlocked ? Number(minBlocked) : undefined,
-      maxBlocked: maxBlocked ? Number(maxBlocked) : undefined,
-    }).then((result) => {
-      if (!cancelled && result.success) {
-        setItems(result.data.items);
-        setTotalCount(result.data.totalCount);
-      }
-    });
+  // Debounced search handler
+  const handleSearchChange = (value: string) => {
+    setSearchValue(value);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [search, dateFrom, dateTo, minBlocked, maxBlocked]);
+    if (searchTimer) {
+      clearTimeout(searchTimer);
+    }
 
-  const handleLoadMore = () => {
-    const next = pageRef.current + 1;
-    pageRef.current = next;
-    fetchSummary(next, { search, dateFrom, dateTo, minBlocked, maxBlocked });
+    const timer = setTimeout(() => {
+      navigateWithFilter({ search: value });
+    }, 300);
+    setSearchTimer(timer);
+  };
+
+  // Debounced minBlocked handler
+  const handleMinBlockedChange = (value: string) => {
+    setMinBlockedValue(value);
+
+    if (minBlockedTimer) {
+      clearTimeout(minBlockedTimer);
+    }
+
+    const timer = setTimeout(() => {
+      navigateWithFilter({ minBlocked: value });
+    }, 300);
+    setMinBlockedTimer(timer);
+  };
+
+  // Debounced maxBlocked handler
+  const handleMaxBlockedChange = (value: string) => {
+    setMaxBlockedValue(value);
+
+    if (maxBlockedTimer) {
+      clearTimeout(maxBlockedTimer);
+    }
+
+    const timer = setTimeout(() => {
+      navigateWithFilter({ maxBlocked: value });
+    }, 300);
+    setMaxBlockedTimer(timer);
   };
 
   const handleExpandKey = async (key: string) => {
@@ -164,7 +232,7 @@ export function SuspiciousActivityPanel() {
     }
   };
 
-  const handleBlockUser = (item: SuspiciousKeySummary) => {
+  const handleBlockUser = (item: SerializedSuspiciousKeySummary) => {
     if (!item.userId || !item.resolvedUser) {
       return;
     }
@@ -209,14 +277,7 @@ export function SuspiciousActivityPanel() {
       );
       setDialogError(null);
       setBlockTarget(null);
-      await fetchSummary(1, {
-        search,
-        dateFrom,
-        dateTo,
-        minBlocked,
-        maxBlocked,
-      });
-      pageRef.current = 1;
+      router.refresh();
     } else if (result.fieldErrors?.reason) {
       setDialogError(result.fieldErrors.reason[0]);
     } else {
@@ -226,7 +287,7 @@ export function SuspiciousActivityPanel() {
     setIsLoading(false);
   };
 
-  const handleUnblockUser = (item: SuspiciousKeySummary) => {
+  const handleUnblockUser = (item: SerializedSuspiciousKeySummary) => {
     if (!item.userId || !item.resolvedUser) {
       return;
     }
@@ -264,14 +325,7 @@ export function SuspiciousActivityPanel() {
       );
       setDialogError(null);
       setUnblockTarget(null);
-      await fetchSummary(1, {
-        search,
-        dateFrom,
-        dateTo,
-        minBlocked,
-        maxBlocked,
-      });
-      pageRef.current = 1;
+      router.refresh();
     } else if (result.fieldErrors?.reason) {
       setDialogError(result.fieldErrors.reason[0]);
     } else {
@@ -281,12 +335,11 @@ export function SuspiciousActivityPanel() {
     setIsLoading(false);
   };
 
-  const handleBlockIp = (item: SuspiciousKeySummary) => {
+  const handleBlockIp = (item: SerializedSuspiciousKeySummary) => {
     // Extract IP from key (IP-keyed entries have format like "ip:1.2.3.4" or just the IP)
     const ip = item.key.startsWith('ip:') ? item.key.slice(3) : item.key;
     const limiterLabel = tLabels(item.limiterLabel);
-    const tBlockedIps = t;
-    const reason = tBlockedIps('autoReason', {
+    const reason = t('autoReason', {
       count: item.totalEvents,
       limiter: limiterLabel,
       first: formatDate(item.firstEventAt),
@@ -315,14 +368,7 @@ export function SuspiciousActivityPanel() {
 
     if (result.success) {
       setBlockIpTarget(null);
-      await fetchSummary(1, {
-        search,
-        dateFrom,
-        dateTo,
-        minBlocked,
-        maxBlocked,
-      });
-      pageRef.current = 1;
+      router.refresh();
     } else {
       setError(result.error);
     }
@@ -337,16 +383,16 @@ export function SuspiciousActivityPanel() {
         <Input
           className="min-w-[12rem] flex-1"
           placeholder={t('searchPlaceholder')}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={searchValue}
+          onChange={(e) => handleSearchChange(e.target.value)}
         />
         <div className="flex items-center gap-1">
           <label className="text-xs text-zinc-500">{t('dateFrom')}</label>
           <input
             type="date"
             className="rounded border border-zinc-300 bg-transparent px-2 py-1 text-sm dark:border-zinc-600"
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            value={filters.dateFrom}
+            onChange={(e) => navigateWithFilter({ dateFrom: e.target.value })}
           />
         </div>
         <div className="flex items-center gap-1">
@@ -354,8 +400,8 @@ export function SuspiciousActivityPanel() {
           <input
             type="date"
             className="rounded border border-zinc-300 bg-transparent px-2 py-1 text-sm dark:border-zinc-600"
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            value={filters.dateTo}
+            onChange={(e) => navigateWithFilter({ dateTo: e.target.value })}
           />
         </div>
         <div className="flex items-center gap-1">
@@ -364,8 +410,8 @@ export function SuspiciousActivityPanel() {
             type="number"
             min={1}
             className="w-16 rounded border border-zinc-300 bg-transparent px-2 py-1 text-sm dark:border-zinc-600"
-            value={minBlocked}
-            onChange={(e) => setMinBlocked(e.target.value)}
+            value={minBlockedValue}
+            onChange={(e) => handleMinBlockedChange(e.target.value)}
           />
         </div>
         <div className="flex items-center gap-1">
@@ -374,10 +420,30 @@ export function SuspiciousActivityPanel() {
             type="number"
             min={1}
             className="w-16 rounded border border-zinc-300 bg-transparent px-2 py-1 text-sm dark:border-zinc-600"
-            value={maxBlocked}
-            onChange={(e) => setMaxBlocked(e.target.value)}
+            value={maxBlockedValue}
+            onChange={(e) => handleMaxBlockedChange(e.target.value)}
           />
         </div>
+
+        {/* Clear filters */}
+        {(filters.search ||
+          filters.dateFrom ||
+          filters.dateTo ||
+          filters.minBlocked ||
+          filters.maxBlocked) && (
+          <Button
+            plain
+            onClick={() => {
+              setSearchValue('');
+              setMinBlockedValue('');
+              setMaxBlockedValue('');
+              router.push(pathname);
+            }}
+            className="text-sm"
+          >
+            {t('clearFilters')}
+          </Button>
+        )}
       </div>
 
       {items.length === 0 && (
@@ -511,10 +577,25 @@ export function SuspiciousActivityPanel() {
         </div>
       ))}
 
-      {items.length < totalCount && (
-        <div className="text-center">
-          <Button plain onClick={handleLoadMore}>
-            {t('loadMore')}
+      {/* Pagination */}
+      {totalPages >= 1 && (
+        <div className="flex items-center justify-between">
+          <Button
+            plain
+            disabled={currentPage <= 1}
+            onClick={() => router.push(buildUrl({ page: currentPage - 1 }))}
+          >
+            {tPagination('previous')}
+          </Button>
+          <Text className="text-sm text-zinc-500">
+            {tPagination('page', { page: currentPage, totalPages })}
+          </Text>
+          <Button
+            plain
+            disabled={currentPage >= totalPages}
+            onClick={() => router.push(buildUrl({ page: currentPage + 1 }))}
+          >
+            {tPagination('next')}
           </Button>
         </div>
       )}

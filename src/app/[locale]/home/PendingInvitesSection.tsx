@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server';
-import { Badge } from '@/app/components/catalyst/badge';
+import { Badge } from '@/src/web/components/catalyst/badge';
 import { Link } from '@/src/i18n/routing';
-import { getUserPendingInvitesAction } from '@/web/actions/invitation';
+import { getUserPendingInvitesAction } from '@/src/web/actions/invitation/invitation';
 
 export async function PendingInvitesSection() {
   const t = await getTranslations('home');

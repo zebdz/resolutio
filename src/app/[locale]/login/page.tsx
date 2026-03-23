@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { AuthLayout } from '@/app/components/catalyst/auth-layout';
+import { AuthLayout } from '@/src/web/components/catalyst/auth-layout';
 import { LoginForm } from '@/web/components/auth/LoginForm';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';

@@ -1,16 +1,16 @@
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
-import { getPollResultsAction } from '@/web/actions/vote';
-import { getPollByIdAction } from '@/web/actions/poll';
-import PollResults from '@/web/components/results/PollResults';
-import { Heading } from '@/app/components/catalyst/heading';
+import { getPollResultsAction } from '@/src/web/actions/poll/vote';
+import { getPollByIdAction } from '@/src/web/actions/poll/poll';
+import PollResults from '@/src/web/components/polls/results/PollResults';
+import { Heading } from '@/src/web/components/catalyst/heading';
 import {
   AnswerResult,
   QuestionResult,
   ProtocolSignWillingnessEntry,
 } from '@/src/application/poll/GetPollResultsUseCase';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { User } from '@/domain/user/User';
 
 interface ResultsPageProps {

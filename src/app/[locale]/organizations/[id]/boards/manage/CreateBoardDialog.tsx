@@ -3,17 +3,17 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
-import { Field, Label } from '@/app/components/catalyst/fieldset';
-import { Input } from '@/app/components/catalyst/input';
-import { createBoardAction } from '@/web/actions/board';
+} from '@/src/web/components/catalyst/dialog';
+import { Field, Label } from '@/src/web/components/catalyst/fieldset';
+import { Input } from '@/src/web/components/catalyst/input';
+import { createBoardAction } from '@/src/web/actions/board/board';
 
 type CreateBoardDialogProps = {
   organizationId: string;
