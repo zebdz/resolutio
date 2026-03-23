@@ -3,15 +3,15 @@
 import { useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/app/components/catalyst/button';
-import { Field, Label } from '@/app/components/catalyst/fieldset';
-import { Input } from '@/app/components/catalyst/input';
-import { AlertBanner } from '@/app/components/catalyst/alert-banner';
-import { createOrgMemberInviteAction } from '@/web/actions/invitation';
-import { searchUsersForOrgAdminAction } from '@/web/actions/organization';
-import { searchUserByPhoneAction } from '@/web/actions/user';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Field, Label } from '@/src/web/components/catalyst/fieldset';
+import { Input } from '@/src/web/components/catalyst/input';
+import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
+import { createOrgMemberInviteAction } from '@/src/web/actions/invitation/invitation';
+import { searchUsersForOrgAdminAction } from '@/src/web/actions/organization/organization';
+import { searchUserByPhoneAction } from '@/src/web/actions/user/user';
 import { User } from '@/domain/user/User';
-import { PhoneInput } from '@/web/components/phone';
+import { PhoneInput } from '@/src/web/components/shared/phone';
 
 type SearchResult = {
   id: string;

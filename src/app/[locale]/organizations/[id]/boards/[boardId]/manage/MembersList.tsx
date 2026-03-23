@@ -3,16 +3,16 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
-import { Textarea } from '@/app/components/catalyst/textarea';
-import { removeBoardMemberAction } from '@/web/actions/board';
+} from '@/src/web/components/catalyst/dialog';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
+import { removeBoardMemberAction } from '@/src/web/actions/board/board';
 import { User } from '@/domain/user/User';
 
 type Member = {

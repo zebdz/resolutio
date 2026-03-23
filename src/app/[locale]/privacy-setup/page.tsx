@@ -1,12 +1,12 @@
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { Button } from '@/app/components/catalyst/button';
-import { Divider } from '@/app/components/catalyst/divider';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Divider } from '@/src/web/components/catalyst/divider';
 import { PrivacySetupForm } from '@/web/components/privacy/PrivacySetupForm';
-import { logoutAction } from '@/web/actions/auth';
+import { logoutAction } from '@/src/web/actions/auth/auth';
 import { consumeReturnToCookieServer } from '@/web/lib/returnTo.server';
 
 export async function generateMetadata() {

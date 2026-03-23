@@ -1,4 +1,4 @@
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { EditPollForm } from './EditPollForm';
 
 export default function EditPollPage() {

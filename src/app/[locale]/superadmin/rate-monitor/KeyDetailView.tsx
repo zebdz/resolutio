@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/app/components/catalyst/button';
-import { resetRateLimitKeysAction } from '@/web/actions/rateLimitAdmin';
-import type { KeyLimiterDetail } from '@/web/actions/rateLimitMonitor';
+import { Button } from '@/src/web/components/catalyst/button';
+import { resetRateLimitKeysAction } from '@/src/web/actions/superadmin/rateLimitAdmin';
+import type { KeyLimiterDetail } from '@/src/web/actions/superadmin/rateLimitMonitor';
 
 interface KeyDetailViewProps {
   keyName: string;

@@ -5,11 +5,11 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import * as Headless from '@headlessui/react';
 import clsx from 'clsx';
-import { Button } from '@/app/components/catalyst/button';
-import { Textarea } from '@/app/components/catalyst/textarea';
-import { Field, Label } from '@/app/components/catalyst/fieldset';
-import { requestJoinParentAction } from '@/web/actions/joinParentRequest';
-import { searchOrganizationsForJoinParentAction } from '@/web/actions/organization';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
+import { Field, Label } from '@/src/web/components/catalyst/fieldset';
+import { requestJoinParentAction } from '@/src/web/actions/organization/joinParentRequest';
+import { searchOrganizationsForJoinParentAction } from '@/src/web/actions/organization/organization';
 
 interface JoinParentFormProps {
   childOrgId: string;

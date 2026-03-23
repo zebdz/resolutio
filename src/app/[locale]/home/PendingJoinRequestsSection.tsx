@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server';
-import { Badge } from '@/app/components/catalyst/badge';
+import { Badge } from '@/src/web/components/catalyst/badge';
 import { Link } from '@/src/i18n/routing';
-import { getUserOrganizationsAction } from '@/web/actions/organization';
+import { getUserOrganizationsAction } from '@/src/web/actions/organization/organization';
 
 export async function PendingJoinRequestsSection() {
   const t = await getTranslations('home');

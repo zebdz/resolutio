@@ -1,14 +1,21 @@
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { searchOrganizationsNotAlreadyMemberOfAction } from '@/web/actions/organization';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { searchOrganizationsNotAlreadyMemberOfAction } from '@/src/web/actions/organization/organization';
 import { OrganizationsList } from './OrganizationsList';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 
 const PAGE_SIZE = 30;
 
-export default async function OrganizationsPage() {
+interface OrganizationsPageProps {
+  searchParams: Promise<{ search?: string }>;
+}
+
+export default async function OrganizationsPage({
+  searchParams,
+}: OrganizationsPageProps) {
+  const params = await searchParams;
   const t = await getTranslations('organization.list');
   const user = await getCurrentUser();
 
@@ -17,6 +24,7 @@ export default async function OrganizationsPage() {
   }
 
   const result = await searchOrganizationsNotAlreadyMemberOfAction({
+    search: params.search || undefined,
     page: 1,
     pageSize: PAGE_SIZE,
   });
@@ -36,9 +44,11 @@ export default async function OrganizationsPage() {
 
         {/* Organizations List */}
         <OrganizationsList
+          key={params.search ?? ''}
           initialOrganizations={organizations}
           initialTotalCount={totalCount}
           userId={user.id}
+          initialSearch={params.search ?? ''}
         />
       </div>
     </AuthenticatedLayout>

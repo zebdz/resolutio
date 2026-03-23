@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 import {
   archiveOrganizationAction,
   unarchiveOrganizationAction,
-} from '@/web/actions/organization';
+} from '@/src/web/actions/organization/organization';
 import { ConfirmArchiveDialog } from './ConfirmArchiveDialog';
 
 interface SuperadminOrgActionsProps {

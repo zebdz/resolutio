@@ -1,9 +1,9 @@
 import { getTranslations } from 'next-intl/server';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { Button } from '@/app/components/catalyst/button';
-import { Badge } from '@/app/components/catalyst/badge';
-import { Divider } from '@/app/components/catalyst/divider';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Badge } from '@/src/web/components/catalyst/badge';
+import { Divider } from '@/src/web/components/catalyst/divider';
 import { Link } from '@/src/i18n/routing';
 
 type Props = {

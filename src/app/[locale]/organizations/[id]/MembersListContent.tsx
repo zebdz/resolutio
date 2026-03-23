@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/app/components/catalyst/button';
-import { Input } from '@/app/components/catalyst/input';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Input } from '@/src/web/components/catalyst/input';
 import { User } from '@/domain/user/User';
-import { getOrgMembersAction } from '@/web/actions/invitation';
+import { getOrgMembersAction } from '@/src/web/actions/invitation/invitation';
 
 export type OrgMember = {
   id: string;

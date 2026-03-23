@@ -1,10 +1,10 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { getOrganizationDetailsAction } from '@/web/actions/organization';
-import { getChildOrgJoinParentRequestAction } from '@/web/actions/joinParentRequest';
-import { Heading, Subheading } from '@/app/components/catalyst/heading';
+import { getOrganizationDetailsAction } from '@/src/web/actions/organization/organization';
+import { getChildOrgJoinParentRequestAction } from '@/src/web/actions/organization/joinParentRequest';
+import { Heading, Subheading } from '@/src/web/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { JoinParentForm } from './JoinParentForm';
 import { prisma, PrismaOrganizationRepository } from '@/infrastructure/index';
 

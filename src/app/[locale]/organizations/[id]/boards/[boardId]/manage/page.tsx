@@ -1,16 +1,16 @@
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { getBoardDetailsAction } from '@/web/actions/board';
-import { getPendingBoardInvitesAction } from '@/web/actions/invitation';
-import { Heading, Subheading } from '@/app/components/catalyst/heading';
-import { Button } from '@/app/components/catalyst/button';
+import { getBoardDetailsAction } from '@/src/web/actions/board/board';
+import { getPendingBoardInvitesAction } from '@/src/web/actions/invitation/invitation';
+import { Heading, Subheading } from '@/src/web/components/catalyst/heading';
+import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import { User } from '@/domain/user/User';
 import InviteMemberSection from './InviteMemberSection';
 import InviteOutsideMemberSection from './InviteOutsideMemberSection';
 import MembersList from './MembersList';
 import PendingBoardInvites from './PendingBoardInvites';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { prisma, PrismaUserRepository } from '@/infrastructure/index';
 
 const userRepository = new PrismaUserRepository(prisma);

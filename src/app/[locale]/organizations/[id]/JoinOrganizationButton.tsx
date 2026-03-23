@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { Button } from '@/app/components/catalyst/button';
-import { joinOrganizationAction } from '@/web/actions/organization';
+import { Button } from '@/src/web/components/catalyst/button';
+import { joinOrganizationAction } from '@/src/web/actions/organization/organization';
 
 interface JoinOrganizationButtonProps {
   organizationId: string;

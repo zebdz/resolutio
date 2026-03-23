@@ -3,10 +3,10 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Badge } from '@/app/components/catalyst/badge';
-import { Button } from '@/app/components/catalyst/button';
-import { Text } from '@/app/components/catalyst/text';
-import { Textarea } from '@/app/components/catalyst/textarea';
+import { Badge } from '@/src/web/components/catalyst/badge';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
 import {
   Table,
   TableBody,
@@ -14,16 +14,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/app/components/catalyst/table';
+} from '@/src/web/components/catalyst/table';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
-import { handleJoinParentRequestAction } from '@/web/actions/joinParentRequest';
-import type { EnrichedJoinParentRequest } from '@/web/actions/joinParentRequest';
+} from '@/src/web/components/catalyst/dialog';
+import { handleJoinParentRequestAction } from '@/src/web/actions/organization/joinParentRequest';
+import type { EnrichedJoinParentRequest } from '@/src/web/actions/organization/joinParentRequest';
 import { User } from '@/domain/user/User';
 
 interface IncomingRequestsTableProps {

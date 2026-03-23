@@ -2,20 +2,20 @@
 
 import { useState, useRef } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/app/components/catalyst/button';
-import { Text } from '@/app/components/catalyst/text';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Text } from '@/src/web/components/catalyst/text';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
+} from '@/src/web/components/catalyst/dialog';
 import {
   getUserPollsForAdminAction,
   type UserPollResult,
-} from '@/web/actions/suspiciousActivity';
+} from '@/src/web/actions/superadmin/suspiciousActivity';
 import { Link } from '@/src/i18n/routing';
-import { PollStateBadge } from '@/web/components/PollStateBadge';
+import { PollStateBadge } from '@/src/web/components/polls/PollStateBadge';
 
 interface UserPollsDialogProps {
   isOpen: boolean;

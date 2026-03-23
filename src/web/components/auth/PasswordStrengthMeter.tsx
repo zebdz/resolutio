@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Text } from '@/app/components/catalyst/text';
+import { Text } from '@/src/web/components/catalyst/text';
 import { getStrengthConfig } from './passwordStrengthConfig';
 
 type Props = {

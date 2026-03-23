@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/app/components/catalyst/button';
-import { AlertBanner } from '@/app/components/catalyst/alert-banner';
-import { removeOrgAdminAction } from '@/web/actions/organization';
+import { Button } from '@/src/web/components/catalyst/button';
+import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
+import { removeOrgAdminAction } from '@/src/web/actions/organization/organization';
 import { User } from '@/domain/user/User';
 
 type Admin = {

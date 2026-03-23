@@ -3,7 +3,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { Nunito } from 'next/font/google';
 import { Toaster } from 'sonner';
-import { ToastClickDismiss } from '@/web/components/ToastClickDismiss';
+import { ToastClickDismiss } from '@/src/web/components/layout/ToastClickDismiss';
 import { routing } from '@/src/i18n/routing';
 import '../globals.css';
 

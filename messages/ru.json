@@ -1238,7 +1238,8 @@
       "dateFrom": "С",
       "dateTo": "По",
       "minBlocked": "Мин. блокир.",
-      "maxBlocked": "Макс. блокир."
+      "maxBlocked": "Макс. блокир.",
+      "clearFilters": "Сбросить фильтры"
     },
     "users": {
       "title": "Управление пользователями",

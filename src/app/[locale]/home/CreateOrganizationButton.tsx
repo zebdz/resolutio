@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 import { PlusIcon } from '@heroicons/react/16/solid';
 import { CreateOrganizationDialog } from '@/web/components/organization/CreateOrganizationDialog';
 

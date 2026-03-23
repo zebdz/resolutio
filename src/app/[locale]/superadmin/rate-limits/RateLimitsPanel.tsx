@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 import {
   getRateLimitOverviewAction,
   resetAllRateLimitsAction,
   type LimiterOverview,
-} from '@/web/actions/rateLimitAdmin';
+} from '@/src/web/actions/superadmin/rateLimitAdmin';
 import { LimiterCard } from './LimiterCard';
 import { ConfirmDialog } from './ConfirmDialog';
 

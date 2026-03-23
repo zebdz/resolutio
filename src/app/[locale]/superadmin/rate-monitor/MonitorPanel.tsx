@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 import {
   getRateLimitMonitorSnapshotAction,
   getKeyLimiterDetailsAction,
   type MonitorEntry,
   type KeyLimiterDetail,
-} from '@/web/actions/rateLimitMonitor';
+} from '@/src/web/actions/superadmin/rateLimitMonitor';
 import { KeyDetailView } from './KeyDetailView';
 
 const POLL_INTERVAL_MS = 2000;

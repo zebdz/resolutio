@@ -71,7 +71,7 @@ import {
   getUserBlockStatusAction,
   getUserBlockHistoryAction,
   searchUsersForAdminAction,
-} from '../suspiciousActivity';
+} from '../superadmin/suspiciousActivity';
 
 const mockUser = {
   id: 'admin-1',

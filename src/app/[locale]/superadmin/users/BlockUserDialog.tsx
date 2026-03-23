@@ -2,15 +2,15 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/app/components/catalyst/button';
-import { Textarea } from '@/app/components/catalyst/textarea';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
+} from '@/src/web/components/catalyst/dialog';
 
 interface BlockResult {
   success: boolean;

@@ -1,8 +1,8 @@
 import { getTranslations } from 'next-intl/server';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
-import { getUserPendingInvitesAction } from '@/web/actions/invitation';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
+import { getUserPendingInvitesAction } from '@/src/web/actions/invitation/invitation';
 import { Link } from '@/src/i18n/routing';
 import { PendingInvitationsList } from './PendingInvitationsList';
 

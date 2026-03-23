@@ -1,9 +1,9 @@
 import { getTranslations } from 'next-intl/server';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { getPendingRequestsAction } from '@/web/actions/organization';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { getPendingRequestsAction } from '@/src/web/actions/organization/organization';
 import { PendingRequestsList } from './PendingRequestsList';
-import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
+import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 
 const DEFAULT_PAGE_SIZE = 10;
 
