@@ -3,18 +3,18 @@
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/app/components/catalyst/button';
-import { Input } from '@/app/components/catalyst/input';
-import { Textarea } from '@/app/components/catalyst/textarea';
-import { Heading } from '@/app/components/catalyst/heading';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Input } from '@/src/web/components/catalyst/input';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
+import { Heading } from '@/src/web/components/catalyst/heading';
 import {
   Field,
   Label,
   FieldGroup,
   Description,
-} from '@/app/components/catalyst/fieldset';
-import { SwitchField, Switch } from '@/app/components/catalyst/switch';
-import { AlertBanner } from '@/app/components/catalyst/alert-banner';
+} from '@/src/web/components/catalyst/fieldset';
+import { SwitchField, Switch } from '@/src/web/components/catalyst/switch';
+import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { updateOrganizationAction } from '@/web/actions/organization';
 
 type Props = {

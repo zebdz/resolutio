@@ -3,10 +3,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/app/components/catalyst/button';
-import { Field, Label } from '@/app/components/catalyst/fieldset';
-import { Input } from '@/app/components/catalyst/input';
-import { AlertBanner } from '@/app/components/catalyst/alert-banner';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Field, Label } from '@/src/web/components/catalyst/fieldset';
+import { Input } from '@/src/web/components/catalyst/input';
+import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { createAdminInviteAction } from '@/web/actions/invitation';
 import { searchUsersForOrgAdminAction } from '@/web/actions/organization';
 import { searchUserByPhoneAction } from '@/web/actions/user';

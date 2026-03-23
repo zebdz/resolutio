@@ -1,8 +1,15 @@
 'use client';
 
-import { Radio, RadioGroup, RadioField } from '@/app/components/catalyst/radio';
-import { Checkbox, CheckboxField } from '@/app/components/catalyst/checkbox';
-import { Label } from '@/app/components/catalyst/fieldset';
+import {
+  Radio,
+  RadioGroup,
+  RadioField,
+} from '@/src/web/components/catalyst/radio';
+import {
+  Checkbox,
+  CheckboxField,
+} from '@/src/web/components/catalyst/checkbox';
+import { Label } from '@/src/web/components/catalyst/fieldset';
 import type { QuestionType } from '@/src/domain/poll/QuestionType';
 
 interface Answer {

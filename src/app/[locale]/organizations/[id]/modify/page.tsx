@@ -1,9 +1,9 @@
 import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/web/lib/session';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { Divider } from '@/app/components/catalyst/divider';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Divider } from '@/src/web/components/catalyst/divider';
 import { Link } from '@/src/i18n/routing';
 import {
   getOrganizationDetailsAction,
@@ -19,7 +19,7 @@ import {
   getChildOrgJoinParentRequestAction,
   getIncomingJoinParentRequestsAction,
 } from '@/web/actions/joinParentRequest';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 import { MembershipSection } from '../MembershipSection';
 import { ParentOrgSection } from '../ParentOrgSection';
 import { BoardsSection } from '../BoardsSection';

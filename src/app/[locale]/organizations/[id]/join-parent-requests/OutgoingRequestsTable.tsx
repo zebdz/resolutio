@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Badge } from '@/app/components/catalyst/badge';
-import { Button } from '@/app/components/catalyst/button';
-import { Text } from '@/app/components/catalyst/text';
+import { Badge } from '@/src/web/components/catalyst/badge';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Text } from '@/src/web/components/catalyst/text';
 import {
   Table,
   TableBody,
@@ -13,7 +13,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/app/components/catalyst/table';
+} from '@/src/web/components/catalyst/table';
 import { cancelJoinParentRequestAction } from '@/web/actions/joinParentRequest';
 import type { EnrichedJoinParentRequest } from '@/web/actions/joinParentRequest';
 import { User } from '@/domain/user/User';

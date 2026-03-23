@@ -3,16 +3,16 @@
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { useRouter } from '@/src/i18n/routing';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 import {
   Field,
   Label,
   Description,
   FieldGroup,
-} from '@/app/components/catalyst/fieldset';
-import { Input } from '@/app/components/catalyst/input';
-import { Switch, SwitchField } from '@/app/components/catalyst/switch';
-import { AlertBanner } from '@/app/components/catalyst/alert-banner';
+} from '@/src/web/components/catalyst/fieldset';
+import { Input } from '@/src/web/components/catalyst/input';
+import { Switch, SwitchField } from '@/src/web/components/catalyst/switch';
+import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { completePrivacySetupAction } from '@/web/actions/user';
 import { consumeReturnToClient } from '@/web/lib/returnTo.client';
 

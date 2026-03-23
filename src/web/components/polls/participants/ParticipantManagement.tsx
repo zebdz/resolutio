@@ -14,8 +14,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/app/components/catalyst/table';
-import { Button } from '@/app/components/catalyst/button';
+} from '@/src/web/components/catalyst/table';
+import { Button } from '@/src/web/components/catalyst/button';
 import EditWeightDialog from './EditWeightDialog';
 import WeightHistoryDialog from './WeightHistoryDialog';
 import RemoveParticipantDialog from './RemoveParticipantDialog';

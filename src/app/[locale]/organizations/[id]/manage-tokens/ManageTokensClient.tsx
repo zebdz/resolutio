@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef } from 'react';
-import { Divider } from '@/app/components/catalyst/divider';
+import { Divider } from '@/src/web/components/catalyst/divider';
 import { CreateTokenSection } from './CreateTokenSection';
 import { TokenList, TokenListHandle } from './TokenList';
 

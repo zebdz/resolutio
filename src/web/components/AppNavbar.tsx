@@ -9,7 +9,7 @@ import {
   NavbarSection,
   NavbarSpacer,
   NavbarLabel,
-} from '@/app/components/catalyst/navbar';
+} from '@/src/web/components/catalyst/navbar';
 import {
   BuildingOffice2Icon,
   ChartBarIcon,

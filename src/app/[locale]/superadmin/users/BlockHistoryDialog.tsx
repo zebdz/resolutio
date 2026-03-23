@@ -1,13 +1,13 @@
 'use client';
 
-import { Button } from '@/app/components/catalyst/button';
-import { Text } from '@/app/components/catalyst/text';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Text } from '@/src/web/components/catalyst/text';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
+} from '@/src/web/components/catalyst/dialog';
 import { User } from '@/domain/user/User';
 
 interface HistoryEntry {

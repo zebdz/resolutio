@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server';
-import { Text } from '@/app/components/catalyst/text';
-import { Button } from '@/app/components/catalyst/button';
-import { Badge } from '@/app/components/catalyst/badge';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Badge } from '@/src/web/components/catalyst/badge';
 import { Link } from '@/src/i18n/routing';
 import { AdminsListContent, OrgAdmin } from '../AdminsListContent';
 

@@ -8,13 +8,13 @@ import {
   useImperativeHandle,
   forwardRef,
 } from 'react';
-import { Button } from '@/app/components/catalyst/button';
-import { Input } from '@/app/components/catalyst/input';
-import { Badge } from '@/app/components/catalyst/badge';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { Switch, SwitchField } from '@/app/components/catalyst/switch';
-import { Label } from '@/app/components/catalyst/fieldset';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Input } from '@/src/web/components/catalyst/input';
+import { Badge } from '@/src/web/components/catalyst/badge';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Switch, SwitchField } from '@/src/web/components/catalyst/switch';
+import { Label } from '@/src/web/components/catalyst/fieldset';
 import {
   getJoinTokensByOrgAction,
   expireJoinTokenAction,

@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
-import { Heading, Subheading } from '@/app/components/catalyst/heading';
-import { Button } from '@/app/components/catalyst/button';
+import { Heading, Subheading } from '@/src/web/components/catalyst/heading';
+import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { searchPollsAction } from '@/web/actions/poll';
@@ -13,7 +13,7 @@ import {
   PrismaUserRepository,
 } from '@/infrastructure/index';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
-import { PollsList } from '@/web/components/PollsList';
+import { PollsList } from '@/src/web/components/polls/PollsList';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);

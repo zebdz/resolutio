@@ -9,14 +9,18 @@ import {
   DialogDescription,
   DialogBody,
   DialogActions,
-} from '@/app/components/catalyst/dialog';
-import { Button } from '@/app/components/catalyst/button';
-import { Input } from '@/app/components/catalyst/input';
-import { Textarea } from '@/app/components/catalyst/textarea';
-import { Select } from '@/app/components/catalyst/select';
-import { Field, Label, Description } from '@/app/components/catalyst/fieldset';
-import { ErrorMessage } from '@/app/components/catalyst/fieldset';
-import { SwitchField, Switch } from '@/app/components/catalyst/switch';
+} from '@/src/web/components/catalyst/dialog';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Input } from '@/src/web/components/catalyst/input';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
+import { Select } from '@/src/web/components/catalyst/select';
+import {
+  Field,
+  Label,
+  Description,
+} from '@/src/web/components/catalyst/fieldset';
+import { ErrorMessage } from '@/src/web/components/catalyst/fieldset';
+import { SwitchField, Switch } from '@/src/web/components/catalyst/switch';
 import { toast } from 'sonner';
 import {
   createOrganizationAction,

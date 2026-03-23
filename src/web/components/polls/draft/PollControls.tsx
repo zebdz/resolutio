@@ -2,13 +2,13 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 import {
   Dialog,
   DialogActions,
   DialogDescription,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
+} from '@/src/web/components/catalyst/dialog';
 import {
   takeSnapshotAction,
   discardSnapshotAction,

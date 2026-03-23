@@ -11,7 +11,7 @@ import {
   SidebarItem,
   SidebarLabel,
   SidebarSection,
-} from '@/app/components/catalyst/sidebar';
+} from '@/src/web/components/catalyst/sidebar';
 import {
   BuildingOffice2Icon,
   ChartBarIcon,

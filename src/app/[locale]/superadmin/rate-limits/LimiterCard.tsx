@@ -2,10 +2,10 @@
 
 import { useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/app/components/catalyst/button';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { Input } from '@/app/components/catalyst/input';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Input } from '@/src/web/components/catalyst/input';
 import {
   resetLimiterAction,
   clearBlockedKeysAction,

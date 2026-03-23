@@ -1,14 +1,14 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
+} from '@/src/web/components/catalyst/dialog';
 
 interface ConfirmArchiveDialogProps {
   isOpen: boolean;

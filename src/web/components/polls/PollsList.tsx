@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { Input } from '@/app/components/catalyst/input';
-import { Select } from '@/app/components/catalyst/select';
-import { Button } from '@/app/components/catalyst/button';
-import { Text } from '@/app/components/catalyst/text';
+import { Input } from '@/src/web/components/catalyst/input';
+import { Select } from '@/src/web/components/catalyst/select';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Text } from '@/src/web/components/catalyst/text';
 import { PollCard } from './PollCard';
 import { searchPollsAction, SearchPollsInput } from '@/web/actions/poll';
 import { getBoardsByOrganizationAction } from '@/web/actions/board';

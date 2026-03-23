@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Badge } from '@/app/components/catalyst/badge';
+import { Badge } from '@/src/web/components/catalyst/badge';
 import VoterBreakdownDialog from './VoterBreakdownDialog';
 import ExportPdfButton from './ExportPdfButton';
 import ExportProtocolPdfButton from './ExportProtocolPdfButton';

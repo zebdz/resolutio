@@ -3,9 +3,9 @@
 import { useTranslations } from 'next-intl';
 import { useState, useTransition, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from '@/src/i18n/routing';
-import { Button } from '@/app/components/catalyst/button';
-import { Text } from '@/app/components/catalyst/text';
-import { AlertBanner } from '@/app/components/catalyst/alert-banner';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Text } from '@/src/web/components/catalyst/text';
+import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { OtpInput } from './OtpInput';
 import { TurnstileWidget } from './TurnstileWidget';
 import {

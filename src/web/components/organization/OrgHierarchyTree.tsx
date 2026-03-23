@@ -7,8 +7,8 @@ import { linkRadial } from 'd3-shape';
 import { select } from 'd3-selection';
 import type { OrganizationTreeNode } from '@/domain/organization/OrganizationRepository';
 import { useRouter } from '@/src/i18n/routing';
-import { Button } from '@/app/components/catalyst/button';
-import { Heading } from '@/app/components/catalyst/heading';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Heading } from '@/src/web/components/catalyst/heading';
 
 interface OrgHierarchyTreeProps {
   tree: OrganizationTreeNode;

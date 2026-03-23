@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 
 interface ExportPdfButtonProps {
   pollId: string;

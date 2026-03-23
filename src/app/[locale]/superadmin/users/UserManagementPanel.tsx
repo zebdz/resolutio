@@ -4,18 +4,18 @@ import { useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter, usePathname } from 'next/navigation';
 import * as Headless from '@headlessui/react';
-import { Button } from '@/app/components/catalyst/button';
-import { Input } from '@/app/components/catalyst/input';
-import { Select } from '@/app/components/catalyst/select';
-import { Text } from '@/app/components/catalyst/text';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Input } from '@/src/web/components/catalyst/input';
+import { Select } from '@/src/web/components/catalyst/select';
+import { Text } from '@/src/web/components/catalyst/text';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
-import { Textarea } from '@/app/components/catalyst/textarea';
+} from '@/src/web/components/catalyst/dialog';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
 import {
   blockUserAction,
   unblockUserAction,

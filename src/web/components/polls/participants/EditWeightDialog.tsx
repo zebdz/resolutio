@@ -8,11 +8,11 @@ import {
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
-import { Field, Label } from '@/app/components/catalyst/fieldset';
-import { Input } from '@/app/components/catalyst/input';
-import { Textarea } from '@/app/components/catalyst/textarea';
-import { Button } from '@/app/components/catalyst/button';
+} from '@/src/web/components/catalyst/dialog';
+import { Field, Label } from '@/src/web/components/catalyst/fieldset';
+import { Input } from '@/src/web/components/catalyst/input';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
+import { Button } from '@/src/web/components/catalyst/button';
 
 interface Participant {
   id: string;

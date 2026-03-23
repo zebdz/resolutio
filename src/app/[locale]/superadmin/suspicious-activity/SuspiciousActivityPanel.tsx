@@ -2,17 +2,17 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/app/components/catalyst/button';
-import { Text } from '@/app/components/catalyst/text';
-import { Textarea } from '@/app/components/catalyst/textarea';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
-import { Input } from '@/app/components/catalyst/input';
+} from '@/src/web/components/catalyst/dialog';
+import { Input } from '@/src/web/components/catalyst/input';
 import {
   getSuspiciousActivitySummaryAction,
   getSuspiciousActivityForKeyAction,

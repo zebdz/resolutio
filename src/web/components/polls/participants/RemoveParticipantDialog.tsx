@@ -7,8 +7,8 @@ import {
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
-import { Button } from '@/app/components/catalyst/button';
+} from '@/src/web/components/catalyst/dialog';
+import { Button } from '@/src/web/components/catalyst/button';
 
 interface Participant {
   id: string;

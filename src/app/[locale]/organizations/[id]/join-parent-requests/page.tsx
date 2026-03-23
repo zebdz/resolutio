@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { getOrganizationDetailsAction } from '@/web/actions/organization';
 import { getAllJoinParentRequestsAction } from '@/web/actions/joinParentRequest';
-import { Heading, Subheading } from '@/app/components/catalyst/heading';
+import { Heading, Subheading } from '@/src/web/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 import { IncomingRequestsTable } from './IncomingRequestsTable';

@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import { PencilIcon } from '@heroicons/react/24/outline';
-import { PollStateBadge } from '@/web/components/PollStateBadge';
+import { PollStateBadge } from '@/src/web/components/polls/PollStateBadge';
 import {
   takeSnapshotAction,
   discardSnapshotAction,

@@ -4,15 +4,15 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Button } from '@/app/components/catalyst/button';
-import { Badge } from '@/app/components/catalyst/badge';
-import { Checkbox } from '@/app/components/catalyst/checkbox';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Badge } from '@/src/web/components/catalyst/badge';
+import { Checkbox } from '@/src/web/components/catalyst/checkbox';
 import {
   Dialog,
   DialogTitle,
   DialogDescription,
   DialogActions,
-} from '@/app/components/catalyst/dialog';
+} from '@/src/web/components/catalyst/dialog';
 import {
   BuildingOffice2Icon,
   BellIcon,

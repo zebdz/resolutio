@@ -1,14 +1,14 @@
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { Button } from '@/app/components/catalyst/button';
-import { Divider } from '@/app/components/catalyst/divider';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Divider } from '@/src/web/components/catalyst/divider';
 import {
   DescriptionList,
   DescriptionTerm,
   DescriptionDetails,
-} from '@/app/components/catalyst/description-list';
+} from '@/src/web/components/catalyst/description-list';
 import { AccountForm } from '@/web/components/account/AccountForm';
 import { logoutAction } from '@/web/actions/auth';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';

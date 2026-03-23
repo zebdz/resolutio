@@ -3,13 +3,20 @@
 import { useTranslations } from 'next-intl';
 import { useRef, useState, useTransition } from 'react';
 import { useRouter } from '@/src/i18n/routing';
-import { Button } from '@/app/components/catalyst/button';
-import { Input } from '@/app/components/catalyst/input';
-import { Field, Label, FieldGroup } from '@/app/components/catalyst/fieldset';
-import { Checkbox, CheckboxField } from '@/app/components/catalyst/checkbox';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Input } from '@/src/web/components/catalyst/input';
+import {
+  Field,
+  Label,
+  FieldGroup,
+} from '@/src/web/components/catalyst/fieldset';
+import {
+  Checkbox,
+  CheckboxField,
+} from '@/src/web/components/catalyst/checkbox';
 import { PhoneInput } from '@/web/components/phone';
-import { Text, TextLink } from '@/app/components/catalyst/text';
-import { AlertBanner } from '@/app/components/catalyst/alert-banner';
+import { Text, TextLink } from '@/src/web/components/catalyst/text';
+import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import { TurnstileWidget } from './TurnstileWidget';
 import { registerAction } from '@/web/actions/auth';

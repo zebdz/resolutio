@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
 import { searchOrganizationsNotAlreadyMemberOfAction } from '@/web/actions/organization';
 import { OrganizationsList } from './OrganizationsList';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';

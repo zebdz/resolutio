@@ -3,10 +3,10 @@ import {
   getUserVotingProgressAction,
   canUserVoteAction,
 } from '@/web/actions/vote';
-import VotingInterface from '@/web/components/voting/VotingInterface';
-import { Heading } from '@/app/components/catalyst/heading';
+import VotingInterface from '@/src/web/components/polls/voting/VotingInterface';
+import { Heading } from '@/src/web/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 

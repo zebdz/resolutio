@@ -3,8 +3,8 @@
 import { useTranslations } from 'next-intl';
 import { useState, useTransition } from 'react';
 import { useRouter } from '@/src/i18n/routing';
-import { Button } from '@/app/components/catalyst/button';
-import { AlertBanner } from '@/app/components/catalyst/alert-banner';
+import { Button } from '@/src/web/components/catalyst/button';
+import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { joinViaTokenAction } from '@/web/actions/joinToken';
 import { toast } from 'sonner';
 

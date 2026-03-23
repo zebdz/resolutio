@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Badge } from '@/app/components/catalyst/badge';
+import { Badge } from '@/src/web/components/catalyst/badge';
 import { MembersListContent, OrgMember } from './MembersListContent';
 
 type Props = {

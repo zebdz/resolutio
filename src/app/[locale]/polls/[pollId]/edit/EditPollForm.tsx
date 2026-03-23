@@ -3,11 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Button } from '@/app/components/catalyst/button';
-import { Field, Label } from '@/app/components/catalyst/fieldset';
-import { Input } from '@/app/components/catalyst/input';
-import { Textarea } from '@/app/components/catalyst/textarea';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Field, Label } from '@/src/web/components/catalyst/fieldset';
+import { Input } from '@/src/web/components/catalyst/input';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
 import {
   getPollByIdAction,
   updatePollAction,
@@ -24,9 +24,9 @@ import {
 import { Link } from '@/src/i18n/routing';
 import { QuestionType } from '@/domain/poll/QuestionType';
 import { PollState } from '@/src/domain/poll/PollState';
-import { PollSidebar } from '@/web/components/PollSidebar';
-import { QuestionForm } from '@/web/components/QuestionForm';
-import PollControls from '@/web/components/PollControls';
+import { PollSidebar } from '@/src/web/components/polls/draft/PollSidebar';
+import { QuestionForm } from '@/src/web/components/polls/draft/QuestionForm';
+import PollControls from '@/src/web/components/polls/draft/PollControls';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { validateHeaderName } from 'http';
 

@@ -3,8 +3,8 @@
 import { XMarkIcon } from '@heroicons/react/20/solid';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Input } from '@/app/components/catalyst/input';
-import { Button } from '@/app/components/catalyst/button';
+import { Input } from '@/src/web/components/catalyst/input';
+import { Button } from '@/src/web/components/catalyst/button';
 import { useTranslations } from 'next-intl';
 
 interface AnswerInputProps {

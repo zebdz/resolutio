@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { Button } from '@/app/components/catalyst/button';
-import { Field, Label } from '@/app/components/catalyst/fieldset';
-import { Select } from '@/app/components/catalyst/select';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Field, Label } from '@/src/web/components/catalyst/fieldset';
+import { Select } from '@/src/web/components/catalyst/select';
 import { createBoardMemberInviteAction } from '@/web/actions/invitation';
 import { User } from '@/domain/user/User';
 

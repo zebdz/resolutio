@@ -5,7 +5,7 @@ import {
   PrismaUserRepository,
   PrismaNotificationRepository,
 } from '@/infrastructure/index';
-import { StackedLayout } from '@/app/components/catalyst/stacked-layout';
+import { StackedLayout } from '@/src/web/components/catalyst/stacked-layout';
 import { AppNavbar } from './AppNavbar';
 import { MobileSidebar } from './MobileSidebar';
 

@@ -1,6 +1,6 @@
 import { getTranslations } from 'next-intl/server';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Button } from '@/app/components/catalyst/button';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import { CreateOrganizationButton } from './CreateOrganizationButton';
 import { UserOrganizationsList } from './UserOrganizationsList';

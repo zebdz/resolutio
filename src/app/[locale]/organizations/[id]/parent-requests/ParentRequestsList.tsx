@@ -2,18 +2,18 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Badge } from '@/app/components/catalyst/badge';
-import { Button } from '@/app/components/catalyst/button';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { Textarea } from '@/app/components/catalyst/textarea';
+import { Badge } from '@/src/web/components/catalyst/badge';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
 import {
   Dialog,
   DialogActions,
   DialogBody,
   DialogDescription,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
+} from '@/src/web/components/catalyst/dialog';
 import { handleJoinParentRequestAction } from '@/web/actions/joinParentRequest';
 import { User } from '@/domain/user/User';
 

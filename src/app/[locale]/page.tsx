@@ -1,6 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import Image from 'next/image';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import { LocaleSwitcher } from '@/web/components/LocaleSwitcher';
 import { getVersion } from '@/src/lib/version';

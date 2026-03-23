@@ -4,7 +4,7 @@ import {
   getOrganizationPendingRequestsAction,
   getOrganizationDetailsAction,
 } from '@/web/actions/organization';
-import { Heading, Subheading } from '@/app/components/catalyst/heading';
+import { Heading, Subheading } from '@/src/web/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
 import { OrgPendingRequestsList } from './OrgPendingRequestsList';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';

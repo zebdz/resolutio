@@ -3,8 +3,8 @@ import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { getPollResultsAction } from '@/web/actions/vote';
 import { getPollByIdAction } from '@/web/actions/poll';
-import PollResults from '@/web/components/results/PollResults';
-import { Heading } from '@/app/components/catalyst/heading';
+import PollResults from '@/src/web/components/polls/results/PollResults';
+import { Heading } from '@/src/web/components/catalyst/heading';
 import {
   AnswerResult,
   QuestionResult,

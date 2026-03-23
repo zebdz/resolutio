@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Button } from '@/app/components/catalyst/button';
+import { Button } from '@/src/web/components/catalyst/button';
 import { resetRateLimitKeysAction } from '@/web/actions/rateLimitAdmin';
 import type { KeyLimiterDetail } from '@/web/actions/rateLimitMonitor';
 

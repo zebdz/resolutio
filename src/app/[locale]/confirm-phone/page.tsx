@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { AuthLayout } from '@/app/components/catalyst/auth-layout';
+import { AuthLayout } from '@/src/web/components/catalyst/auth-layout';
 import { ConfirmPhoneForm } from '@/web/components/auth/ConfirmPhoneForm';
 import { getCurrentUser } from '@/web/lib/session';
 

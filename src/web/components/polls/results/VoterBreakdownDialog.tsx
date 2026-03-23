@@ -6,8 +6,8 @@ import {
   DialogActions,
   DialogBody,
   DialogTitle,
-} from '@/app/components/catalyst/dialog';
-import { Button } from '@/app/components/catalyst/button';
+} from '@/src/web/components/catalyst/dialog';
+import { Button } from '@/src/web/components/catalyst/button';
 import {
   Table,
   TableBody,
@@ -15,7 +15,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/app/components/catalyst/table';
+} from '@/src/web/components/catalyst/table';
 
 interface Voter {
   userId: string;

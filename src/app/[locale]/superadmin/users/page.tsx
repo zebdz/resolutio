@@ -1,6 +1,6 @@
 import { getTranslations } from 'next-intl/server';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
 import { Link } from '@/src/i18n/routing';
 import { UserManagementPanel } from './UserManagementPanel';
 import {

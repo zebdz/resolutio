@@ -22,11 +22,11 @@ import {
   CheckCircleIcon,
   ClipboardDocumentCheckIcon,
 } from '@heroicons/react/24/outline';
-import { Input } from '@/app/components/catalyst/input';
-import { Textarea } from '@/app/components/catalyst/textarea';
-import { Select } from '@/app/components/catalyst/select';
-import { Button } from '@/app/components/catalyst/button';
-import { Field, Label } from '@/app/components/catalyst/fieldset';
+import { Input } from '@/src/web/components/catalyst/input';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
+import { Select } from '@/src/web/components/catalyst/select';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Field, Label } from '@/src/web/components/catalyst/fieldset';
 import { AnswerInput } from './AnswerInput';
 import { QuestionType } from '@/domain/poll/QuestionType';
 

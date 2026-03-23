@@ -5,12 +5,16 @@ import { useState, useTransition } from 'react';
 import { useRouter } from '@/src/i18n/routing';
 import Link from 'next/link';
 import { consumeReturnToClient } from '@/web/lib/returnTo.client';
-import { Button } from '@/app/components/catalyst/button';
-import { Input } from '@/app/components/catalyst/input';
-import { Field, Label, FieldGroup } from '@/app/components/catalyst/fieldset';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Input } from '@/src/web/components/catalyst/input';
+import {
+  Field,
+  Label,
+  FieldGroup,
+} from '@/src/web/components/catalyst/fieldset';
 import { PhoneInput } from '@/web/components/phone';
-import { Text } from '@/app/components/catalyst/text';
-import { AlertBanner } from '@/app/components/catalyst/alert-banner';
+import { Text } from '@/src/web/components/catalyst/text';
+import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { loginAction } from '@/web/actions/auth';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/16/solid';
 import { TurnstileWidget } from '@/web/components/auth/TurnstileWidget';

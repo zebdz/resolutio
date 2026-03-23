@@ -2,12 +2,16 @@
 
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
-import { Button } from '@/app/components/catalyst/button';
-import { Input } from '@/app/components/catalyst/input';
-import { Textarea } from '@/app/components/catalyst/textarea';
-import { Field, Label, FieldGroup } from '@/app/components/catalyst/fieldset';
-import { AlertBanner } from '@/app/components/catalyst/alert-banner';
-import { Heading } from '@/app/components/catalyst/heading';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Input } from '@/src/web/components/catalyst/input';
+import { Textarea } from '@/src/web/components/catalyst/textarea';
+import {
+  Field,
+  Label,
+  FieldGroup,
+} from '@/src/web/components/catalyst/fieldset';
+import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
+import { Heading } from '@/src/web/components/catalyst/heading';
 import { createJoinTokenAction } from '@/web/actions/joinToken';
 import { toast } from 'sonner';
 

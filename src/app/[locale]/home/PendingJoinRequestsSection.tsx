@@ -1,5 +1,5 @@
 import { getTranslations } from 'next-intl/server';
-import { Badge } from '@/app/components/catalyst/badge';
+import { Badge } from '@/src/web/components/catalyst/badge';
 import { Link } from '@/src/i18n/routing';
 import { getUserOrganizationsAction } from '@/web/actions/organization';
 

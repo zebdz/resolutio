@@ -1,17 +1,17 @@
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { Button } from '@/app/components/catalyst/button';
-import { Divider } from '@/app/components/catalyst/divider';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Divider } from '@/src/web/components/catalyst/divider';
 import { Link } from '@/src/i18n/routing';
 import { getOrganizationDetailsAction } from '@/web/actions/organization';
 import { searchPollsAction } from '@/web/actions/poll';
 import { MembershipSection } from './MembershipSection';
 import { BoardsSection } from './BoardsSection';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
-import { OrgHierarchyTree } from '@/app/components/OrgHierarchyTree';
-import { PollsList } from '@/web/components/PollsList';
+import { OrgHierarchyTree } from '@/src/web/components/organization/OrgHierarchyTree';
+import { PollsList } from '@/src/web/components/polls/PollsList';
 import {
   prisma,
   PrismaOrganizationRepository,

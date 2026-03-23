@@ -1,5 +1,5 @@
 import { getTranslations } from 'next-intl/server';
-import { Heading } from '@/app/components/catalyst/heading';
+import { Heading } from '@/src/web/components/catalyst/heading';
 import { AuthenticatedLayout } from '@/web/components/AuthenticatedLayout';
 import { getNotificationsAction } from '@/web/actions/notification';
 import { NotificationsList } from './NotificationsList';

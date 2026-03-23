@@ -10,11 +10,11 @@ import {
 } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
-import { Input } from '@/app/components/catalyst/input';
-import { Button } from '@/app/components/catalyst/button';
-import { Heading } from '@/app/components/catalyst/heading';
-import { Text } from '@/app/components/catalyst/text';
-import { Badge } from '@/app/components/catalyst/badge';
+import { Input } from '@/src/web/components/catalyst/input';
+import { Button } from '@/src/web/components/catalyst/button';
+import { Heading } from '@/src/web/components/catalyst/heading';
+import { Text } from '@/src/web/components/catalyst/text';
+import { Badge } from '@/src/web/components/catalyst/badge';
 import { Link } from '@/src/i18n/routing';
 import {
   joinOrganizationAction,
