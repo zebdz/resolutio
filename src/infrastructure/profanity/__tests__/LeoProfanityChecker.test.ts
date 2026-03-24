@@ -34,6 +34,16 @@ describe('LeoProfanityChecker', () => {
     expect(checker.containsProfanity('   ')).toBe(false);
   });
 
+  it('should detect profanity on separate lines (newline as word boundary)', () => {
+    expect(
+      checker.containsProfanity('Секция 3 — R3721 — подразделение\nанал\nАнал')
+    ).toBe(true);
+  });
+
+  it('should detect profanity after newline', () => {
+    expect(checker.containsProfanity('clean text\nблядь')).toBe(true);
+  });
+
   // ===== ё/е auto-generated variants =====
 
   describe('ё/е auto-generated variants', () => {
@@ -1744,6 +1754,34 @@ describe('LeoProfanityChecker', () => {
 
     it('should NOT flag "hue" (English color term)', () => {
       expect(checker.containsProfanity('hue')).toBe(false);
+    });
+  });
+
+  // ===== Profanity that should be caught =====
+
+  describe('profanity: missing coverage', () => {
+    it.each([
+      ['П!ська', 'писька (! replacing и)'],
+      ['П!др', 'пидр (! replacing и)'],
+      ['Жona', 'жопа (Latin n as п)'],
+      ['Пердак', 'пердак'],
+      ['Соси член', 'соси член'],
+      ['Ебать', 'ебать'],
+      ['Еби', 'еби (imperative)'],
+      ['Сука', 'сука'],
+      ['Трахает', 'трахает'],
+      ['Трахнемся', 'трахнемся'],
+      ['Трахаю', 'трахаю'],
+      ['Ебаться', 'ебаться'],
+      ['Ебля', 'ебля'],
+      ['Траходром', 'траходром'],
+      ['Пенис', 'пенис'],
+      ['Анал', 'анал'],
+      // NOTE: 'Др😲чь' (emoji replacing о) is not catchable — stripping emoji
+      // gives "Дрчь" which doesn't match any stem. Would need vowel-insertion
+      // heuristics or emoji→letter mapping to solve generically.
+    ])('should detect %s — %s', (word) => {
+      expect(checker.containsProfanity(word)).toBe(true);
     });
   });
 });
