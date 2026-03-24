@@ -105,6 +105,7 @@ export class LeoProfanityChecker implements ProfanityChecker {
   // Only used when text contains both Cyrillic and Latin characters.
   private static readonly MIXED_SCRIPT_OVERRIDES: Record<string, string> = {
     s: 'з', // evasion: Latin s used for Cyrillic з (standard translit: s→с)
+    n: 'п', // visual: Latin n looks like Cyrillic п (standard translit: n→н)
   };
 
   // Alternative digit substitutions for ambiguous digits.
@@ -129,17 +130,21 @@ export class LeoProfanityChecker implements ProfanityChecker {
     $: 'с',
     '₽': 'р',
     '€': 'е',
+    '!': 'и', // evasion: П!ська → Писька, П!др → Пидр
   };
 
   containsProfanity(text: string): boolean {
-    if (leoProfanity.check(text)) {
+    // Normalize whitespace: leo-profanity doesn't split on \n or \t
+    const input = text.replace(/\s+/g, ' ');
+
+    if (leoProfanity.check(input)) {
       return true;
     }
 
     // Stage 1: Visual homoglyphs normalization (ё→е, Latin lookalikes→Cyrillic)
-    const normalized = this.normalize(text);
+    const normalized = this.normalize(input);
 
-    if (normalized !== text && leoProfanity.check(normalized)) {
+    if (normalized !== input && leoProfanity.check(normalized)) {
       return true;
     }
 
@@ -154,7 +159,7 @@ export class LeoProfanityChecker implements ProfanityChecker {
       ...LeoProfanityChecker.DIGIT_SUBS,
       ...LeoProfanityChecker.ALT_DIGIT_SUBS,
     };
-    const altDigitNormalized = this.normalize(text, undefined, altDigitMap);
+    const altDigitNormalized = this.normalize(input, undefined, altDigitMap);
 
     if (altDigitNormalized !== normalized) {
       if (leoProfanity.check(altDigitNormalized)) {
@@ -188,14 +193,14 @@ export class LeoProfanityChecker implements ProfanityChecker {
     // When text has both Cyrillic and Latin, try full transliteration (h→х, b→б)
     // plus overrides (s→з) directly on the original to catch evasion like Пиsда.
     // Only for mixed-script to avoid false positives on pure English.
-    if (this.isMixedScript(text)) {
+    if (this.isMixedScript(input)) {
       const altMap = {
         ...LeoProfanityChecker.TRANSLITERATION,
         ...LeoProfanityChecker.MIXED_SCRIPT_OVERRIDES,
       };
-      const altNormalized = this.normalize(text, altMap);
+      const altNormalized = this.normalize(input, altMap);
 
-      if (altNormalized !== fullyNormalized && altNormalized !== text) {
+      if (altNormalized !== fullyNormalized && altNormalized !== input) {
         if (leoProfanity.check(altNormalized)) {
           return true;
         }
@@ -210,14 +215,14 @@ export class LeoProfanityChecker implements ProfanityChecker {
     // Applies digraphs (ya→я, sh→ш) then full TRANSLITERATION (h→х, b→б, p→п).
     // When digraphs are found: full check (transliteration intent is clear).
     // When no digraphs: stem-only check (avoids infix false positives like "hue"→"хуе").
-    const digraphed = this.applyDigraphs(text);
+    const digraphed = this.applyDigraphs(input);
     const fullTranslit = this.normalize(
       digraphed,
       LeoProfanityChecker.TRANSLITERATION
     );
 
-    if (fullTranslit !== fullyNormalized && fullTranslit !== text) {
-      if (digraphed !== text) {
+    if (fullTranslit !== fullyNormalized && fullTranslit !== input) {
+      if (digraphed !== input) {
         // Digraphs found → full check (transliteration intent is clear)
         if (leoProfanity.check(fullTranslit)) {
           return true;
@@ -237,9 +242,9 @@ export class LeoProfanityChecker implements ProfanityChecker {
 
     // Strip non-letter characters from ORIGINAL text to catch cases where
     // special chars replace letters ambiguously (Еб$ть → Ебть, $ could be а or с)
-    const originalLettersOnly = text.replace(/[^\p{L}]/gu, '');
+    const originalLettersOnly = input.replace(/[^\p{L}]/gu, '');
 
-    if (originalLettersOnly !== text.replace(/\s/g, '')) {
+    if (originalLettersOnly !== input.replace(/\s/g, '')) {
       const normalizedStripped = this.normalize(originalLettersOnly);
 
       if (leoProfanity.check(normalizedStripped)) {
@@ -281,7 +286,7 @@ export class LeoProfanityChecker implements ProfanityChecker {
     // Phrase matching: check collapsed text for multi-word phrases and symbol patterns.
     // Check BOTH normalized (for Cyrillic phrases) and original (for # patterns like #опа).
     const collapsedNormLower = normalized.replace(/\s/g, '').toLowerCase();
-    const collapsedOrigLower = text.replace(/\s/g, '').toLowerCase();
+    const collapsedOrigLower = input.replace(/\s/g, '').toLowerCase();
 
     for (const phrase of PROFANITY_PHRASES) {
       if (
@@ -324,7 +329,7 @@ export class LeoProfanityChecker implements ProfanityChecker {
     });
 
     // Special char→Cyrillic (@→а, $→с, ₽→р, €→е)
-    result = result.replace(/[@$₽€]/g, (ch) => {
+    result = result.replace(/[@$₽€!]/g, (ch) => {
       return LeoProfanityChecker.SPECIAL_CHAR_SUBS[ch] ?? ch;
     });
 

@@ -129,6 +129,29 @@ export const PROFANITY_CUSTOM_BLOCKED: string[] = [
   'minet', // минет
   'uebok',
   'yebok', // уебок
+
+  // пенис — can't use as stem (would catch пенистый = foamy)
+  'пенис',
+  'пениса',
+  'пенису',
+  'пенисом',
+  'пенисе',
+  'пенисы',
+  'пенисов',
+  'пенисам',
+  'пенисами',
+  'пенисах',
+  // пенес — common misspelling of пенис
+  'пенес',
+  'пенеса',
+  'пенесу',
+  'пенесом',
+  'пенесе',
+  'пенесы',
+  'пенесов',
+  'пенесам',
+  'пенесами',
+  'пенесах',
 ];
 
 // Profane stems for Russian morphology matching.
@@ -177,6 +200,9 @@ export const PROFANITY_STEMS: string[] = [
 
   // дроч
   'дроч', // дрочить, дрочит, дрочила, дрочу...
+
+  // ебл (ебля, еблище... — no legitimate words start with ебл)
+  'ебл', // ебля, еблю, еблище...
 
   // срат/срак/сран
   'срат', // срать, срал, срала, срали...
@@ -274,6 +300,7 @@ export const PROFANITY_STEMS: string[] = [
   'перепих', // перепих, перепиха...
   'шпехат', // шпехаться...
   'косожоп', // косожопый...
+  'перд', // пердак, пердеть, пердун, пердёж...
 ];
 
 // Profane infixes — checked as substrings within words.
@@ -306,8 +333,9 @@ export const PROFANITY_INFIXES: string[] = [
   'ебт', // catches stripped Еб$ть→Ебть ($ used as letter replacement)
   'жоп', // жопа, косожопый, кривожопый... (moved from stems — infix catches prefixed forms)
   // NOTE: пид removed — false positive on пиджак, эпидемия. Stems пидор/пидар/пидр cover it.
-  'трахат', // трахать (safe: трахея doesn't contain трахат)
-  'трахну', // трахнуть, трахнул...
+  'траха', // трахать, трахает, трахаю... (safe: трахея starts with трахе, not траха)
+  'трахн', // трахнуть, трахнул, трахнемся...
+  'траход', // траходром... (can't use трахо — would catch трахома = trachoma)
 ];
 
 // Profane phrases — checked against the full collapsed text.
