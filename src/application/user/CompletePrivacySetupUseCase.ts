@@ -10,6 +10,7 @@ export interface CompletePrivacySetupInput {
   nickname?: string;
   allowFindByName: boolean;
   allowFindByPhone: boolean;
+  allowFindByAddress: boolean;
 }
 
 export class CompletePrivacySetupUseCase {
@@ -60,6 +61,7 @@ export class CompletePrivacySetupUseCase {
     updatedUser = updatedUser.updatePrivacySettings({
       allowFindByName: input.allowFindByName,
       allowFindByPhone: input.allowFindByPhone,
+      allowFindByAddress: input.allowFindByAddress,
     });
 
     // Mark privacy setup as complete

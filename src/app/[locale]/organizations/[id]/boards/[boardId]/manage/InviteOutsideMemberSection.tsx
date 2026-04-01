@@ -18,6 +18,7 @@ type UserResult = {
   lastName: string;
   middleName?: string;
   nickname: string;
+  address?: { city: string; street: string };
 };
 
 type InviteOutsideMemberSectionProps = {
@@ -185,6 +186,11 @@ export default function InviteOutsideMemberSection({
                 <p className="font-medium text-zinc-900 dark:text-zinc-100">
                   {formatName(user)}
                 </p>
+                {user.address && (
+                  <p className="text-xs text-zinc-500">
+                    {user.address.city}, {user.address.street}
+                  </p>
+                )}
               </div>
               <Button
                 className="w-full sm:w-auto"

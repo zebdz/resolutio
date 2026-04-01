@@ -10,10 +10,11 @@ export interface UserRepository {
   save(user: User): Promise<User>;
   confirmUser(userId: string): Promise<void>;
   updatePrivacySettings(user: User): Promise<void>;
+  deleteAddress(userId: string): Promise<void>;
   exists(phoneNumber: PhoneNumber): Promise<boolean>;
   searchUsers(
     query: string,
-    options?: { respectPrivacy?: boolean }
+    options?: { respectPrivacy?: boolean; city?: string; street?: string }
   ): Promise<User[]>;
   searchUserByPhone(phone: string): Promise<User | null>;
   isSuperAdmin(userId: string): Promise<boolean>;

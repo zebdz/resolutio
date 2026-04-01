@@ -4,6 +4,7 @@ import { User } from '@/src/domain/user/User';
 import { PhoneNumber } from '@/src/domain/user/PhoneNumber';
 import { Nickname } from '@/src/domain/user/Nickname';
 import { UserDomainCodes } from '@/src/domain/user/UserDomainCodes';
+import { Address } from '@/src/domain/user/Address';
 import type { UserRepository } from '@/src/domain/user/UserRepository';
 
 describe('UpdateUserProfileUseCase', () => {
@@ -34,6 +35,7 @@ describe('UpdateUserProfileUseCase', () => {
       isNicknameAvailable: vi.fn(),
       save: vi.fn(),
       updatePrivacySettings: vi.fn(),
+      deleteAddress: vi.fn(),
       exists: vi.fn(),
       searchUsers: vi.fn(),
       searchUserByPhone: vi.fn(),
@@ -230,6 +232,108 @@ describe('UpdateUserProfileUseCase', () => {
       if (!result.success) {
         expect(result.error).toBe(UserDomainCodes.NICKNAME_INVALID);
       }
+    });
+
+    it('should update address when provided', async () => {
+      vi.mocked(userRepository.findById).mockResolvedValue(existingUser);
+      vi.mocked(userRepository.save).mockImplementation((user) =>
+        Promise.resolve(user)
+      );
+
+      const result = await useCase.execute({
+        userId: 'user-123',
+        address: {
+          country: 'Russia',
+          city: 'Moscow',
+          street: 'Tverskaya',
+          building: '12',
+        },
+      });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.address).toBeDefined();
+        expect(result.value.address!.city).toBe('Moscow');
+      }
+    });
+
+    it('should clear address when address is null', async () => {
+      const userWithAddress = User.reconstitute({
+        id: 'user-123',
+        firstName: 'John',
+        lastName: 'Doe',
+        phoneNumber: PhoneNumber.create('+79161234567'),
+        password: 'hashedpassword',
+        language: 'en',
+        createdAt: new Date('2024-01-01'),
+        nickname: Nickname.create('john_doe_123'),
+        allowFindByName: false,
+        allowFindByPhone: false,
+        privacySetupCompleted: true,
+        address: Address.create({
+          country: 'Russia',
+          city: 'Moscow',
+          street: 'Tverskaya',
+          building: '12',
+        }),
+      });
+
+      vi.mocked(userRepository.findById).mockResolvedValue(userWithAddress);
+      vi.mocked(userRepository.deleteAddress).mockResolvedValue();
+      vi.mocked(userRepository.save).mockImplementation((user) =>
+        Promise.resolve(user)
+      );
+
+      const result = await useCase.execute({
+        userId: 'user-123',
+        address: null,
+      });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.address).toBeUndefined();
+      }
+
+      expect(userRepository.deleteAddress).toHaveBeenCalledWith('user-123');
+    });
+
+    it('should update allowFindByAddress via privacy settings', async () => {
+      vi.mocked(userRepository.findById).mockResolvedValue(existingUser);
+      vi.mocked(userRepository.updatePrivacySettings).mockResolvedValue();
+      vi.mocked(userRepository.save).mockImplementation((user) =>
+        Promise.resolve(user)
+      );
+
+      const result = await useCase.execute({
+        userId: 'user-123',
+        allowFindByAddress: true,
+      });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.allowFindByAddress).toBe(true);
+      }
+
+      expect(userRepository.updatePrivacySettings).toHaveBeenCalled();
+    });
+
+    it('should return failure for invalid address (missing city)', async () => {
+      vi.mocked(userRepository.findById).mockResolvedValue(existingUser);
+
+      const result = await useCase.execute({
+        userId: 'user-123',
+        address: {
+          country: 'Russia',
+          city: '',
+          street: 'Tverskaya',
+          building: '12',
+        },
+      });
+
+      expect(result.success).toBe(false);
     });
   });
 });

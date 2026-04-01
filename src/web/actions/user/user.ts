@@ -66,6 +66,12 @@ export async function updateProfileAction(
     const allowFindByNameValue = formData.get('allowFindByName');
     const allowFindByPhoneValue = formData.get('allowFindByPhone');
 
+    const allowFindByAddressValue = formData.get('allowFindByAddress');
+
+    // Address fields — present when user submits the address form
+    const addressCountry = formData.get('addressCountry');
+    const addressAction = formData.get('addressAction'); // 'save' | 'clear' | absent
+
     const input = {
       userId: currentUser.id,
       language: languageValue ? (languageValue as Locale) : undefined,
@@ -78,6 +84,30 @@ export async function updateProfileAction(
         allowFindByPhoneValue !== null
           ? allowFindByPhoneValue === 'true'
           : undefined,
+      allowFindByAddress:
+        allowFindByAddressValue !== null
+          ? allowFindByAddressValue === 'true'
+          : undefined,
+      address:
+        addressAction === 'clear'
+          ? null
+          : addressCountry
+            ? {
+                country: String(formData.get('addressCountry')),
+                region: formData.get('addressRegion')
+                  ? String(formData.get('addressRegion'))
+                  : undefined,
+                city: String(formData.get('addressCity')),
+                street: String(formData.get('addressStreet')),
+                building: String(formData.get('addressBuilding')),
+                apartment: formData.get('addressApartment')
+                  ? String(formData.get('addressApartment'))
+                  : undefined,
+                postalCode: formData.get('addressPostalCode')
+                  ? String(formData.get('addressPostalCode'))
+                  : undefined,
+              }
+            : undefined,
     };
 
     // Validate with Zod
@@ -145,12 +175,14 @@ export async function completePrivacySetupAction(
     const nicknameValue = formData.get('nickname');
     const allowFindByNameValue = formData.get('allowFindByName');
     const allowFindByPhoneValue = formData.get('allowFindByPhone');
+    const allowFindByAddressValue = formData.get('allowFindByAddress');
 
     const input = {
       userId: currentUser.id,
       nickname: nicknameValue ? String(nicknameValue) : undefined,
       allowFindByName: allowFindByNameValue === 'true',
       allowFindByPhone: allowFindByPhoneValue === 'true',
+      allowFindByAddress: allowFindByAddressValue === 'true',
     };
 
     const validation =

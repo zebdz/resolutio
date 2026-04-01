@@ -16,7 +16,6 @@ import { Switch, SwitchField } from '@/src/web/components/catalyst/switch';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { updateProfileAction } from '@/src/web/actions/user/user';
 import { Locale } from '@/src/i18n/locales';
-
 type Props = {
   user: {
     id: string;
@@ -29,6 +28,7 @@ type Props = {
     nickname: string;
     allowFindByName: boolean;
     allowFindByPhone: boolean;
+    allowFindByAddress: boolean;
   };
 };
 
@@ -53,6 +53,7 @@ export function AccountForm({ user }: Props) {
   const [privValues, setPrivValues] = useState({
     allowFindByName: user.allowFindByName,
     allowFindByPhone: user.allowFindByPhone,
+    allowFindByAddress: user.allowFindByAddress,
   });
 
   const prefsChanged =
@@ -61,7 +62,8 @@ export function AccountForm({ user }: Props) {
 
   const privacyChanged =
     privValues.allowFindByName !== user.allowFindByName ||
-    privValues.allowFindByPhone !== user.allowFindByPhone;
+    privValues.allowFindByPhone !== user.allowFindByPhone ||
+    privValues.allowFindByAddress !== user.allowFindByAddress;
 
   function handlePrefChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -123,6 +125,7 @@ export function AccountForm({ user }: Props) {
     const formData = new FormData();
     formData.set('allowFindByName', String(privValues.allowFindByName));
     formData.set('allowFindByPhone', String(privValues.allowFindByPhone));
+    formData.set('allowFindByAddress', String(privValues.allowFindByAddress));
 
     startPrivTransition(async () => {
       const result = await updateProfileAction(formData);
@@ -230,6 +233,30 @@ export function AccountForm({ user }: Props) {
                   setPrivValues((prev) => ({
                     ...prev,
                     allowFindByPhone: checked,
+                  }));
+
+                  if (privError) {
+                    setPrivError(null);
+                  }
+
+                  if (privSuccess) {
+                    setPrivSuccess(null);
+                  }
+                }}
+                disabled={isPrivPending}
+              />
+            </SwitchField>
+
+            <SwitchField>
+              <Label>{t('allowFindByAddressLabel')}</Label>
+              <Description>{t('allowFindByAddressDescription')}</Description>
+              <Switch
+                color="brand-green"
+                checked={privValues.allowFindByAddress}
+                onChange={(checked) => {
+                  setPrivValues((prev) => ({
+                    ...prev,
+                    allowFindByAddress: checked,
                   }));
 
                   if (privError) {

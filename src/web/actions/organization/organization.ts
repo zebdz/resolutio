@@ -1559,6 +1559,10 @@ export async function searchUsersForOrgAdminAction(
         lastName: u.lastName,
         middleName: u.middleName,
         nickname: u.nickname.getValue(),
+        address:
+          u.allowFindByAddress && u.address
+            ? { city: u.address.city, street: u.address.street }
+            : undefined,
       }));
 
     return { success: true, data: filteredUsers };
