@@ -22,6 +22,7 @@ export const completePrivacySetupSchema = (
       .optional(),
     allowFindByName: z.boolean(),
     allowFindByPhone: z.boolean(),
+    allowFindByAddress: z.boolean(),
   });
 
 // Keep backward-compatible constant with a no-op profanity checker for tests

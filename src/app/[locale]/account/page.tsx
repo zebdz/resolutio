@@ -10,6 +10,7 @@ import {
   DescriptionDetails,
 } from '@/src/web/components/catalyst/description-list';
 import { AccountForm } from '@/web/components/account/AccountForm';
+import { AddressForm } from '@/web/components/account/AddressForm';
 import { logoutAction } from '@/src/web/actions/auth/auth';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 
@@ -71,6 +72,31 @@ export default async function AccountPage() {
                 })}
               </DescriptionDetails>
             </DescriptionList>
+
+            {/* Collapsible Address */}
+            <details className="mt-6 border-t border-zinc-200 pt-4 dark:border-zinc-700">
+              <summary className="cursor-pointer text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                {t('addressSection')}
+              </summary>
+              <div className="mt-4">
+                <AddressForm
+                  address={
+                    user.address
+                      ? {
+                          country: user.address.country,
+                          region: user.address.region,
+                          city: user.address.city,
+                          street: user.address.street,
+                          building: user.address.building,
+                          apartment: user.address.apartment,
+                          postalCode: user.address.postalCode,
+                        }
+                      : null
+                  }
+                  locale={user.language}
+                />
+              </div>
+            </details>
           </div>
         </div>
 
@@ -92,6 +118,7 @@ export default async function AccountPage() {
                 nickname: user.nickname.getValue(),
                 allowFindByName: user.allowFindByName,
                 allowFindByPhone: user.allowFindByPhone,
+                allowFindByAddress: user.allowFindByAddress,
               }}
             />
           </div>

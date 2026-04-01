@@ -19,6 +19,7 @@ type SearchResult = {
   lastName: string;
   middleName?: string;
   nickname: string;
+  address?: { city: string; street: string };
 };
 
 export function InviteAdminSection({
@@ -202,9 +203,16 @@ export function InviteAdminSection({
                 key={user.id}
                 className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-700 dark:bg-zinc-800"
               >
-                <span className="text-sm text-zinc-900 dark:text-zinc-100">
-                  {formatName(user)}
-                </span>
+                <div className="min-w-0">
+                  <span className="text-sm text-zinc-900 dark:text-zinc-100">
+                    {formatName(user)}
+                  </span>
+                  {user.address && (
+                    <p className="text-xs text-zinc-500">
+                      {user.address.city}, {user.address.street}
+                    </p>
+                  )}
+                </div>
                 <Button
                   className="w-full sm:w-auto"
                   color="brand-green"
@@ -262,9 +270,16 @@ export function InviteAdminSection({
                 key={user.id}
                 className="flex flex-col gap-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-700 dark:bg-zinc-800"
               >
-                <span className="text-sm text-zinc-900 dark:text-zinc-100">
-                  {formatName(user)}
-                </span>
+                <div className="min-w-0">
+                  <span className="text-sm text-zinc-900 dark:text-zinc-100">
+                    {formatName(user)}
+                  </span>
+                  {user.address && (
+                    <p className="text-xs text-zinc-500">
+                      {user.address.city}, {user.address.street}
+                    </p>
+                  )}
+                </div>
                 <Button
                   className="w-full sm:w-auto"
                   color="brand-green"

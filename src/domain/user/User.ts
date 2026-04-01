@@ -1,5 +1,6 @@
 import { PhoneNumber } from './PhoneNumber';
 import { Nickname } from './Nickname';
+import { Address } from './Address';
 import { UserDomainCodes } from './UserDomainCodes';
 import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
@@ -30,6 +31,8 @@ export interface UserProps {
   nickname: Nickname;
   allowFindByName: boolean;
   allowFindByPhone: boolean;
+  allowFindByAddress: boolean;
+  address?: Address;
   privacySetupCompleted: boolean;
   confirmedAt?: Date;
 }
@@ -97,6 +100,8 @@ export class User {
       | 'nickname'
       | 'allowFindByName'
       | 'allowFindByPhone'
+      | 'allowFindByAddress'
+      | 'address'
       | 'privacySetupCompleted'
     > & {
       language?: Language;
@@ -172,6 +177,7 @@ export class User {
       consentGivenAt: props.consentGivenAt,
       allowFindByName: false,
       allowFindByPhone: false,
+      allowFindByAddress: false,
       privacySetupCompleted: false,
     });
   }
@@ -182,6 +188,8 @@ export class User {
       | 'nickname'
       | 'allowFindByName'
       | 'allowFindByPhone'
+      | 'allowFindByAddress'
+      | 'address'
       | 'privacySetupCompleted'
     > &
       Partial<
@@ -190,6 +198,8 @@ export class User {
           | 'nickname'
           | 'allowFindByName'
           | 'allowFindByPhone'
+          | 'allowFindByAddress'
+          | 'address'
           | 'privacySetupCompleted'
         >
       >
@@ -199,6 +209,8 @@ export class User {
       nickname: props.nickname || Nickname.generate(),
       allowFindByName: props.allowFindByName ?? false,
       allowFindByPhone: props.allowFindByPhone ?? false,
+      allowFindByAddress: props.allowFindByAddress ?? false,
+      address: props.address,
       privacySetupCompleted: props.privacySetupCompleted ?? false,
     });
   }
@@ -249,6 +261,14 @@ export class User {
 
   get allowFindByPhone(): boolean {
     return this.props.allowFindByPhone;
+  }
+
+  get allowFindByAddress(): boolean {
+    return this.props.allowFindByAddress;
+  }
+
+  get address(): Address | undefined {
+    return this.props.address;
   }
 
   get privacySetupCompleted(): boolean {
@@ -320,12 +340,15 @@ export class User {
   updatePrivacySettings(settings: {
     allowFindByName?: boolean;
     allowFindByPhone?: boolean;
+    allowFindByAddress?: boolean;
   }): User {
     return new User({
       ...this.props,
       allowFindByName: settings.allowFindByName ?? this.props.allowFindByName,
       allowFindByPhone:
         settings.allowFindByPhone ?? this.props.allowFindByPhone,
+      allowFindByAddress:
+        settings.allowFindByAddress ?? this.props.allowFindByAddress,
     });
   }
 
@@ -333,6 +356,13 @@ export class User {
     return new User({
       ...this.props,
       nickname,
+    });
+  }
+
+  updateAddress(address: Address | undefined): User {
+    return new User({
+      ...this.props,
+      address,
     });
   }
 
