@@ -31,6 +31,7 @@ describe('CompletePrivacySetupUseCase', () => {
       isNicknameAvailable: vi.fn(),
       save: vi.fn(),
       updatePrivacySettings: vi.fn(),
+      deleteAddress: vi.fn(),
       exists: vi.fn(),
       searchUsers: vi.fn(),
       searchUserByPhone: vi.fn(),

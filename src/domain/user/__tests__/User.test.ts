@@ -10,6 +10,7 @@ import { Nickname } from '../Nickname';
 import { UserDomainCodes } from '../UserDomainCodes';
 import { SharedDomainCodes } from '../../shared/SharedDomainCodes';
 import { ProfanityChecker } from '../../shared/profanity/ProfanityChecker';
+import { Address } from '../Address';
 
 describe('User', () => {
   const validProps = {
@@ -411,6 +412,113 @@ describe('User', () => {
 
       const updated = user.completePrivacySetup();
       expect(updated.privacySetupCompleted).toBe(true);
+    });
+
+    it('should create user with default allowFindByAddress (false)', () => {
+      const user = User.create(validProps);
+      expect(user.allowFindByAddress).toBe(false);
+    });
+
+    it('should reconstitute user with allowFindByAddress', () => {
+      const user = User.reconstitute({
+        id: 'user-123',
+        firstName: 'John',
+        lastName: 'Doe',
+        phoneNumber: PhoneNumber.create('+79161234567'),
+        password: 'hashedpassword123',
+        language: 'en' as const,
+        createdAt: new Date('2024-01-01'),
+        allowFindByAddress: true,
+      });
+      expect(user.allowFindByAddress).toBe(true);
+    });
+
+    it('should update allowFindByAddress via updatePrivacySettings', () => {
+      const user = User.create(validProps);
+      const updated = user.updatePrivacySettings({
+        allowFindByAddress: true,
+      });
+      expect(updated.allowFindByAddress).toBe(true);
+      expect(updated.allowFindByName).toBe(false); // unchanged
+    });
+
+    it('should preserve allowFindByAddress when not provided', () => {
+      const user = User.reconstitute({
+        id: 'user-123',
+        firstName: 'John',
+        lastName: 'Doe',
+        phoneNumber: PhoneNumber.create('+79161234567'),
+        password: 'hashedpassword123',
+        language: 'en' as const,
+        createdAt: new Date('2024-01-01'),
+        allowFindByAddress: true,
+      });
+      const updated = user.updatePrivacySettings({ allowFindByName: true });
+      expect(updated.allowFindByAddress).toBe(true);
+    });
+  });
+
+  describe('address', () => {
+    it('should create user with no address', () => {
+      const user = User.create(validProps);
+      expect(user.address).toBeUndefined();
+    });
+
+    it('should reconstitute user with address', () => {
+      const address = Address.create({
+        country: 'Russia',
+        city: 'Moscow',
+        street: 'Tverskaya',
+        building: '12',
+      });
+      const user = User.reconstitute({
+        id: 'user-123',
+        firstName: 'John',
+        lastName: 'Doe',
+        phoneNumber: PhoneNumber.create('+79161234567'),
+        password: 'hashedpassword123',
+        language: 'en' as const,
+        createdAt: new Date('2024-01-01'),
+        address,
+      });
+      expect(user.address).toBeDefined();
+      expect(user.address!.city).toBe('Moscow');
+    });
+
+    it('should update address', () => {
+      const user = User.create(validProps);
+      const address = Address.create({
+        country: 'Russia',
+        city: 'Moscow',
+        street: 'Tverskaya',
+        building: '12',
+      });
+      const updated = user.updateAddress(address);
+      expect(updated.address).toBeDefined();
+      expect(updated.address!.street).toBe('Tverskaya');
+      // original unchanged
+      expect(user.address).toBeUndefined();
+    });
+
+    it('should clear address with undefined', () => {
+      const address = Address.create({
+        country: 'Russia',
+        city: 'Moscow',
+        street: 'Tverskaya',
+        building: '12',
+      });
+      const user = User.reconstitute({
+        id: 'user-123',
+        firstName: 'John',
+        lastName: 'Doe',
+        phoneNumber: PhoneNumber.create('+79161234567'),
+        password: 'hashedpassword123',
+        language: 'en' as const,
+        createdAt: new Date('2024-01-01'),
+        address,
+      });
+      const updated = user.updateAddress(undefined);
+      expect(updated.address).toBeUndefined();
     });
   });
 

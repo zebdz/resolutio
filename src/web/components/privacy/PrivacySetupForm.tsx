@@ -31,6 +31,7 @@ export function PrivacySetupForm({ nickname }: Props) {
     nickname,
     allowFindByName: false,
     allowFindByPhone: false,
+    allowFindByAddress: false,
   });
 
   async function handleSubmit(formData: FormData) {
@@ -41,6 +42,7 @@ export function PrivacySetupForm({ nickname }: Props) {
     formData.set('nickname', formValues.nickname);
     formData.set('allowFindByName', String(formValues.allowFindByName));
     formData.set('allowFindByPhone', String(formValues.allowFindByPhone));
+    formData.set('allowFindByAddress', String(formValues.allowFindByAddress));
 
     startTransition(async () => {
       const result = await completePrivacySetupAction(formData);
@@ -102,6 +104,22 @@ export function PrivacySetupForm({ nickname }: Props) {
             checked={formValues.allowFindByPhone}
             onChange={(checked) =>
               setFormValues((prev) => ({ ...prev, allowFindByPhone: checked }))
+            }
+            disabled={isPending}
+          />
+        </SwitchField>
+
+        <SwitchField>
+          <Label>{t('allowFindByAddressLabel')}</Label>
+          <Description>{t('allowFindByAddressDescription')}</Description>
+          <Switch
+            color="brand-green"
+            checked={formValues.allowFindByAddress}
+            onChange={(checked) =>
+              setFormValues((prev) => ({
+                ...prev,
+                allowFindByAddress: checked,
+              }))
             }
             disabled={isPending}
           />

@@ -2,6 +2,7 @@ import type { UserRepository } from '@/domain/user/UserRepository';
 import { User, type Language } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
 import { Nickname } from '@/domain/user/Nickname';
+import { Address } from '@/domain/user/Address';
 import type { PrismaClient } from '@/generated/prisma/client';
 
 const USER_SELECT = {
@@ -17,8 +18,21 @@ const USER_SELECT = {
   nickname: true,
   allowFindByName: true,
   allowFindByPhone: true,
+  allowFindByAddress: true,
   privacySetupCompleted: true,
   confirmedAt: true,
+  address: {
+    select: {
+      id: true,
+      country: true,
+      region: true,
+      city: true,
+      street: true,
+      building: true,
+      apartment: true,
+      postalCode: true,
+    },
+  },
 } as const;
 
 export class PrismaUserRepository implements UserRepository {
@@ -98,6 +112,21 @@ export class PrismaUserRepository implements UserRepository {
         allowFindByPhone: user.allowFindByPhone,
         privacySetupCompleted: user.privacySetupCompleted,
         confirmedAt: user.confirmedAt,
+        ...(user.address
+          ? {
+              address: {
+                create: {
+                  country: user.address.country,
+                  region: user.address.region,
+                  city: user.address.city,
+                  street: user.address.street,
+                  building: user.address.building,
+                  apartment: user.address.apartment,
+                  postalCode: user.address.postalCode,
+                },
+              },
+            }
+          : {}),
       },
       update: {
         firstName: user.firstName,
@@ -107,6 +136,32 @@ export class PrismaUserRepository implements UserRepository {
         password: user.password,
         language: user.language,
         nickname: user.nickname.getValue(),
+        ...(user.address
+          ? {
+              address: {
+                upsert: {
+                  create: {
+                    country: user.address.country,
+                    region: user.address.region,
+                    city: user.address.city,
+                    street: user.address.street,
+                    building: user.address.building,
+                    apartment: user.address.apartment,
+                    postalCode: user.address.postalCode,
+                  },
+                  update: {
+                    country: user.address.country,
+                    region: user.address.region,
+                    city: user.address.city,
+                    street: user.address.street,
+                    building: user.address.building,
+                    apartment: user.address.apartment,
+                    postalCode: user.address.postalCode,
+                  },
+                },
+              },
+            }
+          : {}),
       },
       select: USER_SELECT,
     });
@@ -122,6 +177,7 @@ export class PrismaUserRepository implements UserRepository {
         data: {
           allowFindByName: user.allowFindByName,
           allowFindByPhone: user.allowFindByPhone,
+          allowFindByAddress: user.allowFindByAddress,
           privacySetupCompleted: user.privacySetupCompleted,
           nickname: user.nickname.getValue(),
         },
@@ -131,6 +187,7 @@ export class PrismaUserRepository implements UserRepository {
           userId: user.id,
           allowFindByName: user.allowFindByName,
           allowFindByPhone: user.allowFindByPhone,
+          allowFindByAddress: user.allowFindByAddress,
         },
       }),
     ]);
@@ -144,9 +201,13 @@ export class PrismaUserRepository implements UserRepository {
     return count > 0;
   }
 
+  async deleteAddress(userId: string): Promise<void> {
+    await this.prisma.address.deleteMany({ where: { userId } });
+  }
+
   async searchUsers(
     query: string,
-    options?: { respectPrivacy?: boolean }
+    options?: { respectPrivacy?: boolean; city?: string; street?: string }
   ): Promise<User[]> {
     const respectPrivacy = options?.respectPrivacy ?? false;
 
@@ -164,14 +225,31 @@ export class PrismaUserRepository implements UserRepository {
 
     let where;
 
+    // Address-based search conditions (respects allowFindByAddress when privacy is on)
+    const addressConditions = [
+      {
+        address: {
+          city: { contains: query, mode: 'insensitive' as const },
+        },
+      },
+      {
+        address: {
+          street: { contains: query, mode: 'insensitive' as const },
+        },
+      },
+    ];
+
     if (respectPrivacy) {
-      // Users findable by name (opted in) OR by nickname (always)
+      // Users findable by name (opted in) OR by nickname (always) OR by address (opted in)
       where = {
         OR: [
           {
             AND: [{ allowFindByName: true }, { OR: nameConditions }],
           },
           nicknameCondition,
+          {
+            AND: [{ allowFindByAddress: true }, { OR: addressConditions }],
+          },
         ],
       };
     } else {
@@ -298,8 +376,19 @@ export class PrismaUserRepository implements UserRepository {
     nickname: string;
     allowFindByName: boolean;
     allowFindByPhone: boolean;
+    allowFindByAddress: boolean;
     privacySetupCompleted: boolean;
     confirmedAt: Date | null;
+    address: {
+      id: string;
+      country: string;
+      region: string | null;
+      city: string;
+      street: string;
+      building: string;
+      apartment: string | null;
+      postalCode: string | null;
+    } | null;
   }): User {
     // PhoneNumber.create throws if invalid, which is correct here
     // because database should always have valid phone numbers
@@ -318,8 +407,20 @@ export class PrismaUserRepository implements UserRepository {
       nickname: Nickname.create(user.nickname),
       allowFindByName: user.allowFindByName,
       allowFindByPhone: user.allowFindByPhone,
+      allowFindByAddress: user.allowFindByAddress,
       privacySetupCompleted: user.privacySetupCompleted,
       confirmedAt: user.confirmedAt ?? undefined,
+      address: user.address
+        ? Address.create({
+            country: user.address.country,
+            region: user.address.region ?? undefined,
+            city: user.address.city,
+            street: user.address.street,
+            building: user.address.building,
+            apartment: user.address.apartment ?? undefined,
+            postalCode: user.address.postalCode ?? undefined,
+          })
+        : undefined,
     });
   }
 
