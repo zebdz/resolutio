@@ -138,6 +138,8 @@ export function OrganizationsList({
   }, [search]);
 
   // Sync search to URL for shareability (doesn't trigger refetch — above effect handles that)
+  // Uses window.history.replaceState to avoid triggering Next.js server navigation
+  // which would re-render the server component and remount this client component (losing input focus).
   useEffect(() => {
     if (search === initialSearch) {
       return;
@@ -151,11 +153,12 @@ export function OrganizationsList({
       }
 
       const qs = params.toString();
-      router.replace(qs ? `${pathname}?${qs}` : pathname);
+      const url = qs ? `${pathname}?${qs}` : pathname;
+      window.history.replaceState(null, '', url);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [search, initialSearch, pathname, router]);
+  }, [search, initialSearch, pathname]);
 
   // Load next page
   const loadMore = useCallback(() => {

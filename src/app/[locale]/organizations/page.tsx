@@ -44,7 +44,6 @@ export default async function OrganizationsPage({
 
         {/* Organizations List */}
         <OrganizationsList
-          key={params.search ?? ''}
           initialOrganizations={organizations}
           initialTotalCount={totalCount}
           userId={user.id}
