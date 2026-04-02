@@ -52,7 +52,6 @@ export default async function SuperadminOrganizationsPage({
       </div>
 
       <SuperadminOrganizationsList
-        key={params.search ?? ''}
         initialOrganizations={organizations}
         initialTotalCount={totalCount}
         userId={user.id}
