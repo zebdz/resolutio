@@ -236,6 +236,12 @@ class MockBoardRepository implements BoardRepository {
     return board;
   }
 
+  async findActiveBoardsByUserId(
+    _userId: string
+  ): Promise<Array<{ id: string; name: string; organizationId: string }>> {
+    return [];
+  }
+
   // Helper methods for testing
   addBoardMember(userId: string, boardId: string): void {
     if (!this.boardMembers.has(boardId)) {

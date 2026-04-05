@@ -155,6 +155,30 @@ export class PrismaBoardRepository implements BoardRepository {
     });
   }
 
+  async findActiveBoardsByUserId(
+    userId: string
+  ): Promise<Array<{ id: string; name: string; organizationId: string }>> {
+    const boards = await this.prisma.board.findMany({
+      where: {
+        archivedAt: null,
+        members: {
+          some: {
+            userId,
+            removedAt: null,
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        organizationId: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return boards;
+  }
+
   async update(board: Board): Promise<Board> {
     const data = board.toJSON();
 
