@@ -5,4 +5,5 @@ export const BoardErrors = {
   ALREADY_MEMBER: 'board.errors.alreadyMember',
   BOARD_ARCHIVED: 'board.errors.boardArchived',
   NOT_MEMBER: 'board.errors.notMember',
+  LEAVE_FAILED: 'board.errors.leaveFailed',
 } as const;

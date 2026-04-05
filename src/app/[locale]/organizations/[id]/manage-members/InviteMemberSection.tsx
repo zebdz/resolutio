@@ -8,7 +8,7 @@ import { Field, Label } from '@/src/web/components/catalyst/fieldset';
 import { Input } from '@/src/web/components/catalyst/input';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { createOrgMemberInviteAction } from '@/src/web/actions/invitation/invitation';
-import { searchUsersForOrgAdminAction } from '@/src/web/actions/organization/organization';
+import { searchUsersForMemberInviteAction } from '@/src/web/actions/organization/organization';
 import { searchUserByPhoneAction } from '@/src/web/actions/user/user';
 import { User } from '@/domain/user/User';
 import { PhoneInput } from '@/src/web/components/shared/phone';
@@ -55,10 +55,9 @@ export function InviteMemberSection({
       setNameSearching(true);
 
       try {
-        const result = await searchUsersForOrgAdminAction(
+        const result = await searchUsersForMemberInviteAction(
           organizationId,
-          query,
-          'non-members'
+          query
         );
 
         if (result.success) {
