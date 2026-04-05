@@ -5,6 +5,7 @@ import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { CreateBoardUseCase } from '@/application/board/CreateBoardUseCase';
 import { ArchiveBoardUseCase } from '@/application/board/ArchiveBoardUseCase';
 import { RemoveBoardMemberUseCase } from '@/application/board/RemoveBoardMemberUseCase';
+import { LeaveBoardUseCase } from '@/application/board/LeaveBoardUseCase';
 import { createBoardSchema } from '@/application/board/CreateBoardSchema';
 import { ArchiveBoardSchema } from '@/application/board/ArchiveBoardSchema';
 import { RemoveBoardMemberSchema } from '@/application/board/RemoveBoardMemberSchema';
@@ -47,6 +48,13 @@ const archiveBoardUseCase = new ArchiveBoardUseCase({
 });
 
 const removeBoardMemberUseCase = new RemoveBoardMemberUseCase({
+  boardRepository,
+  organizationRepository,
+  userRepository,
+  notificationRepository,
+});
+
+const leaveBoardUseCase = new LeaveBoardUseCase({
   boardRepository,
   organizationRepository,
   userRepository,
@@ -652,6 +660,129 @@ export async function getBoardsByOrganizationAction(
     };
   } catch (error) {
     console.error('Error getting boards by organization:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+export async function leaveBoardAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const boardId = formData.get('boardId') as string;
+
+    if (!boardId) {
+      return { success: false, error: t('validationFailed') };
+    }
+
+    const result = await leaveBoardUseCase.execute({
+      userId: user.id,
+      boardId,
+    });
+
+    if (!result.success) {
+      return { success: false, error: await translateErrorCode(result.error) };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error leaving board:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+export async function getUserBoardsForHomeAction(): Promise<
+  ActionResult<{
+    boardsByOrgId: Record<string, Array<{ id: string; name: string }>>;
+    externalBoards: Array<{
+      id: string;
+      name: string;
+      organizationId: string;
+      organizationName: string;
+    }>;
+  }>
+> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const boards = await boardRepository.findActiveBoardsByUserId(user.id);
+
+    const boardsByOrgId: Record<
+      string,
+      Array<{ id: string; name: string }>
+    > = {};
+    const externalBoardCandidates: Array<{
+      id: string;
+      name: string;
+      organizationId: string;
+    }> = [];
+
+    for (const board of boards) {
+      const isMember = await organizationRepository.isUserMember(
+        user.id,
+        board.organizationId
+      );
+
+      if (isMember) {
+        if (!boardsByOrgId[board.organizationId]) {
+          boardsByOrgId[board.organizationId] = [];
+        }
+
+        boardsByOrgId[board.organizationId].push({
+          id: board.id,
+          name: board.name,
+        });
+      } else {
+        externalBoardCandidates.push(board);
+      }
+    }
+
+    const externalBoards = await Promise.all(
+      externalBoardCandidates.map(async (board) => {
+        const org = await organizationRepository.findById(board.organizationId);
+
+        return {
+          id: board.id,
+          name: board.name,
+          organizationId: board.organizationId,
+          organizationName: org?.name ?? '',
+        };
+      })
+    );
+
+    return {
+      success: true,
+      data: { boardsByOrgId, externalBoards },
+    };
+  } catch (error) {
+    console.error('Error getting user boards for home:', error);
 
     return { success: false, error: t('generic') };
   }

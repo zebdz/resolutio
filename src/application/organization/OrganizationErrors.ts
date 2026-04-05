@@ -46,6 +46,7 @@ export const OrganizationErrors = {
   MULTI_MEMBERSHIP_CONFLICTS_EXIST:
     'organization.errors.multiMembershipConflictsExist',
   NOT_ROOT_ORG: 'organization.errors.notRootOrg',
+  NOT_MEMBER: 'organization.errors.notMember',
 } as const;
 
 export type OrganizationError =

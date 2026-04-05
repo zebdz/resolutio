@@ -46,4 +46,12 @@ export interface BoardRepository {
    * Updates an existing board
    */
   update(board: Board): Promise<Board>;
+
+  /**
+   * Finds all active boards where user is a member (removedAt IS NULL),
+   * returns board id, name, and organizationId.
+   */
+  findActiveBoardsByUserId(
+    userId: string
+  ): Promise<Array<{ id: string; name: string; organizationId: string }>>;
 }

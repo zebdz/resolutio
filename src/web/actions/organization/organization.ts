@@ -24,6 +24,7 @@ import { CancelJoinRequestSchema } from '@/application/organization/CancelJoinRe
 import { UpdateOrganizationUseCase } from '@/application/organization/UpdateOrganizationUseCase';
 import { updateOrganizationSchema } from '@/application/organization/UpdateOrganizationSchema';
 import { RemoveOrgAdminUseCase } from '@/application/organization/RemoveOrgAdminUseCase';
+import { LeaveOrganizationUseCase } from '@/application/organization/LeaveOrganizationUseCase';
 import { GetOrgAdminsPaginatedUseCase } from '@/application/organization/GetOrgAdminsPaginatedUseCase';
 import {
   prisma,
@@ -136,6 +137,13 @@ const removeOrgAdminUseCase = new RemoveOrgAdminUseCase({
 
 const searchOrganizationsUseCase = new SearchOrganizationsUseCase({
   organizationRepository,
+});
+
+const leaveOrganizationUseCase = new LeaveOrganizationUseCase({
+  boardRepository,
+  organizationRepository,
+  userRepository,
+  notificationRepository,
 });
 
 export async function createOrganizationAction(
@@ -1478,21 +1486,23 @@ export async function searchOrganizationsForJoinParentAction(
   }
 }
 
-export async function searchUsersForOrgAdminAction(
+type UserSearchResult = Array<{
+  id: string;
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  nickname: string;
+  address?: { city: string; street: string };
+}>;
+
+async function searchOrgUsers(
   organizationId: string,
   query: string,
-  scope: 'members' | 'non-members'
-): Promise<
-  ActionResult<
-    Array<{
-      id: string;
-      firstName: string;
-      lastName: string;
-      middleName?: string;
-      nickname: string;
-    }>
-  >
-> {
+  opts: {
+    scope: 'members' | 'non-members';
+    excludeAdmins?: boolean;
+  }
+): Promise<ActionResult<UserSearchResult>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -1524,15 +1534,19 @@ export async function searchUsersForOrgAdminAction(
     }
 
     // Search users: members are visible to each other, non-members respect privacy
-    const respectPrivacy = scope === 'non-members';
+    const respectPrivacy = opts.scope === 'non-members';
     const users = await userRepository.searchUsers(query.trim(), {
       respectPrivacy,
     });
 
-    // Get current admin IDs to exclude
-    const adminIds =
-      await organizationRepository.findAdminUserIds(organizationId);
-    const adminIdSet = new Set(adminIds);
+    // Optionally exclude existing admins (used when inviting new admins)
+    let adminIdSet = new Set<string>();
+
+    if (opts.excludeAdmins) {
+      const adminIds =
+        await organizationRepository.findAdminUserIds(organizationId);
+      adminIdSet = new Set(adminIds);
+    }
 
     // Get org member IDs
     const orgMembers = await prisma.organizationUser.findMany({
@@ -1545,9 +1559,9 @@ export async function searchUsersForOrgAdminAction(
     const memberIdSet = new Set(orgMembers.map((m) => m.userId));
 
     const filteredUsers = users
-      .filter((u) => !adminIdSet.has(u.id)) // exclude existing admins
+      .filter((u) => !adminIdSet.has(u.id))
       .filter((u) => {
-        if (scope === 'members') {
+        if (opts.scope === 'members') {
           return memberIdSet.has(u.id);
         }
 
@@ -1567,10 +1581,28 @@ export async function searchUsersForOrgAdminAction(
 
     return { success: true, data: filteredUsers };
   } catch (error) {
-    console.error('Error searching users for org admin:', error);
+    console.error('Error searching users:', error);
 
     return { success: false, error: t('generic') };
   }
+}
+
+export async function searchUsersForMemberInviteAction(
+  organizationId: string,
+  query: string
+): Promise<ActionResult<UserSearchResult>> {
+  return searchOrgUsers(organizationId, query, { scope: 'non-members' });
+}
+
+export async function searchUsersForAdminInviteAction(
+  organizationId: string,
+  query: string,
+  scope: 'members' | 'non-members'
+): Promise<ActionResult<UserSearchResult>> {
+  return searchOrgUsers(organizationId, query, {
+    scope,
+    excludeAdmins: true,
+  });
 }
 
 export async function getRootMultiMembershipInfoAction(
@@ -1665,6 +1697,53 @@ export async function searchOrganizationsForFilterAction(input: {
     return { success: true, data: orgs };
   } catch (error) {
     console.error('Error searching organizations for filter:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+export async function leaveOrganizationAction(
+  formData: FormData
+): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const organizationId = formData.get('organizationId') as string;
+    const boardIdsJson = formData.get('boardIdsToLeave') as string;
+
+    if (!organizationId) {
+      return { success: false, error: t('validationFailed') };
+    }
+
+    const boardIdsToLeave: string[] = boardIdsJson
+      ? JSON.parse(boardIdsJson)
+      : [];
+
+    const result = await leaveOrganizationUseCase.execute({
+      userId: user.id,
+      organizationId,
+      boardIdsToLeave,
+    });
+
+    if (!result.success) {
+      return { success: false, error: await translateErrorCode(result.error) };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error leaving organization:', error);
 
     return { success: false, error: t('generic') };
   }

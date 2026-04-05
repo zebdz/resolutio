@@ -140,7 +140,19 @@
       "cancelSuccess": "Join request cancelled",
       "reRequest": "Request again",
       "reRequesting": "Requesting..."
-    }
+    },
+    "myBoards": "My Boards",
+    "externalBoards": "External Boards",
+    "leaveOrganization": "Leave organization",
+    "leaveBoard": "Leave",
+    "leaveOrgConfirmTitle": "Leave Organization",
+    "leaveOrgConfirmDescription": "Are you sure you want to leave {orgName}?",
+    "leaveOrgBoardsPrompt": "You are a member of these boards. Select which to also leave:",
+    "leaveBoardConfirmTitle": "Leave Board",
+    "leaveBoardConfirmDescription": "Are you sure you want to leave the board \"{boardName}\"?",
+    "leaving": "Leaving...",
+    "leaveSuccess": "Successfully left",
+    "noBoards": "No boards"
   },
   "account": {
     "title": "Account Settings",
@@ -230,7 +242,8 @@
       "userNotFound": "User not found",
       "multiMembershipConflict": "Cannot merge organizations: some users are members of both trees and at least one tree does not allow multi-membership",
       "multiMembershipConflictsExist": "Cannot disable multi-membership: some users are members of multiple organizations in this tree. Remove duplicate memberships first.",
-      "notRootOrg": "This setting can only be modified on the root organization"
+      "notRootOrg": "This setting can only be modified on the root organization",
+      "notMember": "You are not a member of this organization"
     },
     "create": {
       "title": "Create Organization",
@@ -558,7 +571,8 @@
       "userNotOrgMember": "User is not a member of the organization",
       "alreadyMember": "User is already a member of this board",
       "boardArchived": "Cannot modify an archived board",
-      "notMember": "User is not a member of this board"
+      "notMember": "User is not a member of this board",
+      "leaveFailed": "Failed to leave the board"
     }
   },
   "poll": {
@@ -929,6 +943,14 @@
       "orgNameChanged": {
         "title": "Organization renamed",
         "body": "Organization \"{oldName}\" has been renamed to \"{newName}\""
+      },
+      "memberLeftBoard": {
+        "title": "Member left board",
+        "body": "{memberName} left the board \"{boardName}\" in {organizationName}"
+      },
+      "memberLeftOrganization": {
+        "title": "Member left organization",
+        "body": "{memberName} left the organization {organizationName}"
       }
     },
     "page": {
