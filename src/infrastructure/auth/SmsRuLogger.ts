@@ -21,6 +21,7 @@ export interface SmsRuErrorLogEntry {
   retryAttempt: number;
   testMode: boolean;
   clientIp: string;
+  rawResponse?: unknown;
 }
 
 export interface SmsRuCostExceededLogEntry {
@@ -32,6 +33,7 @@ export interface SmsRuCostExceededLogEntry {
   testMode: boolean;
   clientIp: string;
   error: string;
+  rawResponse?: unknown;
 }
 
 export interface SmsRuUndeliverableLogEntry {
@@ -41,6 +43,7 @@ export interface SmsRuUndeliverableLogEntry {
   statusText: string;
   testMode: boolean;
   clientIp: string;
+  rawResponse?: unknown;
 }
 
 export class SmsRuLogger {

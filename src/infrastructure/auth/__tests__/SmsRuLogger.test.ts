@@ -181,6 +181,91 @@ describe('SmsRuLogger', () => {
     expect(errorEntry.maxCost).toBe(2.5);
   });
 
+  it('should include rawResponse in error log when provided', async () => {
+    const rawResponse = {
+      status: 'ERROR',
+      status_code: 201,
+      status_text: 'Insufficient balance',
+    };
+
+    await logger.logError({
+      phone: '79255070602',
+      locale: 'ru',
+      statusCode: 201,
+      error: 'Insufficient balance',
+      retryAttempt: 0,
+      testMode: false,
+      clientIp: '10.0.0.1',
+      rawResponse,
+    });
+
+    const errorLog = await fs.readFile(
+      path.join(testLogsDir, 'sms-ru.error.log'),
+      'utf-8'
+    );
+    const entry = JSON.parse(errorLog.trim());
+    expect(entry.rawResponse).toEqual(rawResponse);
+  });
+
+  it('should include rawResponse in cost exceeded log when provided', async () => {
+    const rawResponse = {
+      status: 'OK',
+      status_code: 100,
+      sms: { '44712345678': { status: 'OK', status_code: 100, cost: '8.5' } },
+      total_cost: 8.5,
+    };
+
+    await logger.logCostExceeded({
+      phone: '44712345678',
+      locale: 'en',
+      statusCode: 100,
+      cost: 8.5,
+      maxCost: 2.5,
+      testMode: false,
+      clientIp: '10.0.0.1',
+      error: 'SMS cost 8.5 exceeds max allowed 2.5',
+      rawResponse,
+    });
+
+    const errorLog = await fs.readFile(
+      path.join(testLogsDir, 'sms-ru.error.log'),
+      'utf-8'
+    );
+    const entry = JSON.parse(errorLog.trim());
+    expect(entry.rawResponse).toEqual(rawResponse);
+  });
+
+  it('should include rawResponse in undeliverable log when provided', async () => {
+    const rawResponse = {
+      status: 'OK',
+      status_code: 100,
+      sms: {
+        '44712345678': {
+          status: 'ERROR',
+          status_code: 207,
+          status_text: 'No delivery route',
+        },
+      },
+    };
+
+    await logger.logUndeliverable({
+      phone: '44712345678',
+      locale: 'en',
+      statusCode: 207,
+      statusText: 'No delivery route',
+      testMode: false,
+      clientIp: '10.0.0.1',
+      rawResponse,
+    });
+
+    const errorLog = await fs.readFile(
+      path.join(testLogsDir, 'sms-ru.error.log'),
+      'utf-8'
+    );
+    const entry = JSON.parse(errorLog.trim());
+    expect(entry.rawResponse).toEqual(rawResponse);
+  });
+
   it('should write undeliverable entry to both log files', async () => {
     await logger.logUndeliverable({
       phone: '44712345678',

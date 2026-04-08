@@ -150,6 +150,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
               testMode: this.testMode,
               clientIp,
               error: `SMS cost ${error.cost} exceeds max allowed ${error.maxCost}`,
+              rawResponse: error.rawResponse,
             });
           } else if (error._tag === 'SmsRuUndeliverableError') {
             this.logger.logUndeliverable({
@@ -159,6 +160,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
               statusText: error.statusText,
               testMode: this.testMode,
               clientIp,
+              rawResponse: error.rawResponse,
             });
           } else {
             const statusCode =
@@ -171,6 +173,8 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
                       ? error.cause.message
                       : error.cause
                   );
+            const rawResponse =
+              error._tag === 'SmsRuApiError' ? error.rawResponse : undefined;
             this.logger.logError({
               phone: recipient,
               locale,
@@ -179,6 +183,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
               retryAttempt: 0,
               testMode: this.testMode,
               clientIp,
+              rawResponse,
             });
           }
 
@@ -227,6 +232,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
           new SmsRuApiError({
             statusCode: data.status_code,
             message: data.status_text ?? `SMS.ru error: ${data.status_code}`,
+            rawResponse: data,
           })
         );
       }
@@ -241,6 +247,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
             phone: recipient,
             statusCode: smsEntry.status_code,
             statusText: smsEntry.status_text ?? 'Undeliverable',
+            rawResponse: data,
           })
         );
       }
@@ -301,6 +308,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
               statusText: error.statusText,
               testMode,
               clientIp,
+              rawResponse: error.rawResponse,
             });
 
             return Effect.succeed({ success: false });
@@ -316,6 +324,8 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
                     ? error.cause.message
                     : error.cause
                 );
+          const rawResponse =
+            error._tag === 'SmsRuApiError' ? error.rawResponse : undefined;
           logger.logError({
             phone: recipient,
             locale,
@@ -324,6 +334,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
             retryAttempt: 0,
             testMode,
             clientIp,
+            rawResponse,
           });
 
           return Effect.succeed({ success: false });
@@ -372,6 +383,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
             statusCode: data.status_code,
             message:
               data.status_text ?? `SMS.ru cost error: ${data.status_code}`,
+            rawResponse: data,
           })
         );
       }
@@ -385,6 +397,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
             phone: recipient,
             statusCode: smsEntry.status_code,
             statusText: smsEntry.status_text ?? 'Undeliverable',
+            rawResponse: data,
           })
         );
       }
@@ -400,6 +413,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
             statusCode: smsEntry?.status_code ?? data.status_code,
             cost,
             maxCost,
+            rawResponse: data,
           })
         );
       }
