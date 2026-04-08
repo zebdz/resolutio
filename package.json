@@ -32,6 +32,9 @@
     "db:org:add-join-requests": "npx tsx prisma/org-add-join-requests.ts"
   },
   "dependencies": {
+    "@ai-sdk/deepseek": "^2.0.27",
+    "@ai-sdk/google": "^3.0.58",
+    "@ai-sdk/react": "^3.0.148",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -47,6 +50,7 @@
     "@zxcvbn-ts/core": "^3.0.4",
     "@zxcvbn-ts/language-common": "^3.0.4",
     "adm-zip": "^0.5.16",
+    "ai": "^6.0.146",
     "archiver": "^7.0.1",
     "arctic": "^3.7.0",
     "clsx": "^2.1.1",
