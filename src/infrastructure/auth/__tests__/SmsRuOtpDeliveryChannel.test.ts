@@ -93,6 +93,22 @@ function smsRuCostUndeliverable(phone: string) {
   };
 }
 
+// sms.ru send response where top-level is OK but per-number failed
+function smsRuSendPerNumberError(phone: string) {
+  return {
+    status: 'OK',
+    status_code: 100,
+    sms: {
+      [phone]: {
+        status: 'ERROR',
+        status_code: 207,
+        status_text: 'No delivery route for this number',
+      },
+    },
+    balance: 4122.56,
+  };
+}
+
 // Helper: mock two sequential fetch calls (cost check then send)
 function mockCostThenSend(costBody: object, sendBody: object) {
   return vi
@@ -423,6 +439,7 @@ describe('SmsRuOtpDeliveryChannel', () => {
           balance: 4122.56,
           cost: 1.77,
           testMode: false,
+          message: 'SMS sent successfully',
         })
       );
     });
@@ -444,6 +461,31 @@ describe('SmsRuOtpDeliveryChannel', () => {
           clientIp: TEST_IP,
           statusCode: 201,
           error: 'Insufficient balance',
+        })
+      );
+    });
+
+    it('should fail and log undeliverable when send returns per-number ERROR with top-level 100', async () => {
+      const phone = '44712345678';
+      const mockFetch = mockCostThenSend(
+        smsRuCostSuccess(phone, 1.77),
+        smsRuSendPerNumberError(phone)
+      );
+      globalThis.fetch = mockFetch;
+
+      const result = await channel.send(phone, '123456', 'en', TEST_IP);
+
+      expect(result.success).toBe(false);
+
+      const loggerInstance = vi.mocked(SmsRuLogger).mock.instances[0];
+      expect(loggerInstance.logUndeliverable).toHaveBeenCalledWith(
+        expect.objectContaining({
+          phone,
+          locale: 'en',
+          clientIp: TEST_IP,
+          statusCode: 207,
+          statusText: 'No delivery route for this number',
+          testMode: false,
         })
       );
     });
@@ -547,9 +589,11 @@ describe('SmsRuOtpDeliveryChannel', () => {
           phone,
           locale: 'en',
           clientIp: TEST_IP,
+          statusCode: 100,
           cost: 8.5,
           maxCost: 2.5,
           testMode: false,
+          error: 'SMS cost 8.5 exceeds max allowed 2.5',
         })
       );
     });

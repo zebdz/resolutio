@@ -1256,6 +1256,7 @@
       "key": "Ключ",
       "limiter": "Ограничитель",
       "timesBlocked": "Раз заблок.",
+      "limitInfo": "(лимит: {max}/{window})",
       "firstEvent": "Первый",
       "lastEvent": "Последний",
       "noEvents": "Подозрительная активность не зафиксирована",

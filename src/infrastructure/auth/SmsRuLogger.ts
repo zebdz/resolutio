@@ -10,6 +10,7 @@ export interface SmsRuSuccessLogEntry {
   cost: number;
   testMode: boolean;
   clientIp: string;
+  message: string;
 }
 
 export interface SmsRuErrorLogEntry {
@@ -25,10 +26,12 @@ export interface SmsRuErrorLogEntry {
 export interface SmsRuCostExceededLogEntry {
   phone: string;
   locale: string;
+  statusCode: number;
   cost: number;
   maxCost: number;
   testMode: boolean;
   clientIp: string;
+  error: string;
 }
 
 export interface SmsRuUndeliverableLogEntry {

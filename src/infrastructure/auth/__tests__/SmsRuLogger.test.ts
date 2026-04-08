@@ -25,6 +25,7 @@ describe('SmsRuLogger', () => {
       cost: 1.77,
       testMode: false,
       clientIp: '10.0.0.1',
+      message: 'SMS sent successfully',
     });
 
     const exists = await fs
@@ -44,6 +45,7 @@ describe('SmsRuLogger', () => {
       cost: 1.77,
       testMode: false,
       clientIp: '10.0.0.1',
+      message: 'SMS sent successfully',
     });
 
     const content = await fs.readFile(
@@ -100,6 +102,7 @@ describe('SmsRuLogger', () => {
       cost: 1.77,
       testMode: true,
       clientIp: '10.0.0.1',
+      message: 'SMS sent successfully',
     });
 
     const content = await fs.readFile(
@@ -123,6 +126,7 @@ describe('SmsRuLogger', () => {
       cost: 1.77,
       testMode: false,
       clientIp: '10.0.0.1',
+      message: 'SMS sent successfully',
     });
     await logger.logSuccess({
       phone: '79255070602',
@@ -133,6 +137,7 @@ describe('SmsRuLogger', () => {
       cost: 1.5,
       testMode: false,
       clientIp: '10.0.0.1',
+      message: 'SMS sent successfully',
     });
 
     const content = await fs.readFile(
@@ -149,10 +154,12 @@ describe('SmsRuLogger', () => {
     await logger.logCostExceeded({
       phone: '44712345678',
       locale: 'en',
+      statusCode: 100,
       cost: 8.5,
       maxCost: 2.5,
       testMode: false,
       clientIp: '10.0.0.1',
+      error: 'SMS cost 8.5 exceeds max allowed 2.5',
     });
 
     const mainLog = await fs.readFile(
