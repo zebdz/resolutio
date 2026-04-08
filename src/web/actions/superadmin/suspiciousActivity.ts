@@ -8,6 +8,7 @@ import { isError } from '@/src/web/actions/superadmin/superadminAuthUtils';
 import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChecker';
 import { SharedDomainCodes } from '@/domain/shared/SharedDomainCodes';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
+import { getLimiterByLabel } from '@/infrastructure/rateLimit/registry';
 
 const profanityChecker = LeoProfanityChecker.getInstance();
 const userRepository = new PrismaUserRepository(prisma);
@@ -21,6 +22,8 @@ export interface SuspiciousKeySummary {
   userId: string | null;
   limiterLabel: string;
   totalEvents: number;
+  maxRequests: number | null;
+  windowMs: number | null;
   firstEventAt: Date;
   lastEventAt: Date;
   resolvedUser?: {
@@ -221,11 +224,14 @@ export async function getSuspiciousActivitySummaryAction(input: {
   // Build summaries
   const items: SuspiciousKeySummary[] = await Promise.all(
     groupedEvents.map(async (event) => {
+      const limiterEntry = getLimiterByLabel(event.limiterLabel);
       const summary: SuspiciousKeySummary = {
         key: event.key,
         userId: event.userId,
         limiterLabel: event.limiterLabel,
         totalEvents: event._count.id,
+        maxRequests: limiterEntry?.maxRequests ?? null,
+        windowMs: limiterEntry?.windowMs ?? null,
         firstEventAt: event._min.createdAt!,
         lastEventAt: event._max.createdAt!,
       };

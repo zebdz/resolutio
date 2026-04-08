@@ -27,6 +27,8 @@ export interface SerializedSuspiciousKeySummary {
   userId: string | null;
   limiterLabel: string;
   totalEvents: number;
+  maxRequests: number | null;
+  windowMs: number | null;
   firstEventAt: string;
   lastEventAt: string;
   resolvedUser?: {
@@ -63,6 +65,27 @@ function formatDateTime(date: Date): string {
   return new Date(date).toLocaleString();
 }
 
+function formatWindow(
+  windowMs: number,
+  t: ReturnType<typeof useTranslations>
+): string {
+  const seconds = Math.round(windowMs / 1000);
+
+  if (seconds < 60) {
+    return t('windowSeconds', { count: seconds });
+  }
+
+  const minutes = Math.round(seconds / 60);
+
+  if (minutes < 60) {
+    return t('windowMinutes', { count: minutes });
+  }
+
+  const hours = Math.round(minutes / 60);
+
+  return t('windowHours', { count: hours });
+}
+
 interface SuspiciousActivityFilters {
   search: string;
   dateFrom: string;
@@ -86,6 +109,7 @@ export function SuspiciousActivityPanel({
 }: SuspiciousActivityPanelProps) {
   const t = useTranslations('superadmin.suspiciousActivity');
   const tLabels = useTranslations('superadmin.rateLimits.labels');
+  const tRateLimits = useTranslations('superadmin.rateLimits');
   const tPagination = useTranslations('common.pagination');
   const router = useRouter();
   const pathname = usePathname();
@@ -488,8 +512,16 @@ export function SuspiciousActivityPanel({
               <span className="break-words text-xs text-zinc-500">
                 {tLabels(item.limiterLabel)}
               </span>
-              <span className="font-mono text-sm font-medium">
-                {item.totalEvents}
+              <span className="font-mono text-sm">
+                <span className="font-medium">{item.totalEvents}</span>
+                {item.maxRequests !== null && item.windowMs !== null && (
+                  <span className="ml-1 text-xs text-zinc-500">
+                    {t('limitInfo', {
+                      max: item.maxRequests,
+                      window: formatWindow(item.windowMs, tRateLimits),
+                    })}
+                  </span>
+                )}
               </span>
               <span className="text-xs text-zinc-500">
                 {formatDate(item.firstEventAt)}
