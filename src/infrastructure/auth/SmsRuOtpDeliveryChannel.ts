@@ -61,7 +61,7 @@ interface SmsRuCostResponse {
     {
       status: string;
       status_code: number;
-      cost?: string;
+      cost?: string | number;
       status_text?: string;
     }
   >;
@@ -402,8 +402,12 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
         );
       }
 
-      // If cost is missing, assume the worst to avoid silent overspend
-      const cost = smsEntry?.cost ? parseFloat(smsEntry.cost) : Infinity;
+      // If cost is missing or invalid, assume the worst to avoid silent overspend.
+      // Parse defensively: sms.ru may return cost as string or number (observed
+      // numeric 0 for free SMS in prod). A truthy check would misclassify
+      // numeric 0 as "missing" and block legitimate free SMS.
+      const parsedCost = parseFloat(String(smsEntry?.cost ?? ''));
+      const cost = Number.isFinite(parsedCost) ? parsedCost : Infinity;
 
       // Check cost against maxCost
       if (maxCost !== undefined && cost > maxCost) {
