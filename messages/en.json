@@ -1256,6 +1256,7 @@
       "key": "Key",
       "limiter": "Limiter",
       "timesBlocked": "Times Blocked",
+      "limitInfo": "(limit: {max}/{window})",
       "firstEvent": "First",
       "lastEvent": "Last",
       "noEvents": "No suspicious activity recorded",

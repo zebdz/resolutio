@@ -42,7 +42,12 @@ interface SmsRuResponse {
   status_text?: string;
   sms?: Record<
     string,
-    { status: string; status_code: number; sms_id?: string }
+    {
+      status: string;
+      status_code: number;
+      sms_id?: string;
+      status_text?: string;
+    }
   >;
   balance?: number;
 }
@@ -139,10 +144,12 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
             this.logger.logCostExceeded({
               phone: error.phone,
               locale,
+              statusCode: error.statusCode,
               cost: error.cost,
               maxCost: error.maxCost,
               testMode: this.testMode,
               clientIp,
+              error: `SMS cost ${error.cost} exceeds max allowed ${error.maxCost}`,
             });
           } else if (error._tag === 'SmsRuUndeliverableError') {
             this.logger.logUndeliverable({
@@ -191,47 +198,64 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
     code: string,
     costResult: CostCheckResult,
     clientIp: string
-  ): Effect.Effect<
-    OtpDeliveryResult,
-    SmsRuApiError | SmsRuNetworkError,
-    HttpClient.HttpClient
-  > {
-    return pipe(
-      HttpClient.HttpClient,
-      Effect.flatMap((client) => {
-        const request = pipe(
-          HttpClientRequest.post(SMS_RU_API_URL),
-          HttpClientRequest.bodyUrlParams(params)
-        );
+  ): Effect.Effect<OtpDeliveryResult, never, HttpClient.HttpClient> {
+    const logger = this.logger;
+    const testMode = this.testMode;
 
-        return client.execute(request);
-      }),
-      Effect.scoped,
-      Effect.flatMap((response) => response.json),
-      Effect.mapError(
-        (error) =>
-          new SmsRuNetworkError({
-            cause: error,
-          })
-      ),
-      Effect.flatMap((json) => {
-        const data = json as SmsRuResponse;
+    const attempt = Effect.gen(function* () {
+      const client = yield* HttpClient.HttpClient;
+      const request = pipe(
+        HttpClientRequest.post(SMS_RU_API_URL),
+        HttpClientRequest.bodyUrlParams(params)
+      );
 
-        if (data.status_code === 100) {
-          return Effect.succeed(data);
-        }
+      const response = yield* pipe(
+        client.execute(request),
+        Effect.scoped,
+        Effect.mapError((error) => new SmsRuNetworkError({ cause: error }))
+      );
 
-        return Effect.fail(
+      const json = yield* pipe(
+        response.json,
+        Effect.mapError((error) => new SmsRuNetworkError({ cause: error }))
+      );
+
+      const data = json as SmsRuResponse;
+
+      if (data.status_code !== 100) {
+        return yield* Effect.fail(
           new SmsRuApiError({
             statusCode: data.status_code,
             message: data.status_text ?? `SMS.ru error: ${data.status_code}`,
           })
         );
-      }),
+      }
+
+      // Top-level OK, but check per-number status — sms.ru can return
+      // top-level 100 with a per-number ERROR (e.g. undeliverable number).
+      const smsEntry = data.sms?.[recipient];
+
+      if (smsEntry && smsEntry.status === 'ERROR') {
+        return yield* Effect.fail(
+          new SmsRuUndeliverableError({
+            phone: recipient,
+            statusCode: smsEntry.status_code,
+            statusText: smsEntry.status_text ?? 'Undeliverable',
+          })
+        );
+      }
+
+      return data;
+    });
+
+    const retried = pipe(
+      attempt,
       Effect.retry({
         times: 2,
         schedule: Schedule.exponential('500 millis'),
-        while: (error) => {
+        while: (
+          error: SmsRuNetworkError | SmsRuApiError | SmsRuUndeliverableError
+        ) => {
           if (error._tag === 'SmsRuNetworkError') {
             return true;
           }
@@ -242,28 +266,46 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
 
           return false;
         },
-      }),
+      })
+    );
+
+    return pipe(
+      retried,
       Effect.map((data: SmsRuResponse): OtpDeliveryResult => {
         const smsEntry = data.sms?.[recipient];
-        this.logger.logSuccess({
+        logger.logSuccess({
           phone: recipient,
           locale,
-          statusCode: data.status_code,
+          statusCode: smsEntry?.status_code ?? data.status_code,
           smsId: smsEntry?.sms_id ?? '',
           balance: data.balance ?? 0,
           cost: costResult.cost,
-          testMode: this.testMode,
+          testMode,
           clientIp,
+          message: 'SMS sent successfully',
         });
 
-        return this.testMode
+        return testMode
           ? { success: true, backdoorCode: code }
           : { success: true };
       }),
       Effect.catchAll(
         (
-          error: SmsRuApiError | SmsRuNetworkError
+          error: SmsRuApiError | SmsRuNetworkError | SmsRuUndeliverableError
         ): Effect.Effect<OtpDeliveryResult> => {
+          if (error._tag === 'SmsRuUndeliverableError') {
+            logger.logUndeliverable({
+              phone: error.phone,
+              locale,
+              statusCode: error.statusCode,
+              statusText: error.statusText,
+              testMode,
+              clientIp,
+            });
+
+            return Effect.succeed({ success: false });
+          }
+
           const statusCode =
             error._tag === 'SmsRuApiError' ? error.statusCode : 0;
           const errorMessage =
@@ -274,13 +316,13 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
                     ? error.cause.message
                     : error.cause
                 );
-          this.logger.logError({
+          logger.logError({
             phone: recipient,
             locale,
             statusCode,
             error: errorMessage,
             retryAttempt: 0,
-            testMode: this.testMode,
+            testMode,
             clientIp,
           });
 
@@ -355,6 +397,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
         return yield* Effect.fail(
           new SmsRuCostExceededError({
             phone: recipient,
+            statusCode: smsEntry?.status_code ?? data.status_code,
             cost,
             maxCost,
           })
