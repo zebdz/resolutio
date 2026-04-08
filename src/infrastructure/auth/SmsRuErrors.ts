@@ -13,6 +13,7 @@ export class SmsRuCostExceededError extends Data.TaggedError(
   'SmsRuCostExceededError'
 )<{
   readonly phone: string;
+  readonly statusCode: number;
   readonly cost: number;
   readonly maxCost: number;
 }> {}
