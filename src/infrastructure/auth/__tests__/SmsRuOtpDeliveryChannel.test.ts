@@ -650,6 +650,53 @@ describe('SmsRuOtpDeliveryChannel', () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
+    it('should proceed with send when cost is zero (free SMS)', async () => {
+      const phone = '79255070602';
+      // sms.ru returns cost as numeric 0 for free SMS (observed in prod logs).
+      // A truthy check on cost would misclassify 0 as "missing" and block
+      // legitimate free SMS.
+      const zeroCostResponse = {
+        status: 'OK',
+        status_code: 100,
+        sms: {
+          [phone]: { status: 'OK', status_code: 100, cost: 0, sms: 1 },
+        },
+        total_cost: 0,
+        total_sms: 1,
+      };
+      const mockFetch = mockCostThenSend(zeroCostResponse, smsRuSuccess(phone));
+      globalThis.fetch = mockFetch;
+
+      const result = await guardedChannel.send(phone, '123456', 'ru', TEST_IP);
+
+      expect(result.success).toBe(true);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should block send when cost is non-numeric garbage', async () => {
+      const phone = '79255070602';
+      // Defensive: parseFloat('abc') → NaN. A truthy check would let NaN
+      // slip past the maxCost guard (NaN > maxCost is false). Treat as
+      // unknown and block to avoid silent overspend.
+      const garbageCostResponse = {
+        status: 'OK',
+        status_code: 100,
+        sms: {
+          [phone]: { status: 'OK', status_code: 100, cost: 'abc', sms: 1 },
+        },
+        total_cost: 0,
+        total_sms: 1,
+      };
+      const mockFetch = mockFetchResponse(garbageCostResponse);
+      globalThis.fetch = mockFetch;
+
+      const result = await guardedChannel.send(phone, '123456', 'ru', TEST_IP);
+
+      expect(result.success).toBe(false);
+      // Only cost check, no send
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
     it('should still call cost API and log cost when maxCost is not set', async () => {
       const phone = '79255070602';
       const mockFetch = mockCostThenSend(
