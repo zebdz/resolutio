@@ -186,13 +186,13 @@ All server actions in `src/web/actions/joinToken.ts` must include `checkRateLimi
 
 ## Auth Redirect: `returnTo` Cookie
 
-**Problem:** Current auth flow has hardcoded redirects (login -> /home, register -> /confirm-phone -> /privacy-setup -> /home). Need to redirect to `/join/[token]` after auth.
+**Problem:** Current auth flow has hardcoded redirects (login -> /home, register -> /confirm-phone -> /privacy-setup -> /home). Need to redirect to `/join/[orgSlug]/[token]` after auth.
 
 **Solution:** Cookie-based `returnTo` mechanism.
 
 ### How it works:
 
-1. `/join/[token]` page sets `returnTo` cookie server-side on render (value = `/join/[token]` without locale prefix)
+1. `/join/[orgSlug]/[token]` page sets `returnTo` cookie server-side on render (value = `/join/[orgSlug]/[token]` without locale prefix)
 2. Cookie config: `httpOnly: false`, `sameSite: lax`, `maxAge: 600` (10 min), `path: /`
 3. Not httpOnly so client components can read it
 
@@ -226,13 +226,46 @@ Intermediate auth steps (confirm-phone -> privacy-setup) remain unchanged — th
 
 ---
 
+## URL Structure
+
+**Shareable URL:** `/join/[orgSlug]/[token]` — org slug is human-readable context for senders/receivers; the token alone is the source of truth.
+
+**Slug derivation** (on the fly, never persisted): `src/web/lib/orgSlug.ts`
+
+```typescript
+export function slugifyOrgName(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/[^\p{L}\p{N}]+/gu, '-') // non-letter/digit (incl. Cyrillic) -> dash
+      .replace(/^-+|-+$/g, '') // trim leading/trailing dashes
+      .slice(0, 60) || 'org'
+  ); // cap length, fallback if empty
+}
+```
+
+Cyrillic is preserved (not transliterated) — modern browsers and Telegram/WhatsApp/VK display Cyrillic URLs natively, and Russian is the default app language.
+
+**Server behavior:** The `orgSlug` segment is **ignored** for validation. `GetJoinTokenPublicInfoUseCase` looks up by `token` only. Consequences:
+
+- Org renames don't break existing links
+- Page renders with the _current_ org name from DB (not the possibly-stale slug)
+- No redirect needed on slug mismatch — the URL stays as-is cosmetically
+
+**Link builder:** `src/web/lib/buildJoinUrl.ts` — `buildJoinUrl(orgName, token): string` returns `/join/{slugifyOrgName(orgName)}/{token}`. Used everywhere a shareable URL is constructed (admin "Copy link" button, future share flows, etc.).
+
+**Migration note:** The previously-planned `/join/[token]` route is replaced by `/join/[orgSlug]/[token]`. Clean cutover — no redirect from the old path, as the feature has not shipped to prod.
+
+---
+
 ## Frontend
 
-### `/join/[token]` Page (PUBLIC)
+### `/join/[orgSlug]/[token]` Page (PUBLIC)
 
-**Route:** `src/app/[locale]/join/[token]/page.tsx`
+**Route:** `src/app/[locale]/join/[orgSlug]/[token]/page.tsx`
 
-Server component. Sets returnTo cookie. Calls `GetJoinTokenPublicInfoUseCase`.
+Server component. Sets returnTo cookie. Calls `GetJoinTokenPublicInfoUseCase` (using `token` only — `orgSlug` is ignored).
 
 **2 states:**
 | State | Behavior |
@@ -245,6 +278,86 @@ Server component. Sets returnTo cookie. Calls `GetJoinTokenPublicInfoUseCase`.
 - Token not found / expired / exhausted -> appropriate message
 - Org archived -> "This organization is no longer active"
 - Already a member / pending request / pending invite / pending hierarchy request -> shown after auth, on confirm action
+
+### Link Preview (Open Graph)
+
+Messengers (Telegram, WhatsApp, VK, Signal, etc.) fetch the page and render a card from its metadata. Two pieces:
+
+**1. `generateMetadata` in `page.tsx`:**
+
+```typescript
+export async function generateMetadata({ params }): Promise<Metadata> {
+  const { token } = await params;
+  const result = await getJoinTokenPublicInfoUseCase.execute(token);
+  const t = await getTranslations('joinToken.preview');
+
+  if (!result.success) {
+    return { title: t('fallbackTitle') }; // "НОМОС"
+  }
+
+  const { organizationName, organizationDescription } = result.data;
+  const title = t('title', { orgName: organizationName }); // "Присоединиться к {orgName}"
+  const description = organizationDescription.slice(0, 200);
+
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: 'website' },
+    twitter: { card: 'summary_large_image', title, description },
+  };
+}
+```
+
+Next.js auto-associates the co-located `opengraph-image.tsx` with `openGraph.images` and `twitter.images`.
+
+**2. `opengraph-image.tsx`** co-located with `page.tsx`:
+
+```typescript
+import { ImageResponse } from 'next/og';
+
+export const runtime = 'edge';
+export const size = { width: 1200, height: 630 };
+export const contentType = 'image/png';
+
+export default async function OgImage({ params }) {
+  const { token } = await params;
+  const result = await getJoinTokenPublicInfoUseCase.execute(token);
+  const orgName = result.success ? result.data.organizationName : 'НОМОС';
+
+  return new ImageResponse(
+    (
+      <div style={{
+        width: '100%', height: '100%',
+        background: '#247063', // --color-brand-green
+        color: '#ffffff',
+        display: 'flex', flexDirection: 'column',
+        justifyContent: 'center', alignItems: 'center',
+        padding: 80,
+      }}>
+        {/* Inline SVG from public/images/logo-icon.svg, bundled at build time */}
+        <svg {/* ...logo markup... */} />
+        <div style={{ fontSize: 96, fontWeight: 800, textAlign: 'center', marginTop: 40 }}>
+          {orgName}
+        </div>
+        <div style={{ fontSize: 40, marginTop: 24, opacity: 0.9 }}>
+          Присоединиться к организации
+        </div>
+        <div style={{ fontSize: 28, marginTop: 60, opacity: 0.7 }}>
+          НОМОС
+        </div>
+      </div>
+    ),
+    { ...size }
+  );
+}
+```
+
+**Design choices:**
+
+- **Russian only.** Messenger bots send no useful `Accept-Language`; reliable locale detection is impossible for crawlers. The actual `/join` page is still fully localized for real visitors.
+- **Inline SVG logo.** Bundled at build time; no runtime fetch from edge runtime (simpler, faster, avoids fetch failures).
+- **Text-minimal image.** Only org name (hero) + CTA line + "НОМОС" brand mark. Org description does NOT appear on the image — it appears only in the OG `description` field below the card.
+- **Fallback.** On token error (not found / expired / exhausted), both `generateMetadata` and `opengraph-image` return a generic "НОМОС" card rather than failing. Error details are shown on the page body itself.
 
 ### Token Management Page (ADMIN)
 
@@ -261,7 +374,7 @@ Server component. Sets returnTo cookie. Calls `GetJoinTokenPublicInfoUseCase`.
 - Actions: Copy link, Expire/Reactivate, Edit max uses
 - Use `prefetch={false}` on all `<Link>` components in lists
 
-**Copy link:** `navigator.clipboard.writeText(url)` with toast notification.
+**Copy link:** build URL via `buildJoinUrl(orgName, token)` (see URL Structure), then `navigator.clipboard.writeText(url)` with toast notification.
 
 **Navigation:** Add "Manage Join Tokens" link to modify page's MembershipSection area.
 
@@ -274,23 +387,27 @@ New namespace `joinToken` in `messages/en.json` and `messages/ru.json`:
 - `joinToken.page.*` - public join page strings
 - `joinToken.errors.*` - error messages
 - `joinToken.manage.*` - admin management page strings
+- `joinToken.preview.*` - link preview (Open Graph) strings:
+  - `joinToken.preview.title` — parameterized, e.g. `"Присоединиться к {orgName}"`
+  - `joinToken.preview.fallbackTitle` — e.g. `"НОМОС"` (used when token is invalid)
+  - `joinToken.preview.cta` — e.g. `"Присоединиться к организации"` (used on the OG image)
 - `domain.joinToken.*` - domain validation codes
 
 ---
 
 ## Error Handling
 
-| Error                     | Where              | Code                                                |
-| ------------------------- | ------------------ | --------------------------------------------------- |
-| Token not found           | /join/[token] page | `joinToken.errors.notFound`                         |
-| Token expired             | /join/[token] page | `joinToken.errors.expired`                          |
-| Token exhausted           | /join/[token] page | `joinToken.errors.exhausted`                        |
-| Org archived              | /join/[token] page | Reuse `organization.errors.archived`                |
-| Already member            | Confirm action     | Reuse `organization.errors.alreadyMember`           |
-| Pending request           | Confirm action     | Reuse `organization.errors.pendingRequest`          |
-| Pending invite            | Confirm action     | Reuse `organization.errors.pendingInvite`           |
-| Pending hierarchy request | Confirm action     | Reuse `organization.errors.pendingHierarchyRequest` |
-| Not admin                 | Token management   | Reuse `organization.errors.notAdmin`                |
+| Error                     | Where                        | Code                                                |
+| ------------------------- | ---------------------------- | --------------------------------------------------- |
+| Token not found           | /join/[orgSlug]/[token] page | `joinToken.errors.notFound`                         |
+| Token expired             | /join/[orgSlug]/[token] page | `joinToken.errors.expired`                          |
+| Token exhausted           | /join/[orgSlug]/[token] page | `joinToken.errors.exhausted`                        |
+| Org archived              | /join/[orgSlug]/[token] page | Reuse `organization.errors.archived`                |
+| Already member            | Confirm action               | Reuse `organization.errors.alreadyMember`           |
+| Pending request           | Confirm action               | Reuse `organization.errors.pendingRequest`          |
+| Pending invite            | Confirm action               | Reuse `organization.errors.pendingInvite`           |
+| Pending hierarchy request | Confirm action               | Reuse `organization.errors.pendingHierarchyRequest` |
+| Not admin                 | Token management             | Reuse `organization.errors.notAdmin`                |
 
 ---
 
@@ -302,3 +419,8 @@ New namespace `joinToken` in `messages/en.json` and `messages/ru.json`:
 - Reactivation: Allowed (admins can un-expire tokens)
 - Re-request overwrite: joinTokenId overwritten with most recent token (intentional)
 - maxUses below useCount: Allowed, token becomes immediately exhausted
+- URL structure: `/join/[orgSlug]/[token]`, slug derived on the fly from org name, Cyrillic preserved (no transliteration), server ignores slug and validates by token only
+- No persistent slug column on Organization — slug is purely cosmetic, recomputed every time a URL is built
+- OG link preview: Russian only (messenger bots don't send reliable locale); title `"Присоединиться к {orgName}"`; description = org description truncated to 200 chars
+- OG image: brand-green (`#247063`) background, inline SVG logo, org name hero + static CTA line + "НОМОС" brand mark, no per-org icon upload feature
+- OG image on token error: generic "НОМОС" fallback card (error details shown on the page body, not the preview)

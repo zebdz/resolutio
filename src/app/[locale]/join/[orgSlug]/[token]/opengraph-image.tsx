@@ -1,0 +1,204 @@
+import { ImageResponse } from 'next/og';
+import { getTranslations } from 'next-intl/server';
+import {
+  prisma,
+  PrismaOrganizationRepository,
+  PrismaJoinTokenRepository,
+} from '@/infrastructure/index';
+import { GetJoinTokenPublicInfoUseCase } from '@/application/organization/GetJoinTokenPublicInfoUseCase';
+
+export const runtime = 'nodejs';
+export const size = { width: 1200, height: 630 };
+export const contentType = 'image/png';
+export const alt = 'NOMOS';
+
+export default async function OgImage({
+  params,
+}: {
+  params: Promise<{ orgSlug: string; token: string; locale: string }>;
+}) {
+  const { token } = await params;
+
+  const organizationRepository = new PrismaOrganizationRepository(prisma);
+  const joinTokenRepository = new PrismaJoinTokenRepository(prisma);
+  const getPublicInfoUseCase = new GetJoinTokenPublicInfoUseCase({
+    joinTokenRepository,
+    organizationRepository,
+    prisma,
+  });
+
+  const result = await getPublicInfoUseCase.execute(token);
+  const t = await getTranslations('joinToken.preview');
+
+  const brandMark = t('fallbackTitle');
+  const orgName = result.success ? result.value.organizationName : brandMark;
+  const showCta = result.success;
+
+  return new ImageResponse(
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        background: '#247063',
+        color: '#ffffff',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: '80px',
+        fontFamily: 'sans-serif',
+      }}
+    >
+      <div
+        style={{
+          width: '160px',
+          height: '160px',
+          borderRadius: '80px',
+          background: '#ffffff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: '40px',
+        }}
+      >
+        <svg
+          width="110"
+          height="116"
+          viewBox="0 0 57 60"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M33.0949 43.6603H26.0566C25.4946 43.6603 24.7793 43.5965 24.3066 43.1113C23.8468 42.639 23.8596 42.0517 23.8723 41.6559V40.5196C20.6534 38.3748 18.533 34.6468 18.533 31.0976C18.533 27.7399 20.0402 24.5992 22.6588 22.4927C25.2774 20.3861 28.7135 19.5946 32.073 20.335C35.2664 21.0372 38.0255 23.1693 39.4561 26.0419C42.228 31.6211 39.5583 37.6598 35.2919 40.5324V41.4899C35.3047 41.8602 35.3175 42.5368 34.7938 43.073C34.3978 43.456 33.8357 43.6603 33.0949 43.6603ZM25.7756 41.7325C25.8395 41.7325 25.9289 41.7453 26.0439 41.7453H33.0949C33.2226 41.7453 33.312 41.7325 33.3631 41.7197C33.3631 41.6814 33.3631 41.6304 33.3631 41.5921V39.9834C33.3631 39.6515 33.5419 39.3323 33.823 39.1663C37.604 36.881 40.1076 31.6594 37.7189 26.8717C36.5438 24.5098 34.27 22.7608 31.6387 22.1863C28.854 21.5734 26.0055 22.2246 23.834 23.9736C21.6625 25.7227 20.4235 28.3144 20.4235 31.0976C20.4235 34.6468 22.876 37.7109 25.303 39.1791C25.5968 39.3578 25.7628 39.6642 25.7628 39.9962V41.7197C25.7756 41.7197 25.7756 41.7197 25.7756 41.7325Z"
+            fill="#FFCB73"
+            stroke="black"
+            strokeWidth="0.2"
+          />
+          <path
+            d="M34.0274 47.4901C33.938 47.4901 33.8486 47.4774 33.7592 47.4518C31.0001 46.6603 28.1005 46.6603 25.3413 47.4518C24.8304 47.5923 24.3066 47.2986 24.1534 46.788C24.0001 46.2773 24.3066 45.7538 24.8176 45.6006C27.9089 44.7197 31.1917 44.7197 34.2829 45.6006C34.7939 45.7411 35.0877 46.2773 34.9471 46.788C34.8322 47.222 34.449 47.4901 34.0274 47.4901Z"
+            fill="#FFCB73"
+            stroke="black"
+            strokeWidth="0.2"
+          />
+          <path
+            d="M52.7475 30.4807L52.7474 30.4806C52.0428 24.0251 48.5784 18.215 43.2352 14.5177C42.3162 13.8774 42.0935 12.6253 42.7341 11.7066C43.3747 10.788 44.6276 10.5652 45.547 11.2056L45.547 11.2057C51.8656 15.6002 55.9421 22.4683 56.7866 30.0638C56.8977 31.1763 56.0918 32.1766 54.9812 32.2903C53.8709 32.2903 53.0072 31.5113 52.7475 30.4807Z"
+            fill="#2B4B46"
+            stroke="black"
+            strokeWidth="0.2"
+          />
+          <path
+            d="M15.2364 11.3212L15.237 11.3207C16.1263 10.6819 17.4083 10.9035 18.0491 11.794C18.6895 12.713 18.4662 13.9654 17.5756 14.6053C12.2918 18.3608 8.85664 24.1706 8.21063 30.5974C8.09902 31.6559 7.20719 32.4356 6.17647 32.4356C5.06617 32.3219 4.0603 31.3214 4.17154 30.2087C4.95776 22.613 8.97594 15.7449 15.2364 11.3212Z"
+            fill="#2B4B46"
+            stroke="black"
+            strokeWidth="0.2"
+          />
+          <path
+            d="M41.9427 56.7467L41.9412 56.7474C38.3597 58.4644 34.5164 59.3375 30.4979 59.3375C26.3044 59.3375 22.3157 58.4062 18.5889 56.5147L18.5889 56.5147L18.5863 56.5134C17.5878 56.0422 17.1953 54.8194 17.6978 53.815L17.6987 53.813C18.17 52.8155 19.3935 52.4221 20.3995 52.896C22.2494 53.835 24.2161 54.4803 26.2116 54.8616C28.9124 55.3898 31.6721 55.4191 34.3731 54.9496L34.3733 54.9496C36.3689 54.5976 38.3357 53.9816 40.1564 53.1012C41.1934 52.6255 42.4147 53.0211 42.8572 54.0436L42.857 54.0437L42.8595 54.0487C43.3617 55.0526 42.9699 56.275 41.9427 56.7467Z"
+            fill="#2B4B46"
+            stroke="black"
+            strokeWidth="0.2"
+          />
+          <path
+            d="M29.6178 9.87967C29.5601 9.87143 29.4859 9.87143 29.42 9.87967C27.9695 9.83025 26.8157 8.64411 26.8157 7.18613C26.8157 5.69522 28.0189 4.48438 29.5189 4.48438C31.0105 4.48438 32.222 5.69522 32.222 7.18613C32.2138 8.64411 31.0682 9.83025 29.6178 9.87967Z"
+            stroke="black"
+            strokeWidth="0.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M35.0739 15.3159C33.607 16.6586 31.662 17.474 29.5193 17.474C27.3765 17.474 25.4316 16.6586 23.9646 15.3159C24.047 14.5416 24.5415 13.7838 25.4233 13.1908C27.6815 11.6916 31.3736 11.6916 33.6152 13.1908C34.497 13.7838 34.9915 14.5416 35.0739 15.3159Z"
+            stroke="black"
+            strokeWidth="0.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M29.5189 17.4741C34.0705 17.4741 37.7603 13.7862 37.7603 9.23706C37.7603 4.68786 34.0705 1 29.5189 1C24.9674 1 21.2776 4.68786 21.2776 9.23706C21.2776 13.7862 24.9674 17.4741 29.5189 17.4741Z"
+            stroke="black"
+            strokeWidth="0.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M9.34017 43.8059C9.28248 43.7977 9.20831 43.7977 9.14238 43.8059C7.6919 43.7565 6.53809 42.5704 6.53809 41.1124C6.53809 39.6215 7.74135 38.4106 9.24128 38.4106C10.733 38.4106 11.9444 39.6215 11.9444 41.1124C11.9362 42.5704 10.7906 43.7565 9.34017 43.8059Z"
+            stroke="black"
+            strokeWidth="0.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M14.7961 49.2422C13.3291 50.5848 11.3842 51.4003 9.24143 51.4003C7.09869 51.4003 5.15373 50.5848 3.68677 49.2422C3.76918 48.4679 4.26366 47.7101 5.14549 47.117C7.40362 45.6179 11.0957 45.6179 13.3374 47.117C14.2192 47.7101 14.7137 48.4679 14.7961 49.2422Z"
+            stroke="black"
+            strokeWidth="0.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M9.24135 51.3999C13.7929 51.3999 17.4827 47.712 17.4827 43.1628C17.4827 38.6136 13.7929 34.9258 9.24135 34.9258C4.68978 34.9258 1 38.6136 1 43.1628C1 47.712 4.68978 51.3999 9.24135 51.3999Z"
+            stroke="black"
+            strokeWidth="0.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M48.8575 43.8059C48.7998 43.7977 48.7256 43.7977 48.6597 43.8059C47.2092 43.7565 46.0554 42.5704 46.0554 41.1124C46.0554 39.6215 47.2587 38.4106 48.7586 38.4106C50.2503 38.4106 51.4618 39.6215 51.4618 41.1124C51.4535 42.5704 50.308 43.7565 48.8575 43.8059Z"
+            stroke="black"
+            strokeWidth="0.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M54.3134 49.2422C52.8465 50.5848 50.9015 51.4003 48.7588 51.4003C46.616 51.4003 44.6711 50.5848 43.2041 49.2422C43.2865 48.4679 43.781 47.7101 44.6628 47.117C46.921 45.6179 50.6131 45.6179 52.8547 47.117C53.7365 47.7101 54.231 48.4679 54.3134 49.2422Z"
+            stroke="black"
+            strokeWidth="0.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M48.7587 51.3999C53.3102 51.3999 57 47.712 57 43.1628C57 38.6136 53.3102 34.9258 48.7587 34.9258C44.2071 34.9258 40.5173 38.6136 40.5173 43.1628C40.5173 47.712 44.2071 51.3999 48.7587 51.3999Z"
+            stroke="black"
+            strokeWidth="0.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+
+      <div
+        style={{
+          fontSize: '96px',
+          fontWeight: 800,
+          textAlign: 'center',
+          maxWidth: '1000px',
+          lineHeight: 1.1,
+        }}
+      >
+        {orgName}
+      </div>
+
+      {showCta && (
+        <div
+          style={{
+            fontSize: '40px',
+            marginTop: '32px',
+            opacity: 0.9,
+          }}
+        >
+          {t('cta')}
+        </div>
+      )}
+
+      <div
+        style={{
+          position: 'absolute',
+          bottom: '40px',
+          fontSize: '28px',
+          opacity: 0.7,
+        }}
+      >
+        {brandMark}
+      </div>
+    </div>,
+    { ...size }
+  );
+}

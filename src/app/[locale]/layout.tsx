@@ -13,6 +13,9 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:8080'
+  ),
   title: 'НОМОС',
   description: 'Unite in organizations, vote, and create legal decisions',
 };

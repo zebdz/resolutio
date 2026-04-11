@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { Heading } from '@/src/web/components/catalyst/heading';
@@ -11,13 +12,80 @@ import {
 } from '@/infrastructure/index';
 import { GetJoinTokenPublicInfoUseCase } from '@/application/organization/GetJoinTokenPublicInfoUseCase';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
+import { buildJoinUrl } from '@/web/lib/buildJoinUrl';
 import { JoinConfirmButton } from './JoinConfirmButton';
 import { SetReturnTo } from './SetReturnTo';
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ orgSlug: string; token: string; locale: string }>;
+}): Promise<Metadata> {
+  const { orgSlug, token, locale } = await params;
+
+  const organizationRepository = new PrismaOrganizationRepository(prisma);
+  const joinTokenRepository = new PrismaJoinTokenRepository(prisma);
+  const getPublicInfoUseCase = new GetJoinTokenPublicInfoUseCase({
+    joinTokenRepository,
+    organizationRepository,
+    prisma,
+  });
+
+  const result = await getPublicInfoUseCase.execute(token);
+  const t = await getTranslations('joinToken.preview');
+
+  const ogImageUrl = `/${locale}/join/${orgSlug}/${token}/opengraph-image`;
+  const ogImage = {
+    url: ogImageUrl,
+    width: 1200,
+    height: 630,
+    type: 'image/png',
+  };
+
+  if (!result.success) {
+    const fallbackTitle = t('fallbackTitle');
+
+    return {
+      title: fallbackTitle,
+      openGraph: {
+        title: fallbackTitle,
+        type: 'website',
+        images: [ogImage],
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: fallbackTitle,
+        images: [ogImage],
+      },
+    };
+  }
+
+  const { organizationName, organizationDescription } = result.value;
+  const title = t('title', { orgName: organizationName });
+  const description = (organizationDescription ?? '').slice(0, 200);
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: 'website',
+      images: [ogImage],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [ogImage],
+    },
+  };
+}
 
 export default async function JoinTokenPage({
   params,
 }: {
-  params: Promise<{ token: string; locale: string }>;
+  params: Promise<{ orgSlug: string; token: string; locale: string }>;
 }) {
   const { token } = await params;
 
@@ -92,7 +160,9 @@ export default async function JoinTokenPage({
               <JoinConfirmButton token={token} />
             ) : (
               <div className="flex flex-col gap-3">
-                <SetReturnTo path={'/join/' + token} />
+                <SetReturnTo
+                  path={buildJoinUrl(data.organizationName, token)}
+                />
                 <Link href="/login" prefetch={false}>
                   <Button color="brand-green" className="w-full">
                     {t('loginToJoin')}
