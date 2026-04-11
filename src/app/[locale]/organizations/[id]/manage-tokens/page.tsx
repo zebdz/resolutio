@@ -60,6 +60,9 @@ export default async function ManageTokensPage({
 
         <ManageTokensClient
           organizationId={id}
+          organizationName={
+            orgResult.success ? orgResult.data.organization.name : ''
+          }
           initialTokens={tokensResult.success ? tokensResult.data.tokens : []}
           initialTotalCount={
             tokensResult.success ? tokensResult.data.totalCount : 0
