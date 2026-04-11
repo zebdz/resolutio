@@ -842,6 +842,44 @@
       }
     }
   },
+  "legalCheck": {
+    "checkLegality": "Check Legality",
+    "analyzing": "Analyzing...",
+    "selectModel": "AI Model",
+    "severity": {
+      "warning": "Warning",
+      "danger": "Danger"
+    },
+    "risk": {
+      "low": "Low Risk",
+      "medium": "Medium Risk",
+      "high": "High Risk"
+    },
+    "summary": {
+      "title": "Legal Analysis Summary",
+      "issues": "{count, plural, =0 {No issues found} one {# issue found} other {# issues found}}",
+      "recommendation": "Recommendation",
+      "noIssues": "No legal issues found.",
+      "checkedAt": "Checked {date}",
+      "checkedWith": "Model: {model}"
+    },
+    "annotation": {
+      "legalBasis": "Legal basis",
+      "showDetails": "Show details",
+      "hideDetails": "Hide details"
+    },
+    "errors": {
+      "notAdmin": "You must be an organization admin to check poll legality.",
+      "pollNotFound": "Poll not found.",
+      "pollNotInOrg": "Poll does not belong to your organization.",
+      "pollNotReady": "This poll is not ready for a legality check — all questions must have valid answers.",
+      "orgTooSmall": "Your organization does not meet the minimum size required for AI legality checks.",
+      "rateLimitExceeded": "You have reached the maximum number of legality checks per hour. Please try again later.",
+      "tokenCapExceeded": "You have reached your daily AI usage limit. Please try again tomorrow.",
+      "providerError": "AI provider error. Please try again.",
+      "invalidModel": "Selected AI model is not available."
+    }
+  },
   "notification": {
     "errors": {
       "notFound": "Notification not found",
@@ -1180,7 +1218,26 @@
       "monitorLink": "Rate Limit Monitor",
       "monitorDescription": "Live monitoring of rate limit entries",
       "logsLink": "Server Logs",
-      "logsDescription": "View, follow, download and archive server log files"
+      "logsDescription": "View, follow, download and archive server log files",
+      "settingsLink": "System Settings",
+      "settingsDescription": "Configure AI legal-check limits and other system-wide settings"
+    },
+    "settings": {
+      "title": "System Settings",
+      "subtitle": "Configure system-wide limits and thresholds.",
+      "save": "Save",
+      "saving": "Saving...",
+      "saved": "Saved",
+      "loadError": "Failed to load settings.",
+      "legalCheck": {
+        "title": "Legal Check (AI)",
+        "maxPerHour": "Max checks per admin per hour",
+        "maxPerHourDescription": "Maximum number of AI legality checks each admin can run per hour.",
+        "dailyTokenCap": "Daily token cap per admin",
+        "dailyTokenCapDescription": "Maximum combined input+output tokens an admin can consume per calendar day. Set to 0 to disable.",
+        "minOrgSize": "Minimum organization size",
+        "minOrgSizeDescription": "Organizations with fewer members (tree-wide) cannot run AI legality checks. Set to 0 to disable."
+      }
     },
     "organizations": {
       "title": "Manage Organizations",
