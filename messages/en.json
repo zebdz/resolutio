@@ -1615,6 +1615,11 @@
         "actions": "Actions",
         "unlimited": "Unlimited"
       }
+    },
+    "preview": {
+      "title": "Join {orgName}",
+      "fallbackTitle": "NOMOS",
+      "cta": "Join this organization"
     }
   }
 }

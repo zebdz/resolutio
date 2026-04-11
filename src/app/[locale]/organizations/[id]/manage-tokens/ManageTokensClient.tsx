@@ -20,10 +20,12 @@ type TokenData = {
 
 export function ManageTokensClient({
   organizationId,
+  organizationName,
   initialTokens,
   initialTotalCount,
 }: {
   organizationId: string;
+  organizationName: string;
   initialTokens: TokenData[];
   initialTotalCount: number;
 }) {
@@ -41,6 +43,7 @@ export function ManageTokensClient({
       <TokenList
         ref={tokenListRef}
         organizationId={organizationId}
+        organizationName={organizationName}
         initialTokens={initialTokens}
         initialTotalCount={initialTotalCount}
       />

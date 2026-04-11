@@ -109,6 +109,7 @@ jobs:
         env:
           DATABASE_URL: ${{ inputs.branch == 'beta' && secrets.DATABASE_URL_BETA || secrets.DATABASE_URL }}
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
+          NEXT_PUBLIC_APP_URL: ${{ inputs.site_url }}
         run: yarn build
 
       - name: Create deployment package

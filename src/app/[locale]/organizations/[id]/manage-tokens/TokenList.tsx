@@ -21,6 +21,7 @@ import {
   reactivateJoinTokenAction,
   updateJoinTokenMaxUsesAction,
 } from '@/src/web/actions/organization/joinToken';
+import { buildJoinUrl } from '@/web/lib/buildJoinUrl';
 import { toast } from 'sonner';
 
 type TokenData = {
@@ -70,11 +71,12 @@ export const TokenList = forwardRef<
   TokenListHandle,
   {
     organizationId: string;
+    organizationName: string;
     initialTokens: TokenData[];
     initialTotalCount: number;
   }
 >(function TokenList(
-  { organizationId, initialTokens, initialTotalCount },
+  { organizationId, organizationName, initialTokens, initialTotalCount },
   ref
 ) {
   const t = useTranslations('joinToken.manage');
@@ -146,7 +148,8 @@ export const TokenList = forwardRef<
   };
 
   const handleCopyLink = (tokenValue: string) => {
-    const url = `${window.location.origin}/${locale}/join/${tokenValue}`;
+    const path = buildJoinUrl(organizationName, tokenValue);
+    const url = `${window.location.origin}/${locale}${path}`;
     navigator.clipboard.writeText(url);
     toast.success(t('copySuccess'));
   };
