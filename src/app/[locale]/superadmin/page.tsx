@@ -39,6 +39,11 @@ const hubLinks = [
     labelKey: 'logsLink' as const,
     descKey: 'logsDescription' as const,
   },
+  {
+    href: '/superadmin/settings' as const,
+    labelKey: 'settingsLink' as const,
+    descKey: 'settingsDescription' as const,
+  },
 ];
 
 export default async function SuperadminPage() {

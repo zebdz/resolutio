@@ -1,50 +1,26 @@
-import { streamText, Output } from 'ai';
-import type { z } from 'zod';
-import type {
-  AIProviderPort,
-  StreamAnalysisResult,
-} from '@/domain/ai/AIProviderPort';
+import type { LanguageModel } from 'ai';
+import { AVAILABLE_MODEL_KEYS } from '@/application/ai/modelRegistry';
 import { getDeepSeekModel } from './providers/deepseek';
 import { getGoogleModel } from './providers/google';
 
-type ModelFactory = () => ReturnType<typeof getDeepSeekModel>;
+type ModelFactory = () => LanguageModel;
 
 const MODEL_REGISTRY: Record<string, ModelFactory> = {
   deepseek: getDeepSeekModel,
   google: getGoogleModel,
 };
 
-export const AVAILABLE_MODELS = Object.keys(MODEL_REGISTRY);
+// Re-exported so callers (e.g. route handlers) only import from one place.
+export const AVAILABLE_MODELS = AVAILABLE_MODEL_KEYS;
 
-export class AIProviderAdapter implements AIProviderPort {
-  streamAnalysis<T>(params: {
-    model: string;
-    schema: z.ZodType<T>;
-    system: string;
-    prompt: string;
-  }): StreamAnalysisResult<T> {
-    const modelFactory = MODEL_REGISTRY[params.model];
+export class AIProviderAdapter {
+  getModel(modelKey: string): LanguageModel {
+    const factory = MODEL_REGISTRY[modelKey];
 
-    if (!modelFactory) {
-      throw new Error(`Unknown model: ${params.model}`);
+    if (!factory) {
+      throw new Error(`Unknown model: ${modelKey}`);
     }
 
-    const result = streamText({
-      model: modelFactory(),
-      system: params.system,
-      prompt: params.prompt,
-      output: Output.object({ schema: params.schema }),
-    });
-
-    return {
-      partialOutputStream: result.partialOutputStream as AsyncIterable<
-        T | undefined
-      >,
-      output: result.output as PromiseLike<T>,
-      usage: result.usage.then((u) => ({
-        promptTokens: u.inputTokens ?? 0,
-        completionTokens: u.outputTokens ?? 0,
-      })),
-    };
+    return factory();
   }
 }

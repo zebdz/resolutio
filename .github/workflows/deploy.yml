@@ -122,6 +122,8 @@ jobs:
           SMS_RU_API_ID: ${{ secrets.SMS_RU_API_ID }}
           SMS_RU_TEST_MODE: ${{ inputs.branch == 'beta' && 'true' || 'false' }}
           SMS_RU_MAX_COST_RUBLES: ${{ vars.SMS_RU_MAX_COST_RUBLES || '' }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GOOGLE_GENERATIVE_AI_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_KEY }}
           PORT: ${{ inputs.port }}
         run: |
           # Create .env file for deployment
@@ -133,6 +135,8 @@ jobs:
           echo "SMS_RU_API_ID=$SMS_RU_API_ID" >> .env
           echo "SMS_RU_TEST_MODE=$SMS_RU_TEST_MODE" >> .env
           echo "SMS_RU_MAX_COST_RUBLES=$SMS_RU_MAX_COST_RUBLES" >> .env
+          echo "DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY" >> .env
+          echo "GOOGLE_GENERATIVE_AI_KEY=$GOOGLE_GENERATIVE_AI_KEY" >> .env
           echo "PORT=$PORT" >> .env
 
           tar -czf deploy.tar.gz \
