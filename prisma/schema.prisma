@@ -20,6 +20,14 @@ enum PollState {
   FINISHED
 }
 
+enum OverallRisk {
+  low
+  medium
+  high
+
+  @@map("overall_risk_enum")
+}
+
 // Authentication Models
 model User {
   id          String   @id @default(cuid())
@@ -67,6 +75,8 @@ model User {
   invitationsReceived        Invitation[] @relation("InvitationInvitee")
   joinTokensCreated          OrganizationJoinToken[] @relation("JoinTokenCreator")
   address            Address?
+  legalChecks        PollLegalCheck[]    @relation("LegalChecks")
+  legalCheckLogs     PollLegalCheckLog[] @relation("LegalCheckLogs")
 
   @@map("users")
 }
@@ -259,8 +269,10 @@ model Poll {
   board        Board?                          @relation(fields: [boardId], references: [id], onDelete: Cascade)
   creator      User                           @relation(fields: [createdBy], references: [id])
   questions    Question[]
-  participants PollParticipant[]
-  voteDrafts   VoteDraft[]
+  participants   PollParticipant[]
+  voteDrafts     VoteDraft[]
+  legalCheck     PollLegalCheck?
+  legalCheckLogs PollLegalCheckLog[]
 
   @@index([organizationId])
   @@index([boardId])
@@ -538,5 +550,50 @@ model Invitation {
   @@index([boardId, status])
   @@index([inviteeId, status])
   @@map("invitations")
+}
+
+// AI Legal Check Models
+model PollLegalCheck {
+  id          String      @id @default(cuid())
+  pollId      String      @unique @map("poll_id")
+  model       String
+  annotations Json
+  summary     Json
+  overallRisk OverallRisk @map("overall_risk")
+  totalIssues Int         @map("total_issues")
+  checkedBy   String      @map("checked_by")
+  checkedAt   DateTime    @default(now()) @map("checked_at")
+
+  poll Poll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  user User @relation("LegalChecks", fields: [checkedBy], references: [id], onDelete: Cascade)
+
+  @@index([pollId])
+  @@index([checkedBy])
+  @@map("poll_legal_checks")
+}
+
+model PollLegalCheckLog {
+  id          String   @id @default(cuid())
+  pollId      String   @map("poll_id")
+  checkedBy   String   @map("checked_by")
+  checkedAt   DateTime @default(now()) @map("checked_at")
+  inputTokens  Int     @default(0) @map("input_tokens")
+  outputTokens Int     @default(0) @map("output_tokens")
+
+  poll Poll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  user User @relation("LegalCheckLogs", fields: [checkedBy], references: [id], onDelete: Cascade)
+
+  @@index([checkedBy, checkedAt])
+  @@index([pollId])
+  @@map("poll_legal_check_logs")
+}
+
+// System Settings
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("system_settings")
 }
 

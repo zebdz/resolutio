@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   DndContext,
@@ -22,7 +22,6 @@ import {
   CheckCircleIcon,
   ClipboardDocumentCheckIcon,
 } from '@heroicons/react/24/outline';
-import { Input } from '@/src/web/components/catalyst/input';
 import { Textarea } from '@/src/web/components/catalyst/textarea';
 import { Select } from '@/src/web/components/catalyst/select';
 import { Button } from '@/src/web/components/catalyst/button';
@@ -68,6 +67,21 @@ export function QuestionForm({
   fieldErrors,
 }: QuestionFormProps) {
   const t = useTranslations('poll');
+
+  const questionTextRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-grow the question textarea to fit its content (triggered on text change
+  // and when switching between questions — questionId change remounts the value).
+  useLayoutEffect(() => {
+    const el = questionTextRef.current;
+
+    if (!el) {
+      return;
+    }
+
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [text, questionId]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -148,13 +162,17 @@ export function QuestionForm({
       {/* Question Text */}
       <Field>
         <Label>{t('questionText')}</Label>
-        <Input
+        <Textarea
+          ref={questionTextRef}
           value={text}
           invalid={!!fieldErrors?.text}
           onChange={(e) => onTextChange(e.target.value)}
           placeholder={t('questionText')}
           disabled={disabled}
           required
+          rows={1}
+          resizable={false}
+          style={{ overflow: 'hidden' }}
         />
         {fieldErrors?.text && (
           <p className="text-sm text-red-600">{fieldErrors.text[0]}</p>

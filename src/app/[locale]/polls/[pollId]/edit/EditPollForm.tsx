@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { experimental_useObject as useObject } from '@ai-sdk/react';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Field, Label } from '@/src/web/components/catalyst/fieldset';
@@ -21,12 +22,25 @@ import {
   updateAnswerAction,
   deleteAnswerAction,
 } from '@/src/web/actions/poll/poll';
+import { getLegalCheckAction } from '@/web/actions/ai/getLegalCheck';
+import { legalAnalysisResultSchema } from '@/application/ai/legalAnalysisSchema';
+import type {
+  LegalAnnotation as LegalAnnotationType,
+  LegalAnalysisSummary as LegalAnalysisSummaryType,
+} from '@/application/ai/legalAnalysisSchema';
 import { Link } from '@/src/i18n/routing';
 import { QuestionType } from '@/domain/poll/QuestionType';
 import { PollState } from '@/src/domain/poll/PollState';
 import { PollSidebar } from '@/src/web/components/polls/draft/PollSidebar';
 import { QuestionForm } from '@/src/web/components/polls/draft/QuestionForm';
 import PollControls from '@/src/web/components/polls/draft/PollControls';
+import { LegalCheckControls } from '@/src/web/components/polls/legal/LegalCheckControls';
+import { LegalAnnotation } from '@/src/web/components/polls/legal/LegalAnnotation';
+import { LegalAnalysisSummary } from '@/src/web/components/polls/legal/LegalAnalysisSummary';
+import {
+  completeAnnotationsFromPartial,
+  tryCompleteSummary,
+} from '@/src/web/components/polls/legal/partialHelpers';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { validateHeaderName } from 'http';
 
@@ -54,12 +68,29 @@ interface PollData {
   state: PollState;
 }
 
+// useObject surfaces non-2xx response bodies as Error.message. Our Route
+// Handler returns JSON like { error: "localized message" } — unwrap it here.
+function extractErrorMessage(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw);
+
+    if (parsed && typeof parsed.error === 'string') {
+      return parsed.error;
+    }
+  } catch {
+    // not JSON — fall through
+  }
+
+  return raw;
+}
+
 export function EditPollForm() {
   const router = useRouter();
   const params = useParams();
   const pollId = params.pollId as string;
   const t = useTranslations('poll');
   const tCommon = useTranslations('common');
+  const tLegal = useTranslations('legalCheck');
 
   const [pollData, setPollData] = useState<PollData>({
     title: '',
@@ -84,6 +115,67 @@ export function EditPollForm() {
   } | null>(null);
   const [canEdit, setCanEdit] = useState(false);
   const [canManage, setCanManage] = useState(false);
+
+  // Legal check: persisted result (loaded from DB on mount)
+  const [persistedAnnotations, setPersistedAnnotations] = useState<
+    LegalAnnotationType[]
+  >([]);
+  const [persistedSummary, setPersistedSummary] =
+    useState<LegalAnalysisSummaryType | null>(null);
+  const [legalCheckModel, setLegalCheckModel] = useState<string>('');
+  const [legalCheckDate, setLegalCheckDate] = useState<Date | undefined>();
+
+  // Streaming hook — POSTs { model } to the route handler and parses partial JSON
+  const [midStreamError, setMidStreamError] = useState<string | null>(null);
+  const {
+    object: streamedObject,
+    submit: submitLegalCheck,
+    isLoading: isAnalyzing,
+    error: legalCheckError,
+  } = useObject({
+    api: `/api/polls/${pollId}/legal-check`,
+    schema: legalAnalysisResultSchema,
+    onFinish: ({ object }) => {
+      if (object) {
+        setLegalCheckDate(new Date());
+        setPersistedAnnotations(object.annotations);
+        setPersistedSummary(object.summary);
+      } else {
+        // Schema validation failed OR stream errored mid-way with no final object
+        setMidStreamError(tLegal('errors.providerError'));
+      }
+    },
+    onError: (err) => {
+      setMidStreamError(err instanceof Error ? err.message : String(err));
+    },
+  });
+
+  // Derived display state: during stream, show partial from hook; otherwise use persisted.
+  const displayAnnotations = useMemo<LegalAnnotationType[]>(() => {
+    if (streamedObject?.annotations) {
+      return completeAnnotationsFromPartial(streamedObject.annotations);
+    }
+
+    return persistedAnnotations;
+  }, [streamedObject, persistedAnnotations]);
+
+  const displaySummary = useMemo<LegalAnalysisSummaryType | null>(() => {
+    if (streamedObject?.summary) {
+      return tryCompleteSummary(streamedObject.summary) ?? persistedSummary;
+    }
+
+    return persistedSummary;
+  }, [streamedObject, persistedSummary]);
+
+  const handleCheckLegality = useCallback(
+    (model: string) => {
+      setLegalCheckModel(model);
+      setLegalCheckDate(undefined);
+      setMidStreamError(null);
+      submitLegalCheck({ model });
+    },
+    [submitLegalCheck]
+  );
 
   const loadPoll = useCallback(async () => {
     try {
@@ -162,6 +254,16 @@ export function EditPollForm() {
           setQuestions(loadedQuestions);
           setOriginalQuestions(JSON.parse(JSON.stringify(loadedQuestions))); // Deep copy
           setActiveQuestionId(loadedQuestions[0].id);
+        }
+
+        // Load latest persisted legal check (admin-only; errors ignored)
+        const legalCheckResult = await getLegalCheckAction(pollId);
+
+        if (legalCheckResult.success && legalCheckResult.data) {
+          setPersistedAnnotations(legalCheckResult.data.annotations);
+          setPersistedSummary(legalCheckResult.data.summary);
+          setLegalCheckModel(legalCheckResult.data.model);
+          setLegalCheckDate(new Date(legalCheckResult.data.checkedAt));
         }
       } else {
         setError(result.error);
@@ -686,6 +788,23 @@ export function EditPollForm() {
         />
       )}
 
+      {/* Legal check controls (admin only) */}
+      {canManage && (
+        <div className="space-y-2">
+          <LegalCheckControls
+            isAnalyzing={isAnalyzing}
+            onCheckLegality={handleCheckLegality}
+          />
+          {(legalCheckError || midStreamError) && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200">
+              {legalCheckError
+                ? extractErrorMessage(legalCheckError.message)
+                : midStreamError}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Poll Basic Info */}
       <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-4">
         <Field>
@@ -784,32 +903,44 @@ export function EditPollForm() {
         {/* Main Content - Question Form */}
         <div className="lg:col-span-3">
           {activeQuestion ? (
-            <QuestionForm
-              questionId={activeQuestion.id}
-              text={activeQuestion.text}
-              details={activeQuestion.details}
-              questionType={activeQuestion.questionType}
-              answers={activeQuestion.answers || []}
-              page={activeQuestion.page}
-              order={activeQuestion.order}
-              onTextChange={(text) =>
-                handleQuestionUpdate(activeQuestion.id, { text })
-              }
-              onDetailsChange={(details) =>
-                handleQuestionUpdate(activeQuestion.id, { details })
-              }
-              onTypeChange={(questionType) =>
-                handleQuestionUpdate(activeQuestion.id, { questionType })
-              }
-              onAnswersChange={(answers) =>
-                handleQuestionUpdate(activeQuestion.id, { answers })
-              }
-              fieldErrors={
-                questionFieldErrors?.questionId === activeQuestion.id
-                  ? questionFieldErrors.errors
-                  : undefined
-              }
-            />
+            <>
+              <QuestionForm
+                questionId={activeQuestion.id}
+                text={activeQuestion.text}
+                details={activeQuestion.details}
+                questionType={activeQuestion.questionType}
+                answers={activeQuestion.answers || []}
+                page={activeQuestion.page}
+                order={activeQuestion.order}
+                onTextChange={(text) =>
+                  handleQuestionUpdate(activeQuestion.id, { text })
+                }
+                onDetailsChange={(details) =>
+                  handleQuestionUpdate(activeQuestion.id, { details })
+                }
+                onTypeChange={(questionType) =>
+                  handleQuestionUpdate(activeQuestion.id, { questionType })
+                }
+                onAnswersChange={(answers) =>
+                  handleQuestionUpdate(activeQuestion.id, { answers })
+                }
+                fieldErrors={
+                  questionFieldErrors?.questionId === activeQuestion.id
+                    ? questionFieldErrors.errors
+                    : undefined
+                }
+              />
+
+              {/* Inline legal annotations for this question */}
+              {displayAnnotations
+                .filter((a) => a.questionId === activeQuestion.id)
+                .map((annotation, index) => (
+                  <LegalAnnotation
+                    key={`${annotation.questionId}-${annotation.answerId ?? 'q'}-${index}`}
+                    annotation={annotation}
+                  />
+                ))}
+            </>
           ) : questions.length === 0 ? (
             <div className="p-12 text-center bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
               <p className="text-zinc-500 dark:text-zinc-400 mb-4">
@@ -829,6 +960,16 @@ export function EditPollForm() {
           )}
         </div>
       </div>
+
+      {/* Legal analysis summary */}
+      {canManage && displaySummary && (
+        <LegalAnalysisSummary
+          summary={displaySummary}
+          annotations={displayAnnotations}
+          model={legalCheckModel}
+          checkedAt={legalCheckDate}
+        />
+      )}
     </div>
   );
 }
