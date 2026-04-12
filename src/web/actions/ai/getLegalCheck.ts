@@ -11,6 +11,7 @@ import {
 } from '@/infrastructure/index';
 import { PrismaLegalCheckRepository } from '@/infrastructure/repositories/PrismaLegalCheckRepository';
 import { AIErrors } from '@/application/ai/AIErrors';
+import { onPollContentChanged } from '@/application/ai/onPollContentChanged';
 import type {
   LegalAnnotation,
   LegalAnalysisSummary,
@@ -31,6 +32,7 @@ export interface SerializedLegalCheck {
   totalIssues: number;
   checkedBy: string;
   checkedAt: string;
+  isStale: boolean;
 }
 
 export type GetLegalCheckResult =
@@ -79,13 +81,13 @@ export async function getLegalCheckAction(
     }
   }
 
-  const legalCheck = await legalCheckRepository.findByPollId(pollId);
+  const result = await legalCheckRepository.findByPollId(pollId);
 
-  if (!legalCheck) {
+  if (!result) {
     return { success: true, data: null };
   }
 
-  const props = legalCheck.toJSON();
+  const props = result.check.toJSON();
 
   return {
     success: true,
@@ -99,6 +101,11 @@ export async function getLegalCheckAction(
       totalIssues: props.totalIssues,
       checkedBy: props.checkedBy,
       checkedAt: props.checkedAt.toISOString(),
+      isStale: result.isStale,
     },
   };
+}
+
+export async function markLegalCheckStaleAction(pollId: string): Promise<void> {
+  await onPollContentChanged(pollId, legalCheckRepository);
 }

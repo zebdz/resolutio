@@ -563,6 +563,7 @@ model PollLegalCheck {
   totalIssues Int         @map("total_issues")
   checkedBy   String      @map("checked_by")
   checkedAt   DateTime    @default(now()) @map("checked_at")
+  isStale     Boolean     @default(false) @map("is_stale")
 
   poll Poll @relation(fields: [pollId], references: [id], onDelete: Cascade)
   user User @relation("LegalChecks", fields: [checkedBy], references: [id], onDelete: Cascade)
