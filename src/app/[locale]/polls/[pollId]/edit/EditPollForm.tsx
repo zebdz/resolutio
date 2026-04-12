@@ -141,8 +141,8 @@ export function EditPollForm() {
         setPersistedAnnotations(object.annotations);
         setPersistedSummary(object.summary);
       } else {
-        // Schema validation failed OR stream errored mid-way with no final object
-        setMidStreamError(tLegal('errors.providerError'));
+        // Don't overwrite a specific error already set by onError
+        setMidStreamError((prev) => prev ?? tLegal('errors.providerError'));
       }
     },
     onError: (err) => {
