@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { streamText, Output } from 'ai';
+import { generateText, Output } from 'ai';
 import { getLocale } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
@@ -18,7 +18,6 @@ import {
 } from '@/infrastructure/ai/AIProviderAdapter';
 import { AnalyzePollLegalityUseCase } from '@/application/ai/AnalyzePollLegalityUseCase';
 import { legalAnalysisResultSchema } from '@/application/ai/legalAnalysisSchema';
-import type { LegalAnalysisResult } from '@/application/ai/legalAnalysisSchema';
 import { LegalCheck } from '@/domain/ai/LegalCheck';
 import { AIErrors } from '@/application/ai/AIErrors';
 import {
@@ -125,75 +124,68 @@ export async function POST(
   const userPrompt = buildUserPrompt(pollData);
 
   try {
-    const result = streamText({
+    const result = await generateText({
       model: aiProvider.getModel(model),
       system: systemPrompt,
       prompt: userPrompt,
       output: Output.object({ schema: legalAnalysisResultSchema }),
-      onError: async ({ error }) => {
-        await aiLogger.logError({
-          pollId,
-          userId: user.id,
-          model,
-          error: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-        });
-        await legalCheckRepository
-          .logCheckAttempt(pollId, user.id, 0, 0)
-          .catch(() => undefined);
-      },
-      onFinish: async ({ text, totalUsage }) => {
-        const inputTokens = totalUsage.inputTokens ?? 0;
-        const outputTokens = totalUsage.outputTokens ?? 0;
-
-        await legalCheckRepository.logCheckAttempt(
-          pollId,
-          user.id,
-          inputTokens,
-          outputTokens
-        );
-
-        let parsed: LegalAnalysisResult;
-
-        try {
-          parsed = JSON.parse(text) as LegalAnalysisResult;
-        } catch (err) {
-          await aiLogger.logError({
-            pollId,
-            userId: user.id,
-            model,
-            error: 'Failed to parse LLM output',
-            stack: err instanceof Error ? err.stack : undefined,
-          });
-
-          return;
-        }
-
-        const created = LegalCheck.create({
-          pollId,
-          model,
-          annotations: parsed.annotations,
-          summary: parsed.summary,
-          checkedBy: user.id,
-        });
-
-        if (created.success) {
-          await legalCheckRepository.upsert(created.value);
-          await aiLogger.logSuccess({
-            pollId,
-            userId: user.id,
-            model,
-            inputTokens,
-            outputTokens,
-            annotationCount: parsed.annotations.length,
-            overallRisk: parsed.summary.overallRisk,
-            message: 'Analysis complete',
-          });
-        }
-      },
     });
 
-    return result.toTextStreamResponse();
+    const analysisResult = result.output;
+    const inputTokens = result.usage.inputTokens ?? 0;
+    const outputTokens = result.usage.outputTokens ?? 0;
+
+    await legalCheckRepository.logCheckAttempt(
+      pollId,
+      user.id,
+      inputTokens,
+      outputTokens
+    );
+
+    if (!analysisResult) {
+      await aiLogger.logError({
+        pollId,
+        userId: user.id,
+        model,
+        error: 'Schema validation failed on LLM output',
+      });
+
+      return NextResponse.json(
+        { error: await translateErrorCode(AIErrors.PROVIDER_ERROR) },
+        { status: 502 }
+      );
+    }
+
+    const created = LegalCheck.create({
+      pollId,
+      model,
+      annotations: analysisResult.annotations,
+      summary: analysisResult.summary,
+      checkedBy: user.id,
+    });
+
+    if (created.success) {
+      await legalCheckRepository.upsert(created.value);
+    }
+
+    await aiLogger.logSuccess({
+      pollId,
+      userId: user.id,
+      model,
+      inputTokens,
+      outputTokens,
+      annotationCount: analysisResult.annotations.length,
+      overallRisk: analysisResult.summary.overallRisk,
+      message: 'Analysis complete',
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        annotations: analysisResult.annotations,
+        summary: analysisResult.summary,
+      },
+    });
   } catch (error) {
     await aiLogger.logError({
       pollId,
@@ -202,14 +194,18 @@ export async function POST(
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });
-    // Log failed attempt so hourly counter still advances
     await legalCheckRepository
       .logCheckAttempt(pollId, user.id, 0, 0)
       .catch(() => undefined);
 
     return NextResponse.json(
-      { error: await translateErrorCode(AIErrors.PROVIDER_ERROR) },
-      { status: 500 }
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : await translateErrorCode(AIErrors.PROVIDER_ERROR),
+      },
+      { status: 502 }
     );
   }
 }
