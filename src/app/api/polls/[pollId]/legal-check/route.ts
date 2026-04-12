@@ -8,6 +8,7 @@ import {
   prisma,
   PrismaPollRepository,
   PrismaOrganizationRepository,
+  PrismaUserRepository,
 } from '@/infrastructure/index';
 import { PrismaLegalCheckRepository } from '@/infrastructure/repositories/PrismaLegalCheckRepository';
 import { PrismaSystemSettingRepository } from '@/infrastructure/repositories/PrismaSystemSettingRepository';
@@ -24,6 +25,7 @@ import {
   buildSystemPrompt,
   buildUserPrompt,
 } from '@/infrastructure/ai/prompts/legalAnalysisPrompt';
+import { AILogger } from '@/infrastructure/ai/AILogger';
 
 export const maxDuration = 60;
 
@@ -31,7 +33,9 @@ const pollRepository = new PrismaPollRepository(prisma);
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const legalCheckRepository = new PrismaLegalCheckRepository(prisma);
 const systemSettingRepository = new PrismaSystemSettingRepository(prisma);
+const userRepository = new PrismaUserRepository(prisma);
 const aiProvider = new AIProviderAdapter();
+const aiLogger = new AILogger();
 
 const useCase = new AnalyzePollLegalityUseCase({
   pollRepository,
@@ -78,12 +82,14 @@ export async function POST(
 
   const { pollId } = await params;
   const locale = await getLocale();
+  const isSuperadmin = await userRepository.isSuperAdmin(user.id);
 
   const validation = await useCase.validate({
     pollId,
     userId: user.id,
     model,
     locale,
+    isSuperadmin,
   });
 
   if (!validation.success) {
@@ -140,7 +146,13 @@ export async function POST(
         try {
           parsed = JSON.parse(text) as LegalAnalysisResult;
         } catch (err) {
-          console.error('Failed to parse legal analysis JSON:', err);
+          await aiLogger.logError({
+            pollId,
+            userId: user.id,
+            model,
+            error: 'Failed to parse LLM output',
+            stack: err instanceof Error ? err.stack : undefined,
+          });
 
           return;
         }
@@ -155,13 +167,29 @@ export async function POST(
 
         if (created.success) {
           await legalCheckRepository.upsert(created.value);
+          await aiLogger.logSuccess({
+            pollId,
+            userId: user.id,
+            model,
+            inputTokens,
+            outputTokens,
+            annotationCount: parsed.annotations.length,
+            overallRisk: parsed.summary.overallRisk,
+            message: 'Analysis complete',
+          });
         }
       },
     });
 
     return result.toTextStreamResponse();
   } catch (error) {
-    console.error('Legal analysis stream error:', error);
+    await aiLogger.logError({
+      pollId,
+      userId: user.id,
+      model,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     // Log failed attempt so hourly counter still advances
     await legalCheckRepository
       .logCheckAttempt(pollId, user.id, 0, 0)
