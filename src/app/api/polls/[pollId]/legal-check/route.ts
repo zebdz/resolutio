@@ -199,12 +199,7 @@ export async function POST(
       .catch(() => undefined);
 
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : await translateErrorCode(AIErrors.PROVIDER_ERROR),
-      },
+      { error: await translateErrorCode(AIErrors.PROVIDER_ERROR) },
       { status: 502 }
     );
   }

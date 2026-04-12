@@ -1,6 +1,6 @@
 {
   "name": "resolutio",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
@@ -20,7 +20,6 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "prisma:generate": "prisma generate",
-    "prisma:db:push": "prisma db push",
     "db:seed": "npx tsx prisma/seed.ts",
     "db:seed:external-board-member": "npx tsx prisma/seed-external-board-member.ts",
     "db:seed:legal-check": "npx tsx prisma/seed-legal-check.ts",

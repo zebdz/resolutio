@@ -18,6 +18,7 @@ export class PrismaLegalCheckRepository implements LegalCheckRepository {
       totalIssues: legalCheck.totalIssues,
       checkedBy: legalCheck.checkedBy,
       checkedAt: legalCheck.checkedAt,
+      isStale: false,
     };
 
     const saved = await this.prisma.pollLegalCheck.upsert({
@@ -42,7 +43,9 @@ export class PrismaLegalCheckRepository implements LegalCheckRepository {
     });
   }
 
-  async findByPollId(pollId: string): Promise<LegalCheck | null> {
+  async findByPollId(
+    pollId: string
+  ): Promise<{ check: LegalCheck; isStale: boolean } | null> {
     const found = await this.prisma.pollLegalCheck.findUnique({
       where: { pollId },
     });
@@ -51,16 +54,26 @@ export class PrismaLegalCheckRepository implements LegalCheckRepository {
       return null;
     }
 
-    return LegalCheck.reconstitute({
-      id: found.id,
-      pollId: found.pollId,
-      model: found.model,
-      annotations: found.annotations as unknown as LegalAnnotation[],
-      summary: found.summary as unknown as LegalAnalysisSummary,
-      overallRisk: found.overallRisk,
-      totalIssues: found.totalIssues,
-      checkedBy: found.checkedBy,
-      checkedAt: found.checkedAt,
+    return {
+      check: LegalCheck.reconstitute({
+        id: found.id,
+        pollId: found.pollId,
+        model: found.model,
+        annotations: found.annotations as unknown as LegalAnnotation[],
+        summary: found.summary as unknown as LegalAnalysisSummary,
+        overallRisk: found.overallRisk,
+        totalIssues: found.totalIssues,
+        checkedBy: found.checkedBy,
+        checkedAt: found.checkedAt,
+      }),
+      isStale: found.isStale,
+    };
+  }
+
+  async markStale(pollId: string): Promise<void> {
+    await this.prisma.pollLegalCheck.updateMany({
+      where: { pollId },
+      data: { isStale: true },
     });
   }
 

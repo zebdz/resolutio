@@ -10,11 +10,13 @@ import { AI_MODELS } from '@/application/ai/modelRegistry';
 
 interface LegalCheckControlsProps {
   isAnalyzing: boolean;
+  hasUnsavedChanges: boolean;
   onCheckLegality: (model: string) => void;
 }
 
 export function LegalCheckControls({
   isAnalyzing,
+  hasUnsavedChanges,
   onCheckLegality,
 }: LegalCheckControlsProps) {
   const t = useTranslations('legalCheck');
@@ -39,10 +41,14 @@ export function LegalCheckControls({
       <Button
         color="amber"
         onClick={() => onCheckLegality(model)}
-        disabled={isAnalyzing}
+        disabled={isAnalyzing || hasUnsavedChanges}
       >
         <ShieldCheckIcon data-slot="icon" />
-        {isAnalyzing ? t('analyzing') : t('checkLegality')}
+        {isAnalyzing
+          ? t('analyzing')
+          : hasUnsavedChanges
+            ? t('saveFirst')
+            : t('checkLegality')}
       </Button>
     </div>
   );

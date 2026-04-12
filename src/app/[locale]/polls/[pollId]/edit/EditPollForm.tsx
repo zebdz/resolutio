@@ -21,7 +21,11 @@ import {
   updateAnswerAction,
   deleteAnswerAction,
 } from '@/src/web/actions/poll/poll';
-import { getLegalCheckAction } from '@/web/actions/ai/getLegalCheck';
+import {
+  getLegalCheckAction,
+  markLegalCheckStaleAction,
+} from '@/web/actions/ai/getLegalCheck';
+import { hasLegalRelevantChanges } from '@/application/ai/hasLegalRelevantChanges';
 import type {
   LegalAnnotation as LegalAnnotationType,
   LegalAnalysisSummary as LegalAnalysisSummaryType,
@@ -80,6 +84,8 @@ export function EditPollForm() {
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [originalQuestions, setOriginalQuestions] = useState<Question[]>([]);
+  const [originalTitle, setOriginalTitle] = useState('');
+  const [originalDescription, setOriginalDescription] = useState('');
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -104,6 +110,7 @@ export function EditPollForm() {
   const [legalCheckDate, setLegalCheckDate] = useState<Date | undefined>();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [legalCheckError, setLegalCheckError] = useState<string | null>(null);
+  const [isLegalCheckStale, setIsLegalCheckStale] = useState(false);
 
   const handleCheckLegality = useCallback(
     async (model: string) => {
@@ -129,6 +136,7 @@ export function EditPollForm() {
         setLegalAnnotations(body.data.annotations);
         setLegalSummary(body.data.summary);
         setLegalCheckDate(new Date());
+        setIsLegalCheckStale(false);
       } catch (err) {
         setLegalCheckError(
           err instanceof Error ? err.message : tLegal('errors.providerError')
@@ -195,6 +203,8 @@ export function EditPollForm() {
           endDate: new Date(poll.endDate).toISOString().split('T')[0],
           state: poll.state,
         });
+        setOriginalTitle(poll.title);
+        setOriginalDescription(poll.description);
 
         // Load questions
         if (poll.questions && poll.questions.length > 0) {
@@ -227,6 +237,7 @@ export function EditPollForm() {
           setLegalSummary(legalCheckResult.data.summary);
           setLegalCheckModel(legalCheckResult.data.model);
           setLegalCheckDate(new Date(legalCheckResult.data.checkedAt));
+          setIsLegalCheckStale(legalCheckResult.data.isStale);
         }
       } else {
         setError(result.error);
@@ -665,8 +676,42 @@ export function EditPollForm() {
         }
       }
 
-      // Success! Redirect to polls list
-      router.push('/polls');
+      // Mark legal check stale if content the AI analyzes changed
+      if (legalSummary) {
+        const changed = hasLegalRelevantChanges(
+          {
+            title: originalTitle,
+            description: originalDescription,
+            questions: originalQuestions.map((q) => ({
+              id: q.id,
+              text: q.text,
+              answers: (q.answers ?? []).map((a) => ({
+                id: a.id,
+                text: a.text,
+              })),
+            })),
+          },
+          {
+            title: pollData.title,
+            description: pollData.description,
+            questions: questions.map((q) => ({
+              id: q.id,
+              text: q.text,
+              answers: (q.answers ?? []).map((a) => ({
+                id: a.id,
+                text: a.text,
+              })),
+            })),
+          }
+        );
+
+        if (changed) {
+          await markLegalCheckStaleAction(pollId);
+        }
+      }
+
+      // Reload to sync original state (so unsaved-change detection resets)
+      await loadPoll();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -756,6 +801,32 @@ export function EditPollForm() {
         <div className="space-y-2">
           <LegalCheckControls
             isAnalyzing={isAnalyzing}
+            hasUnsavedChanges={hasLegalRelevantChanges(
+              {
+                title: originalTitle,
+                description: originalDescription,
+                questions: originalQuestions.map((q) => ({
+                  id: q.id,
+                  text: q.text,
+                  answers: (q.answers ?? []).map((a) => ({
+                    id: a.id,
+                    text: a.text,
+                  })),
+                })),
+              },
+              {
+                title: pollData.title,
+                description: pollData.description,
+                questions: questions.map((q) => ({
+                  id: q.id,
+                  text: q.text,
+                  answers: (q.answers ?? []).map((a) => ({
+                    id: a.id,
+                    text: a.text,
+                  })),
+                })),
+              }
+            )}
             onCheckLegality={handleCheckLegality}
           />
           {legalCheckError && (
@@ -924,12 +995,19 @@ export function EditPollForm() {
 
       {/* Legal analysis summary */}
       {canManage && pollData.state !== PollState.DRAFT && legalSummary && (
-        <LegalAnalysisSummary
-          summary={legalSummary}
-          annotations={legalAnnotations}
-          model={legalCheckModel}
-          checkedAt={legalCheckDate}
-        />
+        <>
+          {isLegalCheckStale && (
+            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200">
+              {tLegal('summary.stale')}
+            </div>
+          )}
+          <LegalAnalysisSummary
+            summary={legalSummary}
+            annotations={legalAnnotations}
+            model={legalCheckModel}
+            checkedAt={legalCheckDate}
+          />
+        </>
       )}
     </div>
   );

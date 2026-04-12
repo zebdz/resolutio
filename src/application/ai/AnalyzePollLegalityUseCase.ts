@@ -100,31 +100,33 @@ export class AnalyzePollLegalityUseCase {
       }
     }
 
-    const maxPerHour = await this.getNumericSetting(
-      SETTING_KEYS.MAX_PER_HOUR,
-      DEFAULTS.MAX_PER_HOUR
-    );
-    const recentCount = await this.legalCheckRepository.countRecentChecks(
-      input.userId,
-      ONE_HOUR_MS
-    );
-
-    if (recentCount >= maxPerHour) {
-      return failure(AIErrors.RATE_LIMIT_EXCEEDED);
-    }
-
-    const dailyTokenCap = await this.getNumericSetting(
-      SETTING_KEYS.DAILY_TOKEN_CAP,
-      DEFAULTS.DAILY_TOKEN_CAP
-    );
-
-    if (dailyTokenCap > 0) {
-      const dailyTokens = await this.legalCheckRepository.sumDailyTokens(
-        input.userId
+    if (!input.isSuperadmin) {
+      const maxPerHour = await this.getNumericSetting(
+        SETTING_KEYS.MAX_PER_HOUR,
+        DEFAULTS.MAX_PER_HOUR
+      );
+      const recentCount = await this.legalCheckRepository.countRecentChecks(
+        input.userId,
+        ONE_HOUR_MS
       );
 
-      if (dailyTokens >= dailyTokenCap) {
-        return failure(AIErrors.TOKEN_CAP_EXCEEDED);
+      if (recentCount >= maxPerHour) {
+        return failure(AIErrors.RATE_LIMIT_EXCEEDED);
+      }
+
+      const dailyTokenCap = await this.getNumericSetting(
+        SETTING_KEYS.DAILY_TOKEN_CAP,
+        DEFAULTS.DAILY_TOKEN_CAP
+      );
+
+      if (dailyTokenCap > 0) {
+        const dailyTokens = await this.legalCheckRepository.sumDailyTokens(
+          input.userId
+        );
+
+        if (dailyTokens >= dailyTokenCap) {
+          return failure(AIErrors.TOKEN_CAP_EXCEEDED);
+        }
       }
     }
 
