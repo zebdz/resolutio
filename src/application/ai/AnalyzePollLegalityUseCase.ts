@@ -26,6 +26,7 @@ export interface AnalyzePollLegalityInput {
   userId: string;
   model: string;
   locale: string;
+  isSuperadmin?: boolean;
 }
 
 export interface ValidatedAnalysisInput {
@@ -66,32 +67,36 @@ export class AnalyzePollLegalityUseCase {
 
     const poll = pollResult.value;
 
-    const isAdmin = await this.organizationRepository.isUserAdmin(
-      input.userId,
-      poll.organizationId
-    );
+    if (!input.isSuperadmin) {
+      const isAdmin = await this.organizationRepository.isUserAdmin(
+        input.userId,
+        poll.organizationId
+      );
 
-    if (!isAdmin) {
-      return failure(AIErrors.NOT_ADMIN);
+      if (!isAdmin) {
+        return failure(AIErrors.NOT_ADMIN);
+      }
     }
 
     if (!poll.isReady()) {
       return failure(AIErrors.POLL_NOT_READY);
     }
 
-    const minOrgSize = await this.getNumericSetting(
-      SETTING_KEYS.MIN_ORG_SIZE,
-      DEFAULTS.MIN_ORG_SIZE
-    );
+    if (!input.isSuperadmin) {
+      const minOrgSize = await this.getNumericSetting(
+        SETTING_KEYS.MIN_ORG_SIZE,
+        DEFAULTS.MIN_ORG_SIZE
+      );
 
-    if (minOrgSize > 0) {
-      const memberIds =
-        await this.organizationRepository.findAcceptedMemberUserIdsIncludingDescendants(
-          poll.organizationId
-        );
+      if (minOrgSize > 0) {
+        const memberIds =
+          await this.organizationRepository.findAcceptedMemberUserIdsIncludingDescendants(
+            poll.organizationId
+          );
 
-      if (memberIds.length < minOrgSize) {
-        return failure(AIErrors.ORG_TOO_SMALL);
+        if (memberIds.length < minOrgSize) {
+          return failure(AIErrors.ORG_TOO_SMALL);
+        }
       }
     }
 

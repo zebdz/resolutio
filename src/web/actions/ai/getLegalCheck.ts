@@ -7,6 +7,7 @@ import {
   prisma,
   PrismaPollRepository,
   PrismaOrganizationRepository,
+  PrismaUserRepository,
 } from '@/infrastructure/index';
 import { PrismaLegalCheckRepository } from '@/infrastructure/repositories/PrismaLegalCheckRepository';
 import { AIErrors } from '@/application/ai/AIErrors';
@@ -18,6 +19,7 @@ import type {
 const pollRepository = new PrismaPollRepository(prisma);
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const legalCheckRepository = new PrismaLegalCheckRepository(prisma);
+const userRepository = new PrismaUserRepository(prisma);
 
 export interface SerializedLegalCheck {
   id: string;
@@ -61,16 +63,20 @@ export async function getLegalCheckAction(
 
   const poll = pollResult.value;
 
-  const isAdmin = await organizationRepository.isUserAdmin(
-    user.id,
-    poll.organizationId
-  );
+  const isSuperadmin = await userRepository.isSuperAdmin(user.id);
 
-  if (!isAdmin) {
-    return {
-      success: false,
-      error: await translateErrorCode(AIErrors.NOT_ADMIN),
-    };
+  if (!isSuperadmin) {
+    const isAdmin = await organizationRepository.isUserAdmin(
+      user.id,
+      poll.organizationId
+    );
+
+    if (!isAdmin) {
+      return {
+        success: false,
+        error: await translateErrorCode(AIErrors.NOT_ADMIN),
+      };
+    }
   }
 
   const legalCheck = await legalCheckRepository.findByPollId(pollId);

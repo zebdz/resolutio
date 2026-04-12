@@ -17,6 +17,7 @@ export const LOG_SOURCES: LogSource[] = [
     label: 'SMS Errors',
     json: true,
   },
+  { id: 'ai', path: 'logs/ai.log', label: 'AI Log', json: true },
 ];
 
 export const ARCHIVE_DIR = path.join(process.cwd(), 'logs', 'archive');
