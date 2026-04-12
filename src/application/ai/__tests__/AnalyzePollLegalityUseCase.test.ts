@@ -220,4 +220,64 @@ describe('AnalyzePollLegalityUseCase', () => {
       expect(result.value.locale).toBe('en');
     }
   });
+
+  describe('superadmin bypass', () => {
+    const runValidateAsSuperadmin = () =>
+      useCase.validate({
+        pollId: 'poll-1',
+        userId: 'user-1',
+        model: 'deepseek',
+        locale: 'en',
+        isSuperadmin: true,
+      });
+
+    it('bypasses NOT_ADMIN for superadmin', async () => {
+      (
+        organizationRepository.isUserAdmin as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(false);
+
+      const result = await runValidateAsSuperadmin();
+      expect(result.success).toBe(true);
+    });
+
+    it('bypasses ORG_TOO_SMALL for superadmin', async () => {
+      (
+        organizationRepository.findAcceptedMemberUserIdsIncludingDescendants as ReturnType<
+          typeof vi.fn
+        >
+      ).mockResolvedValue(memberIds(1));
+
+      const result = await runValidateAsSuperadmin();
+      expect(result.success).toBe(true);
+    });
+
+    it('still enforces POLL_NOT_READY for superadmin', async () => {
+      (
+        pollRepository.getPollById as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(success(createMockPoll({ isReady: false })));
+
+      const result = await runValidateAsSuperadmin();
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        expect(result.error).toBe(AIErrors.POLL_NOT_READY);
+      }
+    });
+
+    it('still enforces RATE_LIMIT for superadmin', async () => {
+      (
+        organizationRepository.isUserAdmin as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(false);
+      (
+        legalCheckRepository.countRecentChecks as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(10);
+
+      const result = await runValidateAsSuperadmin();
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        expect(result.error).toBe(AIErrors.RATE_LIMIT_EXCEEDED);
+      }
+    });
+  });
 });

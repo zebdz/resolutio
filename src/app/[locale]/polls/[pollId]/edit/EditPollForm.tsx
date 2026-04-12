@@ -788,8 +788,8 @@ export function EditPollForm() {
         />
       )}
 
-      {/* Legal check controls (admin only) */}
-      {canManage && (
+      {/* Legal check controls (admin only, non-draft polls) */}
+      {canManage && pollData.state !== PollState.DRAFT && (
         <div className="space-y-2">
           <LegalCheckControls
             isAnalyzing={isAnalyzing}
@@ -962,7 +962,7 @@ export function EditPollForm() {
       </div>
 
       {/* Legal analysis summary */}
-      {canManage && displaySummary && (
+      {canManage && pollData.state !== PollState.DRAFT && displaySummary && (
         <LegalAnalysisSummary
           summary={displaySummary}
           annotations={displayAnnotations}

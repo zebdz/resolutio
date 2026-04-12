@@ -872,7 +872,7 @@
       "notAdmin": "You must be an organization admin to check poll legality.",
       "pollNotFound": "Poll not found.",
       "pollNotInOrg": "Poll does not belong to your organization.",
-      "pollNotReady": "This poll is not ready for a legality check — all questions must have valid answers.",
+      "pollNotReady": "This poll is not ready for a legality check, check the poll's status.",
       "orgTooSmall": "Your organization does not meet the minimum size required for AI legality checks.",
       "rateLimitExceeded": "You have reached the maximum number of legality checks per hour. Please try again later.",
       "tokenCapExceeded": "You have reached your daily AI usage limit. Please try again tomorrow.",
