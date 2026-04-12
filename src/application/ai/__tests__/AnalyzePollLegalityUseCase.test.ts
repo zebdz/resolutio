@@ -264,20 +264,22 @@ describe('AnalyzePollLegalityUseCase', () => {
       }
     });
 
-    it('still enforces RATE_LIMIT for superadmin', async () => {
-      (
-        organizationRepository.isUserAdmin as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(false);
+    it('bypasses RATE_LIMIT for superadmin', async () => {
       (
         legalCheckRepository.countRecentChecks as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(10);
+      ).mockResolvedValue(999);
 
       const result = await runValidateAsSuperadmin();
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
+    });
 
-      if (!result.success) {
-        expect(result.error).toBe(AIErrors.RATE_LIMIT_EXCEEDED);
-      }
+    it('bypasses TOKEN_CAP for superadmin', async () => {
+      (
+        legalCheckRepository.sumDailyTokens as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(999_999);
+
+      const result = await runValidateAsSuperadmin();
+      expect(result.success).toBe(true);
     });
   });
 });

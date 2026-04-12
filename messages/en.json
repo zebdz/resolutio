@@ -844,6 +844,7 @@
   },
   "legalCheck": {
     "checkLegality": "Check Legality",
+    "saveFirst": "Save to check legality",
     "analyzing": "Analyzing...",
     "selectModel": "AI Model",
     "severity": {
@@ -861,7 +862,8 @@
       "recommendation": "Recommendation",
       "noIssues": "No legal issues found.",
       "checkedAt": "Checked {date}",
-      "checkedWith": "Model: {model}"
+      "checkedWith": "Model: {model}",
+      "stale": "The poll was modified since this check. Results may be outdated — consider re-checking."
     },
     "annotation": {
       "legalBasis": "Legal basis",
