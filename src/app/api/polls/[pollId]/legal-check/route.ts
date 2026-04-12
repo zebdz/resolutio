@@ -130,6 +130,18 @@ export async function POST(
       system: systemPrompt,
       prompt: userPrompt,
       output: Output.object({ schema: legalAnalysisResultSchema }),
+      onError: async ({ error }) => {
+        await aiLogger.logError({
+          pollId,
+          userId: user.id,
+          model,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
+        await legalCheckRepository
+          .logCheckAttempt(pollId, user.id, 0, 0)
+          .catch(() => undefined);
+      },
       onFinish: async ({ text, totalUsage }) => {
         const inputTokens = totalUsage.inputTokens ?? 0;
         const outputTokens = totalUsage.outputTokens ?? 0;
