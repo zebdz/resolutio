@@ -112,7 +112,9 @@ export function PropertyEditorInline({
           ))}
         </Select>
       </div>
-      <div className="flex gap-2">
+      {/* flex-wrap so a long Russian label like "Архивировать" can drop to
+          its own line on narrow phones instead of overflowing the card. */}
+      <div className="flex flex-wrap gap-2">
         <Button onClick={save} disabled={pending}>
           {t('save')}
         </Button>

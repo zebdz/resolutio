@@ -144,7 +144,7 @@ export function AssetsTable({
 
   return (
     <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="font-semibold">{t('assets.heading')}</h3>
         <label className="inline-flex items-center gap-2 text-sm">
           <input
@@ -202,8 +202,10 @@ export function AssetsTable({
             />
             {/* Wrap the two action buttons so they sit side-by-side on mobile
                 instead of each taking a full row; `sm:contents` lets each
-                button become its own grid cell on desktop. */}
-            <div className="flex items-center gap-2 sm:contents">
+                button become its own grid cell on desktop. `flex-wrap` lets
+                long RU labels (e.g. "Редактировать владельцев") drop instead
+                of overflowing the card on narrow phones. */}
+            <div className="flex flex-wrap items-center gap-2 sm:contents">
               {a.archivedAt ? (
                 // Archived assets are read-only — ownership edits are blocked
                 // server-side too (see ReplaceAssetOwnersUseCase archived guard).
