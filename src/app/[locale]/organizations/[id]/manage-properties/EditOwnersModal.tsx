@@ -233,8 +233,9 @@ export function EditOwnersModal({
               {/* Wrap the share input + Remove button so they sit side-by-side
                   on mobile (Remove was full-width before, dominating the row).
                   `sm:contents` collapses the wrapper on desktop so each child
-                  becomes a direct grid cell. */}
-              <div className="flex items-center gap-3 sm:contents">
+                  becomes a direct grid cell. `flex-wrap` keeps the layout from
+                  overflowing the card on narrow RU screens. */}
+              <div className="flex flex-wrap items-center gap-3 sm:contents">
                 <div className="relative flex-1 sm:flex-none">
                   <Input
                     className="pr-8"

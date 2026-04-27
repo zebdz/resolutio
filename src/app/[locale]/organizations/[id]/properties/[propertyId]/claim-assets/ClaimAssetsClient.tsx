@@ -132,7 +132,10 @@ export function ClaimAssetsClient({
       <ErrorBanner tone="warning" message={err} />
       <ul className="divide-y">
         {filtered.map((a) => (
-          <li key={a.id} className="py-2 flex items-center justify-between">
+          <li
+            key={a.id}
+            className="py-2 flex flex-wrap items-center justify-between gap-2"
+          >
             <span>{a.name}</span>
             {successId === a.id ? (
               // Plain <p> instead of Catalyst <Text> so the green color
