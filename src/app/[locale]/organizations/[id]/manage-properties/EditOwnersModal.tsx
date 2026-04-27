@@ -160,7 +160,7 @@ export function EditOwnersModal({
     <Dialog open size="2xl" onClose={onClose}>
       <DialogTitle>{t('title')}</DialogTitle>
       <DialogBody>
-        <div className="space-y-2">
+        <div className="space-y-3 sm:space-y-2">
           {rows.length > 0 && (
             <div className="hidden sm:grid grid-cols-[180px_minmax(0,1fr)_110px_auto] gap-3 px-1 text-xs font-medium uppercase text-zinc-500 dark:text-zinc-400">
               <span>{t('cols.kind')}</span>
@@ -170,9 +170,12 @@ export function EditOwnersModal({
             </div>
           )}
           {rows.map((row, i) => (
+            // Mobile: each owner is its own bordered card so the boundary
+            // between rows is unmistakable. Desktop: the card disappears
+            // and the row falls back to the original 4-column grid.
             <div
               key={i}
-              className="grid grid-cols-1 sm:grid-cols-[180px_minmax(0,1fr)_110px_auto] gap-3 items-center"
+              className="rounded-lg border border-zinc-300 p-3 space-y-2 dark:border-zinc-700 sm:rounded-none sm:border-0 sm:p-0 sm:space-y-0 sm:grid sm:grid-cols-[180px_minmax(0,1fr)_110px_auto] sm:gap-3 sm:items-center"
             >
               <Select
                 value={row.kind}
@@ -227,23 +230,29 @@ export function EditOwnersModal({
                   onChange={(e) => updateRow(i, { label: e.target.value })}
                 />
               )}
-              <div className="relative">
-                <Input
-                  className="pr-8"
-                  inputMode="decimal"
-                  value={row.share}
-                  onChange={(e) => updateRow(i, { share: e.target.value })}
-                />
-                <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-zinc-500 dark:text-zinc-400">
-                  %
-                </span>
+              {/* Wrap the share input + Remove button so they sit side-by-side
+                  on mobile (Remove was full-width before, dominating the row).
+                  `sm:contents` collapses the wrapper on desktop so each child
+                  becomes a direct grid cell. */}
+              <div className="flex items-center gap-3 sm:contents">
+                <div className="relative flex-1 sm:flex-none">
+                  <Input
+                    className="pr-8"
+                    inputMode="decimal"
+                    value={row.share}
+                    onChange={(e) => updateRow(i, { share: e.target.value })}
+                  />
+                  <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-zinc-500 dark:text-zinc-400">
+                    %
+                  </span>
+                </div>
+                <Button
+                  color="red"
+                  onClick={() => setRows(rows.filter((_, j) => j !== i))}
+                >
+                  {t('remove')}
+                </Button>
               </div>
-              <Button
-                color="red"
-                onClick={() => setRows(rows.filter((_, j) => j !== i))}
-              >
-                {t('remove')}
-              </Button>
             </div>
           ))}
           <Button
