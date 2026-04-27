@@ -128,6 +128,12 @@
     "pendingInvitationsCount": "У вас {count} {count, plural, =1 {приглашение} few {приглашения} other {приглашений}}",
     "pendingRequestsCount": "У вас {count} {count, plural, =1 {заявка на вступление} few {заявки на вступление} other {заявок на вступление}}",
     "archivedBadge": "В архиве",
+    "sort": {
+      "ariaLabel": "Сортировка",
+      "byName": "Имя",
+      "byJoined": "Дата вступления",
+      "byOrganization": "Организация"
+    },
     "joinRequest": {
       "requested": "Заявка подана",
       "pending": "Ожидает",

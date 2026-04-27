@@ -128,6 +128,12 @@
     "pendingInvitationsCount": "You have {count} pending {count, plural, =1 {invitation} other {invitations}}",
     "pendingRequestsCount": "You have {count} pending join {count, plural, =1 {request} other {requests}}",
     "archivedBadge": "Archived",
+    "sort": {
+      "ariaLabel": "Sort",
+      "byName": "Name",
+      "byJoined": "Joined",
+      "byOrganization": "Organization"
+    },
     "joinRequest": {
       "requested": "Requested",
       "pending": "Pending",
