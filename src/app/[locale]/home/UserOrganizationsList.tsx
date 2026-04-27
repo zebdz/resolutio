@@ -20,6 +20,7 @@ interface UserOrganization {
   joinedAt?: Date;
   archivedAt?: Date | null;
   parentOrg?: { id: string; name: string } | null;
+  hasProperties?: boolean;
 }
 
 interface AdminOrganization {
@@ -51,6 +52,7 @@ export function UserOrganizationsList({
 }: UserOrganizationsListProps) {
   const t = useTranslations('home');
   const tOrg = useTranslations('organization');
+  const tShortcut = useTranslations('propertyClaim.shortcut');
   const [member, setMember] = useState<UserOrganization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +90,7 @@ export function UserOrganizationsList({
             joinedAt: new Date(org.joinedAt),
             archivedAt: org.archivedAt ? new Date(org.archivedAt) : null,
             parentOrg: org.parentOrg,
+            hasProperties: org.hasProperties,
           }))
         );
       } else {
@@ -257,6 +260,23 @@ export function UserOrganizationsList({
                           ))}
                         </ul>
                       )}
+                    </div>
+                  )}
+
+                  {/* Claim property shortcut */}
+                  {org.hasProperties && !org.archivedAt && (
+                    <div className="mt-3 flex justify-start">
+                      <Link
+                        href={`/organizations/${org.id}#properties`}
+                        prefetch={false}
+                      >
+                        <Button
+                          color="brand-green"
+                          className="!px-2 !py-1 !text-xs"
+                        >
+                          {tShortcut('claim')}
+                        </Button>
+                      </Link>
                     </div>
                   )}
 

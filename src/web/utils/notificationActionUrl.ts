@@ -123,6 +123,26 @@ const TYPE_CONFIG: Record<string, TypeConfigEntry> = {
     url: (id) => `/organizations/${id}`,
     actionKey: 'viewOrganization',
   },
+  // Admin notification: a member submitted a property claim. Land directly
+  // on the queue so approve/deny is one click away.
+  property_claim_submitted: {
+    dataKey: 'organizationId',
+    url: (id) => `/organizations/${id}/property-claims`,
+    actionKey: 'viewPropertyClaims',
+  },
+  // Claimant notifications. Without propertyId in the payload we can't deep-
+  // link to the per-property claim view, so route to the org page where the
+  // user can navigate into "Properties" → their claim.
+  property_claim_approved: {
+    dataKey: 'organizationId',
+    url: (id) => `/organizations/${id}`,
+    actionKey: 'viewOrganization',
+  },
+  property_claim_denied: {
+    dataKey: 'organizationId',
+    url: (id) => `/organizations/${id}`,
+    actionKey: 'viewOrganization',
+  },
 };
 
 export function getNotificationActionUrl(

@@ -19,7 +19,15 @@ import {
   addQuestionAction,
 } from '@/src/web/actions/poll/poll';
 import { getUserBoardsAction } from '@/src/web/actions/board/board';
-import { getUserMemberOrganizationsAction } from '@/src/web/actions/organization/organization';
+import {
+  getUserMemberOrganizationsAction,
+  getAdminOrganizationsAction,
+  getOrgPropertiesTreeAction,
+  getOrgOwnershipStatusAction,
+} from '@/src/web/actions/organization/organization';
+import { DistributionTypeSelector } from '@/src/web/components/polls/participants/DistributionTypeSelector';
+import { PropertyScopeSelector } from '@/src/web/components/polls/participants/PropertyScopeSelector';
+import { PropertyAggregationSelector } from '@/src/web/components/polls/participants/PropertyAggregationSelector';
 
 interface Answer {
   id: string;
@@ -64,6 +72,28 @@ export function CreatePollForm() {
   >([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Weight config state
+  const [distributionType, setDistributionType] = useState<
+    'EQUAL' | 'OWNERSHIP_UNIT_COUNT' | 'OWNERSHIP_SIZE_WEIGHTED'
+  >('EQUAL');
+  const [propertyAggregation, setPropertyAggregation] = useState<
+    'RAW_SUM' | 'NORMALIZE_PER_PROPERTY'
+  >('RAW_SUM');
+  const [propertyIds, setPropertyIds] = useState<string[]>([]);
+  const [properties, setProperties] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
+  const [descendantGroups, setDescendantGroups] = useState<
+    Array<{
+      orgId: string;
+      orgName: string;
+      properties: Array<{ id: string; name: string }>;
+    }>
+  >([]);
+  const [orgHasOwnershipData, setOrgHasOwnershipData] = useState(false);
+  const [userHasOwnership, setUserHasOwnership] = useState(false);
+  const [adminOrgIds, setAdminOrgIds] = useState<Set<string>>(new Set());
+
   // Merge direct org memberships with orgs derived from board memberships
   const allOrganizations = useMemo(() => {
     const orgIds = new Set(organizations.map((o) => o.id));
@@ -104,9 +134,10 @@ export function CreatePollForm() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [orgsResult, boardsResult] = await Promise.all([
+        const [orgsResult, boardsResult, adminOrgsResult] = await Promise.all([
           getUserMemberOrganizationsAction(),
           getUserBoardsAction(),
+          getAdminOrganizationsAction(),
         ]);
 
         if (orgsResult.success) {
@@ -117,6 +148,12 @@ export function CreatePollForm() {
 
         if (boardsResult.success) {
           setBoards(boardsResult.data);
+        }
+
+        if (adminOrgsResult.success) {
+          setAdminOrgIds(
+            new Set(adminOrgsResult.data.organizations.map((o) => o.id))
+          );
         }
       } catch (err) {
         setError(t('errors.loadOrganizations'));
@@ -137,6 +174,50 @@ export function CreatePollForm() {
       }));
     }
   }, [allOrganizations]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch properties + ownership when org selection changes
+  useEffect(() => {
+    if (!pollData.organizationId) {
+      setProperties([]);
+      setDescendantGroups([]);
+      setOrgHasOwnershipData(false);
+      setUserHasOwnership(false);
+      setDistributionType('EQUAL');
+      setPropertyIds([]);
+
+      return;
+    }
+
+    async function loadOrgWeightData() {
+      const [treeResult, ownershipResult] = await Promise.all([
+        getOrgPropertiesTreeAction(pollData.organizationId),
+        getOrgOwnershipStatusAction(pollData.organizationId),
+      ]);
+
+      if (treeResult.success) {
+        setProperties(treeResult.data.direct);
+        setDescendantGroups(treeResult.data.descendantGroups);
+      } else {
+        setProperties([]);
+        setDescendantGroups([]);
+      }
+
+      if (ownershipResult.success) {
+        setOrgHasOwnershipData(ownershipResult.data.orgHasOwnershipData);
+        setUserHasOwnership(ownershipResult.data.userHasOwnership);
+      } else {
+        setOrgHasOwnershipData(false);
+        setUserHasOwnership(false);
+      }
+
+      // Reset weight config when org changes
+      setDistributionType('EQUAL');
+      setPropertyIds([]);
+      setPropertyAggregation('RAW_SUM');
+    }
+
+    void loadOrgWeightData();
+  }, [pollData.organizationId]);
 
   // Filter boards by selected organization
   const filteredBoards = boards.filter(
@@ -316,6 +397,9 @@ export function CreatePollForm() {
 
       pollFormData.append('startDate', pollData.startDate);
       pollFormData.append('endDate', pollData.endDate);
+      pollFormData.append('distributionType', distributionType);
+      pollFormData.append('propertyAggregation', propertyAggregation);
+      pollFormData.append('propertyIds', JSON.stringify(propertyIds));
 
       const pollResult = await createPollAction(pollFormData);
 
@@ -601,6 +685,50 @@ export function CreatePollForm() {
           </Field>
         </div>
       </div>
+
+      {/* Weight distribution section — only if org has ownership data or user is admin */}
+      {(userHasOwnership || adminOrgIds.has(pollData.organizationId)) &&
+        pollData.organizationId && (
+          <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-4">
+            <h3 className="font-semibold text-zinc-900 dark:text-white">
+              {t('distribution.label')}
+            </h3>
+            <DistributionTypeSelector
+              value={distributionType}
+              onChange={setDistributionType}
+              ownershipDisabledReason={
+                !orgHasOwnershipData
+                  ? t('distribution.ownershipOptionDisabledTooltip')
+                  : null
+              }
+            />
+            {(properties.length >= 2 ||
+              descendantGroups.some((g) => g.properties.length > 0)) && (
+              <PropertyScopeSelector
+                properties={properties}
+                descendantGroups={descendantGroups}
+                selectedIds={propertyIds}
+                onChange={setPropertyIds}
+                mode={distributionType === 'EQUAL' ? 'equal' : 'ownership'}
+              />
+            )}
+            <PropertyAggregationSelector
+              value={propertyAggregation}
+              onChange={setPropertyAggregation}
+              visible={
+                (distributionType === 'OWNERSHIP_UNIT_COUNT' ||
+                  distributionType === 'OWNERSHIP_SIZE_WEIGHTED') &&
+                (propertyIds.length === 0
+                  ? properties.length +
+                    descendantGroups.reduce(
+                      (sum, g) => sum + g.properties.length,
+                      0
+                    )
+                  : propertyIds.length) >= 2
+              }
+            />
+          </div>
+        )}
 
       {/* Questions Section */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

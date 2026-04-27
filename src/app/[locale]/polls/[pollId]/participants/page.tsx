@@ -13,10 +13,23 @@ import {
   prisma,
   PrismaOrganizationRepository,
   PrismaUserRepository,
+  PrismaOrganizationPropertyRepository,
+  PrismaPropertyAssetRepository,
+  PrismaVoteRepository,
 } from '@/infrastructure/index';
+import { PollWeightCalculator } from '@/application/poll/PollWeightCalculator';
+import { DistributionType } from '@/domain/poll/DistributionType';
+import { PropertyAggregation } from '@/domain/poll/PropertyAggregation';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
+const propertyRepository = new PrismaOrganizationPropertyRepository(prisma);
+const propertyAssetRepository = new PrismaPropertyAssetRepository(prisma);
+const voteRepository = new PrismaVoteRepository(prisma);
+const pollWeightCalculator = new PollWeightCalculator(
+  organizationRepository,
+  propertyAssetRepository
+);
 
 interface ParticipantsPageProps {
   params: Promise<{
@@ -58,8 +71,19 @@ export default async function ParticipantsPage({
     redirect(`/polls/${pollId}`);
   }
 
-  // Get participants
-  const participantsResult = await getParticipantsAction(pollId);
+  // Fetch weight-config related data in parallel with participants.
+  // Tree-aware property fetch: direct org's properties + descendant orgs' grouped.
+  const [
+    participantsResult,
+    treePropertiesResult,
+    orgHasOwnershipResult,
+    votesCastResult,
+  ] = await Promise.all([
+    getParticipantsAction(pollId),
+    propertyRepository.findByOrganizationTree(poll.organizationId),
+    propertyAssetRepository.orgHasOwnershipData(poll.organizationId),
+    voteRepository.pollHasVotes(pollId),
+  ]);
 
   if (!participantsResult.success) {
     return (
@@ -95,6 +119,46 @@ export default async function ParticipantsPage({
     })
   );
 
+  // Serialize properties for client component. First group is direct org
+  // (always present, even if empty), rest are descendants.
+  const treeGroups = treePropertiesResult.success
+    ? treePropertiesResult.value
+    : [];
+  const properties = (treeGroups[0]?.properties ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+  }));
+  const descendantGroups = treeGroups.slice(1).map((g) => ({
+    orgId: g.orgId,
+    orgName: g.orgName,
+    properties: g.properties.map((p) => ({ id: p.id, name: p.name })),
+  }));
+
+  const orgHasOwnershipData = orgHasOwnershipResult.success
+    ? orgHasOwnershipResult.value
+    : false;
+
+  const votesCast = votesCastResult.success ? votesCastResult.value : false;
+
+  const weightConfig = {
+    distributionType: poll.distributionType,
+    propertyAggregation: poll.propertyAggregation,
+    propertyIds: poll.propertyIds,
+  };
+
+  // "Building total" = theoretical max if every owner were registered. The
+  // gap (Building − Registered) is what unregistered owners hold. EQUAL polls
+  // have no such gap, so the calculator returns 0 and the UI hides the column.
+  const buildingTotalResult = await pollWeightCalculator.computeBuildingTotal({
+    organizationId: poll.organizationId,
+    distributionType: poll.distributionType as DistributionType,
+    propertyAggregation: poll.propertyAggregation as PropertyAggregation,
+    propertyIds: poll.propertyIds,
+  });
+  const buildingTotal = buildingTotalResult.success
+    ? buildingTotalResult.value
+    : 0;
+
   return (
     <AuthenticatedLayout>
       <div className="mb-8">
@@ -109,6 +173,12 @@ export default async function ParticipantsPage({
           canModify: participantsData.canModify,
         }}
         pollState={poll.state}
+        weightConfig={weightConfig}
+        properties={properties}
+        descendantGroups={descendantGroups}
+        orgHasOwnershipData={orgHasOwnershipData}
+        votesCast={votesCast}
+        buildingTotal={buildingTotal}
       />
     </AuthenticatedLayout>
   );

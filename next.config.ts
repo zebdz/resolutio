@@ -20,6 +20,14 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_APP_VERSION: appVersion,
     NEXT_PUBLIC_BUILD_ID: buildIdValue,
   },
+  experimental: {
+    serverActions: {
+      // Property-claim proof attachments cap at 10 MB (see
+      // PropertyClaimAttachment). Headroom (12mb) covers FormData boundary
+      // overhead + the JSON fields posted alongside the file.
+      bodySizeLimit: '12mb',
+    },
+  },
 };
 
 export default withNextIntl(nextConfig);

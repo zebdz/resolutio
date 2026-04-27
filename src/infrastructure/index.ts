@@ -17,6 +17,12 @@ export { PrismaJoinTokenRepository } from './repositories/PrismaJoinTokenReposit
 export { PrismaNotificationRepository } from './repositories/PrismaNotificationRepository';
 export { PrismaInvitationRepository } from './repositories/PrismaInvitationRepository';
 export { PrismaOtpRepository } from './repositories/PrismaOtpRepository';
+export { PrismaPropertyAssetRepository } from './repositories/PrismaPropertyAssetRepository';
+export { PrismaPollEligibleMemberRepository } from './repositories/PrismaPollEligibleMemberRepository';
+export { PrismaOrganizationPropertyRepository } from './repositories/PrismaOrganizationPropertyRepository';
+export { PrismaPropertyClaimRepository } from './repositories/PrismaPropertyClaimRepository';
+export { PrismaPropertyClaimAttachmentRepository } from './repositories/PrismaPropertyClaimAttachmentRepository';
+export { PrismaPropertyLockRepository } from './repositories/PrismaPropertyLockRepository';
 
 // Auth
 export { Argon2PasswordHasher } from './auth/Argon2PasswordHasher';

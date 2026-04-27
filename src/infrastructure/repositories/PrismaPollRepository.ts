@@ -29,6 +29,18 @@ export class PrismaPollRepository implements PollRepository {
           endDate: poll.endDate,
           state: this.toPrismaState(poll.state),
           weightCriteria: poll.weightCriteria,
+          distributionType: poll.distributionType,
+          propertyAggregation: poll.propertyAggregation,
+          properties:
+            poll.propertyIds.length > 0
+              ? {
+                  createMany: {
+                    data: poll.propertyIds.map((propertyId) => ({
+                      propertyId,
+                    })),
+                  },
+                }
+              : undefined,
         },
         include: {
           questions: {
@@ -39,6 +51,7 @@ export class PrismaPollRepository implements PollRepository {
             },
             orderBy: [{ page: 'asc' }, { order: 'asc' }],
           },
+          properties: true,
         },
       });
 
@@ -65,6 +78,7 @@ export class PrismaPollRepository implements PollRepository {
             },
             orderBy: [{ page: 'asc' }, { order: 'asc' }],
           },
+          properties: true,
         },
       });
 
@@ -98,6 +112,7 @@ export class PrismaPollRepository implements PollRepository {
             },
             orderBy: [{ page: 'asc' }, { order: 'asc' }],
           },
+          properties: true,
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -130,6 +145,7 @@ export class PrismaPollRepository implements PollRepository {
             },
             orderBy: [{ page: 'asc' }, { order: 'asc' }],
           },
+          properties: true,
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -188,6 +204,7 @@ export class PrismaPollRepository implements PollRepository {
             },
             orderBy: [{ page: 'asc' }, { order: 'asc' }],
           },
+          properties: true,
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -276,6 +293,11 @@ export class PrismaPollRepository implements PollRepository {
               some: { userId },
             },
           },
+          // Creator branch: a user who creates a poll on an org they're not
+          // a member/admin of (e.g., a child-org admin scoping into the
+          // parent) must still see and be able to edit/manage their own poll
+          // before someone activates it.
+          { createdBy: userId },
         ];
 
         if (adminOrgIds && adminOrgIds.length > 0) {
@@ -298,6 +320,7 @@ export class PrismaPollRepository implements PollRepository {
             },
             orderBy: [{ page: 'asc' }, { order: 'asc' }],
           },
+          properties: true,
         },
         orderBy: { createdAt: 'desc' },
       };
@@ -334,6 +357,8 @@ export class PrismaPollRepository implements PollRepository {
           endDate: poll.endDate,
           state: this.toPrismaState(poll.state),
           weightCriteria: poll.weightCriteria,
+          distributionType: poll.distributionType,
+          propertyAggregation: poll.propertyAggregation,
           archivedAt: poll.archivedAt,
         },
       });
@@ -376,6 +401,11 @@ export class PrismaPollRepository implements PollRepository {
       endDate: prismaData.endDate,
       state: this.toDomainState(prismaData.state),
       weightCriteria: prismaData.weightCriteria || null,
+      distributionType: prismaData.distributionType,
+      propertyAggregation: prismaData.propertyAggregation,
+      propertyIds: (prismaData.properties ?? []).map(
+        (p: { propertyId: string }) => p.propertyId
+      ),
       createdBy: prismaData.createdBy,
       createdAt: prismaData.createdAt,
       archivedAt: prismaData.archivedAt,

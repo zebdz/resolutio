@@ -21,6 +21,8 @@ export const PollErrors = {
 
   // Answer
   ANSWER_NOT_FOUND: 'poll.errors.answerNotFound',
+
+  CANNOT_CHANGE_WEIGHT_CONFIG: 'poll.errors.cannotChangeWeightConfig',
 } as const;
 
 export type PollError = (typeof PollErrors)[keyof typeof PollErrors];

@@ -19,6 +19,8 @@ import {
 } from '@/infrastructure/index';
 import { OrgMembersList } from './OrgMembersList';
 import { getOrgMembersAction } from '@/src/web/actions/invitation/invitation';
+import { listOrgPropertiesForMemberAction } from '@/src/web/actions/organization/propertyClaim';
+import { PropertiesSection } from './PropertiesSection';
 import { User } from '@/domain/user/User';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);
@@ -100,6 +102,18 @@ export default async function OrganizationDetailPage({
     }
   }
 
+  let safeProperties:
+    | { id: string; name: string; address: string | null }[]
+    | null = null;
+
+  if (user && (isUserMember || isUserAdmin || isSuperAdmin)) {
+    const r = await listOrgPropertiesForMemberAction({ organizationId: id });
+
+    if (r.success) {
+      safeProperties = r.data.properties;
+    }
+  }
+
   return (
     <AuthenticatedLayout>
       <div className="space-y-8">
@@ -149,6 +163,10 @@ export default async function OrganizationDetailPage({
           isUserMember={isUserMember}
           showMemberRequests={false}
         />
+
+        {safeProperties && (
+          <PropertiesSection organizationId={id} properties={safeProperties} />
+        )}
 
         {/* Members Section */}
         {(isUserMember || isUserAdmin || isSuperAdmin) && (

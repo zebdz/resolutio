@@ -33,6 +33,8 @@ import {
   PrismaUserRepository,
   PrismaNotificationRepository,
   PrismaInvitationRepository,
+  PrismaOrganizationPropertyRepository,
+  PrismaPropertyAssetRepository,
 } from '@/infrastructure/index';
 import { Notification } from '@/domain/notification/Notification';
 import { getCurrentUser } from '../../lib/session';
@@ -52,6 +54,8 @@ const boardRepository = new PrismaBoardRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 const notificationRepository = new PrismaNotificationRepository(prisma);
 const invitationRepository = new PrismaInvitationRepository(prisma);
+const propertyRepository = new PrismaOrganizationPropertyRepository(prisma);
+const propertyAssetRepository = new PrismaPropertyAssetRepository(prisma);
 const profanityChecker = LeoProfanityChecker.getInstance();
 
 // Use cases
@@ -600,6 +604,7 @@ export async function getUserOrganizationsAction(): Promise<
       joinedAt: Date;
       archivedAt: Date | null;
       parentOrg: { id: string; name: string } | null;
+      hasProperties: boolean;
     }>;
     pending: Array<{
       id: string;
@@ -651,6 +656,16 @@ export async function getUserOrganizationsAction(): Promise<
       };
     }
 
+    // Build hasProperties flag map for member orgs only
+    const memberOrgIds = result.value.member.map(
+      (item) => item.organization.id
+    );
+    const hasPropertiesResult =
+      await propertyRepository.hasAnyNonArchived(memberOrgIds);
+    const hasPropertiesMap = hasPropertiesResult.success
+      ? hasPropertiesResult.value
+      : new Map<string, boolean>();
+
     return {
       success: true,
       data: {
@@ -661,6 +676,7 @@ export async function getUserOrganizationsAction(): Promise<
           joinedAt: item.joinedAt,
           archivedAt: item.organization.archivedAt,
           parentOrg: item.parentOrg,
+          hasProperties: hasPropertiesMap.get(item.organization.id) ?? false,
         })),
         pending: result.value.pending.map((item) => ({
           id: item.organization.id,
@@ -1744,6 +1760,163 @@ export async function leaveOrganizationAction(
     return { success: true, data: undefined };
   } catch (error) {
     console.error('Error leaving organization:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+export async function getOrgPropertiesAction(
+  organizationId: string
+): Promise<ActionResult<Array<{ id: string; name: string }>>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const isMember = await organizationRepository.isUserMember(
+      user.id,
+      organizationId
+    );
+    const isAdmin = await organizationRepository.isUserAdmin(
+      user.id,
+      organizationId
+    );
+    const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
+
+    if (!isMember && !isAdmin && !isSuperAdmin) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const result = await propertyRepository.findByOrganization(organizationId);
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return {
+      success: true,
+      data: result.value.map((p) => ({ id: p.id, name: p.name })),
+    };
+  } catch (error) {
+    console.error('Error getting org properties:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+// Tree-aware variant of getOrgPropertiesAction: returns the direct org's
+// properties as `direct` plus each descendant org with its properties as
+// `descendantGroups`. Used by poll-creation UI to let admins scope polls into
+// descendant-org properties (e.g., a parent-org poll including a building
+// owned by a child org). Only admins of the root org (+superadmin) can see
+// descendant-org properties.
+export async function getOrgPropertiesTreeAction(
+  organizationId: string
+): Promise<
+  ActionResult<{
+    direct: Array<{ id: string; name: string }>;
+    descendantGroups: Array<{
+      orgId: string;
+      orgName: string;
+      properties: Array<{ id: string; name: string }>;
+    }>;
+  }>
+> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const isAdmin = await organizationRepository.isUserAdmin(
+      user.id,
+      organizationId
+    );
+    const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
+
+    if (!isAdmin && !isSuperAdmin) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const result =
+      await propertyRepository.findByOrganizationTree(organizationId);
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    const groups = result.value;
+    const direct = (groups[0]?.properties ?? []).map((p) => ({
+      id: p.id,
+      name: p.name,
+    }));
+    const descendantGroups = groups.slice(1).map((g) => ({
+      orgId: g.orgId,
+      orgName: g.orgName,
+      properties: g.properties.map((p) => ({ id: p.id, name: p.name })),
+    }));
+
+    return { success: true, data: { direct, descendantGroups } };
+  } catch (error) {
+    console.error('Error getting org properties tree:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+export async function getOrgOwnershipStatusAction(
+  organizationId: string
+): Promise<
+  ActionResult<{ orgHasOwnershipData: boolean; userHasOwnership: boolean }>
+> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const [orgResult, userResult] = await Promise.all([
+      propertyAssetRepository.orgHasOwnershipData(organizationId),
+      propertyAssetRepository.hasUserOwnership(organizationId, user.id),
+    ]);
+
+    return {
+      success: true,
+      data: {
+        orgHasOwnershipData: orgResult.success ? orgResult.value : false,
+        userHasOwnership: userResult.success ? userResult.value : false,
+      },
+    };
+  } catch (error) {
+    console.error('Error getting org ownership status:', error);
 
     return { success: false, error: t('generic') };
   }
