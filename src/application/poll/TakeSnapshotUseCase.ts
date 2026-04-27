@@ -7,6 +7,11 @@ import { UserRepository } from '../../domain/user/UserRepository';
 import { PollParticipant } from '../../domain/poll/PollParticipant';
 import { ParticipantWeightHistory } from '../../domain/poll/ParticipantWeightHistory';
 import { PollErrors } from './PollErrors';
+import { PollEligibleMember } from '../../domain/poll/PollEligibleMember';
+import { PollEligibleMemberRepository } from '../../domain/poll/PollEligibleMemberRepository';
+import { DistributionType } from '../../domain/poll/DistributionType';
+import { PropertyAggregation } from '../../domain/poll/PropertyAggregation';
+import { PollWeightCalculator } from './PollWeightCalculator';
 
 interface TakeSnapshotCommand {
   pollId: string;
@@ -24,7 +29,9 @@ export class TakeSnapshotUseCase {
     private participantRepository: ParticipantRepository,
     private boardRepository: BoardRepository,
     private organizationRepository: OrganizationRepository,
-    private userRepository: UserRepository
+    private userRepository: UserRepository,
+    private eligibleMemberRepository: PollEligibleMemberRepository,
+    private pollWeightCalculator: PollWeightCalculator
   ) {}
 
   async execute(command: TakeSnapshotCommand): Promise<Result<void, string>> {
@@ -96,12 +103,41 @@ export class TakeSnapshotUseCase {
         );
     }
 
-    // Create participants with initial weight of 1.0
+    // Record snapshot timestamp
+    const snapshotAt = new Date();
+
+    // Persist eligible members for every candidate (full candidate set)
+    const eligibleMembers = memberUserIds.map((userId) =>
+      PollEligibleMember.create(poll.id, userId, snapshotAt)
+    );
+
+    const eligibleResult =
+      await this.eligibleMemberRepository.createMany(eligibleMembers);
+
+    if (!eligibleResult.success) {
+      return failure(eligibleResult.error);
+    }
+
+    const weightResult = await this.pollWeightCalculator.compute({
+      organizationId: poll.organizationId,
+      distributionType: poll.distributionType as DistributionType,
+      propertyAggregation: poll.propertyAggregation as PropertyAggregation,
+      propertyIds: poll.propertyIds,
+      candidates: memberUserIds,
+    });
+
+    if (!weightResult.success) {
+      return failure(weightResult.error);
+    }
+
+    const weightMap = weightResult.value;
+
+    // Create participants and history only for users with a computed weight
     const participants: PollParticipant[] = [];
     const historyRecords: ParticipantWeightHistory[] = [];
 
-    for (const userId of memberUserIds) {
-      const participantResult = PollParticipant.create(poll.id, userId, 1.0);
+    for (const [userId, weight] of weightMap) {
+      const participantResult = PollParticipant.create(poll.id, userId, weight);
 
       if (!participantResult.success) {
         return failure(participantResult.error);
@@ -115,7 +151,7 @@ export class TakeSnapshotUseCase {
         poll.id,
         userId,
         0, // oldWeight (initial)
-        1.0, // newWeight
+        weight, // newWeight
         command.userId, // changedBy (admin)
         'Initial snapshot on poll preparation'
       );

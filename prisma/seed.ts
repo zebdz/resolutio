@@ -4,6 +4,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { hash } from '@node-rs/argon2';
 import { randomUUID } from 'crypto';
+import { loadCrossTreeData, printCrossTreeSummary } from './demo-summary';
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -989,6 +990,19 @@ async function main() {
 
   console.log(`Join parent requests: ${jpRows.length}`);
 
+  // ── 9. Condo ownership (roots[0]) ───────────────────────────
+  await seedCondoOwnership(
+    prisma,
+    roots[0].id,
+    orgMembers.get(roots[0].id) ?? []
+  );
+
+  // ── 10. Cross-tree ownership demo ────────────────────────────
+  await seedCrossTreeOwnership(
+    prisma,
+    await hash('password123', ARGON2_OPTIONS)
+  );
+
   // ── Summary ──────────────────────────────────────────────────
   console.log(`\n=== Seed Complete (scale=${SCALE}) ===`);
   console.log(`Users: ${users.length}`);
@@ -1000,6 +1014,301 @@ async function main() {
   console.log(`Join parent requests: ${jpRows.length}`);
   console.log('\nPassword for all users: password123');
   console.log('First user (+79161000001) is superadmin');
+}
+
+async function seedCondoOwnership(
+  prismaClient: PrismaClient,
+  orgId: string,
+  userIds: string[]
+): Promise<void> {
+  if (userIds.length === 0) {
+    console.log('[seed] skipping condo ownership — no users');
+
+    return;
+  }
+
+  // Idempotency guard
+  const existing = await prismaClient.organizationProperty.findFirst({
+    where: { organizationId: orgId, name: 'Apt house #13' },
+  });
+
+  if (existing) {
+    console.log('[seed] condo ownership already present, skipping');
+
+    return;
+  }
+
+  // Property 1: Apartment house — 10 apts summing to 850 m²
+  const aptHouse = await prismaClient.organizationProperty.create({
+    data: {
+      organizationId: orgId,
+      name: 'Apt house #13',
+      address: '5th St.',
+      sizeUnit: 'SQUARE_METERS',
+    },
+  });
+  const aptSizes = [75, 100, 80, 80, 80, 85, 85, 85, 90, 90];
+  const apts: { id: string }[] = [];
+
+  for (let i = 0; i < aptSizes.length; i++) {
+    apts.push(
+      await prismaClient.propertyAsset.create({
+        data: {
+          propertyId: aptHouse.id,
+          name: `Apt #${101 + i}`,
+          size: aptSizes[i],
+        },
+      })
+    );
+  }
+
+  // Property 2: Parking lot — 20 spots of 12 m² each
+  const parkingLot = await prismaClient.organizationProperty.create({
+    data: {
+      organizationId: orgId,
+      name: 'Parking lot',
+      address: '5th St.',
+      sizeUnit: 'SQUARE_METERS',
+    },
+  });
+  const spots: { id: string }[] = [];
+
+  for (let i = 0; i < 20; i++) {
+    spots.push(
+      await prismaClient.propertyAsset.create({
+        data: {
+          propertyId: parkingLot.id,
+          name: `Parking #${i + 1}`,
+          size: 12,
+        },
+      })
+    );
+  }
+
+  // Ownership:
+  // - user 0: owns apt #101 fully + parking #1 fully
+  // - user 1: owns 50% of apt #102 + parking #2 fully + 50% of parking #3
+  // - users 2..9: one apt each (#103..#110)
+  await prismaClient.propertyAssetOwnership.create({
+    data: { assetId: apts[0].id, userId: userIds[0], share: 1 },
+  });
+  await prismaClient.propertyAssetOwnership.create({
+    data: { assetId: spots[0].id, userId: userIds[0], share: 1 },
+  });
+
+  if (userIds.length >= 2) {
+    await prismaClient.propertyAssetOwnership.create({
+      data: { assetId: apts[1].id, userId: userIds[1], share: 0.5 },
+    });
+    await prismaClient.propertyAssetOwnership.create({
+      data: { assetId: spots[1].id, userId: userIds[1], share: 1 },
+    });
+    await prismaClient.propertyAssetOwnership.create({
+      data: { assetId: spots[2].id, userId: userIds[1], share: 0.5 },
+    });
+  }
+
+  for (let i = 2; i < Math.min(userIds.length, 10); i++) {
+    await prismaClient.propertyAssetOwnership.create({
+      data: { assetId: apts[i].id, userId: userIds[i], share: 1 },
+    });
+  }
+
+  console.log(
+    `[seed] condo ownership: ${apts.length} apts + ${spots.length} parking spots for ${Math.min(userIds.length, 10)} users`
+  );
+}
+
+// ── Cross-tree ownership demo scenario ─────────────────────────
+//
+// Builds a deterministic scenario that exercises every cross-tree concern:
+//  - a parent org "Tree Root A" with no properties of its own
+//  - two child orgs "Building B" and "Parking C"
+//  - multi-tree membership: Oscar is a member of A, B, AND C
+//  - cross-asset co-ownership inside B (Alice + Bob share an apt)
+//  - mixed unit properties (m² apartments vs m² parking — same unit here for
+//    simplicity; the logic that matters is the per-property denominator)
+//
+// At the end we print a summary table with:
+//  - who owns what (user → org → property → asset → share)
+//  - expected weights for 5 representative poll configurations
+//
+// The expected weights are computed by re-running the domain `computeWeights`
+// function over the same inputs the app would hand it — so the table is
+// literally "what you will see when these users vote".
+async function seedCrossTreeOwnership(
+  client: PrismaClient,
+  passwordHash: string
+): Promise<void> {
+  // Idempotency guard — matches the pattern used by seedCondoOwnership.
+  const existing = await client.organization.findFirst({
+    where: { name: 'Tree Root A (demo)' },
+  });
+
+  if (existing) {
+    console.log('[seed] cross-tree demo already present, skipping');
+
+    return;
+  }
+
+  // Users — named, with distinct +79162*** phone prefix so they don't collide
+  // with the randomly-generated users earlier in the seed.
+  const userSpecs = [
+    { phone: '+79162000001', firstName: 'Alice', lastName: 'Anderson' },
+    { phone: '+79162000002', firstName: 'Bob', lastName: 'Brown' },
+    { phone: '+79162000003', firstName: 'Helen', lastName: 'Harris' },
+    { phone: '+79162000004', firstName: 'Oscar', lastName: 'Osborne' },
+  ];
+
+  const users = await Promise.all(
+    userSpecs.map((s, i) =>
+      client.user.create({
+        data: {
+          firstName: s.firstName,
+          lastName: s.lastName,
+          middleName: null,
+          phoneNumber: s.phone,
+          password: passwordHash,
+          nickname: s.firstName.toLowerCase() + '_demo',
+          language: 'en',
+          confirmedAt: new Date(),
+          consentGivenAt: new Date(),
+          privacySetupCompleted: true,
+          allowFindByPhone: true,
+          createdAt: new Date(`2026-02-${String(i + 1).padStart(2, '0')}`),
+        },
+      })
+    )
+  );
+  const [alice, bob, helen, oscar] = users;
+
+  // Orgs: A (root) → B, C.
+  // allowMultiTreeMembership on A so Oscar can join both B and C under A.
+  const orgA = await client.organization.create({
+    data: {
+      name: 'Tree Root A (demo)',
+      description:
+        'Parent org with no properties — exists for cross-tree polls.',
+      createdById: oscar.id,
+      allowMultiTreeMembership: true,
+    },
+  });
+  const orgB = await client.organization.create({
+    data: {
+      name: 'Building B (demo)',
+      description: 'Apartment building — 4 apts.',
+      createdById: alice.id,
+      parentId: orgA.id,
+    },
+  });
+  const orgC = await client.organization.create({
+    data: {
+      name: 'Parking C (demo)',
+      description: 'Parking lot — 5 spots.',
+      createdById: helen.id,
+      parentId: orgA.id,
+    },
+  });
+
+  // Memberships: Alice → B; Bob → B; Helen → C; Oscar → A + B + C (multi-tree).
+  const memberships = [
+    { userId: alice.id, orgId: orgB.id },
+    { userId: bob.id, orgId: orgB.id },
+    { userId: helen.id, orgId: orgC.id },
+    { userId: oscar.id, orgId: orgA.id },
+    { userId: oscar.id, orgId: orgB.id },
+    { userId: oscar.id, orgId: orgC.id },
+  ];
+  await client.organizationUser.createMany({
+    data: memberships.map((m) => ({
+      userId: m.userId,
+      organizationId: m.orgId,
+      status: 'accepted',
+      acceptedAt: new Date(),
+      acceptedByUserId: oscar.id,
+    })),
+  });
+  // Each org also needs its creator as an admin.
+  await client.organizationAdminUser.createMany({
+    data: [
+      { userId: oscar.id, organizationId: orgA.id },
+      { userId: alice.id, organizationId: orgB.id },
+      { userId: helen.id, organizationId: orgC.id },
+    ],
+  });
+
+  // Properties + assets. B has 4 apts (total 290 m²); C has 5 spots (total 60 m²).
+  const aptProperty = await client.organizationProperty.create({
+    data: {
+      organizationId: orgB.id,
+      name: 'Apt House (B)',
+      address: 'Demo Street 1',
+      sizeUnit: 'SQUARE_METERS',
+    },
+  });
+  const aptSpecs = [
+    { name: 'B-Apt #1', size: 50 },
+    { name: 'B-Apt #2', size: 60 },
+    { name: 'B-Apt #3', size: 80 },
+    { name: 'B-Apt #4', size: 100 },
+  ];
+  const apts = await Promise.all(
+    aptSpecs.map((s) =>
+      client.propertyAsset.create({
+        data: { propertyId: aptProperty.id, name: s.name, size: s.size },
+      })
+    )
+  );
+
+  const parkingProperty = await client.organizationProperty.create({
+    data: {
+      organizationId: orgC.id,
+      name: 'Parking (C)',
+      address: 'Demo Street 2',
+      sizeUnit: 'SQUARE_METERS',
+    },
+  });
+  const spots = await Promise.all(
+    [1, 2, 3, 4, 5].map((i) =>
+      client.propertyAsset.create({
+        data: {
+          propertyId: parkingProperty.id,
+          name: `C-Spot #${i}`,
+          size: 12,
+        },
+      })
+    )
+  );
+
+  // Ownership rows. Each asset's active rows sum to 1.0 (enforced).
+  const ownershipSpecs = [
+    { assetIdx: 0, userId: alice.id, share: 1.0, prop: 'apt' }, // Alice owns B-Apt #1
+    { assetIdx: 1, userId: bob.id, share: 1.0, prop: 'apt' }, // Bob owns B-Apt #2
+    { assetIdx: 2, userId: alice.id, share: 0.5, prop: 'apt' }, // Alice + Bob co-own #3
+    { assetIdx: 2, userId: bob.id, share: 0.5, prop: 'apt' },
+    { assetIdx: 3, userId: oscar.id, share: 1.0, prop: 'apt' }, // Oscar owns B-Apt #4
+    { assetIdx: 0, userId: helen.id, share: 1.0, prop: 'spot' }, // Helen owns C-Spot #1
+    { assetIdx: 1, userId: helen.id, share: 1.0, prop: 'spot' },
+    { assetIdx: 2, userId: helen.id, share: 1.0, prop: 'spot' },
+    { assetIdx: 3, userId: oscar.id, share: 1.0, prop: 'spot' }, // Oscar owns #4 + #5
+    { assetIdx: 4, userId: oscar.id, share: 1.0, prop: 'spot' },
+  ];
+
+  for (const spec of ownershipSpecs) {
+    const asset =
+      spec.prop === 'apt' ? apts[spec.assetIdx] : spots[spec.assetIdx];
+    await client.propertyAssetOwnership.create({
+      data: { assetId: asset.id, userId: spec.userId, share: spec.share },
+    });
+  }
+
+  // ── Summary table — re-read from DB via the shared printer so seed-time
+  // output and `yarn db:demo-summary` output are generated by the same code.
+  const summaryData = await loadCrossTreeData(client);
+
+  if (summaryData) {
+    printCrossTreeSummary(summaryData);
+  }
 }
 
 main()

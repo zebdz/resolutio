@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/web/lib/session';
 import { getPollResultsAction } from '@/src/web/actions/poll/vote';
 import { getPollByIdAction } from '@/src/web/actions/poll/poll';
 import PollResults from '@/src/web/components/polls/results/PollResults';
+import { WeightConfigLabel } from '@/src/web/components/polls/results/WeightConfigLabel';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import {
   AnswerResult,
@@ -12,6 +13,21 @@ import {
 } from '@/src/application/poll/GetPollResultsUseCase';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { User } from '@/domain/user/User';
+import {
+  prisma,
+  PrismaOrganizationPropertyRepository,
+  PrismaOrganizationRepository,
+  PrismaPropertyAssetRepository,
+} from '@/infrastructure/index';
+import { PollWeightCalculator } from '@/application/poll/PollWeightCalculator';
+import { DistributionType } from '@/domain/poll/DistributionType';
+import { PropertyAggregation } from '@/domain/poll/PropertyAggregation';
+
+const propertyRepository = new PrismaOrganizationPropertyRepository(prisma);
+const pollWeightCalculator = new PollWeightCalculator(
+  new PrismaOrganizationRepository(prisma),
+  new PrismaPropertyAssetRepository(prisma)
+);
 
 interface ResultsPageProps {
   params: Promise<{
@@ -38,8 +54,44 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
 
   const poll = pollResult.data;
 
-  // Get results
-  const resultsResult = await getPollResultsAction(pollId);
+  // Fetch properties for weight config label + building total (parallel).
+  const [resultsResult, propertiesResult, buildingTotalResult] =
+    await Promise.all([
+      getPollResultsAction(pollId),
+      propertyRepository.findByOrganization(poll.organizationId),
+      pollWeightCalculator.computeBuildingTotal({
+        organizationId: poll.organizationId,
+        distributionType: poll.distributionType as DistributionType,
+        propertyAggregation: poll.propertyAggregation as PropertyAggregation,
+        propertyIds: poll.propertyIds,
+      }),
+    ]);
+  // 0 for EQUAL polls; the UI hides the building stat in that case.
+  const buildingTotal = buildingTotalResult.success
+    ? buildingTotalResult.value
+    : 0;
+
+  const allProperties = propertiesResult.success
+    ? propertiesResult.value.map((p) => ({ id: p.id, name: p.name }))
+    : [];
+
+  const scopedPropertyNames =
+    poll.propertyIds.length === 0
+      ? []
+      : allProperties
+          .filter((p) => poll.propertyIds.includes(p.id))
+          .map((p) => p.name);
+
+  const isOwnership =
+    poll.distributionType === 'OWNERSHIP_UNIT_COUNT' ||
+    poll.distributionType === 'OWNERSHIP_SIZE_WEIGHTED';
+
+  const effectiveScopeCount =
+    poll.propertyIds.length === 0
+      ? allProperties.length
+      : poll.propertyIds.length;
+
+  const showAggregation = isOwnership && effectiveScopeCount >= 2;
 
   if (!resultsResult.success) {
     return (
@@ -87,10 +139,15 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
       questionText: q.questionText,
       questionType: q.questionType,
       totalVotes: q.totalVotes,
+      // Σ answer weights (double-counts multi-choice voters); used for
+      // displaying answer-share percentages where each tick is a separate row.
       totalWeight: q.answers.reduce(
         (sum: number, a: any) => sum + a.totalWeight,
         0
       ),
+      // Σ unique voters' weights — the right denominator for "% of building"
+      // since participation is per voter, not per tick.
+      participantWeight: q.participantWeight,
       answers: q.answers.map((a: any) => ({
         answerId: a.answerId,
         answerText: a.answerText,
@@ -138,11 +195,21 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
         )}
       </div>
 
+      <div className="mb-4">
+        <WeightConfigLabel
+          distributionType={poll.distributionType}
+          propertyAggregation={poll.propertyAggregation}
+          scopedPropertyNames={scopedPropertyNames}
+          showAggregation={showAggregation}
+        />
+      </div>
+
       <PollResults
         results={serializedResults}
         pollState={poll.state}
         isPollCreator={isPollCreator}
         canViewVoters={canViewVoters}
+        buildingTotal={buildingTotal}
       />
     </AuthenticatedLayout>
   );

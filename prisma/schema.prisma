@@ -77,6 +77,10 @@ model User {
   address            Address?
   legalChecks        PollLegalCheck[]    @relation("LegalChecks")
   legalCheckLogs     PollLegalCheckLog[] @relation("LegalCheckLogs")
+  propertyOwnerships PropertyAssetOwnership[]
+  pollEligibilities  PollEligibleMember[]
+  propertyClaimsSubmitted PropertyClaim[] @relation("PropertyClaimUser")
+  propertyClaimsDecided   PropertyClaim[] @relation("PropertyClaimDecidedBy")
 
   @@map("users")
 }
@@ -145,6 +149,8 @@ model Organization {
   parentJoinRequests  OrganizationJoinParentRequest[] @relation("ParentOrgJoinParent")
   invitations         Invitation[]
   joinTokens          OrganizationJoinToken[]
+  properties          OrganizationProperty[]
+  propertyClaims      PropertyClaim[]
 
   @@index([parentId])
   @@index([createdById])
@@ -259,20 +265,24 @@ model Poll {
   boardId        String?   @map("board_id")
   startDate      DateTime  @map("start_date")
   endDate        DateTime  @map("end_date")
-  state          PollState @default(DRAFT)
-  weightCriteria String?   @map("weight_criteria")
+  state                PollState @default(DRAFT)
+  weightCriteria       String?   @map("weight_criteria")
+  distributionType     String    @default("EQUAL")   @map("distribution_type")
+  propertyAggregation  String    @default("RAW_SUM") @map("property_aggregation")
   createdBy      String    @map("created_by")
   createdAt      DateTime  @default(now()) @map("created_at")
   archivedAt     DateTime? @map("archived_at")
 
-  organization Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  board        Board?                          @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  creator      User                           @relation(fields: [createdBy], references: [id])
-  questions    Question[]
-  participants   PollParticipant[]
-  voteDrafts     VoteDraft[]
-  legalCheck     PollLegalCheck?
-  legalCheckLogs PollLegalCheckLog[]
+  organization    Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  board           Board?                          @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  creator         User                            @relation(fields: [createdBy], references: [id])
+  questions       Question[]
+  participants    PollParticipant[]
+  voteDrafts      VoteDraft[]
+  legalCheck      PollLegalCheck?
+  legalCheckLogs  PollLegalCheckLog[]
+  properties      PollProperty[]
+  eligibleMembers PollEligibleMember[]
 
   @@index([organizationId])
   @@index([boardId])
@@ -323,7 +333,7 @@ model Vote {
   questionId String   @map("question_id")
   answerId   String   @map("answer_id")
   userId     String   @map("user_id")
-  userWeight Decimal  @default(1.0) @map("user_weight") @db.Decimal(10, 2)
+  userWeight Decimal  @default(1.0) @map("user_weight") @db.Decimal(15, 6)
   createdAt  DateTime @default(now()) @map("created_at")
 
   question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
@@ -340,7 +350,7 @@ model PollParticipant {
   id         String   @id @default(cuid())
   pollId     String   @map("poll_id")
   userId     String   @map("user_id")
-  userWeight          Decimal  @default(1.0) @map("user_weight") @db.Decimal(10, 2)
+  userWeight          Decimal  @default(1.0) @map("user_weight") @db.Decimal(15, 6)
   willingToSignProtocol Boolean? @map("willing_to_sign_protocol")
   snapshotAt          DateTime @default(now()) @map("snapshot_at")
   createdAt           DateTime @default(now()) @map("created_at")
@@ -360,8 +370,8 @@ model ParticipantWeightHistory {
   participantId String   @map("participant_id")
   pollId        String   @map("poll_id")
   userId        String   @map("user_id")
-  oldWeight     Decimal  @db.Decimal(10, 2) @map("old_weight")
-  newWeight     Decimal  @db.Decimal(10, 2) @map("new_weight")
+  oldWeight     Decimal  @db.Decimal(15, 6) @map("old_weight")
+  newWeight     Decimal  @db.Decimal(15, 6) @map("new_weight")
   changedBy     String   @map("changed_by")
   reason        String?
   changedAt     DateTime @default(now()) @map("changed_at")
@@ -596,5 +606,135 @@ model SystemSetting {
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("system_settings")
+}
+
+// Property Models
+model OrganizationProperty {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  name           String
+  address        String?
+  sizeUnit       String    @map("size_unit")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  archivedAt     DateTime? @map("archived_at")
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assets       PropertyAsset[]
+  polls        PollProperty[]
+
+  @@index([organizationId])
+  @@map("organization_properties")
+}
+
+model PropertyAsset {
+  id          String    @id @default(cuid())
+  propertyId  String    @map("property_id")
+  name        String
+  size        Decimal   @db.Decimal(15, 6)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  archivedAt  DateTime? @map("archived_at")
+
+  property   OrganizationProperty     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  ownerships PropertyAssetOwnership[]
+  claims     PropertyClaim[]
+
+  @@index([propertyId])
+  @@map("property_assets")
+}
+
+/// IMPORTANT: a partial UNIQUE INDEX on (asset_id, user_id) WHERE
+/// effective_until IS NULL AND user_id IS NOT NULL is enforced at the DB
+/// level (see migration `20260427142323_unique_active_ownership_per_user`).
+/// This prevents two ACTIVE ownership rows for the same registered user on
+/// the same asset — would corrupt the weight calc and the per-asset
+/// share-sum invariant. External placeholders (user_id IS NULL) and
+/// historical rows (effective_until IS NOT NULL) are deliberately exempt
+/// and may repeat freely. Prisma 7 cannot express partial unique indexes
+/// via @@unique, so the constraint lives in the migration only.
+model PropertyAssetOwnership {
+  id                 String    @id @default(cuid())
+  assetId            String    @map("asset_id")
+  userId             String?   @map("user_id")
+  externalOwnerLabel String?   @map("external_owner_label")
+  share              Decimal   @db.Decimal(9, 8)
+  effectiveFrom      DateTime  @default(now()) @map("effective_from")
+  effectiveUntil     DateTime? @map("effective_until")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  asset PropertyAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  user  User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([assetId, effectiveUntil])
+  @@index([userId, effectiveUntil])
+  @@map("property_asset_ownerships")
+}
+
+model PollProperty {
+  pollId     String @map("poll_id")
+  propertyId String @map("property_id")
+
+  poll     Poll                 @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  property OrganizationProperty @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@id([pollId, propertyId])
+  @@index([pollId])
+  @@map("poll_properties")
+}
+
+model PollEligibleMember {
+  id         String   @id @default(cuid())
+  pollId     String   @map("poll_id")
+  userId     String   @map("user_id")
+  snapshotAt DateTime @map("snapshot_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  poll Poll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, userId])
+  @@index([pollId])
+  @@map("poll_eligible_members")
+}
+
+model PropertyClaim {
+  id             String    @id @default(cuid())
+  organizationId String    @map("organization_id")
+  userId         String    @map("user_id")
+  assetId        String    @map("asset_id")
+  status         String
+  deniedReason   String?   @map("denied_reason")
+  decidedBy      String?   @map("decided_by")
+  decidedAt      DateTime? @map("decided_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user          User          @relation("PropertyClaimUser", fields: [userId], references: [id], onDelete: Cascade)
+  asset         PropertyAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  decidedByUser User?         @relation("PropertyClaimDecidedBy", fields: [decidedBy], references: [id])
+  attachments   PropertyClaimAttachment[]
+
+  @@index([organizationId, status])
+  @@index([userId])
+  @@index([assetId])
+  @@map("property_claims")
+}
+
+model PropertyClaimAttachment {
+  id        String   @id @default(cuid())
+  claimId   String   @map("claim_id")
+  fileName  String   @map("file_name")
+  mimeType  String   @map("mime_type")
+  sizeBytes Int      @map("size_bytes")
+  // bytea — kept inline for atomicity with the claim row. Capped at 10 MB by
+  // domain validation; Postgres TOAST stores values >2 KB out of line, so this
+  // does not slow row scans on PropertyClaim. Migrating to object storage
+  // later means swapping `bytes` for a `url` column on this same table.
+  bytes     Bytes
+  createdAt DateTime @default(now()) @map("created_at")
+
+  claim PropertyClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@index([claimId])
+  @@map("property_claim_attachments")
 }
 

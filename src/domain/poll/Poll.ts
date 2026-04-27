@@ -19,6 +19,9 @@ export interface PollProps {
   endDate: Date;
   state: PollState;
   weightCriteria: string | null;
+  distributionType: string; // 'EQUAL' | 'OWNERSHIP_UNIT_COUNT' | 'OWNERSHIP_SIZE_WEIGHTED'
+  propertyAggregation: string; // 'RAW_SUM' | 'NORMALIZE_PER_PROPERTY'
+  propertyIds: string[]; // empty = no filter (all properties)
   createdBy: string;
   createdAt: Date;
   archivedAt: Date | null;
@@ -79,6 +82,9 @@ export class Poll {
       endDate,
       state: PollState.DRAFT,
       weightCriteria: null,
+      distributionType: 'EQUAL',
+      propertyAggregation: 'RAW_SUM',
+      propertyIds: [],
       createdBy,
       createdAt: new Date(),
       archivedAt: null,
@@ -127,6 +133,18 @@ export class Poll {
 
   public get weightCriteria(): string | null {
     return this.props.weightCriteria;
+  }
+
+  public get distributionType(): string {
+    return this.props.distributionType;
+  }
+
+  public get propertyAggregation(): string {
+    return this.props.propertyAggregation;
+  }
+
+  public get propertyIds(): string[] {
+    return [...this.props.propertyIds];
   }
 
   public get createdBy(): string {
@@ -455,5 +473,15 @@ export class Poll {
    */
   public setWeightCriteria(criteria: string | null): void {
     this.props.weightCriteria = criteria;
+  }
+
+  public applyWeightConfig(
+    distributionType: string,
+    propertyAggregation: string,
+    propertyIds: string[]
+  ): void {
+    this.props.distributionType = distributionType;
+    this.props.propertyAggregation = propertyAggregation;
+    this.props.propertyIds = [...propertyIds];
   }
 }

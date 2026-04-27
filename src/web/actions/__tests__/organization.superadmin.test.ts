@@ -30,6 +30,8 @@ vi.mock('@/infrastructure/index', () => ({
   },
   PrismaNotificationRepository: class {},
   PrismaInvitationRepository: class {},
+  PrismaOrganizationPropertyRepository: class {},
+  PrismaPropertyAssetRepository: class {},
 }));
 
 vi.mock('@/infrastructure/profanity/LeoProfanityChecker', () => ({

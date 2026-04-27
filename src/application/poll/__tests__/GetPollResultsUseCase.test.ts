@@ -477,6 +477,10 @@ describe('GetPollResultsUseCase', () => {
       expect(answer1Result?.voteCount).toBe(1);
       expect(answer2Result?.voteCount).toBe(2);
       expect(answer2Result?.totalWeight).toBe(5.0); // 3.0 + 2.0
+      // participantWeight = unique voters' weights (each counted once even
+      // when they pick multiple answers). user-1 weight 2 + user-2 weight 3 = 5,
+      // NOT 7 (= sum across answers, which double-counts user-1).
+      expect(questionResult.participantWeight).toBe(5.0);
     }
   });
 

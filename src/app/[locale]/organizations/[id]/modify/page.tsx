@@ -186,6 +186,24 @@ export default async function OrganizationModifyPage({
           </Link>
         </div>
 
+        <Divider />
+
+        {/* Property Management */}
+        <div className="space-y-3">
+          <Heading level={2}>{t('propertyManagement')}</Heading>
+          <div className="flex flex-wrap gap-2">
+            <Link href={`/organizations/${id}/manage-properties`}>
+              <Button color="zinc">{t('manageProperties')}</Button>
+            </Link>
+            <Link href={`/organizations/${id}/ownership`}>
+              <Button color="zinc">{t('viewOwnership')}</Button>
+            </Link>
+            <Link href={`/organizations/${id}/property-claims`}>
+              <Button color="zinc">{t('propertyClaims')}</Button>
+            </Link>
+          </div>
+        </div>
+
         {/* Parent Org Section */}
         <ParentOrgSection
           organizationId={id}

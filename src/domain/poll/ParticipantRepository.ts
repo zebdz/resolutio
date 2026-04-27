@@ -43,4 +43,28 @@ export interface ParticipantRepository {
     participants: PollParticipant[],
     historyRecords: ParticipantWeightHistory[]
   ): Promise<Result<PollParticipant[], string>>;
+
+  pollHasVotes(pollId: string): Promise<Result<boolean, string>>;
+
+  /**
+   * Atomic reconfigure: applies adds/removes/updates to poll_participants,
+   * writes one ParticipantWeightHistory per change, updates polls columns,
+   * and replaces poll_properties rows.
+   */
+  applyWeightConfigChange(
+    pollId: string,
+    newDistributionType: string,
+    newPropertyAggregation: string,
+    newPropertyIds: string[],
+    add: Array<{ userId: string; weight: number }>,
+    remove: Array<{ participantId: string; userId: string; oldWeight: number }>,
+    update: Array<{
+      participantId: string;
+      userId: string;
+      oldWeight: number;
+      newWeight: number;
+    }>,
+    adminUserId: string,
+    reason: string
+  ): Promise<Result<void, string>>;
 }

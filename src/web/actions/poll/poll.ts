@@ -2,6 +2,8 @@
 
 import { getTranslations } from 'next-intl/server';
 import { CreatePollUseCase } from '@/application/poll/CreatePollUseCase';
+import { PreviewPollWeightConfigUseCase } from '@/application/poll/PreviewPollWeightConfigUseCase';
+import { UpdatePollWeightConfigUseCase } from '@/application/poll/UpdatePollWeightConfigUseCase';
 import { UpdatePollUseCase } from '@/application/poll/UpdatePollUseCase';
 import { AddQuestionUseCase } from '@/application/poll/AddQuestionUseCase';
 import { UpdateQuestionUseCase } from '@/application/poll/UpdateQuestionUseCase';
@@ -11,6 +13,7 @@ import { UpdateAnswerUseCase } from '@/application/poll/UpdateAnswerUseCase';
 import { DeleteAnswerUseCase } from '@/application/poll/DeleteAnswerUseCase';
 import { UpdateQuestionOrderUseCase } from '@/application/poll/UpdateQuestionOrderUseCase';
 import { TakeSnapshotUseCase } from '@/application/poll/TakeSnapshotUseCase';
+import { PollWeightCalculator } from '@/application/poll/PollWeightCalculator';
 import { ActivatePollUseCase } from '@/application/poll/ActivatePollUseCase';
 import { DeactivatePollUseCase } from '@/application/poll/DeactivatePollUseCase';
 import { DiscardSnapshotUseCase } from '@/application/poll/DiscardSnapshotUseCase';
@@ -37,6 +40,9 @@ import {
   PrismaAnswerRepository,
   PrismaDraftRepository,
   PrismaNotificationRepository,
+  PrismaPropertyAssetRepository,
+  PrismaPollEligibleMemberRepository,
+  PrismaOrganizationPropertyRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
@@ -62,6 +68,13 @@ const boardRepository = new PrismaBoardRepository(prisma);
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 const notificationRepository = new PrismaNotificationRepository(prisma);
+const propertyAssetRepository = new PrismaPropertyAssetRepository(prisma);
+const pollEligibleMemberRepository = new PrismaPollEligibleMemberRepository(
+  prisma
+);
+const organizationPropertyRepository = new PrismaOrganizationPropertyRepository(
+  prisma
+);
 
 const profanityChecker = LeoProfanityChecker.getInstance();
 
@@ -126,12 +139,18 @@ const updateQuestionOrderUseCase = new UpdateQuestionOrderUseCase(
   questionRepository,
   userRepository
 );
+const pollWeightCalculator = new PollWeightCalculator(
+  organizationRepository,
+  propertyAssetRepository
+);
 const takeSnapshotUseCase = new TakeSnapshotUseCase(
   pollRepository,
   participantRepository,
   boardRepository,
   organizationRepository,
-  userRepository
+  userRepository,
+  pollEligibleMemberRepository,
+  pollWeightCalculator
 );
 const activatePollUseCase = new ActivatePollUseCase(
   pollRepository,
@@ -164,6 +183,25 @@ const finishPollUseCase = new FinishPollUseCase(
   participantRepository,
   boardRepository
 );
+const previewPollWeightConfigUseCase = new PreviewPollWeightConfigUseCase(
+  pollRepository,
+  participantRepository,
+  userRepository,
+  organizationRepository,
+  pollEligibleMemberRepository,
+  propertyAssetRepository,
+  pollWeightCalculator
+);
+const updatePollWeightConfigUseCase = new UpdatePollWeightConfigUseCase(
+  pollRepository,
+  participantRepository,
+  userRepository,
+  organizationRepository,
+  pollEligibleMemberRepository,
+  propertyAssetRepository,
+  organizationPropertyRepository,
+  pollWeightCalculator
+);
 
 export async function createPollAction(
   formData: FormData
@@ -189,6 +227,13 @@ export async function createPollAction(
 
     // Extract form data
     const boardIdRaw = formData.get('boardId') as string | null;
+    const distributionTypeRaw = formData.get('distributionType') as
+      | string
+      | null;
+    const propertyAggregationRaw = formData.get('propertyAggregation') as
+      | string
+      | null;
+    const propertyIdsRaw = formData.get('propertyIds') as string | null;
     const input = {
       title: formData.get('title') as string,
       description: formData.get('description') as string,
@@ -196,6 +241,17 @@ export async function createPollAction(
       boardId: boardIdRaw && boardIdRaw.trim() ? boardIdRaw : null,
       startDate: new Date(formData.get('startDate') as string),
       endDate: new Date(formData.get('endDate') as string),
+      distributionType:
+        distributionTypeRaw && distributionTypeRaw.trim()
+          ? distributionTypeRaw
+          : undefined,
+      propertyAggregation:
+        propertyAggregationRaw && propertyAggregationRaw.trim()
+          ? propertyAggregationRaw
+          : undefined,
+      propertyIds: propertyIdsRaw
+        ? (JSON.parse(propertyIdsRaw) as string[])
+        : undefined,
     };
 
     // Validate with Zod
@@ -1509,4 +1565,84 @@ export async function searchPollsAction(
 
     return { success: false, error: t('generic') };
   }
+}
+
+export async function previewPollWeightConfigAction(args: {
+  pollId: string;
+  distributionType?: string;
+  propertyAggregation?: string;
+  propertyIds?: string[];
+}): Promise<
+  ActionResult<
+    import('@/application/poll/PreviewPollWeightConfigUseCase').PreviewPollWeightConfigOutput
+  >
+> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return {
+      success: false,
+      error: await translateErrorCode('auth.errors.unauthorized'),
+    };
+  }
+
+  const result = await previewPollWeightConfigUseCase.execute({
+    pollId: args.pollId,
+    newConfig: {
+      distributionType: args.distributionType,
+      propertyAggregation: args.propertyAggregation,
+      propertyIds: args.propertyIds,
+    },
+    actingUserId: user.id,
+  });
+
+  if (!result.success) {
+    return { success: false, error: await translateErrorCode(result.error) };
+  }
+
+  return { success: true, data: result.value };
+}
+
+export async function updatePollWeightConfigAction(args: {
+  pollId: string;
+  distributionType?: string;
+  propertyAggregation?: string;
+  propertyIds?: string[];
+}): Promise<ActionResult<void>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return {
+      success: false,
+      error: await translateErrorCode('auth.errors.unauthorized'),
+    };
+  }
+
+  const result = await updatePollWeightConfigUseCase.execute({
+    pollId: args.pollId,
+    newConfig: {
+      distributionType: args.distributionType,
+      propertyAggregation: args.propertyAggregation,
+      propertyIds: args.propertyIds,
+    },
+    adminUserId: user.id,
+  });
+
+  if (!result.success) {
+    return { success: false, error: await translateErrorCode(result.error) };
+  }
+
+  return { success: true, data: undefined };
 }
