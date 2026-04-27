@@ -171,11 +171,14 @@ export function AssetsTable({
         </Button>
       </div>
       <ErrorBanner message={err} />
-      <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+      {/* Mobile: each asset becomes a bordered card with stacked rows so
+          name / size / actions don't run together. Desktop falls back to
+          the existing 4-column grid via `sm:contents` on the action wrapper. */}
+      <ul className="space-y-3 sm:space-y-0 sm:divide-y sm:divide-zinc-200 sm:dark:divide-zinc-800">
         {assets.map((a) => (
           <li
             key={a.id}
-            className={`py-3 grid grid-cols-1 sm:grid-cols-[1fr_120px_auto_auto_auto] gap-2 items-center ${
+            className={`rounded-lg border border-zinc-300 p-3 space-y-2 dark:border-zinc-700 sm:rounded-none sm:border-0 sm:p-0 sm:py-3 sm:space-y-0 sm:grid sm:grid-cols-[1fr_120px_auto_auto] sm:gap-2 sm:items-center ${
               a.archivedAt ? 'opacity-60' : ''
             }`}
           >
@@ -197,21 +200,26 @@ export function AssetsTable({
                 }
               }}
             />
-            {a.archivedAt ? (
-              // Archived assets are read-only — ownership edits are blocked
-              // server-side too (see ReplaceAssetOwnersUseCase archived guard).
-              <span />
-            ) : (
-              <Button plain onClick={() => setEditing(a.id)}>
-                {t('assets.editOwners')}
+            {/* Wrap the two action buttons so they sit side-by-side on mobile
+                instead of each taking a full row; `sm:contents` lets each
+                button become its own grid cell on desktop. */}
+            <div className="flex items-center gap-2 sm:contents">
+              {a.archivedAt ? (
+                // Archived assets are read-only — ownership edits are blocked
+                // server-side too (see ReplaceAssetOwnersUseCase archived guard).
+                <span className="hidden sm:block" />
+              ) : (
+                <Button plain onClick={() => setEditing(a.id)}>
+                  {t('assets.editOwners')}
+                </Button>
+              )}
+              <Button
+                color={a.archivedAt ? 'zinc' : 'red'}
+                onClick={() => toggleArchive(a.id, a.archivedAt !== null)}
+              >
+                {a.archivedAt ? t('unarchive.button') : t('archive.button')}
               </Button>
-            )}
-            <Button
-              color={a.archivedAt ? 'zinc' : 'red'}
-              onClick={() => toggleArchive(a.id, a.archivedAt !== null)}
-            >
-              {a.archivedAt ? t('unarchive.button') : t('archive.button')}
-            </Button>
+            </div>
           </li>
         ))}
       </ul>
