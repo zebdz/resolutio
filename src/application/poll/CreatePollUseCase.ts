@@ -14,6 +14,9 @@ export interface CreatePollInput {
   createdBy: string;
   startDate: Date;
   endDate: Date;
+  distributionType?: string;
+  propertyAggregation?: string;
+  propertyIds?: string[];
 }
 
 export class CreatePollUseCase {
@@ -67,6 +70,19 @@ export class CreatePollUseCase {
 
     if (!pollResult.success) {
       return failure(pollResult.error);
+    }
+
+    // Apply optional weight config overrides (defaults are EQUAL / RAW_SUM / [])
+    if (
+      input.distributionType !== undefined ||
+      input.propertyAggregation !== undefined ||
+      input.propertyIds !== undefined
+    ) {
+      pollResult.value.applyWeightConfig(
+        input.distributionType ?? pollResult.value.distributionType,
+        input.propertyAggregation ?? pollResult.value.propertyAggregation,
+        input.propertyIds ?? pollResult.value.propertyIds
+      );
     }
 
     // 3. Persist the validated domain object

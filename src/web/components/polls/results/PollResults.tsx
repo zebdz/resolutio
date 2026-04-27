@@ -29,6 +29,7 @@ interface QuestionResult {
   questionType: QuestionType;
   totalVotes: number;
   totalWeight: number;
+  participantWeight: number;
   answers: AnswerResult[];
 }
 
@@ -54,6 +55,9 @@ interface PollResultsProps {
   pollState: PollState;
   isPollCreator: boolean;
   canViewVoters: boolean;
+  // Theoretical max Σ weights if every owner were registered. 0 for EQUAL
+  // polls — the UI then collapses Building/Registered into a single number.
+  buildingTotal: number;
 }
 
 export default function PollResults({
@@ -61,6 +65,7 @@ export default function PollResults({
   pollState,
   isPollCreator,
   canViewVoters,
+  buildingTotal,
 }: PollResultsProps) {
   const isActive = pollState === 'ACTIVE';
   const isFinished = pollState === 'FINISHED';
@@ -100,11 +105,18 @@ export default function PollResults({
 
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 bg-white dark:bg-zinc-900">
             <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              {t('totalWeight')}
+              {buildingTotal > 0 ? t('registeredOfBuilding') : t('totalWeight')}
             </div>
             <div className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-white">
-              {results.totalWeight.toFixed(2)}
+              {buildingTotal > 0
+                ? `${results.totalWeight.toFixed(2)} / ${buildingTotal.toFixed(2)}`
+                : results.totalWeight.toFixed(2)}
             </div>
+            {buildingTotal > 0 && (
+              <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                {`${((results.totalWeight / buildingTotal) * 100).toFixed(2)}% ${t('ofBuilding')}`}
+              </div>
+            )}
           </div>
 
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 bg-white dark:bg-zinc-900">
@@ -169,6 +181,13 @@ export default function PollResults({
                   <span>
                     {t('voteWeight')}: {question.totalWeight.toFixed(2)}
                   </span>
+                  {buildingTotal > 0 && (
+                    <span>
+                      {t('participation')}:{' '}
+                      {question.participantWeight.toFixed(2)}{' '}
+                      {`(${((question.participantWeight / buildingTotal) * 100).toFixed(2)}% ${t('ofBuilding')})`}
+                    </span>
+                  )}
                   <Badge color="zinc">
                     {question.questionType === 'single-choice'
                       ? t('singleChoice')

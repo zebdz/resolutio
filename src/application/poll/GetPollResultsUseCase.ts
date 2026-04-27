@@ -38,6 +38,11 @@ export interface QuestionResult {
   questionType: string;
   answers: AnswerResult[];
   totalVotes: number;
+  // Σ unique voters' weights for this question. Same as Σ answer weights for
+  // single-choice; for multi-choice each voter is counted once even when they
+  // pick multiple answers. Use this (not Σ answer weights) for "% of building"
+  // since voter participation is by definition per person, not per ticked box.
+  participantWeight: number;
 }
 
 export interface ProtocolSignWillingnessEntry {
@@ -224,6 +229,21 @@ export class GetPollResultsUseCase {
         });
       }
 
+      // Dedupe by userId — a multi-choice voter casting N votes contributes
+      // their weight only once to the participation total.
+      const uniqueVoterWeights = new Map<string, number>();
+
+      for (const v of questionVotes) {
+        if (!uniqueVoterWeights.has(v.userId)) {
+          uniqueVoterWeights.set(v.userId, v.userWeight);
+        }
+      }
+
+      const participantWeight = Array.from(uniqueVoterWeights.values()).reduce(
+        (s, w) => s + w,
+        0
+      );
+
       results.push({
         questionId: question.id,
         questionText: question.text,
@@ -231,6 +251,7 @@ export class GetPollResultsUseCase {
         questionType: question.questionType,
         answers: answerResults,
         totalVotes: questionVotes.length,
+        participantWeight,
       });
     }
 

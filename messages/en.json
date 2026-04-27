@@ -128,6 +128,12 @@
     "pendingInvitationsCount": "You have {count} pending {count, plural, =1 {invitation} other {invitations}}",
     "pendingRequestsCount": "You have {count} pending join {count, plural, =1 {request} other {requests}}",
     "archivedBadge": "Archived",
+    "sort": {
+      "ariaLabel": "Sort",
+      "byName": "Name",
+      "byJoined": "Joined",
+      "byOrganization": "Organization"
+    },
     "joinRequest": {
       "requested": "Requested",
       "pending": "Pending",
@@ -374,6 +380,10 @@
       "saving": "Saving...",
       "updateSuccess": "Organization updated successfully",
       "manageTokens": "Manage Join Links",
+      "propertyManagement": "Property Management",
+      "manageProperties": "Manage Properties",
+      "viewOwnership": "View Ownership",
+      "propertyClaims": "Property Claims",
       "allowMultiTreeMembershipLabel": "Allow multi-membership within hierarchy",
       "allowMultiTreeMembershipDescription": "When enabled, users can be members of multiple organizations within this hierarchy tree",
       "allowMultiTreeMembershipInherited": "Multi-membership: {status} (setting from root org \"{rootOrgName}\")",
@@ -700,7 +710,8 @@
       "answerTextRequired": "Answer text is required",
       "loadBoards": "Failed to load boards",
       "resultsAdminOnly": "Only admins can view voter breakdown for active polls",
-      "notOrganizationMember": "You must be a member of the organization to view results"
+      "notOrganizationMember": "You must be a member of the organization to view results",
+      "cannotChangeWeightConfig": "Cannot change weight configuration for this poll"
     },
     "voting": {
       "title": "Vote on Poll",
@@ -729,7 +740,12 @@
       "name": "Name",
       "phone": "Phone",
       "weight": "Weight",
+      "votingWeight": "Voting weight",
+      "propertyWeight": "Property weight",
       "totalWeight": "Total Weight",
+      "buildingTotal": "Building total voting power",
+      "registeredTotal": "Registered voting power",
+      "buildingGapHint": "Voting weight = share among registered voters (sums to 100%). Property weight = share of the building's total voting power; the remainder belongs to unregistered owners (the gap above).",
       "lastChanged": "Last Changed",
       "actions": "Actions",
       "editWeight": "Edit Weight",
@@ -767,6 +783,9 @@
       "title": "Poll Results",
       "totalParticipants": "Participants Voted",
       "totalWeight": "Total Weight",
+      "registeredOfBuilding": "Registered / Building",
+      "ofBuilding": "of building",
+      "participation": "Participation",
       "status": "Status",
       "votes": "Votes",
       "voteWeight": "Weight",
@@ -839,6 +858,54 @@
         "columnFullName": "Full Name",
         "pageOf": "Page {current} of {total}",
         "generatedOn": "Generated: {date}"
+      },
+      "distributionTypeLabel": "Weight distribution: {type}",
+      "propertiesLabel": "Properties: {names}",
+      "aggregationLabel": "Aggregation: {aggregation}"
+    },
+    "distribution": {
+      "label": "Weight distribution",
+      "type": {
+        "equal": "Equal (1 per participant)",
+        "ownershipUnitCount": "By unit count",
+        "ownershipSizeWeighted": "By unit size"
+      },
+      "ownershipOptionDisabledTooltip": "Organization has no ownership data configured"
+    },
+    "propertyScope": {
+      "label": "Properties",
+      "ownership": {
+        "allByDefault": "(default: weight is counted from all properties in this organization and its sub-organizations)",
+        "someSelected": "Filter mode: only checked properties will be counted ({count} selected)"
+      },
+      "equal": {
+        "allByDefault": "(default: all members can vote — leave empty unless you want to restrict voting to property owners)",
+        "someSelected": "Eligibility filter: only members who own assets in checked properties can vote ({count} selected)"
+      },
+      "empty": "No properties selected",
+      "showSubOrgs": "Show sub-organizations ({count})",
+      "hideSubOrgs": "Hide sub-organizations"
+    },
+    "aggregation": {
+      "label": "Property aggregation",
+      "rawSum": "Raw sum",
+      "normalizePerProperty": "Normalize per property",
+      "tooltip": "Raw sum: larger properties dominate the total weight. Normalize per property: each property contributes equally up to 1.0 before being summed."
+    },
+    "weightConfig": {
+      "lockedAfterActivation": "Weight configuration is locked once the poll is activated. Deactivate it first to make changes.",
+      "preview": {
+        "added": "{count, plural, one {# participant will be added} other {# participants will be added}}",
+        "removed": "{count, plural, one {# participant will be removed} other {# participants will be removed}}",
+        "reweighted": "{count, plural, one {# participant will be reweighted} other {# participants will be reweighted}}",
+        "save": "Save",
+        "cancel": "Cancel"
+      },
+      "changeReason": {
+        "distributionType": "Distribution type changed to {type}",
+        "propertyScope": "Property scope changed",
+        "propertyAggregation": "Property aggregation changed to {aggregation}",
+        "combined": "Weight config changed"
       }
     }
   },
@@ -991,6 +1058,18 @@
       "memberLeftOrganization": {
         "title": "Member left organization",
         "body": "{memberName} left the organization {organizationName}"
+      },
+      "propertyClaimSubmitted": {
+        "title": "New property claim",
+        "body": "A member submitted a claim. Review in the queue."
+      },
+      "propertyClaimApproved": {
+        "title": "Your claim was approved",
+        "body": "You are now linked as the owner of this asset."
+      },
+      "propertyClaimDenied": {
+        "title": "Your claim was denied",
+        "body": "See the denial reason for details."
       }
     },
     "page": {
@@ -1017,7 +1096,8 @@
         "voteNow": "Vote now",
         "viewResults": "View results",
         "respondToInvite": "Respond to invitation",
-        "viewBoard": "View board"
+        "viewBoard": "View board",
+        "viewPropertyClaims": "View property claims"
       }
     }
   },
@@ -1040,7 +1120,43 @@
       "organizationAlreadyArchived": "Organization is already archived",
       "organizationNotArchived": "Organization is not archived",
       "organizationNameTooShort": "Organization name must be at least {minLength, plural, =1 {1 character} other {# characters}}",
-      "organizationNameInvalidChars": "Organization name can only contain letters, numbers, spaces, hyphens, and double quotes"
+      "organizationNameInvalidChars": "Organization name can only contain letters, numbers, spaces, hyphens, and double quotes",
+      "propertyNameEmpty": "Property name cannot be empty",
+      "propertyAssetNameEmpty": "Asset name cannot be empty",
+      "propertyAssetSizeNonPositive": "Asset size must be greater than zero",
+      "propertyAssetOwnershipShareOutOfRange": "Ownership share must be between 0 and 1",
+      "propertyNotFound": "Property not found",
+      "propertyAlreadyArchived": "Property is already archived",
+      "propertyNotArchived": "Property is not archived",
+      "propertyAssetNotFound": "Asset not found",
+      "propertyAssetAlreadyArchived": "Asset is already archived",
+      "propertyAssetNotArchived": "Asset is not archived",
+      "sizeUnitInvalid": "Unsupported size unit",
+      "sharesDoNotSumToOne": "Shares must sum to 100%",
+      "ownerRepresentationInvalid": "Exactly one of user or external owner label must be set",
+      "externalOwnerLabelEmpty": "External owner label is required",
+      "ownershipUserIdRequired": "Pick a member for every registered-user owner row",
+      "ownershipShareMustBePositive": "Each owner's share must be greater than 0%. Remove rows instead of setting them to 0.",
+      "ownershipDuplicateOwner": "The same owner appears more than once.",
+      "correctionReasonEmpty": "Correction reason is required",
+      "cannotCorrectLockedProperty": "Cannot correct ownership: property is locked by a past poll",
+      "ownershipRowNotFound": "Ownership row not found",
+      "ownershipRowNotActive": "Ownership row is no longer active",
+      "propertyClaimNotFound": "Property claim not found",
+      "propertyClaimNotPending": "Property claim is not pending",
+      "propertyClaimDenialReasonEmpty": "Denial reason is required",
+      "propertyClaimAlreadyPendingForAsset": "This asset is already under review for another claim",
+      "propertyClaimOwnPendingForAsset": "You already have a pending claim on this asset — wait for an admin decision",
+      "propertyClaimRepeatBlockedDuringCooldown": "Wait 1 hour before re-submitting a claim for this asset",
+      "propertyClaimAssetNotClaimable": "This asset is no longer claimable",
+      "propertyClaimAttachmentTooLarge": "Proof file is larger than 10 MB",
+      "propertyClaimAttachmentTypeNotAllowed": "Proof file type not allowed (use PNG, JPEG, WebP, PDF, or ZIP)",
+      "propertyClaimAttachmentMagicMismatch": "Proof file content does not match its declared type",
+      "propertyClaimMultiplePlaceholdersRequireTarget": "This asset has multiple external owners — pick which slot to assign before approving",
+      "propertyClaimTargetOwnershipInvalid": "The selected ownership slot is invalid for this asset",
+      "propertyClaimAttachmentFileNameEmpty": "Proof file name is required",
+      "propertyClaimAttachmentNotFound": "Proof file not found",
+      "notOrgMember": "You are not a member of this organization"
     },
     "joinParentRequest": {
       "messageEmpty": "Message cannot be empty",
@@ -1110,7 +1226,13 @@
       "questionCannotAddAnswerArchived": "Cannot add answer to an archived question",
       "questionCannotRemoveAnswerArchived": "Cannot remove answer from an archived question",
       "questionAnswerNotFound": "Answer not found in question",
-      "answerInvalidOrder": "Invalid answer order"
+      "answerInvalidOrder": "Invalid answer order",
+      "distributionTypeInvalid": "Invalid distribution type",
+      "propertyAggregationInvalid": "Invalid property aggregation",
+      "ownershipDataMissing": "Organization has no ownership data",
+      "propertyNotInOrg": "Selected property does not belong to this organization",
+      "votesCastCannotChangeWeightConfig": "Weight config cannot be changed after votes are cast",
+      "weightConfigLockedAfterActivation": "Weight config can only be changed before the poll is activated"
     },
     "user": {
       "userNotFound": "User not found",
@@ -1679,6 +1801,191 @@
       "title": "Join {orgName}",
       "fallbackTitle": "NOMOS",
       "cta": "Join this organization"
+    }
+  },
+  "propertyAdmin": {
+    "title": "Manage properties",
+    "back": "Back to org management",
+    "save": "Save",
+    "cancel": "Cancel",
+    "addProperty": "Add property",
+    "empty": {
+      "cta": "You don't have any properties yet.",
+      "create": "Create your first property"
+    },
+    "create": {
+      "title": "Create property"
+    },
+    "fields": {
+      "name": "Name",
+      "address": "Address",
+      "assetName": "Asset name",
+      "sizeMustBePositive": "Size must be greater than 0"
+    },
+    "archive": {
+      "button": "Archive",
+      "confirm": "Archive this property? Its assets will also be archived.",
+      "assetConfirm": "Archive this asset?"
+    },
+    "unarchive": {
+      "button": "Unarchive"
+    },
+    "assets": {
+      "heading": "Assets",
+      "add": "Add asset",
+      "editOwners": "Edit owners",
+      "includeArchived": "Show archived"
+    },
+    "editOwners": {
+      "title": "Edit owners",
+      "kind": {
+        "user": "Registered user",
+        "external": "External owner"
+      },
+      "cols": {
+        "kind": "Owner type",
+        "owner": "Owner",
+        "share": "Share (%)"
+      },
+      "fields": {
+        "userId": "User ID",
+        "externalLabel": "Owner label",
+        "pickMember": "Pick a member…"
+      },
+      "addRow": "Add owner",
+      "remove": "Remove",
+      "totalValid": "Total 100% — OK",
+      "totalInvalid": "Total {percent}% — adjust to 100%",
+      "save": "Save",
+      "cancel": "Cancel",
+      "pickMemberHint": "Pick a member for every registered-user row before saving.",
+      "externalLabelHint": "Fill in the label for every external-owner row before saving.",
+      "zeroShareHint": "Share must be greater than 0%. Remove unwanted rows instead.",
+      "duplicateOwnerHint": "The same owner appears more than once. Each row must be a distinct owner."
+    },
+    "memberSearch": {
+      "placeholder": "Search by name, nickname…",
+      "loading": "Searching…",
+      "noResults": "No matches",
+      "typeToSearch": "Start typing to search members",
+      "change": "Change"
+    },
+    "sizeUnit": {
+      "squareMeters": "m²",
+      "squareFeet": "ft²",
+      "hectares": "ha",
+      "acres": "ac",
+      "cubicMeters": "m³",
+      "linearMeters": "m",
+      "unitCount": "units",
+      "shares": "shares"
+    },
+    "ownership": {
+      "title": "Ownership",
+      "back": "Back to org management",
+      "activeOnly": "Active only",
+      "filters": {
+        "ownerName": "Filter by owner name",
+        "assetName": "Filter by asset name"
+      },
+      "cols": {
+        "property": "Property",
+        "asset": "Asset",
+        "owner": "Owner",
+        "share": "Share",
+        "from": "From",
+        "until": "Until"
+      },
+      "active": "Active",
+      "empty": "No ownership rows",
+      "pdf": {
+        "exportPdf": "Export PDF",
+        "exporting": "Exporting...",
+        "title": "Ownership snapshot",
+        "organization": "Organization",
+        "generatedAt": "Generated at",
+        "filters": "Filters",
+        "filterActive": "Active rows only",
+        "filterAll": "All rows (active + historical)",
+        "property": "Property",
+        "asset": "Asset",
+        "owner": "Owner",
+        "share": "Share",
+        "from": "From",
+        "until": "Until",
+        "active": "Active",
+        "empty": "No ownership rows match the selected filters."
+      }
+    }
+  },
+  "propertyClaim": {
+    "section": {
+      "title": "Properties",
+      "empty": "This organization has no properties yet.",
+      "claim": "Claim"
+    },
+    "shortcut": {
+      "claim": "Claim property"
+    },
+    "page": {
+      "title": "Claim an asset",
+      "back": "Back to organization",
+      "search": "Search",
+      "claim": "Claim",
+      "submitted": "Submitted",
+      "empty": "No claimable assets here right now.",
+      "confirm": {
+        "title": "Submit claim?",
+        "body": "An admin will verify and approve your claim.",
+        "submit": "Submit"
+      },
+      "proof": {
+        "label": "Proof of ownership (optional)",
+        "hint": "PNG, JPEG, WebP, PDF, or ZIP. Max 10 MB.",
+        "tooLarge": "File is larger than 10 MB.",
+        "typeNotAllowed": "File type not allowed."
+      },
+      "cancel": "Cancel"
+    },
+    "myClaims": {
+      "title": "Your claims for this property",
+      "reasonLabel": "Denial reason"
+    },
+    "status": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "denied": "Denied"
+    },
+    "admin": {
+      "title": "Pending property claims",
+      "back": "Back to org management",
+      "empty": "No pending claims.",
+      "label": "Recorded as",
+      "downloadProof": "Download proof",
+      "attachmentTrustWarning": "Attached proofs are uploads from claimants. Treat them as untrusted — scan with antivirus before opening, and prefer viewing in a sandbox.",
+      "cancel": "Cancel",
+      "approve": {
+        "button": "Approve",
+        "confirm": "Approve this claim? Any other pending claims for this asset will be auto-denied.",
+        "pickPlaceholderLabel": "This asset has multiple external owners — pick which slot the claimant takes:",
+        "pickPlaceholderNone": "— select —",
+        "pickPlaceholderFirst": "Pick which external-owner slot the claimant takes before approving."
+      },
+      "deny": {
+        "button": "Deny",
+        "title": "Deny claim",
+        "reasonPlaceholder": "Reason (required)",
+        "confirm": "Deny"
+      }
+    },
+    "submit": {
+      "success": "Claim submitted. An admin will review."
+    },
+    "deny": {
+      "reasonRequired": "Denial reason is required."
+    },
+    "banner": {
+      "alreadyClaimed": "This asset is already under review for another claim."
     }
   }
 }

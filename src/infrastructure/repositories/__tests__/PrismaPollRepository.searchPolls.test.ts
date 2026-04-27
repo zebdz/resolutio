@@ -207,9 +207,24 @@ describe('PrismaPollRepository.searchPolls', () => {
                 some: { userId: 'user-1' },
               },
             },
+            { createdBy: 'user-1' },
           ],
         }),
       })
+    );
+  });
+
+  it('should include polls created by the user even when not member/admin/participant', async () => {
+    // Regression: the creator of a poll on org X should always see it,
+    // even if they aren't a member or admin of X (e.g., admin of a child org
+    // creating a poll on the parent for cross-tree weighting).
+    mockPrisma.poll.findMany.mockResolvedValue([]);
+
+    await repo.searchPolls({}, 'user-1');
+
+    const call = mockPrisma.poll.findMany.mock.calls[0][0];
+    expect(call.where.OR).toEqual(
+      expect.arrayContaining([{ createdBy: 'user-1' }])
     );
   });
 
@@ -219,8 +234,9 @@ describe('PrismaPollRepository.searchPolls', () => {
     await repo.searchPolls({}, 'user-1', ['org-admin-1', 'org-admin-2']);
 
     const call = mockPrisma.poll.findMany.mock.calls[0][0];
-    expect(call.where.OR).toHaveLength(4);
-    expect(call.where.OR[3]).toEqual({
+    // 3 membership-style branches + creator + admin-orgs = 5
+    expect(call.where.OR).toHaveLength(5);
+    expect(call.where.OR[4]).toEqual({
       organizationId: { in: ['org-admin-1', 'org-admin-2'] },
     });
   });
@@ -231,7 +247,8 @@ describe('PrismaPollRepository.searchPolls', () => {
     await repo.searchPolls({}, 'user-1', []);
 
     const call = mockPrisma.poll.findMany.mock.calls[0][0];
-    expect(call.where.OR).toHaveLength(3);
+    // 3 membership-style branches + creator = 4
+    expect(call.where.OR).toHaveLength(4);
   });
 
   it('should NOT add membership clause when userId omitted (superadmin)', async () => {
@@ -274,6 +291,7 @@ describe('PrismaPollRepository.searchPolls', () => {
     expect(mockPrisma.poll.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         include: {
+          properties: true,
           questions: {
             where: { archivedAt: null },
             include: {

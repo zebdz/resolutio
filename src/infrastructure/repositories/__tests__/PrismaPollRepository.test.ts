@@ -81,6 +81,9 @@ function buildDomainPoll(state: PollState = PollState.DRAFT): Poll {
     endDate,
     state,
     weightCriteria: null,
+    distributionType: 'EQUAL',
+    propertyAggregation: 'RAW_SUM',
+    propertyIds: [],
     createdAt: now,
     archivedAt: null,
     questions: [],
@@ -341,8 +344,12 @@ describe('PrismaPollRepository', () => {
           endDate,
           state: 'DRAFT',
           weightCriteria: null,
+          distributionType: 'EQUAL',
+          propertyAggregation: 'RAW_SUM',
+          properties: undefined,
         },
         include: {
+          properties: true,
           questions: {
             include: {
               answers: {
@@ -392,6 +399,7 @@ describe('PrismaPollRepository', () => {
       expect(mockPrisma.poll.findUnique).toHaveBeenCalledWith({
         where: { id: 'poll-1' },
         include: {
+          properties: true,
           questions: {
             where: { archivedAt: null },
             include: {
@@ -450,6 +458,7 @@ describe('PrismaPollRepository', () => {
           archivedAt: null,
         },
         include: {
+          properties: true,
           questions: {
             where: { archivedAt: null },
             include: {
@@ -538,6 +547,7 @@ describe('PrismaPollRepository', () => {
           archivedAt: null,
         },
         include: {
+          properties: true,
           questions: {
             where: { archivedAt: null },
             include: {
@@ -619,6 +629,7 @@ describe('PrismaPollRepository', () => {
           archivedAt: null,
         },
         include: {
+          properties: true,
           questions: {
             where: { archivedAt: null },
             include: {
@@ -676,6 +687,8 @@ describe('PrismaPollRepository', () => {
           endDate,
           state: 'DRAFT',
           weightCriteria: null,
+          distributionType: 'EQUAL',
+          propertyAggregation: 'RAW_SUM',
           archivedAt: null,
         },
       });
@@ -696,6 +709,9 @@ describe('PrismaPollRepository', () => {
         endDate,
         state: PollState.DRAFT,
         weightCriteria: null,
+        distributionType: 'EQUAL',
+        propertyAggregation: 'RAW_SUM',
+        propertyIds: [],
         createdAt: now,
         archivedAt,
         questions: [],

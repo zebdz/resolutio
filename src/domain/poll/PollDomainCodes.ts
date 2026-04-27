@@ -65,6 +65,16 @@ export const PollDomainCodes = {
   MUST_ANSWER_ALL_QUESTIONS: 'domain.poll.mustAnswerAllQuestions',
   CANNOT_MODIFY_PARTICIPANTS_HAS_VOTES:
     'domain.poll.cannotModifyParticipantsHasVotes',
+
+  // Weight distribution
+  DISTRIBUTION_TYPE_INVALID: 'domain.poll.distributionTypeInvalid',
+  PROPERTY_AGGREGATION_INVALID: 'domain.poll.propertyAggregationInvalid',
+  OWNERSHIP_DATA_MISSING: 'domain.poll.ownershipDataMissing',
+  PROPERTY_NOT_IN_ORG: 'domain.poll.propertyNotInOrg',
+  VOTES_CAST_CANNOT_CHANGE_WEIGHT_CONFIG:
+    'domain.poll.votesCastCannotChangeWeightConfig',
+  WEIGHT_CONFIG_LOCKED_AFTER_ACTIVATION:
+    'domain.poll.weightConfigLockedAfterActivation',
 } as const;
 
 export type PollDomainCode =

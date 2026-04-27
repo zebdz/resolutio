@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useTranslations } from 'next-intl';
+import { useState, useEffect, useMemo } from 'react';
+import { useTranslations, useLocale } from 'next-intl';
 import { Badge } from '@/src/web/components/catalyst/badge';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Heading } from '@/src/web/components/catalyst/heading';
@@ -12,6 +12,13 @@ import { getUserOrganizationsAction } from '@/src/web/actions/organization/organ
 import { getUserBoardsForHomeAction } from '@/src/web/actions/board/board';
 import { LeaveBoardDialog } from './LeaveBoardDialog';
 import { LeaveOrganizationDialog } from './LeaveOrganizationDialog';
+import { SortPills } from './SortPills';
+import { usePersistedSort } from './usePersistedSort';
+import {
+  sortMemberOrganizations,
+  sortAdminOrganizations,
+  sortExternalBoards,
+} from './sortOrganizations';
 
 interface UserOrganization {
   id: string;
@@ -20,6 +27,7 @@ interface UserOrganization {
   joinedAt?: Date;
   archivedAt?: Date | null;
   parentOrg?: { id: string; name: string } | null;
+  hasProperties?: boolean;
 }
 
 interface AdminOrganization {
@@ -51,6 +59,26 @@ export function UserOrganizationsList({
 }: UserOrganizationsListProps) {
   const t = useTranslations('home');
   const tOrg = useTranslations('organization');
+  const tShortcut = useTranslations('propertyClaim.shortcut');
+  const tSort = useTranslations('home.sort');
+  const locale = useLocale();
+
+  const [memberSort, setMemberSort] = usePersistedSort(
+    'home.sort.member',
+    ['name', 'joinedAt'] as const,
+    { field: 'name', direction: 'asc' }
+  );
+  const [adminSort, setAdminSort] = usePersistedSort(
+    'home.sort.adminOnly',
+    ['name'] as const,
+    { field: 'name', direction: 'asc' }
+  );
+  const [externalSort, setExternalSort] = usePersistedSort(
+    'home.sort.external',
+    ['name', 'organizationName'] as const,
+    { field: 'name', direction: 'asc' }
+  );
+
   const [member, setMember] = useState<UserOrganization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +116,7 @@ export function UserOrganizationsList({
             joinedAt: new Date(org.joinedAt),
             archivedAt: org.archivedAt ? new Date(org.archivedAt) : null,
             parentOrg: org.parentOrg,
+            hasProperties: org.hasProperties,
           }))
         );
       } else {
@@ -119,6 +148,26 @@ export function UserOrganizationsList({
     });
   };
 
+  const memberIds = new Set(member.map((org) => org.id));
+  const adminOnlyOrgs = adminOrganizations.filter(
+    (org) => !memberIds.has(org.id)
+  );
+  const adminIdSet = new Set(adminOrganizations.map((org) => org.id));
+  const hasOrganizations = member.length > 0 || adminOnlyOrgs.length > 0;
+
+  const sortedMember = useMemo(
+    () => sortMemberOrganizations(member, memberSort, locale),
+    [member, memberSort, locale]
+  );
+  const sortedAdminOnly = useMemo(
+    () => sortAdminOrganizations(adminOnlyOrgs, adminSort, locale),
+    [adminOnlyOrgs, adminSort, locale]
+  );
+  const sortedExternalBoards = useMemo(
+    () => sortExternalBoards(externalBoards, externalSort, locale),
+    [externalBoards, externalSort, locale]
+  );
+
   if (isLoading) {
     return (
       <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
@@ -135,14 +184,6 @@ export function UserOrganizationsList({
     );
   }
 
-  const memberIds = new Set(member.map((org) => org.id));
-  const adminOnlyOrgs = adminOrganizations.filter(
-    (org) => !memberIds.has(org.id)
-  );
-  const adminIdSet = new Set(adminOrganizations.map((org) => org.id));
-
-  const hasOrganizations = member.length > 0 || adminOnlyOrgs.length > 0;
-
   if (!hasOrganizations && externalBoards.length === 0) {
     return (
       <div className="rounded-lg border-2 border-dashed border-zinc-300 p-12 text-center dark:border-zinc-700">
@@ -158,11 +199,27 @@ export function UserOrganizationsList({
       {/* Member Organizations */}
       {member.length > 0 && (
         <div>
-          <Heading level={2} className="mb-4">
-            {t('myOrganizations')}
-          </Heading>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <Heading level={2}>{t('myOrganizations')}</Heading>
+            <SortPills
+              fields={[
+                { value: 'name', label: tSort('byName') },
+                { value: 'joinedAt', label: tSort('byJoined') },
+              ]}
+              active={memberSort}
+              onChange={(next) =>
+                setMemberSort(
+                  next as {
+                    field: 'name' | 'joinedAt';
+                    direction: 'asc' | 'desc';
+                  }
+                )
+              }
+              ariaLabel={tSort('ariaLabel')}
+            />
+          </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {member.map((org) => {
+            {sortedMember.map((org) => {
               const orgBoards = boardsByOrgId[org.id] || [];
               const isExpanded = expandedOrgs.has(org.id);
 
@@ -260,6 +317,23 @@ export function UserOrganizationsList({
                     </div>
                   )}
 
+                  {/* Claim property shortcut */}
+                  {org.hasProperties && !org.archivedAt && (
+                    <div className="mt-3 flex justify-start">
+                      <Link
+                        href={`/organizations/${org.id}#properties`}
+                        prefetch={false}
+                      >
+                        <Button
+                          color="brand-green"
+                          className="!px-2 !py-1 !text-xs"
+                        >
+                          {tShortcut('claim')}
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
+
                   {/* Leave organization button */}
                   {!org.archivedAt && (
                     <div className="mt-3 flex justify-start">
@@ -290,11 +364,21 @@ export function UserOrganizationsList({
         <>
           {member.length > 0 && <Divider className="my-8" />}
           <div>
-            <Heading level={2} className="mb-4">
-              {t('myAdminOrganizations')}
-            </Heading>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <Heading level={2}>{t('myAdminOrganizations')}</Heading>
+              <SortPills
+                fields={[{ value: 'name', label: tSort('byName') }]}
+                active={adminSort}
+                onChange={(next) =>
+                  setAdminSort(
+                    next as { field: 'name'; direction: 'asc' | 'desc' }
+                  )
+                }
+                ariaLabel={tSort('ariaLabel')}
+              />
+            </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {adminOnlyOrgs.map((org) => (
+              {sortedAdminOnly.map((org) => (
                 <Link
                   key={org.id}
                   href={`/organizations/${org.id}`}
@@ -336,11 +420,27 @@ export function UserOrganizationsList({
         <>
           <Divider className="my-8" />
           <div>
-            <Heading level={2} className="mb-4">
-              {t('externalBoards')}
-            </Heading>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <Heading level={2}>{t('externalBoards')}</Heading>
+              <SortPills
+                fields={[
+                  { value: 'name', label: tSort('byName') },
+                  { value: 'organizationName', label: tSort('byOrganization') },
+                ]}
+                active={externalSort}
+                onChange={(next) =>
+                  setExternalSort(
+                    next as {
+                      field: 'name' | 'organizationName';
+                      direction: 'asc' | 'desc';
+                    }
+                  )
+                }
+                ariaLabel={tSort('ariaLabel')}
+              />
+            </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {externalBoards.map((board) => (
+              {sortedExternalBoards.map((board) => (
                 <div
                   key={board.id}
                   className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"

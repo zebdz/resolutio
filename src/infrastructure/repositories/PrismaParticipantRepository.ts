@@ -291,6 +291,116 @@ export class PrismaParticipantRepository implements ParticipantRepository {
     }
   }
 
+  async pollHasVotes(pollId: string): Promise<Result<boolean, string>> {
+    try {
+      const vote = await this.prisma.vote.findFirst({
+        where: { question: { pollId } },
+      });
+
+      return success(vote !== null);
+    } catch (e) {
+      return failure((e as Error).message);
+    }
+  }
+
+  async applyWeightConfigChange(
+    pollId: string,
+    newDistributionType: string,
+    newPropertyAggregation: string,
+    newPropertyIds: string[],
+    add: Array<{ userId: string; weight: number }>,
+    remove: Array<{ participantId: string; userId: string; oldWeight: number }>,
+    update: Array<{
+      participantId: string;
+      userId: string;
+      oldWeight: number;
+      newWeight: number;
+    }>,
+    adminUserId: string,
+    reason: string
+  ): Promise<Result<void, string>> {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // 1. Update polls columns
+        await tx.poll.update({
+          where: { id: pollId },
+          data: {
+            distributionType: newDistributionType,
+            propertyAggregation: newPropertyAggregation,
+          },
+        });
+
+        // 2. Replace poll_properties rows
+        await tx.pollProperty.deleteMany({ where: { pollId } });
+
+        if (newPropertyIds.length > 0) {
+          await tx.pollProperty.createMany({
+            data: newPropertyIds.map((propertyId) => ({ pollId, propertyId })),
+          });
+        }
+
+        // 3. Deletes + history rows
+        if (remove.length > 0) {
+          await tx.pollParticipant.deleteMany({
+            where: { id: { in: remove.map((r) => r.participantId) } },
+          });
+          await tx.participantWeightHistory.createMany({
+            data: remove.map((r) => ({
+              participantId: r.participantId,
+              pollId,
+              userId: r.userId,
+              oldWeight: r.oldWeight,
+              newWeight: 0,
+              changedBy: adminUserId,
+              reason,
+            })),
+          });
+        }
+
+        // 4. Inserts + history rows
+        for (const a of add) {
+          const created = await tx.pollParticipant.create({
+            data: { pollId, userId: a.userId, userWeight: a.weight },
+          });
+          await tx.participantWeightHistory.create({
+            data: {
+              participantId: created.id,
+              pollId,
+              userId: a.userId,
+              oldWeight: 0,
+              newWeight: a.weight,
+              changedBy: adminUserId,
+              reason,
+            },
+          });
+        }
+
+        // 5. Weight updates + history rows
+        for (const u of update) {
+          await tx.pollParticipant.update({
+            where: { id: u.participantId },
+            data: { userWeight: u.newWeight },
+          });
+          await tx.participantWeightHistory.create({
+            data: {
+              participantId: u.participantId,
+              pollId,
+              userId: u.userId,
+              oldWeight: u.oldWeight,
+              newWeight: u.newWeight,
+              changedBy: adminUserId,
+              reason,
+            },
+          });
+        }
+      });
+
+      return success(undefined);
+    } catch (e) {
+      return failure((e as Error).message);
+    }
+  }
+
   private toDomainParticipant(prismaData: any): PollParticipant {
     return PollParticipant.reconstitute({
       id: prismaData.id,

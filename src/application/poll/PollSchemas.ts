@@ -37,6 +37,13 @@ export const createPollSchema = (profanityChecker: ProfanityChecker) =>
       boardId: z.string().nullable().default(null),
       startDate: z.coerce.date(),
       endDate: z.coerce.date(),
+      distributionType: z
+        .enum(['EQUAL', 'OWNERSHIP_UNIT_COUNT', 'OWNERSHIP_SIZE_WEIGHTED'])
+        .optional(),
+      propertyAggregation: z
+        .enum(['RAW_SUM', 'NORMALIZE_PER_PROPERTY'])
+        .optional(),
+      propertyIds: z.array(z.string()).optional(),
     })
     .refine((data) => data.startDate < data.endDate, {
       message: 'Start date must be before end date',
