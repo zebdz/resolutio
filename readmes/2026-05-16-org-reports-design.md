@@ -60,19 +60,11 @@ Allowed mime types and caps:
 
 Per-report cap: **20 attachments**.
 
-### `ReportVideoLink`
+### Video URLs (no entity)
 
-| Field       | Type       | Notes                                      |
-| ----------- | ---------- | ------------------------------------------ |
-| `id`        | `cuid`     | PK                                         |
-| `reportId`  | `string`   | FK → `reports` ON DELETE CASCADE           |
-| `url`       | `string`   | Validated against provider patterns        |
-| `provider`  | `string`   | `'youtube' \| 'vimeo' \| 'rutube' \| 'vk'` |
-| `createdAt` | `DateTime` |                                            |
+Video URLs live **inline in the markdown body** — no separate table, no domain entity, no count cap. The renderer auto-detects URLs from a whitelist of providers and replaces them with embedded `<iframe>` players; non-matching URLs render as plain `<a>` links (still subject to the protocol whitelist).
 
-Per-report cap: **10 video links**.
-
-Validation regexes (initial set — extend as needed):
+Provider detection regexes (used by the renderer only):
 
 | Provider  | Pattern (https only)                                                                |
 | --------- | ----------------------------------------------------------------------------------- |
@@ -255,8 +247,6 @@ For non-public visibility, return generic meta (title only) to avoid leaking con
 | `boards`              | non-empty when `visibility=WITHIN_BOARDS`; all belong to `organizationId` | `REPORT_BOARDS_EMPTY`, `REPORT_BOARD_NOT_IN_ORG`                                                                                |
 | Attachment file       | mime in whitelist; size ≤ cap; magic bytes match                          | `REPORT_ATTACHMENT_TYPE_NOT_ALLOWED`, `REPORT_ATTACHMENT_TOO_LARGE`, `REPORT_ATTACHMENT_MAGIC_MISMATCH`                         |
 | Attachment count      | ≤ 20 per report                                                           | `REPORT_ATTACHMENT_LIMIT_REACHED`                                                                                               |
-| Video URL             | matches one of provider patterns; uses `https`                            | `REPORT_VIDEO_URL_INVALID`                                                                                                      |
-| Video count           | ≤ 10 per report                                                           | `REPORT_VIDEO_LIMIT_REACHED`                                                                                                    |
 | Attached poll         | audience-superset rule                                                    | `REPORT_POLL_AUDIENCE_TOO_NARROW`                                                                                               |
 | State transition      | per state machine                                                         | `REPORT_MUST_BE_DRAFT`, `REPORT_MUST_BE_PUBLISHED`, `REPORT_NOT_AUTHOR_OR_ADMIN`, `REPORT_NOT_ADMIN`, `REPORT_ALREADY_ARCHIVED` |
 | Edit while published  | rejected                                                                  | `REPORT_CANNOT_EDIT_PUBLISHED`                                                                                                  |
@@ -285,7 +275,6 @@ Reports themselves are **not language-tagged** — any author writes in any lang
 - `Report.ts` — aggregate root
 - `ReportVisibility.ts` — enum + helpers
 - `ReportAttachment.ts` — entity (mirrors `PropertyClaimAttachment`)
-- `ReportVideoLink.ts` — value object with provider detection
 - `ReportRepository.ts` — interface
 - `ReportAttachmentRepository.ts` — interface
 - `ReportDomainCodes.ts` — error codes
@@ -297,7 +286,6 @@ Reports themselves are **not language-tagged** — any author writes in any lang
 - `SetReportVisibilityUseCase.ts` — visibility + boards in Draft
 - `AttachPollUseCase.ts` / `DetachPollUseCase.ts`
 - `AddReportAttachmentUseCase.ts` / `RemoveReportAttachmentUseCase.ts`
-- `AddReportVideoLinkUseCase.ts` / `RemoveReportVideoLinkUseCase.ts`
 - `PublishReportUseCase.ts`
 - `DowngradeReportToDraftUseCase.ts`
 - `ArchiveReportUseCase.ts`
@@ -325,7 +313,6 @@ Reports themselves are **not language-tagged** — any author writes in any lang
   - `BoardsMultiPicker.tsx`
   - `PollPicker.tsx`
   - `AttachmentUploader.tsx`
-  - `VideoLinkInput.tsx`
   - `ReportForm.tsx`
   - `ReportCard.tsx`
   - `ReportDetail.tsx`
