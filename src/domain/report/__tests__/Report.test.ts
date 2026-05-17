@@ -18,6 +18,16 @@ const make = (overrides: Partial<Parameters<typeof Report.create>[0]> = {}) =>
     ...overrides,
   });
 
+function unwrap<T>(
+  r: { success: true; value: T } | { success: false; error: string }
+): T {
+  if (!r.success) {
+    throw new Error(`Expected success, got error: ${r.error}`);
+  }
+
+  return r.value;
+}
+
 describe('Report.create', () => {
   it('creates a Draft report with valid input', () => {
     const r = make();
@@ -108,7 +118,7 @@ describe('Report.create', () => {
 
 describe('Report state machine', () => {
   it('publish: DRAFT → PUBLISHED, sets publishedBy + lastPublishedAt', () => {
-    const r = make().value!;
+    const r = unwrap(make());
     const before = new Date();
     const res = r.publish('admin-1', false);
     expect(res.success).toBe(true);
@@ -121,7 +131,7 @@ describe('Report state machine', () => {
   });
 
   it('publish: rejects when not Draft', () => {
-    const r = make().value!;
+    const r = unwrap(make());
     r.publish('admin-1', false);
     const second = r.publish('admin-1', false);
     expect(second.success).toBe(false);
@@ -132,25 +142,25 @@ describe('Report state machine', () => {
   });
 
   it('publish: forces notifyAudience=false for PUBLIC_ANON', () => {
-    const r = make({ visibility: ReportVisibility.PUBLIC_ANON }).value!;
+    const r = unwrap(make({ visibility: ReportVisibility.PUBLIC_ANON }));
     r.publish('admin-1', true);
     expect(r.notifyAudience).toBe(false);
   });
 
   it('publish: forces notifyAudience=false for PUBLIC_AUTH', () => {
-    const r = make({ visibility: ReportVisibility.PUBLIC_AUTH }).value!;
+    const r = unwrap(make({ visibility: ReportVisibility.PUBLIC_AUTH }));
     r.publish('admin-1', true);
     expect(r.notifyAudience).toBe(false);
   });
 
   it('publish: honors notifyAudience for WITHIN_ORG_ONLY', () => {
-    const r = make().value!;
+    const r = unwrap(make());
     r.publish('admin-1', true);
     expect(r.notifyAudience).toBe(true);
   });
 
   it('downgrade: PUBLISHED → DRAFT preserves lastPublishedAt; clears publishedById; resets notifyAudience', () => {
-    const r = make().value!;
+    const r = unwrap(make());
     r.publish('admin-1', true);
     const lastPub = r.lastPublishedAt;
     const res = r.downgradeToDraft();
@@ -162,7 +172,7 @@ describe('Report state machine', () => {
   });
 
   it('downgrade: rejects when not Published', () => {
-    const r = make().value!;
+    const r = unwrap(make());
     const res = r.downgradeToDraft();
     expect(res.success).toBe(false);
 
@@ -172,7 +182,7 @@ describe('Report state machine', () => {
   });
 
   it('archive: sets archivedAt', () => {
-    const r = make().value!;
+    const r = unwrap(make());
     const res = r.archive();
     expect(res.success).toBe(true);
     expect(r.archivedAt).not.toBeNull();
@@ -180,7 +190,7 @@ describe('Report state machine', () => {
   });
 
   it('archive: rejects double archive', () => {
-    const r = make().value!;
+    const r = unwrap(make());
     r.archive();
     const second = r.archive();
     expect(second.success).toBe(false);
@@ -193,14 +203,14 @@ describe('Report state machine', () => {
 
 describe('Report editing constraints', () => {
   it('updateTitle: allowed in Draft', () => {
-    const r = make().value!;
+    const r = unwrap(make());
     const res = r.updateTitle('New');
     expect(res.success).toBe(true);
     expect(r.title).toBe('New');
   });
 
   it('updateTitle: rejected in Published', () => {
-    const r = make().value!;
+    const r = unwrap(make());
     r.publish('admin-1', false);
     const res = r.updateTitle('New');
     expect(res.success).toBe(false);
@@ -211,7 +221,7 @@ describe('Report editing constraints', () => {
   });
 
   it('setVisibility: rejected in Published', () => {
-    const r = make().value!;
+    const r = unwrap(make());
     r.publish('admin-1', false);
     const res = r.setVisibility(ReportVisibility.PUBLIC_AUTH, []);
     expect(res.success).toBe(false);
@@ -222,7 +232,7 @@ describe('Report editing constraints', () => {
   });
 
   it('setVisibility: WITHIN_BOARDS requires boardIds', () => {
-    const r = make().value!;
+    const r = unwrap(make());
     const res = r.setVisibility(ReportVisibility.WITHIN_BOARDS, []);
     expect(res.success).toBe(false);
 
@@ -232,10 +242,12 @@ describe('Report editing constraints', () => {
   });
 
   it('setVisibility: switching away from WITHIN_BOARDS clears boardIds', () => {
-    const r = make({
-      visibility: ReportVisibility.WITHIN_BOARDS,
-      boardIds: ['b1'],
-    }).value!;
+    const r = unwrap(
+      make({
+        visibility: ReportVisibility.WITHIN_BOARDS,
+        boardIds: ['b1'],
+      })
+    );
     const res = r.setVisibility(ReportVisibility.WITHIN_ORG_ONLY, []);
     expect(res.success).toBe(true);
     expect(r.boardIds).toEqual([]);
