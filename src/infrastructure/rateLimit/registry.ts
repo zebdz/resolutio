@@ -47,6 +47,10 @@ const REGISTRATION_IP_WINDOW_MS = 60 * 60_000;
 const REGISTRATION_DEVICE_MAX = 3;
 const REGISTRATION_DEVICE_WINDOW_MS = 60 * 60_000;
 
+// 10 / 24 hours
+const REPORT_CREATE_MAX = 10;
+const REPORT_CREATE_WINDOW_MS = 24 * 60 * 60_000;
+
 function createRegistry(): LimiterEntry[] {
   return [
     {
@@ -118,6 +122,15 @@ function createRegistry(): LimiterEntry[] {
       maxRequests: REGISTRATION_DEVICE_MAX,
       windowMs: REGISTRATION_DEVICE_WINDOW_MS,
     },
+    {
+      label: 'reportCreate',
+      limiter: new InMemoryRateLimiter(
+        REPORT_CREATE_MAX,
+        REPORT_CREATE_WINDOW_MS
+      ),
+      maxRequests: REPORT_CREATE_MAX,
+      windowMs: REPORT_CREATE_WINDOW_MS,
+    },
   ];
 }
 
@@ -135,6 +148,7 @@ export const phoneSearchLimiter = limiterRegistry[4].limiter;
 export const loginLimiter = limiterRegistry[5].limiter;
 export const registrationIpLimiter = limiterRegistry[6].limiter;
 export const registrationDeviceLimiter = limiterRegistry[7].limiter;
+export const reportCreateLimiter = limiterRegistry[8].limiter;
 
 export function getLimiterByLabel(label: string): LimiterEntry | undefined {
   return limiterRegistry.find((entry) => entry.label === label);
