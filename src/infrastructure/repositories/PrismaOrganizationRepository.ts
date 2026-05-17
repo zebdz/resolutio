@@ -180,6 +180,18 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return [rootId, ...allDescendants].filter((id) => id !== organizationId);
   }
 
+  async isUserExactMember(
+    userId: string,
+    organizationId: string
+  ): Promise<boolean> {
+    const membership = await this.prisma.organizationUser.findFirst({
+      where: { userId, organizationId, status: 'accepted' },
+      select: { id: true },
+    });
+
+    return membership !== null;
+  }
+
   async isUserMember(userId: string, organizationId: string): Promise<boolean> {
     // Check membership in this org or any descendant
     const descendantIds = await this.getDescendantIds(organizationId);

@@ -81,6 +81,14 @@ export interface OrganizationRepository {
   isUserMember(userId: string, organizationId: string): Promise<boolean>;
 
   /**
+   * Exact membership check — does NOT walk descendant orgs. Used by the
+   * report visibility service for the WITHIN_ORG_ONLY rule, where
+   * "member of orgX" must not silently include members of orgX's
+   * descendant orgs.
+   */
+  isUserExactMember(userId: string, organizationId: string): Promise<boolean>;
+
+  /**
    * Checks if a user is an admin of an organization
    */
   isUserAdmin(userId: string, organizationId: string): Promise<boolean>;

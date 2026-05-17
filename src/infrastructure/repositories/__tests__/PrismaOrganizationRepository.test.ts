@@ -214,6 +214,36 @@ describe('PrismaOrganizationRepository', () => {
     });
   });
 
+  // ─── isUserExactMember ───────────────────────────────────────────
+
+  describe('isUserExactMember', () => {
+    it('returns true when accepted membership exists in exactly that org', async () => {
+      mockPrisma.organizationUser.findFirst.mockResolvedValueOnce({
+        id: 'ou-1',
+      });
+
+      const result = await repo.isUserExactMember('user-1', 'org-1');
+
+      expect(result).toBe(true);
+      expect(mockPrisma.organizationUser.findFirst).toHaveBeenCalledWith({
+        where: {
+          userId: 'user-1',
+          organizationId: 'org-1',
+          status: 'accepted',
+        },
+        select: { id: true },
+      });
+    });
+
+    it('returns false when no accepted membership in that exact org', async () => {
+      mockPrisma.organizationUser.findFirst.mockResolvedValueOnce(null);
+
+      const result = await repo.isUserExactMember('user-1', 'org-1');
+
+      expect(result).toBe(false);
+    });
+  });
+
   // ─── findAcceptedMemberUserIdsIncludingDescendants ───────────────
 
   describe('findAcceptedMemberUserIdsIncludingDescendants', () => {
