@@ -1,4 +1,4 @@
-import { Result, failure, success } from '../../domain/shared/Result';
+import { Result, failure } from '../../domain/shared/Result';
 import { ReportRepository } from '../../domain/report/ReportRepository';
 import { ReportErrors } from './ReportErrors';
 
