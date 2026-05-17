@@ -22,6 +22,15 @@ import {
   NICKNAME_MAX_LENGTH,
 } from '@/domain/user/Nickname';
 import { SharedDomainCodes } from '@/domain/shared/SharedDomainCodes';
+import {
+  REPORT_TITLE_MAX_LENGTH,
+  REPORT_BODY_MAX_LENGTH,
+} from '@/domain/report/Report';
+import {
+  REPORT_ATTACHMENT_COUNT_LIMIT,
+  REPORT_ATTACHMENT_IMAGE_MAX_BYTES,
+  REPORT_ATTACHMENT_PDF_MAX_BYTES,
+} from '@/domain/report/ReportAttachment';
 
 // Maps error codes to ICU message parameters (limit values from domain constants)
 const ERROR_CODE_PARAMS: Record<string, Record<string, string | number>> = {
@@ -52,6 +61,15 @@ const ERROR_CODE_PARAMS: Record<string, Record<string, string | number>> = {
   'domain.user.nicknameInvalid': {
     minLength: NICKNAME_MIN_LENGTH,
     maxLength: NICKNAME_MAX_LENGTH,
+  },
+  'domain.report.titleTooLong': { maxLength: REPORT_TITLE_MAX_LENGTH },
+  'domain.report.bodyTooLong': { maxLength: REPORT_BODY_MAX_LENGTH },
+  'domain.report.attachmentLimitReached': {
+    maxCount: REPORT_ATTACHMENT_COUNT_LIMIT,
+  },
+  'domain.report.attachmentTooLarge': {
+    imageMaxMb: Math.floor(REPORT_ATTACHMENT_IMAGE_MAX_BYTES / (1024 * 1024)),
+    pdfMaxMb: Math.floor(REPORT_ATTACHMENT_PDF_MAX_BYTES / (1024 * 1024)),
   },
   [SharedDomainCodes.CONTAINS_PROFANITY]: {},
 };

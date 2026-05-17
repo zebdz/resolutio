@@ -1265,6 +1265,27 @@
       "notExpired": "Token is not expired",
       "tokenExhausted": "Token has reached its maximum number of uses"
     },
+    "report": {
+      "titleEmpty": "Title cannot be empty",
+      "titleTooLong": "Title cannot exceed {maxLength} characters",
+      "bodyEmpty": "Body cannot be empty",
+      "bodyTooLong": "Body cannot exceed {maxLength} characters",
+      "invalidVisibility": "Invalid visibility",
+      "boardsEmpty": "Select at least one board",
+      "boardNotInOrg": "Board does not belong to the report's organization",
+      "mustBeDraft": "Report must be a draft",
+      "mustBePublished": "Report must be published",
+      "cannotEditPublished": "Cannot edit a published report",
+      "alreadyArchived": "Report is already archived",
+      "archived": "Report is archived",
+      "attachmentFilenameEmpty": "Attachment filename cannot be empty",
+      "attachmentTooLarge": "Attachment too large (images up to {imageMaxMb} MB, PDFs up to {pdfMaxMb} MB)",
+      "attachmentTypeNotAllowed": "Attachment type is not allowed (use PNG, JPEG, WebP, or PDF)",
+      "attachmentMagicMismatch": "File contents do not match the declared type",
+      "attachmentLimitReached": "Maximum {maxCount} attachments per report",
+      "pollAudienceTooNarrow": "Poll audience must cover the report's audience",
+      "pollNotFound": "Poll not found"
+    },
     "shared": {
       "containsProfanity": "Contains inappropriate language"
     }

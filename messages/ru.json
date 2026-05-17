@@ -1265,6 +1265,27 @@
       "notExpired": "Токен не истёк",
       "tokenExhausted": "Токен достиг максимального числа использований"
     },
+    "report": {
+      "titleEmpty": "Заголовок не может быть пустым",
+      "titleTooLong": "Заголовок не может превышать {maxLength} символов",
+      "bodyEmpty": "Текст не может быть пустым",
+      "bodyTooLong": "Текст не может превышать {maxLength} символов",
+      "invalidVisibility": "Недопустимая видимость",
+      "boardsEmpty": "Выберите хотя бы один орган управления",
+      "boardNotInOrg": "Этот орган не относится к организации отчёта",
+      "mustBeDraft": "Отчёт должен быть черновиком",
+      "mustBePublished": "Отчёт должен быть опубликован",
+      "cannotEditPublished": "Нельзя редактировать опубликованный отчёт",
+      "alreadyArchived": "Отчёт уже в архиве",
+      "archived": "Отчёт в архиве",
+      "attachmentFilenameEmpty": "Имя файла не может быть пустым",
+      "attachmentTooLarge": "Файл слишком большой (изображения до {imageMaxMb} МБ, PDF до {pdfMaxMb} МБ)",
+      "attachmentTypeNotAllowed": "Недопустимый тип файла (используйте PNG, JPEG, WebP или PDF)",
+      "attachmentMagicMismatch": "Содержимое файла не соответствует заявленному типу",
+      "attachmentLimitReached": "Максимум {maxCount} файлов на отчёт",
+      "pollAudienceTooNarrow": "Аудитория голосования должна включать аудиторию отчёта",
+      "pollNotFound": "Голосование не найдено"
+    },
     "shared": {
       "containsProfanity": "Содержит ненормативную лексику"
     }
