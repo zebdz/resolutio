@@ -1987,5 +1987,13 @@
     "banner": {
       "alreadyClaimed": "This asset is already under review for another claim."
     }
+  },
+  "report": {
+    "errors": {
+      "notFound": "Report not found",
+      "notAuthorOrAdmin": "Only the report author or an organization admin can perform this action",
+      "attachmentNotFound": "Attachment not found",
+      "rateLimitedDaily": "You have reached the daily report creation limit. Please try again tomorrow."
+    }
   }
 }
