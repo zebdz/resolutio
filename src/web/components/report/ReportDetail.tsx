@@ -2,7 +2,7 @@ import { getTranslations, getFormatter } from 'next-intl/server';
 import { Link } from '@/src/i18n/routing';
 import { Heading } from '@/web/components/catalyst/heading';
 import { User } from '@/domain/user/User';
-import type { SerializedReport } from '@/web/actions/report/report';
+import type { SerializedReport } from '@/web/actions/report/serializeReport';
 import { ReportStateBadge } from './ReportStateBadge';
 import { ReportMarkdownRenderer } from './ReportMarkdownRenderer';
 import { ReportAdminActions } from './ReportAdminActions';

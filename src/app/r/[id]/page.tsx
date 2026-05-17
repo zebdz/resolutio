@@ -15,7 +15,7 @@ import { getCurrentUser } from '@/web/lib/session';
 import { ReportDetail } from '@/web/components/report/ReportDetail';
 import { ResolveReportVisibilityService } from '@/application/report/ResolveReportVisibilityService';
 import { GetReportForViewerUseCase } from '@/application/report/GetReportForViewerUseCase';
-import { serializeReport } from '@/web/actions/report/report';
+import { serializeReport } from '@/web/actions/report/serializeReport';
 
 const reportRepo = new PrismaReportRepository(prisma);
 const attachmentRepo = new PrismaReportAttachmentRepository(prisma);

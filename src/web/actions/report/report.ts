@@ -31,7 +31,6 @@ import { ListReportsForViewerUseCase } from '@/application/report/ListReportsFor
 import { NotifyReportPublishedUseCase } from '@/application/report/NotifyReportPublishedUseCase';
 import { ResolveReportVisibilityService } from '@/application/report/ResolveReportVisibilityService';
 import { ReportVisibility } from '@/domain/report/ReportVisibility';
-import { Report } from '@/domain/report/Report';
 
 // ---------------------------------------------------------------------------
 // Shared ActionResult discriminated union
@@ -41,28 +40,11 @@ export type ActionResult<T = void> =
   | { success: true; data: T }
   | { success: false; error: string };
 
-// ---------------------------------------------------------------------------
-// Serialization shape (safe to cross the Server→Client boundary)
-// ---------------------------------------------------------------------------
+// SerializedReport + serializeReport now live in ./serializeReport so they
+// can be imported by 'use server' callers (which forbid non-async exports)
+// and by non-server callers like the public /r/[id] page.
 
-export interface SerializedReport {
-  id: string;
-  organizationId: string;
-  createdById: string;
-  title: string;
-  body: string;
-  visibility: string;
-  state: string;
-  publishedById: string | null;
-  lastPublishedAt: string | null;
-  notifyAudience: boolean;
-  createdAt: string;
-  updatedAt: string;
-  archivedAt: string | null;
-  boardIds: string[];
-  pollIds: string[];
-  attachmentIds: string[];
-}
+import { serializeReport, type SerializedReport } from './serializeReport';
 
 // ---------------------------------------------------------------------------
 // Module-level repository + use-case singletons
@@ -172,31 +154,6 @@ async function requireUser(): Promise<{ error: string } | { userId: string }> {
   }
 
   return { userId: u.id };
-}
-
-// ---------------------------------------------------------------------------
-// Serialization helper
-// ---------------------------------------------------------------------------
-
-export function serializeReport(r: Report): SerializedReport {
-  return {
-    id: r.id,
-    organizationId: r.organizationId,
-    createdById: r.createdById,
-    title: r.title,
-    body: r.body,
-    visibility: r.visibility,
-    state: r.state,
-    publishedById: r.publishedById,
-    lastPublishedAt: r.lastPublishedAt?.toISOString() ?? null,
-    notifyAudience: r.notifyAudience,
-    createdAt: r.createdAt.toISOString(),
-    updatedAt: r.updatedAt.toISOString(),
-    archivedAt: r.archivedAt?.toISOString() ?? null,
-    boardIds: r.boardIds,
-    pollIds: r.pollIds,
-    attachmentIds: r.attachmentIds,
-  };
 }
 
 // ---------------------------------------------------------------------------
