@@ -2058,6 +2058,26 @@
       "editButton": "Edit",
       "publishedDate": "Published {date}",
       "createdDate": "Created {date}"
+    },
+    "pages": {
+      "newTitle": "New report",
+      "feedTitle": "Reports",
+      "feedEmpty": "No reports yet.",
+      "pickOrg": "Choose an organization",
+      "filterByOrg": "Filter by organization",
+      "noOrgsCallout": "You aren't a member of any organization yet.",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {page}",
+      "cannotEditPublished": "This report is published. Downgrade to draft to edit.",
+      "backToDetail": "Back to report",
+      "unauthorized": "You don't have permission to perform this action."
+    },
+    "section": {
+      "heading": "Reports",
+      "empty": "No reports yet.",
+      "newButton": "New report",
+      "viewAll": "View all"
     }
   }
 }
