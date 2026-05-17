@@ -1999,6 +1999,19 @@
       "draft": "Draft",
       "published": "Published",
       "archived": "Archived"
+    },
+    "visibility": {
+      "label": "Visibility",
+      "publicAnon": "Public — anyone (no login required)",
+      "publicAuth": "Public — any logged-in user",
+      "withinOrgOnly": "Org members only",
+      "withinOrgAncestors": "Org + parent orgs",
+      "withinOrgDescendants": "Org + sub-orgs",
+      "withinOrgTree": "Entire org tree",
+      "withinBoards": "Selected boards only"
+    },
+    "boards": {
+      "noneInOrg": "This organization has no boards yet."
     }
   }
 }
