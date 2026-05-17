@@ -137,6 +137,13 @@ export interface OrganizationRepository {
   ): Promise<string[]>;
 
   /**
+   * Returns deduplicated user IDs of accepted members across the EXACT
+   * org IDs given (no hierarchy walk). Used by NotifyReportPublishedUseCase
+   * to fan out notifications to a precise audience set.
+   */
+  findAcceptedMemberUserIdsForOrgs(orgIds: string[]): Promise<string[]>;
+
+  /**
    * Removes a user's membership from an organization (deletes OrganizationUser row)
    */
   removeUserFromOrganization(

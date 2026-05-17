@@ -300,6 +300,38 @@ describe('PrismaOrganizationRepository', () => {
     });
   });
 
+  // ─── findAcceptedMemberUserIdsForOrgs ────────────────────────────
+
+  describe('findAcceptedMemberUserIdsForOrgs', () => {
+    it('returns empty array when orgIds is empty', async () => {
+      const result = await repo.findAcceptedMemberUserIdsForOrgs([]);
+      expect(result).toEqual([]);
+      expect(mockPrisma.organizationUser.findMany).not.toHaveBeenCalled();
+    });
+
+    it('returns deduplicated user IDs for the given org IDs', async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValueOnce([
+        { userId: 'u1' },
+        { userId: 'u2' },
+      ]);
+
+      const result = await repo.findAcceptedMemberUserIdsForOrgs([
+        'org-1',
+        'org-2',
+      ]);
+
+      expect(result).toEqual(['u1', 'u2']);
+      expect(mockPrisma.organizationUser.findMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: { in: ['org-1', 'org-2'] },
+          status: 'accepted',
+        },
+        select: { userId: true },
+        distinct: ['userId'],
+      });
+    });
+  });
+
   // ─── removeUserFromOrganization ──────────────────────────────────
 
   describe('removeUserFromOrganization', () => {

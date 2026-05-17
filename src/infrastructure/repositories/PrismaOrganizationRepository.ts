@@ -319,6 +319,20 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return [...new Set(members.map((m: { userId: string }) => m.userId))];
   }
 
+  async findAcceptedMemberUserIdsForOrgs(orgIds: string[]): Promise<string[]> {
+    if (orgIds.length === 0) {
+      return [];
+    }
+
+    const rows = await this.prisma.organizationUser.findMany({
+      where: { organizationId: { in: orgIds }, status: 'accepted' },
+      select: { userId: true },
+      distinct: ['userId'],
+    });
+
+    return rows.map((r: { userId: string }) => r.userId);
+  }
+
   async removeUserFromOrganization(
     userId: string,
     organizationId: string
