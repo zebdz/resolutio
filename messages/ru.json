@@ -2028,6 +2028,36 @@
       "by": "автор: {name}",
       "publishedAt": "Опубликовано {date}",
       "createdAt": "Создано {date}"
+    },
+    "form": {
+      "titleLabel": "Заголовок",
+      "titlePlaceholder": "Заголовок отчёта",
+      "bodyLabel": "Текст (Markdown)",
+      "bodyHint": "Изображения и PDF можно вставить или перетащить прямо в редактор.",
+      "bodyCreateHint": "Файлы можно прикрепить после сохранения черновика.",
+      "attachmentsLabel": "Файлы",
+      "attachmentsRemove": "Удалить",
+      "createSubmit": "Сохранить черновик",
+      "saveSubmit": "Сохранить",
+      "cancel": "Отмена",
+      "submitting": "Сохранение…",
+      "savedToast": "Сохранено",
+      "createdToast": "Черновик создан"
+    },
+    "detail": {
+      "pollsHeader": "Прикреплённые голосования",
+      "noPolls": "Голосования не прикреплены.",
+      "attachmentsHeader": "Файлы",
+      "noAttachments": "Файлы не прикреплены.",
+      "openFile": "Открыть",
+      "publishButton": "Опубликовать",
+      "notifyAudience": "Уведомить аудиторию",
+      "downgradeButton": "Вернуть в черновик",
+      "archiveButton": "В архив",
+      "archiveConfirm": "Архивировать отчёт? Архивированные отчёты скрываются из лент и не могут быть восстановлены.",
+      "editButton": "Редактировать",
+      "publishedDate": "Опубликовано {date}",
+      "createdDate": "Создано {date}"
     }
   }
 }

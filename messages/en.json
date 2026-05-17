@@ -2028,6 +2028,36 @@
       "by": "by {name}",
       "publishedAt": "Published {date}",
       "createdAt": "Created {date}"
+    },
+    "form": {
+      "titleLabel": "Title",
+      "titlePlaceholder": "Report title",
+      "bodyLabel": "Body (Markdown)",
+      "bodyHint": "You can paste or drop images and PDFs into the editor.",
+      "bodyCreateHint": "Attachments can be added after you save the draft.",
+      "attachmentsLabel": "Attachments",
+      "attachmentsRemove": "Remove",
+      "createSubmit": "Save draft",
+      "saveSubmit": "Save",
+      "cancel": "Cancel",
+      "submitting": "Saving…",
+      "savedToast": "Saved",
+      "createdToast": "Draft created"
+    },
+    "detail": {
+      "pollsHeader": "Attached polls",
+      "noPolls": "No polls attached.",
+      "attachmentsHeader": "Files",
+      "noAttachments": "No files attached.",
+      "openFile": "Open",
+      "publishButton": "Publish",
+      "notifyAudience": "Notify audience",
+      "downgradeButton": "Move back to draft",
+      "archiveButton": "Archive",
+      "archiveConfirm": "Archive this report? Archived reports are hidden from feeds and cannot be unarchived.",
+      "editButton": "Edit",
+      "publishedDate": "Published {date}",
+      "createdDate": "Created {date}"
     }
   }
 }
