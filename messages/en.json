@@ -2012,6 +2012,22 @@
     },
     "boards": {
       "noneInOrg": "This organization has no boards yet."
+    },
+    "polls": {
+      "label": "Attached polls",
+      "noneAttachable": "No polls are attachable with this visibility.",
+      "archivedSuffix": " (archived)",
+      "noLongerAttachable": " (no longer attachable)"
+    },
+    "attachments": {
+      "uploadButton": "Choose file",
+      "uploading": "Uploading…",
+      "uploadError": "Upload failed: {error}"
+    },
+    "card": {
+      "by": "by {name}",
+      "publishedAt": "Published {date}",
+      "createdAt": "Created {date}"
     }
   }
 }

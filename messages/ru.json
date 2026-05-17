@@ -2012,6 +2012,22 @@
     },
     "boards": {
       "noneInOrg": "В этой организации пока нет органов управления."
+    },
+    "polls": {
+      "label": "Прикреплённые голосования",
+      "noneAttachable": "Нет голосований, доступных при выбранной видимости.",
+      "archivedSuffix": " (архивировано)",
+      "noLongerAttachable": " (больше не доступно)"
+    },
+    "attachments": {
+      "uploadButton": "Выбрать файл",
+      "uploading": "Загрузка…",
+      "uploadError": "Ошибка загрузки: {error}"
+    },
+    "card": {
+      "by": "автор: {name}",
+      "publishedAt": "Опубликовано {date}",
+      "createdAt": "Создано {date}"
     }
   }
 }
