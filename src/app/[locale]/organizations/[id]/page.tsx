@@ -21,6 +21,7 @@ import { OrgMembersList } from './OrgMembersList';
 import { getOrgMembersAction } from '@/src/web/actions/invitation/invitation';
 import { listOrgPropertiesForMemberAction } from '@/src/web/actions/organization/propertyClaim';
 import { PropertiesSection } from './PropertiesSection';
+import { ReportsSection } from '@/src/web/components/report/ReportsSection';
 import { User } from '@/domain/user/User';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);
@@ -184,6 +185,14 @@ export default async function OrganizationDetailPage({
             boards={boards}
             showManageBoards={false}
           />
+        )}
+
+        {/* Reports Section - Visible to members and admins */}
+        {(isUserMember || isUserAdmin) && (
+          <>
+            <Divider />
+            <ReportsSection organizationId={id} viewerId={user?.id ?? null} />
+          </>
         )}
 
         {/* Polls Section - Visible to members and admins */}

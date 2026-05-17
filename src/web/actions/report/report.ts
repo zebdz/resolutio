@@ -178,7 +178,7 @@ async function requireUser(): Promise<{ error: string } | { userId: string }> {
 // Serialization helper
 // ---------------------------------------------------------------------------
 
-function serializeReport(r: Report): SerializedReport {
+export function serializeReport(r: Report): SerializedReport {
   return {
     id: r.id,
     organizationId: r.organizationId,
