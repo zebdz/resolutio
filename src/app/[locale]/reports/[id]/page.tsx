@@ -14,7 +14,7 @@ import {
 import { getCurrentUser } from '@/web/lib/session';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { ReportDetail } from '@/web/components/report/ReportDetail';
-import { getReportAction } from '@/web/actions/report/report';
+import { serializeReport } from '@/web/actions/report/serializeReport';
 import { GetReportForViewerUseCase } from '@/application/report/GetReportForViewerUseCase';
 import { ResolveReportVisibilityService } from '@/application/report/ResolveReportVisibilityService';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
@@ -29,9 +29,9 @@ const attachmentRepo = new PrismaReportAttachmentRepository(prisma);
 const pollRepo = new PrismaPollRepository(prisma);
 const boardRepo = new PrismaBoardRepository(prisma);
 
-// Used for the anonymous-visibility peek that decides whether a logged-out
-// user should be sent to /r/[id] (publicly viewable) or to /login.
-const anonReportUC = new GetReportForViewerUseCase(
+// Visibility-aware fetch used by both anon and authenticated viewers. The
+// service evaluates canRead with the supplied viewerId; null = anonymous.
+const reportUC = new GetReportForViewerUseCase(
   reportRepo,
   new ResolveReportVisibilityService(orgRepo, boardRepo, userRepo),
   attachmentRepo,
@@ -46,13 +46,15 @@ export async function generateMetadata({
   params,
 }: ReportDetailPageProps): Promise<import('next').Metadata> {
   const { id, locale } = await params;
-  const result = await getReportAction({ reportId: id });
+  // Anonymous metadata fetch — keeps OG generation working for crawlers
+  // that won't have a session cookie.
+  const result = await reportUC.execute({ reportId: id, viewerId: null });
 
   if (!result.success) {
     return { title: 'Report' };
   }
 
-  const { report, attachments } = result.data;
+  const { report, attachments } = result.value;
 
   if (report.visibility !== 'PUBLIC_ANON') {
     return { title: report.title };
@@ -73,7 +75,7 @@ export async function generateMetadata({
       type: 'article',
       url: `${SITE_ORIGIN}/${locale}/reports/${id}`,
       locale,
-      publishedTime: report.lastPublishedAt ?? undefined,
+      publishedTime: report.lastPublishedAt?.toISOString() ?? undefined,
       images: imageUrl ? [{ url: imageUrl }] : undefined,
     },
   };
@@ -84,29 +86,22 @@ export default async function ReportDetailPage({
 }: ReportDetailPageProps) {
   const { id } = await params;
   const currentUser = await getCurrentUser();
-
-  if (!currentUser) {
-    // Logged-out users get the anonymous route if the report is publicly
-    // viewable; otherwise we send them to login (the report may exist but be
-    // org-only, so the existence isn't leaked either way — /r/[id] 404s for
-    // non-public ids).
-    const anon = await anonReportUC.execute({
-      reportId: id,
-      viewerId: null,
-    });
-
-    if (anon.success) {
-      redirect(`/r/${id}`);
-    }
-
-    redirect('/login');
-  }
-
-  const user = currentUser;
   const t = await getTranslations('report');
-  const result = await getReportAction({ reportId: id });
+
+  const result = await reportUC.execute({
+    reportId: id,
+    viewerId: currentUser?.id ?? null,
+  });
 
   if (!result.success) {
+    // Not visible to this viewer. Anonymous → bounce to login (might be a
+    // member who got logged out); authenticated → render error inline
+    // (existence not leaked: REPORT_NOT_FOUND covers both "doesn't exist"
+    // and "not visible to you").
+    if (!currentUser) {
+      redirect('/login');
+    }
+
     return (
       <AuthenticatedLayout>
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950">
@@ -116,13 +111,15 @@ export default async function ReportDetailPage({
     );
   }
 
-  const { report, attachments, polls } = result.data;
+  const { report, attachments, polls } = result.value;
 
-  const [authorUser, isAdmin, isSuperAdmin] = await Promise.all([
-    userRepo.findById(report.createdById),
-    orgRepo.isUserAdmin(user.id, report.organizationId),
-    userRepo.isSuperAdmin(user.id),
-  ]);
+  const [authorUser, isAdmin, isSuperAdmin] = currentUser
+    ? await Promise.all([
+        userRepo.findById(report.createdById),
+        orgRepo.isUserAdmin(currentUser.id, report.organizationId),
+        userRepo.isSuperAdmin(currentUser.id),
+      ])
+    : [await userRepo.findById(report.createdById), false, false];
 
   const author = authorUser
     ? {
@@ -132,27 +129,52 @@ export default async function ReportDetailPage({
       }
     : { firstName: '?', lastName: '?', middleName: null };
 
-  const isAuthor = report.createdById === user.id;
+  const isAuthor = !!currentUser && report.createdById === currentUser.id;
 
-  return (
-    <AuthenticatedLayout>
-      <div className="space-y-6">
-        <Link
-          href="/reports"
-          className="cursor-pointer inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-        >
-          <ArrowLeftIcon className="h-4 w-4" />
-          {t('pages.feedTitle')}
-        </Link>
+  const serializedReport = serializeReport(report);
+  const serializedAttachments = attachments.map((a) => ({
+    id: a.id,
+    fileName: a.fileName,
+    mimeType: a.mimeType,
+    sizeBytes: a.sizeBytes,
+    createdAt: a.createdAt.toISOString(),
+  }));
+  const serializedPolls = polls.map((p) => ({
+    id: p.id,
+    title: p.title,
+    state: p.state,
+    archivedAt: p.archivedAt?.toISOString() ?? null,
+  }));
 
-        <ReportDetail
-          report={report}
-          author={author}
-          attachments={attachments}
-          polls={polls}
-          viewer={{ id: user.id, isAuthor, isAdmin, isSuperAdmin }}
-        />
-      </div>
-    </AuthenticatedLayout>
+  const viewer = currentUser
+    ? { id: currentUser.id, isAuthor, isAdmin, isSuperAdmin }
+    : null;
+
+  const body = (
+    <div className="space-y-6">
+      <Link
+        href="/reports"
+        className="cursor-pointer inline-flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+      >
+        <ArrowLeftIcon className="h-4 w-4" />
+        {t('pages.feedTitle')}
+      </Link>
+
+      <ReportDetail
+        report={serializedReport}
+        author={author}
+        attachments={serializedAttachments}
+        polls={serializedPolls}
+        viewer={viewer}
+      />
+    </div>
   );
+
+  if (!currentUser) {
+    // Anonymous viewer: skip the authenticated chrome (navbar, sidebar)
+    // and render the report standalone, same as /r/[id].
+    return <main className="mx-auto max-w-3xl px-4 py-8">{body}</main>;
+  }
+
+  return <AuthenticatedLayout>{body}</AuthenticatedLayout>;
 }
