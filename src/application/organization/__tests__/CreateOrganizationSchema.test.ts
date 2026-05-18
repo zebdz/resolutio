@@ -4,6 +4,7 @@ import { ProfanityChecker } from '../../../domain/shared/profanity/ProfanityChec
 
 const mockProfanityChecker: ProfanityChecker = {
   containsProfanity: () => false,
+  findProfaneWords: () => [],
 };
 
 const CreateOrganizationSchema = createOrganizationSchema(mockProfanityChecker);

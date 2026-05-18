@@ -12,6 +12,7 @@ import { BoardDomainCodes } from '@/domain/board/BoardDomainCodes';
 
 const noopProfanityChecker: ProfanityChecker = {
   containsProfanity: () => false,
+  findProfaneWords: () => [],
 };
 const CreateOrganizationSchema = createOrganizationSchema(noopProfanityChecker);
 

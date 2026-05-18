@@ -340,6 +340,19 @@ export class Report {
   }
 }
 
+// Compose a profanity error code, embedding the specific offending words as
+// a URL-encoded query suffix when they're available so the UI message can
+// quote them back to the user.
+function profanityErrorCode(words: string[]): string {
+  if (words.length === 0) {
+    return SharedDomainCodes.CONTAINS_PROFANITY;
+  }
+
+  const encoded = encodeURIComponent(words.join(', '));
+
+  return `${SharedDomainCodes.CONTAINS_PROFANITY_WITH_WORDS}?words=${encoded}`;
+}
+
 function validateTitle(
   title: string,
   profanityChecker?: ProfanityChecker
@@ -353,7 +366,9 @@ function validateTitle(
   }
 
   if (profanityChecker?.containsProfanity(title.trim())) {
-    return failure(SharedDomainCodes.CONTAINS_PROFANITY);
+    return failure(
+      profanityErrorCode(profanityChecker.findProfaneWords(title.trim()))
+    );
   }
 
   return success(undefined);
@@ -378,7 +393,9 @@ function validateBody(
       : body;
 
     if (profanityChecker.containsProfanity(text)) {
-      return failure(SharedDomainCodes.CONTAINS_PROFANITY);
+      return failure(
+        profanityErrorCode(profanityChecker.findProfaneWords(text))
+      );
     }
   }
 

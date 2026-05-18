@@ -323,6 +323,7 @@ describe('User', () => {
     it('should not throw when middleName is undefined with checker', () => {
       const checker: ProfanityChecker = {
         containsProfanity: () => true,
+        findProfaneWords: () => [],
       };
       const user = User.create(validProps);
       const updated = user.updateMiddleName(undefined, checker);

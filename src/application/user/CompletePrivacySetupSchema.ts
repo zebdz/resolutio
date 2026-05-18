@@ -28,6 +28,7 @@ export const completePrivacySetupSchema = (
 // Keep backward-compatible constant with a no-op profanity checker for tests
 export const CompletePrivacySetupSchema = completePrivacySetupSchema({
   containsProfanity: () => false,
+  findProfaneWords: () => [],
 });
 
 export type CompletePrivacySetupInput = z.infer<

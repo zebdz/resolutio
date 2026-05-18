@@ -133,6 +133,35 @@ export class LeoProfanityChecker implements ProfanityChecker {
     '!': 'и', // evasion: П!ська → Писька, П!др → Пидр
   };
 
+  findProfaneWords(text: string): string[] {
+    if (!text) {
+      return [];
+    }
+
+    // Split by whitespace and any in-word punctuation context preserved by
+    // running containsProfanity per token. A token triggers when it itself
+    // is profane (dictionary hit, stem, infix, or single-token punctuation
+    // evasion). Cross-token evasions (п и з д е ц) won't produce per-token
+    // hits — callers see that as an empty result and fall back to a generic
+    // message.
+    const tokens = text.split(/\s+/).filter(Boolean);
+    const seen = new Set<string>();
+    const result: string[] = [];
+
+    for (const tok of tokens) {
+      if (seen.has(tok)) {
+        continue;
+      }
+
+      if (this.containsProfanity(tok)) {
+        seen.add(tok);
+        result.push(tok);
+      }
+    }
+
+    return result;
+  }
+
   containsProfanity(text: string): boolean {
     // Normalize whitespace: leo-profanity doesn't split on \n or \t
     const input = text.replace(/\s+/g, ' ');
@@ -240,12 +269,29 @@ export class LeoProfanityChecker implements ProfanityChecker {
       }
     }
 
-    // Strip non-letter characters from ORIGINAL text to catch cases where
-    // special chars replace letters ambiguously (Еб$ть → Ебть, $ could be а or с)
-    const originalLettersOnly = input.replace(/[^\p{L}]/gu, '');
+    // Cross-token collapse (concatenating multiple whitespace-separated
+    // words) is only safe when the text *looks* like spaced-letter evasion —
+    // tokens are short (max 3 chars). Otherwise we glue legitimate prose
+    // together ("Яблоки Бананы" → "яблокибананы" hits infix "ибан").
+    const looksLikeSpacedEvasion = (s: string): boolean => {
+      const tokens = s.split(/\s+/).filter(Boolean);
 
-    if (originalLettersOnly !== input.replace(/\s/g, '')) {
-      const normalizedStripped = this.normalize(originalLettersOnly);
+      return tokens.length >= 2 && tokens.every((t) => t.length <= 3);
+    };
+
+    // Per-token strip: removes in-word punctuation (е.б.а.т.ь, х-у-е-в-ы-й,
+    // б*л*я*т*ь) without concatenating across word boundaries.
+    const stripTokens = (s: string): string =>
+      s
+        .split(/\s+/)
+        .map((tok) => tok.replace(/[^\p{L}]/gu, ''))
+        .filter(Boolean)
+        .join(' ');
+
+    const inputStripped = stripTokens(input);
+
+    if (inputStripped !== input && inputStripped !== input.replace(/\s/g, '')) {
+      const normalizedStripped = this.normalize(inputStripped);
 
       if (leoProfanity.check(normalizedStripped)) {
         return true;
@@ -256,22 +302,24 @@ export class LeoProfanityChecker implements ProfanityChecker {
       }
     }
 
-    // Strip non-letter characters from normalized text to catch obfuscation
-    // like х.у.е.в.ы.й, б*л*я*т*ь
-    const lettersOnly = normalized.replace(/[^\p{L}]/gu, '');
+    const normalizedStrippedPerToken = stripTokens(normalized);
 
-    if (lettersOnly !== normalized.replace(/\s/g, '')) {
-      if (leoProfanity.check(lettersOnly)) {
+    if (
+      normalizedStrippedPerToken !== normalized &&
+      normalizedStrippedPerToken !== normalized.replace(/\s/g, '')
+    ) {
+      if (leoProfanity.check(normalizedStrippedPerToken)) {
         return true;
       }
 
-      if (this.containsProfaneStem(lettersOnly)) {
+      if (this.containsProfaneStem(normalizedStrippedPerToken)) {
         return true;
       }
     }
 
-    // Collapse spaces to catch spaced-out letters: п и з д е ц
-    if (normalized.includes(' ')) {
+    // Collapse whitespace to catch spaced-out letters: п и з д е ц.
+    // Gated by looksLikeSpacedEvasion so legitimate prose isn't concatenated.
+    if (normalized.includes(' ') && looksLikeSpacedEvasion(normalized)) {
       const collapsed = normalized.replace(/\s/g, '');
 
       if (leoProfanity.check(collapsed)) {

@@ -1295,7 +1295,8 @@
       "pollNotFound": "Голосование не найдено"
     },
     "shared": {
-      "containsProfanity": "Содержит ненормативную лексику"
+      "containsProfanity": "Содержит ненормативную лексику",
+      "containsProfanityWithWords": "Содержит ненормативную лексику: {words}"
     }
   },
   "phone": {

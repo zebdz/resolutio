@@ -19,6 +19,7 @@ export const createBoardSchema = (profanityChecker: ProfanityChecker) =>
 // Keep backward-compatible constant with a no-op profanity checker for tests
 export const CreateBoardSchema = createBoardSchema({
   containsProfanity: () => false,
+  findProfaneWords: () => [],
 });
 
 export type CreateBoardInput = z.infer<typeof CreateBoardSchema>;
