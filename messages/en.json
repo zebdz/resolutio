@@ -1295,7 +1295,8 @@
       "pollNotFound": "Poll not found"
     },
     "shared": {
-      "containsProfanity": "Contains inappropriate language"
+      "containsProfanity": "Contains inappropriate language",
+      "containsProfanityWithWords": "Contains inappropriate language: {words}"
     }
   },
   "phone": {

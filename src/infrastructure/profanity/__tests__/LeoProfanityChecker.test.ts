@@ -1233,6 +1233,16 @@ describe('LeoProfanityChecker', () => {
   // ===== False positive checks =====
 
   describe('false positives: legitimate words must NOT be flagged', () => {
+    // cross-word concatenation regression (Яблоки+Бананы → яблокибананы
+    // would have hit infix "ибан" before the looksLikeSpacedEvasion gate)
+    it('should NOT flag "Яблоки Бананы" (adjacent words, no evasion shape)', () => {
+      expect(checker.containsProfanity('Яблоки Бананы')).toBe(false);
+    });
+
+    it('should NOT flag "* Яблоки\\n* Бананы" (markdown list items)', () => {
+      expect(checker.containsProfanity('* Яблоки\n* Бананы')).toBe(false);
+    });
+
     // пид infix
     it('should NOT flag пиджак', () => {
       expect(checker.containsProfanity('пиджак')).toBe(false);
