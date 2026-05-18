@@ -22,6 +22,15 @@ import {
   NICKNAME_MAX_LENGTH,
 } from '@/domain/user/Nickname';
 import { SharedDomainCodes } from '@/domain/shared/SharedDomainCodes';
+import {
+  REPORT_TITLE_MAX_LENGTH,
+  REPORT_BODY_MAX_LENGTH,
+} from '@/domain/report/Report';
+import {
+  REPORT_ATTACHMENT_COUNT_LIMIT,
+  REPORT_ATTACHMENT_IMAGE_MAX_BYTES,
+  REPORT_ATTACHMENT_PDF_MAX_BYTES,
+} from '@/domain/report/ReportAttachment';
 
 // Maps error codes to ICU message parameters (limit values from domain constants)
 const ERROR_CODE_PARAMS: Record<string, Record<string, string | number>> = {
@@ -53,6 +62,15 @@ const ERROR_CODE_PARAMS: Record<string, Record<string, string | number>> = {
     minLength: NICKNAME_MIN_LENGTH,
     maxLength: NICKNAME_MAX_LENGTH,
   },
+  'domain.report.titleTooLong': { maxLength: REPORT_TITLE_MAX_LENGTH },
+  'domain.report.bodyTooLong': { maxLength: REPORT_BODY_MAX_LENGTH },
+  'domain.report.attachmentLimitReached': {
+    maxCount: REPORT_ATTACHMENT_COUNT_LIMIT,
+  },
+  'domain.report.attachmentTooLarge': {
+    imageMaxMb: Math.floor(REPORT_ATTACHMENT_IMAGE_MAX_BYTES / (1024 * 1024)),
+    documentMaxMb: Math.floor(REPORT_ATTACHMENT_PDF_MAX_BYTES / (1024 * 1024)),
+  },
   [SharedDomainCodes.CONTAINS_PROFANITY]: {},
 };
 
@@ -72,7 +90,8 @@ const ERROR_CODE_PARAMS: Record<string, Record<string, string | number>> = {
  */
 export async function translateErrorCode(
   errorCode: string,
-  params?: Record<string, string | number>
+  paramsOrLocale?: Record<string, string | number> | { locale: string },
+  maybeLocale?: { locale: string }
 ): Promise<string> {
   const dotIndex = errorCode.indexOf('.');
 
@@ -82,10 +101,28 @@ export async function translateErrorCode(
 
   const namespace = errorCode.substring(0, dotIndex);
   const key = errorCode.substring(dotIndex + 1);
+
+  // Caller may pass: (code), (code, params), (code, { locale }),
+  // or (code, params, { locale }). Disambiguate.
+  let params: Record<string, string | number> | undefined;
+  let localeOpts: { locale: string } | undefined;
+
+  if (
+    paramsOrLocale &&
+    typeof (paramsOrLocale as { locale?: unknown }).locale === 'string'
+  ) {
+    localeOpts = paramsOrLocale as { locale: string };
+  } else {
+    params = paramsOrLocale as Record<string, string | number> | undefined;
+    localeOpts = maybeLocale;
+  }
+
   const resolvedParams = params || ERROR_CODE_PARAMS[errorCode];
 
   try {
-    const t = await getTranslations(namespace);
+    const t = localeOpts
+      ? await getTranslations({ locale: localeOpts.locale, namespace })
+      : await getTranslations(namespace);
 
     return resolvedParams ? t(key as any, resolvedParams) : t(key as any);
   } catch {

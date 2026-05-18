@@ -28,6 +28,25 @@ enum OverallRisk {
   @@map("overall_risk_enum")
 }
 
+enum ReportVisibility {
+  PUBLIC_ANON
+  PUBLIC_AUTH
+  WITHIN_ORG_ONLY
+  WITHIN_ORG_ANCESTORS
+  WITHIN_ORG_DESCENDANTS
+  WITHIN_ORG_TREE
+  WITHIN_BOARDS
+
+  @@map("report_visibility_enum")
+}
+
+enum ReportState {
+  DRAFT
+  PUBLISHED
+
+  @@map("report_state_enum")
+}
+
 // Authentication Models
 model User {
   id          String   @id @default(cuid())
@@ -81,6 +100,8 @@ model User {
   pollEligibilities  PollEligibleMember[]
   propertyClaimsSubmitted PropertyClaim[] @relation("PropertyClaimUser")
   propertyClaimsDecided   PropertyClaim[] @relation("PropertyClaimDecidedBy")
+  reportsAuthored         Report[]        @relation("ReportAuthor")
+  reportsPublished        Report[]        @relation("ReportPublisher")
 
   @@map("users")
 }
@@ -151,6 +172,7 @@ model Organization {
   joinTokens          OrganizationJoinToken[]
   properties          OrganizationProperty[]
   propertyClaims      PropertyClaim[]
+  reports             Report[]
 
   @@index([parentId])
   @@index([createdById])
@@ -227,6 +249,7 @@ model Board {
   members      BoardUser[]
   polls        Poll[]
   invitations  Invitation[]
+  reportBoards ReportBoard[]
 
   @@unique([name, organizationId])
   @@index([organizationId])
@@ -283,6 +306,7 @@ model Poll {
   legalCheckLogs  PollLegalCheckLog[]
   properties      PollProperty[]
   eligibleMembers PollEligibleMember[]
+  reportPolls     ReportPoll[]
 
   @@index([organizationId])
   @@index([boardId])
@@ -736,5 +760,74 @@ model PropertyClaimAttachment {
 
   @@index([claimId])
   @@map("property_claim_attachments")
+}
+
+// Report Models
+model Report {
+  id              String           @id @default(cuid())
+  organizationId  String           @map("organization_id")
+  createdById     String           @map("created_by_id")
+  title           String
+  body            String
+  visibility      ReportVisibility
+  state           ReportState      @default(DRAFT)
+  publishedById   String?          @map("published_by_id")
+  lastPublishedAt DateTime?        @map("last_published_at")
+  notifyAudience  Boolean          @default(false) @map("notify_audience")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  archivedAt      DateTime?        @map("archived_at")
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User                @relation("ReportAuthor", fields: [createdById], references: [id])
+  publishedBy  User?               @relation("ReportPublisher", fields: [publishedById], references: [id], onDelete: SetNull)
+  attachments  ReportAttachment[]
+  boards       ReportBoard[]
+  polls        ReportPoll[]
+
+  @@index([organizationId])
+  @@index([createdById])
+  @@index([state, archivedAt])
+  @@index([visibility, state, lastPublishedAt])
+  @@map("reports")
+}
+
+model ReportAttachment {
+  id        String   @id @default(cuid())
+  reportId  String   @map("report_id")
+  fileName  String   @map("file_name")
+  mimeType  String   @map("mime_type")
+  sizeBytes Int      @map("size_bytes")
+  bytes     Bytes
+  createdAt DateTime @default(now()) @map("created_at")
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@map("report_attachments")
+}
+
+model ReportBoard {
+  reportId String @map("report_id")
+  boardId  String @map("board_id")
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  board  Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@id([reportId, boardId])
+  @@index([boardId])
+  @@map("report_boards")
+}
+
+model ReportPoll {
+  reportId String @map("report_id")
+  pollId   String @map("poll_id")
+
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  @@id([reportId, pollId])
+  @@index([pollId])
+  @@map("report_polls")
 }
 

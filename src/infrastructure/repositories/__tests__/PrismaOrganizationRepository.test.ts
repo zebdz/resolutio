@@ -214,6 +214,36 @@ describe('PrismaOrganizationRepository', () => {
     });
   });
 
+  // ─── isUserExactMember ───────────────────────────────────────────
+
+  describe('isUserExactMember', () => {
+    it('returns true when accepted membership exists in exactly that org', async () => {
+      mockPrisma.organizationUser.findFirst.mockResolvedValueOnce({
+        id: 'ou-1',
+      });
+
+      const result = await repo.isUserExactMember('user-1', 'org-1');
+
+      expect(result).toBe(true);
+      expect(mockPrisma.organizationUser.findFirst).toHaveBeenCalledWith({
+        where: {
+          userId: 'user-1',
+          organizationId: 'org-1',
+          status: 'accepted',
+        },
+        select: { id: true },
+      });
+    });
+
+    it('returns false when no accepted membership in that exact org', async () => {
+      mockPrisma.organizationUser.findFirst.mockResolvedValueOnce(null);
+
+      const result = await repo.isUserExactMember('user-1', 'org-1');
+
+      expect(result).toBe(false);
+    });
+  });
+
   // ─── findAcceptedMemberUserIdsIncludingDescendants ───────────────
 
   describe('findAcceptedMemberUserIdsIncludingDescendants', () => {
@@ -267,6 +297,38 @@ describe('PrismaOrganizationRepository', () => {
         await repo.findAcceptedMemberUserIdsIncludingDescendants('org-1');
 
       expect(result).toEqual([]);
+    });
+  });
+
+  // ─── findAcceptedMemberUserIdsForOrgs ────────────────────────────
+
+  describe('findAcceptedMemberUserIdsForOrgs', () => {
+    it('returns empty array when orgIds is empty', async () => {
+      const result = await repo.findAcceptedMemberUserIdsForOrgs([]);
+      expect(result).toEqual([]);
+      expect(mockPrisma.organizationUser.findMany).not.toHaveBeenCalled();
+    });
+
+    it('returns deduplicated user IDs for the given org IDs', async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValueOnce([
+        { userId: 'u1' },
+        { userId: 'u2' },
+      ]);
+
+      const result = await repo.findAcceptedMemberUserIdsForOrgs([
+        'org-1',
+        'org-2',
+      ]);
+
+      expect(result).toEqual(['u1', 'u2']);
+      expect(mockPrisma.organizationUser.findMany).toHaveBeenCalledWith({
+        where: {
+          organizationId: { in: ['org-1', 'org-2'] },
+          status: 'accepted',
+        },
+        select: { userId: true },
+        distinct: ['userId'],
+      });
     });
   });
 

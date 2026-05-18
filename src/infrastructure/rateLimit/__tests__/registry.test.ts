@@ -10,10 +10,10 @@ import {
 } from '../registry';
 
 describe('limiterRegistry', () => {
-  it('has 8 entries with unique labels', () => {
-    expect(limiterRegistry).toHaveLength(8);
+  it('has 9 entries with unique labels', () => {
+    expect(limiterRegistry).toHaveLength(9);
     const labels = limiterRegistry.map((e) => e.label);
-    expect(new Set(labels).size).toBe(8);
+    expect(new Set(labels).size).toBe(9);
   });
 
   it('each entry has a limiter instance', () => {
@@ -55,5 +55,12 @@ describe('getLimiterByLabel', () => {
     expect(entry).toBeDefined();
     expect(entry!.maxRequests).toBe(5_000);
     expect(entry!.windowMs).toBe(60 * 60_000);
+  });
+
+  it('reportCreate configured at 10 per 24 h', () => {
+    const entry = getLimiterByLabel('reportCreate');
+    expect(entry).toBeDefined();
+    expect(entry!.maxRequests).toBe(10);
+    expect(entry!.windowMs).toBe(24 * 60 * 60_000);
   });
 });

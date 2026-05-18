@@ -810,6 +810,7 @@
       "willingToSignProtocolCount": "{count} готовы",
       "protocolNotWillingCount": "{count} не готовы",
       "exportProtocolPdf": "Экспорт подписантов в PDF",
+      "attachedReportsHeading": "Отчёты, ссылающиеся на это голосование",
       "pdf": {
         "exportPdf": "Экспорт в PDF",
         "exporting": "Экспорт...",
@@ -1070,6 +1071,10 @@
       "propertyClaimDenied": {
         "title": "Ваша заявка отклонена",
         "body": "Подробности см. в причине отклонения."
+      },
+      "reportPublished": {
+        "title": "Новый отчёт",
+        "body": "{title}"
       }
     },
     "page": {
@@ -1097,7 +1102,8 @@
         "viewResults": "Результаты",
         "respondToInvite": "Ответить на приглашение",
         "viewBoard": "Просмотреть орган управления",
-        "viewPropertyClaims": "Просмотреть заявки на имущество"
+        "viewPropertyClaims": "Просмотреть заявки на имущество",
+        "viewReport": "Открыть отчёт"
       }
     }
   },
@@ -1107,6 +1113,7 @@
     "home": "Главная",
     "organizations": "Организации",
     "polls": "Голосования",
+    "reports": "Отчёты",
     "superadmin": "Суперадмин",
     "account": "Аккаунт",
     "notifications": "Уведомления"
@@ -1264,6 +1271,28 @@
       "alreadyExpired": "Токен уже истёк",
       "notExpired": "Токен не истёк",
       "tokenExhausted": "Токен достиг максимального числа использований"
+    },
+    "report": {
+      "titleEmpty": "Заголовок не может быть пустым",
+      "titleTooLong": "Заголовок не может превышать {maxLength} символов",
+      "bodyEmpty": "Текст не может быть пустым",
+      "bodyTooLong": "Текст не может превышать {maxLength} символов",
+      "bodyInvalidAttachmentRef": "В тексте есть ссылка на файл из другого отчёта. Загрузите файл сюда и вставьте его снова.",
+      "invalidVisibility": "Недопустимая видимость",
+      "boardsEmpty": "Выберите хотя бы один орган управления",
+      "boardNotInOrg": "Этот орган не относится к организации отчёта",
+      "mustBeDraft": "Отчёт должен быть черновиком",
+      "mustBePublished": "Отчёт должен быть опубликован",
+      "cannotEditPublished": "Нельзя редактировать опубликованный отчёт",
+      "alreadyArchived": "Отчёт уже в архиве",
+      "archived": "Отчёт в архиве",
+      "attachmentFilenameEmpty": "Имя файла не может быть пустым",
+      "attachmentTooLarge": "Файл слишком большой (изображения до {imageMaxMb} МБ, документы до {documentMaxMb} МБ)",
+      "attachmentTypeNotAllowed": "Недопустимый тип файла (используйте PNG, JPEG, WebP, PDF, XLS, XLSX, DOC, DOCX, ODT или ODS)",
+      "attachmentMagicMismatch": "Содержимое файла не соответствует заявленному типу",
+      "attachmentLimitReached": "Максимум {maxCount} файлов на отчёт",
+      "pollAudienceTooNarrow": "Аудитория голосования должна включать аудиторию отчёта",
+      "pollNotFound": "Голосование не найдено"
     },
     "shared": {
       "containsProfanity": "Содержит ненормативную лексику"
@@ -1986,6 +2015,106 @@
     },
     "banner": {
       "alreadyClaimed": "По этому объекту уже рассматривается другая заявка."
+    }
+  },
+  "report": {
+    "errors": {
+      "notFound": "Отчёт не найден",
+      "notAuthorOrAdmin": "Только автор отчёта или администратор организации может выполнить это действие",
+      "attachmentNotFound": "Вложение не найдено",
+      "rateLimitedDaily": "Вы достигли дневного лимита создания отчётов. Пожалуйста, попробуйте завтра."
+    },
+    "state": {
+      "draft": "Черновик",
+      "published": "Опубликован",
+      "archived": "В архиве"
+    },
+    "visibility": {
+      "label": "Видимость",
+      "publicAnon": "Публично — доступно всем (без регистрации)",
+      "publicAuth": "Публично — доступно зарегистрированным пользователям",
+      "withinOrgOnly": "Только участники организации",
+      "withinOrgAncestors": "Организация и родительские организации",
+      "withinOrgDescendants": "Организация и подорганизации",
+      "withinOrgTree": "Всё дерево организаций",
+      "withinBoards": "Только выбранные доски"
+    },
+    "boards": {
+      "noneInOrg": "В этой организации пока нет органов управления."
+    },
+    "polls": {
+      "label": "Прикреплённые голосования",
+      "noneAttachable": "Можно прикреплять только завершённые голосования той же организации (с подходящей аудиторией).",
+      "archivedSuffix": " (архивировано)",
+      "noLongerAttachable": " (больше не доступно)"
+    },
+    "markdown": {
+      "externalImageBlocked": "Внешние изображения не разрешены — загрузите файл через прикрепление."
+    },
+    "attachments": {
+      "uploadButton": "Выбрать файл",
+      "uploading": "Загрузка…",
+      "uploadError": "Ошибка загрузки: {error}"
+    },
+    "card": {
+      "by": "автор: {name}",
+      "publishedAt": "Опубликовано {date}",
+      "createdAt": "Создано {date}"
+    },
+    "form": {
+      "titleLabel": "Заголовок",
+      "titlePlaceholder": "Заголовок отчёта",
+      "bodyLabel": "Текст (Markdown)",
+      "bodyHint": "Изображения и PDF можно вставить или перетащить прямо в редактор.",
+      "bodyCreateHint": "Файлы можно прикрепить после сохранения черновика.",
+      "attachmentsLabel": "Файлы",
+      "attachmentsRemove": "Удалить",
+      "createSubmit": "Сохранить черновик",
+      "saveSubmit": "Сохранить",
+      "cancel": "Отмена",
+      "submitting": "Сохранение…",
+      "savedToast": "Сохранено",
+      "createdToast": "Черновик создан"
+    },
+    "detail": {
+      "pollsHeader": "Прикреплённые голосования",
+      "noPolls": "Голосования не прикреплены.",
+      "imagesHeader": "Изображения",
+      "attachmentsHeader": "Файлы",
+      "fileSizeBytes": "{size} Б",
+      "fileSizeKb": "{size} КБ",
+      "fileSizeMb": "{size} МБ",
+      "noAttachments": "Файлы не прикреплены.",
+      "openFile": "Открыть",
+      "publishButton": "Опубликовать",
+      "notifyAudience": "Уведомить аудиторию",
+      "downgradeButton": "Вернуть в черновик",
+      "archiveButton": "В архив",
+      "archiveConfirm": "Архивировать отчёт? Архивированные отчёты скрываются из лент и не могут быть восстановлены.",
+      "editButton": "Редактировать",
+      "publishedDate": "Опубликовано {date}",
+      "createdDate": "Создано {date}"
+    },
+    "pages": {
+      "newTitle": "Новый отчёт",
+      "newButton": "Новый отчёт",
+      "feedTitle": "Отчёты",
+      "feedEmpty": "Пока нет отчётов.",
+      "pickOrg": "Выберите организацию",
+      "filterByOrg": "Фильтр по организации",
+      "noOrgsCallout": "Вы пока не состоите ни в одной организации.",
+      "previous": "Назад",
+      "next": "Вперёд",
+      "page": "Страница {page}",
+      "cannotEditPublished": "Этот отчёт опубликован. Чтобы редактировать, верните его в черновик.",
+      "backToDetail": "К отчёту",
+      "unauthorized": "У вас нет прав для выполнения этого действия."
+    },
+    "section": {
+      "heading": "Отчёты",
+      "empty": "Пока нет отчётов.",
+      "newButton": "Новый отчёт",
+      "viewAll": "Все отчёты"
     }
   }
 }

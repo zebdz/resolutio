@@ -181,6 +181,17 @@ describe('getNotificationActionUrl', () => {
         actionKey: 'viewOrganization',
       });
     });
+
+    it('report_published → /reports/{id}', () => {
+      const result = getNotificationActionUrl('report_published', {
+        reportId: 'rep-1',
+        title: 'My Report',
+      });
+      expect(result).toEqual({
+        href: '/reports/rep-1',
+        actionKey: 'viewReport',
+      });
+    });
   });
 
   describe('returns null for missing/invalid data', () => {
