@@ -91,7 +91,7 @@ export function ReportAdminActions({ report, canPublish, canEdit }: Props) {
               checked={notifyAudience}
               onChange={(e) => setNotifyAudience(e.target.checked)}
               disabled={submitting}
-              className="h-4 w-4 rounded border-zinc-300 accent-zinc-900 disabled:cursor-not-allowed dark:border-zinc-600"
+              className="h-4 w-4 cursor-pointer rounded border-zinc-300 accent-zinc-900 disabled:cursor-not-allowed dark:border-zinc-600"
             />
             {t('notifyAudience')}
           </label>
