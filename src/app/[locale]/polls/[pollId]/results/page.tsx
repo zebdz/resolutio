@@ -3,9 +3,11 @@ import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { getPollResultsAction } from '@/src/web/actions/poll/vote';
 import { getPollByIdAction } from '@/src/web/actions/poll/poll';
+import { listReportsAction } from '@/web/actions/report/report';
 import PollResults from '@/src/web/components/polls/results/PollResults';
 import { WeightConfigLabel } from '@/src/web/components/polls/results/WeightConfigLabel';
 import { Heading } from '@/src/web/components/catalyst/heading';
+import ReportCard from '@/web/components/report/ReportCard';
 import {
   AnswerResult,
   QuestionResult,
@@ -18,10 +20,13 @@ import {
   PrismaOrganizationPropertyRepository,
   PrismaOrganizationRepository,
   PrismaPropertyAssetRepository,
+  PrismaUserRepository,
 } from '@/infrastructure/index';
 import { PollWeightCalculator } from '@/application/poll/PollWeightCalculator';
 import { DistributionType } from '@/domain/poll/DistributionType';
 import { PropertyAggregation } from '@/domain/poll/PropertyAggregation';
+
+const userRepository = new PrismaUserRepository(prisma);
 
 const propertyRepository = new PrismaOrganizationPropertyRepository(prisma);
 const pollWeightCalculator = new PollWeightCalculator(
@@ -112,6 +117,26 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
 
   const results = resultsResult.data;
   const isPollCreator = poll.createdBy === user.id;
+
+  // Reports citing this poll (filtered to those the viewer can see)
+  const attachedReportsResult = await listReportsAction({
+    attachedPollId: pollId,
+    publishedOnly: true,
+    pageSize: 20,
+  });
+  const attachedReports = attachedReportsResult.success
+    ? attachedReportsResult.data.reports
+    : [];
+  const attachedReportAuthorIds = [
+    ...new Set(attachedReports.map((r) => r.createdById)),
+  ];
+  const attachedReportAuthors =
+    attachedReportAuthorIds.length > 0
+      ? await userRepository.findByIds(attachedReportAuthorIds)
+      : [];
+  const attachedReportAuthorMap = new Map(
+    attachedReportAuthors.map((a) => [a.id, a])
+  );
 
   // IMPORTANT: Only send voter data to client if user has permission to view it
   // This prevents unauthorized access to sensitive voting data via browser console
@@ -211,6 +236,42 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
         canViewVoters={canViewVoters}
         buildingTotal={buildingTotal}
       />
+
+      {attachedReports.length > 0 && (
+        <section className="mt-10 space-y-4">
+          <Heading level={2}>{t('attachedReportsHeading')}</Heading>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {attachedReports.map((report) => {
+              const author = attachedReportAuthorMap.get(report.createdById);
+              const authorInfo = author
+                ? {
+                    firstName: author.firstName,
+                    lastName: author.lastName,
+                    middleName: author.middleName ?? null,
+                  }
+                : { firstName: '?', lastName: '?', middleName: null };
+
+              return (
+                <ReportCard
+                  key={report.id}
+                  report={{
+                    id: report.id,
+                    title: report.title,
+                    body: report.body,
+                    state: report.state as 'DRAFT' | 'PUBLISHED',
+                    visibility: report.visibility,
+                    lastPublishedAt: report.lastPublishedAt,
+                    createdAt: report.createdAt,
+                    archivedAt: report.archivedAt,
+                    organizationId: report.organizationId,
+                  }}
+                  author={authorInfo}
+                />
+              );
+            })}
+          </div>
+        </section>
+      )}
     </AuthenticatedLayout>
   );
 }

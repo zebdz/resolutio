@@ -49,7 +49,7 @@ export function VisibilityPicker({
                 value={v}
                 checked={value === v}
                 onChange={() => onChange(v)}
-                className="h-4 w-4 border-zinc-300 accent-zinc-900 dark:border-zinc-600"
+                className="h-4 w-4 cursor-pointer border-zinc-300 accent-zinc-900 dark:border-zinc-600"
               />
               <span className="text-sm text-zinc-800 dark:text-zinc-200">
                 {t(VISIBILITY_KEY[v] as Parameters<typeof t>[0])}

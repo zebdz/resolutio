@@ -13,6 +13,7 @@ import {
   PrismaUserRepository,
 } from '@/infrastructure/index';
 import { AddReportAttachmentUseCase } from '@/application/report/AddReportAttachmentUseCase';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 
 const reportRepo = new PrismaReportRepository(prisma);
 const attachmentRepo = new PrismaReportAttachmentRepository(prisma);
@@ -36,6 +37,8 @@ export async function POST(request: NextRequest) {
   const form = await request.formData();
   const reportId = form.get('reportId');
   const file = form.get('file');
+  const localeField = form.get('locale');
+  const locale = typeof localeField === 'string' ? localeField : undefined;
 
   if (
     typeof reportId !== 'string' ||
@@ -57,7 +60,15 @@ export async function POST(request: NextRequest) {
   });
 
   if (!result.success) {
-    return NextResponse.json({ error: result.error }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: await translateErrorCode(
+          result.error,
+          locale ? { locale } : undefined
+        ),
+      },
+      { status: 400 }
+    );
   }
 
   // result.value is { id: string }

@@ -8,6 +8,7 @@ export interface ReportSearchFilters {
   state?: 'DRAFT' | 'PUBLISHED';
   includeArchived?: boolean;
   authorId?: string;
+  attachedPollId?: string;
   page?: number;
   pageSize?: number;
 }

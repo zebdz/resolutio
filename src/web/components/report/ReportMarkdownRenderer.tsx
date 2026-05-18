@@ -3,6 +3,7 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
+import { useTranslations } from 'next-intl';
 import { detectVideoEmbed } from './detectVideoEmbed';
 import { isAllowedAttachmentSrc } from './isAllowedAttachmentSrc';
 
@@ -20,6 +21,8 @@ interface Props {
 }
 
 export function ReportMarkdownRenderer({ source }: Props) {
+  const t = useTranslations('report.markdown');
+
   return (
     <div className="prose prose-zinc max-w-none dark:prose-invert">
       <ReactMarkdown
@@ -62,7 +65,11 @@ export function ReportMarkdownRenderer({ source }: Props) {
               typeof src !== 'string' ||
               !isAllowedAttachmentSrc(src)
             ) {
-              return null;
+              return (
+                <span className="block rounded-md border border-dashed border-zinc-300 bg-zinc-50 p-3 text-xs italic text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+                  {t('externalImageBlocked')}
+                </span>
+              );
             }
 
             return (

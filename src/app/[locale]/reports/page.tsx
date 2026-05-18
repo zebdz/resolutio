@@ -68,6 +68,11 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       <div className="space-y-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Heading className="text-3xl font-bold">{t('feedTitle')}</Heading>
+          <Link href="/reports/new">
+            <Button color="brand-green" className="cursor-pointer">
+              {t('newButton')}
+            </Button>
+          </Link>
         </div>
 
         {reports.length === 0 ? (

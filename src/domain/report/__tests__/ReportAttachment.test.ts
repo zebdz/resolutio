@@ -16,6 +16,16 @@ const WEBP_HEADER = Buffer.concat([
   Buffer.alloc(4),
   Buffer.from('WEBP'),
 ]);
+const OLE2_HEADER = Buffer.from([
+  0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1,
+]);
+const ZIP_HEADER = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+const XLS_MIME = 'application/vnd.ms-excel';
+const XLSX_MIME =
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const DOC_MIME = 'application/msword';
+const DOCX_MIME =
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 describe('ReportAttachment', () => {
   it('accepts a valid PNG', () => {
@@ -56,6 +66,77 @@ describe('ReportAttachment', () => {
       bytes: Buffer.concat([PDF_HEADER, Buffer.alloc(10)]),
     });
     expect(r.success).toBe(true);
+  });
+
+  it('accepts a valid .xls (OLE2 magic)', () => {
+    const r = ReportAttachment.createWithBytes({
+      reportId: 'r1',
+      fileName: 'a.xls',
+      mimeType: XLS_MIME,
+      bytes: Buffer.concat([OLE2_HEADER, Buffer.alloc(10)]),
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('accepts a valid .xlsx (ZIP magic)', () => {
+    const r = ReportAttachment.createWithBytes({
+      reportId: 'r1',
+      fileName: 'a.xlsx',
+      mimeType: XLSX_MIME,
+      bytes: Buffer.concat([ZIP_HEADER, Buffer.alloc(10)]),
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('accepts a valid .doc (OLE2 magic)', () => {
+    const r = ReportAttachment.createWithBytes({
+      reportId: 'r1',
+      fileName: 'a.doc',
+      mimeType: DOC_MIME,
+      bytes: Buffer.concat([OLE2_HEADER, Buffer.alloc(10)]),
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('accepts a valid .docx (ZIP magic)', () => {
+    const r = ReportAttachment.createWithBytes({
+      reportId: 'r1',
+      fileName: 'a.docx',
+      mimeType: DOCX_MIME,
+      bytes: Buffer.concat([ZIP_HEADER, Buffer.alloc(10)]),
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('rejects .xlsx declared with wrong bytes', () => {
+    const r = ReportAttachment.createWithBytes({
+      reportId: 'r1',
+      fileName: 'a.xlsx',
+      mimeType: XLSX_MIME,
+      bytes: Buffer.concat([PDF_HEADER, Buffer.alloc(10)]),
+    });
+    expect(r.success).toBe(false);
+
+    if (!r.success) {
+      expect(r.error).toBe(ReportDomainCodes.REPORT_ATTACHMENT_MAGIC_MISMATCH);
+    }
+  });
+
+  it('rejects oversized .xlsx', () => {
+    const r = ReportAttachment.createWithBytes({
+      reportId: 'r1',
+      fileName: 'a.xlsx',
+      mimeType: XLSX_MIME,
+      bytes: Buffer.concat([
+        ZIP_HEADER,
+        Buffer.alloc(REPORT_ATTACHMENT_PDF_MAX_BYTES + 1),
+      ]),
+    });
+    expect(r.success).toBe(false);
+
+    if (!r.success) {
+      expect(r.error).toBe(ReportDomainCodes.REPORT_ATTACHMENT_TOO_LARGE);
+    }
   });
 
   it('rejects oversized image', () => {

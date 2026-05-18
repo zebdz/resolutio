@@ -193,6 +193,10 @@ export class PrismaReportRepository implements ReportRepository {
         where.createdById = filters.authorId;
       }
 
+      if (filters.attachedPollId) {
+        where.polls = { some: { pollId: filters.attachedPollId } };
+      }
+
       const page = filters.page ?? 1;
       const pageSize = filters.pageSize ?? 20;
       const skip = (page - 1) * pageSize;

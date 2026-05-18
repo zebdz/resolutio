@@ -1,9 +1,11 @@
 import { Report } from '../../domain/report/Report';
 import { ReportVisibility } from '../../domain/report/ReportVisibility';
+import { PollState } from '../../domain/poll/PollState';
 
 export interface PollAudienceDescriptor {
   organizationId: string;
   boardId: string | null;
+  state: PollState;
 }
 
 /**
@@ -26,6 +28,13 @@ export function canPollSatisfyReportAudience(
   poll: PollAudienceDescriptor,
   report: Report
 ): boolean {
+  // Only finished polls have a final tally to cite from a report.
+  // DRAFT / READY / ACTIVE polls would surface incomplete or absent results
+  // when followed from the report.
+  if (poll.state !== PollState.FINISHED) {
+    return false;
+  }
+
   switch (report.visibility) {
     case ReportVisibility.PUBLIC_ANON:
     case ReportVisibility.PUBLIC_AUTH:

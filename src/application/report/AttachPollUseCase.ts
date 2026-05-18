@@ -1,6 +1,7 @@
 import { Result, failure } from '../../domain/shared/Result';
 import { ReportRepository } from '../../domain/report/ReportRepository';
 import { ReportDomainCodes } from '../../domain/report/ReportDomainCodes';
+import { PollState } from '../../domain/poll/PollState';
 import { ReportErrors } from './ReportErrors';
 import { canPollSatisfyReportAudience } from './canPollSatisfyReportAudience';
 
@@ -13,10 +14,15 @@ export interface UserRepoForAttachPoll {
 }
 
 export interface PollRepoForAttachPoll {
-  getPollById(
-    pollId: string
-  ): Promise<
-    Result<{ organizationId: string; boardId: string | null } | null, string>
+  getPollById(pollId: string): Promise<
+    Result<
+      {
+        organizationId: string;
+        boardId: string | null;
+        state: PollState;
+      } | null,
+      string
+    >
   >;
 }
 

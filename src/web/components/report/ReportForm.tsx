@@ -13,6 +13,7 @@ import {
   Description,
 } from '@/web/components/catalyst/fieldset';
 import { ReportVisibility } from '@/domain/report/ReportVisibility';
+import { PollState } from '@/domain/poll/PollState';
 import {
   createReportAction,
   updateReportAction,
@@ -37,6 +38,7 @@ interface OrgPoll {
   organizationId: string;
   boardId: string | null;
   archivedAt: string | null;
+  state: PollState;
 }
 
 interface AttachmentMeta {

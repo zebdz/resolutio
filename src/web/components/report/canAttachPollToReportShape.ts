@@ -1,8 +1,10 @@
 import { ReportVisibility } from '@/domain/report/ReportVisibility';
+import { PollState } from '@/domain/poll/PollState';
 
 export interface PollShapeForAttach {
   organizationId: string;
   boardId: string | null;
+  state: PollState;
 }
 
 export interface ReportShapeForAttach {
@@ -21,6 +23,10 @@ export function canAttachPollToReportShape(
   poll: PollShapeForAttach,
   report: ReportShapeForAttach
 ): boolean {
+  if (poll.state !== PollState.FINISHED) {
+    return false;
+  }
+
   switch (report.visibility) {
     case ReportVisibility.PUBLIC_ANON:
     case ReportVisibility.PUBLIC_AUTH:

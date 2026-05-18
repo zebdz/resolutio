@@ -810,6 +810,7 @@
       "willingToSignProtocolCount": "{count} готовы",
       "protocolNotWillingCount": "{count} не готовы",
       "exportProtocolPdf": "Экспорт подписантов в PDF",
+      "attachedReportsHeading": "Отчёты, ссылающиеся на это голосование",
       "pdf": {
         "exportPdf": "Экспорт в PDF",
         "exporting": "Экспорт...",
@@ -1107,6 +1108,7 @@
     "home": "Главная",
     "organizations": "Организации",
     "polls": "Голосования",
+    "reports": "Отчёты",
     "superadmin": "Суперадмин",
     "account": "Аккаунт",
     "notifications": "Уведомления"
@@ -1279,8 +1281,8 @@
       "alreadyArchived": "Отчёт уже в архиве",
       "archived": "Отчёт в архиве",
       "attachmentFilenameEmpty": "Имя файла не может быть пустым",
-      "attachmentTooLarge": "Файл слишком большой (изображения до {imageMaxMb} МБ, PDF до {pdfMaxMb} МБ)",
-      "attachmentTypeNotAllowed": "Недопустимый тип файла (используйте PNG, JPEG, WebP или PDF)",
+      "attachmentTooLarge": "Файл слишком большой (изображения до {imageMaxMb} МБ, документы до {documentMaxMb} МБ)",
+      "attachmentTypeNotAllowed": "Недопустимый тип файла (используйте PNG, JPEG, WebP, PDF, XLS, XLSX, DOC или DOCX)",
       "attachmentMagicMismatch": "Содержимое файла не соответствует заявленному типу",
       "attachmentLimitReached": "Максимум {maxCount} файлов на отчёт",
       "pollAudienceTooNarrow": "Аудитория голосования должна включать аудиторию отчёта",
@@ -2036,9 +2038,12 @@
     },
     "polls": {
       "label": "Прикреплённые голосования",
-      "noneAttachable": "Нет голосований, доступных при выбранной видимости.",
+      "noneAttachable": "Можно прикреплять только завершённые голосования той же организации (с подходящей аудиторией).",
       "archivedSuffix": " (архивировано)",
       "noLongerAttachable": " (больше не доступно)"
+    },
+    "markdown": {
+      "externalImageBlocked": "Внешние изображения не разрешены — загрузите файл через прикрепление."
     },
     "attachments": {
       "uploadButton": "Выбрать файл",
@@ -2068,7 +2073,11 @@
     "detail": {
       "pollsHeader": "Прикреплённые голосования",
       "noPolls": "Голосования не прикреплены.",
+      "imagesHeader": "Изображения",
       "attachmentsHeader": "Файлы",
+      "fileSizeBytes": "{size} Б",
+      "fileSizeKb": "{size} КБ",
+      "fileSizeMb": "{size} МБ",
       "noAttachments": "Файлы не прикреплены.",
       "openFile": "Открыть",
       "publishButton": "Опубликовать",
@@ -2082,6 +2091,7 @@
     },
     "pages": {
       "newTitle": "Новый отчёт",
+      "newButton": "Новый отчёт",
       "feedTitle": "Отчёты",
       "feedEmpty": "Пока нет отчётов.",
       "pickOrg": "Выберите организацию",

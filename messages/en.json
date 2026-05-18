@@ -810,6 +810,7 @@
       "willingToSignProtocolCount": "{count} willing",
       "protocolNotWillingCount": "{count} not willing",
       "exportProtocolPdf": "Export signers PDF",
+      "attachedReportsHeading": "Reports citing this poll",
       "pdf": {
         "exportPdf": "Export as PDF",
         "exporting": "Exporting...",
@@ -1107,6 +1108,7 @@
     "home": "Home",
     "organizations": "Organizations",
     "polls": "Polls",
+    "reports": "Reports",
     "superadmin": "Superadmin",
     "account": "Account",
     "notifications": "Notifications"
@@ -1279,8 +1281,8 @@
       "alreadyArchived": "Report is already archived",
       "archived": "Report is archived",
       "attachmentFilenameEmpty": "Attachment filename cannot be empty",
-      "attachmentTooLarge": "Attachment too large (images up to {imageMaxMb} MB, PDFs up to {pdfMaxMb} MB)",
-      "attachmentTypeNotAllowed": "Attachment type is not allowed (use PNG, JPEG, WebP, or PDF)",
+      "attachmentTooLarge": "Attachment too large (images up to {imageMaxMb} MB, documents up to {documentMaxMb} MB)",
+      "attachmentTypeNotAllowed": "Attachment type is not allowed (use PNG, JPEG, WebP, PDF, XLS, XLSX, DOC, or DOCX)",
       "attachmentMagicMismatch": "File contents do not match the declared type",
       "attachmentLimitReached": "Maximum {maxCount} attachments per report",
       "pollAudienceTooNarrow": "Poll audience must cover the report's audience",
@@ -2036,9 +2038,12 @@
     },
     "polls": {
       "label": "Attached polls",
-      "noneAttachable": "No polls are attachable with this visibility.",
+      "noneAttachable": "Only finished polls in the same organization (and matching audience) can be attached.",
       "archivedSuffix": " (archived)",
       "noLongerAttachable": " (no longer attachable)"
+    },
+    "markdown": {
+      "externalImageBlocked": "External image not allowed — upload it via the attachment uploader instead."
     },
     "attachments": {
       "uploadButton": "Choose file",
@@ -2068,7 +2073,11 @@
     "detail": {
       "pollsHeader": "Attached polls",
       "noPolls": "No polls attached.",
+      "imagesHeader": "Images",
       "attachmentsHeader": "Files",
+      "fileSizeBytes": "{size} B",
+      "fileSizeKb": "{size} KB",
+      "fileSizeMb": "{size} MB",
       "noAttachments": "No files attached.",
       "openFile": "Open",
       "publishButton": "Publish",
@@ -2082,6 +2091,7 @@
     },
     "pages": {
       "newTitle": "New report",
+      "newButton": "New report",
       "feedTitle": "Reports",
       "feedEmpty": "No reports yet.",
       "pickOrg": "Choose an organization",

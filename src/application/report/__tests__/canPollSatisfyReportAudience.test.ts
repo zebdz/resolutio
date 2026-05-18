@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { canPollSatisfyReportAudience } from '../canPollSatisfyReportAudience';
 import { Report, ReportProps } from '../../../domain/report/Report';
 import { ReportVisibility } from '../../../domain/report/ReportVisibility';
+import { PollState } from '../../../domain/poll/PollState';
 
 const makeReport = (overrides: Partial<ReportProps> = {}) =>
   Report.reconstitute({
@@ -24,10 +25,21 @@ const makeReport = (overrides: Partial<ReportProps> = {}) =>
     ...overrides,
   });
 
-const orgPoll = { organizationId: 'org-1', boardId: null as string | null };
-const boardPoll = { organizationId: 'org-1', boardId: 'b1' };
-const foreignOrgPoll = { organizationId: 'org-2', boardId: null };
-const foreignBoardPoll = { organizationId: 'org-1', boardId: 'b-foreign' };
+const orgPoll = {
+  organizationId: 'org-1',
+  boardId: null as string | null,
+  state: PollState.FINISHED,
+};
+const boardPoll = {
+  organizationId: 'org-1',
+  boardId: 'b1',
+  state: PollState.FINISHED,
+};
+const foreignBoardPoll = {
+  organizationId: 'org-1',
+  boardId: 'b-foreign',
+  state: PollState.FINISHED,
+};
 
 describe('canPollSatisfyReportAudience', () => {
   it('PUBLIC_ANON → false (no polls have public flag)', () => {
@@ -72,4 +84,15 @@ describe('canPollSatisfyReportAudience', () => {
     });
     expect(canPollSatisfyReportAudience(foreignBoardPoll, report)).toBe(false);
   });
+
+  it.each([PollState.DRAFT, PollState.READY, PollState.ACTIVE])(
+    'non-FINISHED poll (%s) → false even if audience matches',
+    (state) => {
+      const report = makeReport({
+        visibility: ReportVisibility.WITHIN_ORG_ONLY,
+      });
+      const poll = { ...orgPoll, state };
+      expect(canPollSatisfyReportAudience(poll, report)).toBe(false);
+    }
+  );
 });

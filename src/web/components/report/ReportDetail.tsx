@@ -65,9 +65,26 @@ export async function ReportDetail({
     (viewer.isAuthor || viewer.isAdmin || viewer.isSuperAdmin) &&
     !isArchived;
 
-  const pdfAttachments = attachments.filter(
-    (a) => a.mimeType === 'application/pdf'
+  const imageAttachments = attachments.filter((a) =>
+    a.mimeType.startsWith('image/')
   );
+  const fileAttachments = attachments.filter(
+    (a) => !a.mimeType.startsWith('image/')
+  );
+
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) {
+      return t('detail.fileSizeBytes', { size: bytes });
+    }
+
+    if (bytes < 1024 * 1024) {
+      return t('detail.fileSizeKb', { size: Math.round(bytes / 1024) });
+    }
+
+    return t('detail.fileSizeMb', {
+      size: (bytes / (1024 * 1024)).toFixed(1),
+    });
+  }
 
   return (
     <div className="space-y-8">
@@ -115,18 +132,45 @@ export async function ReportDetail({
         <ReportMarkdownRenderer source={report.body} />
       </div>
 
+      {/* Image attachments */}
+      {imageAttachments.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-base font-semibold text-zinc-950 dark:text-white">
+            {t('detail.imagesHeader')}
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {imageAttachments.map((att) => (
+              <a
+                key={att.id}
+                href={`/api/report-attachments/${att.id}`}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="cursor-pointer block overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-800"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/report-attachments/${att.id}`}
+                  alt={att.fileName}
+                  className="h-48 w-full object-cover"
+                />
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* PDF attachments */}
       <section className="space-y-3">
         <h2 className="text-base font-semibold text-zinc-950 dark:text-white">
           {t('detail.attachmentsHeader')}
         </h2>
-        {pdfAttachments.length === 0 ? (
+        {fileAttachments.length === 0 ? (
           <p className="text-sm text-zinc-500 dark:text-zinc-400">
             {t('detail.noAttachments')}
           </p>
         ) : (
           <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
-            {pdfAttachments.map((att) => (
+            {fileAttachments.map((att) => (
               <li
                 key={att.id}
                 className="flex items-center justify-between px-4 py-3"
@@ -136,7 +180,7 @@ export async function ReportDetail({
                     {att.fileName}
                   </p>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {(att.sizeBytes / (1024 * 1024)).toFixed(1)} MB
+                    {formatFileSize(att.sizeBytes)}
                   </p>
                 </div>
                 <a
@@ -170,7 +214,7 @@ export async function ReportDetail({
               return (
                 <li key={poll.id}>
                   <Link
-                    href={`/polls/${poll.id}`}
+                    href={`/polls/${poll.id}/results`}
                     className={[
                       'cursor-pointer text-sm hover:underline',
                       archived

@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { ReportVisibility } from '@/domain/report/ReportVisibility';
+import { PollState } from '@/domain/poll/PollState';
 import { canAttachPollToReportShape } from './canAttachPollToReportShape';
 
 interface PollItem {
@@ -10,6 +11,7 @@ interface PollItem {
   organizationId: string;
   boardId: string | null;
   archivedAt: string | null;
+  state: PollState;
 }
 
 interface ReportShape {
@@ -86,7 +88,7 @@ export function PollPicker({
                   checked={isSelected}
                   disabled={!isSelected && !isAttachable}
                   onChange={() => toggle(poll.id)}
-                  className="h-4 w-4 rounded border-zinc-300 accent-zinc-900 disabled:cursor-not-allowed dark:border-zinc-600"
+                  className="h-4 w-4 cursor-pointer rounded border-zinc-300 accent-zinc-900 disabled:cursor-not-allowed dark:border-zinc-600"
                 />
                 <span
                   className={[

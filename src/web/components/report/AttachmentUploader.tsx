@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/web/components/catalyst/button';
 
 interface AttachmentUploaderProps {
@@ -19,6 +19,7 @@ export function AttachmentUploader({
   onUploaded,
 }: AttachmentUploaderProps) {
   const t = useTranslations('report.attachments');
+  const locale = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,7 @@ export function AttachmentUploader({
       const form = new FormData();
       form.append('reportId', reportId);
       form.append('file', file);
+      form.append('locale', locale);
 
       const res = await fetch('/api/report-attachments', {
         method: 'POST',

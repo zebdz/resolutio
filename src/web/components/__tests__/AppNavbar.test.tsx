@@ -5,6 +5,7 @@ function getNavbarItems(isSuperAdmin: boolean) {
   const items = [
     { key: 'organizations', href: '/organizations' },
     { key: 'polls', href: '/polls' },
+    { key: 'reports', href: '/reports' },
   ];
 
   if (isSuperAdmin) {
@@ -24,19 +25,20 @@ function isItemCurrent(itemHref: string, pathname: string): boolean {
 
 describe('AppNavbar navigation logic', () => {
   describe('getNavbarItems', () => {
-    it('should return organizations and polls for regular users', () => {
+    it('should return organizations, polls and reports for regular users', () => {
       const items = getNavbarItems(false);
 
-      expect(items).toHaveLength(2);
+      expect(items).toHaveLength(3);
       expect(items.find((i) => i.key === 'organizations')).toBeDefined();
       expect(items.find((i) => i.key === 'polls')).toBeDefined();
+      expect(items.find((i) => i.key === 'reports')).toBeDefined();
       expect(items.find((i) => i.key === 'superadmin')).toBeUndefined();
     });
 
     it('should include superadmin link for superadmins', () => {
       const items = getNavbarItems(true);
 
-      expect(items).toHaveLength(3);
+      expect(items).toHaveLength(4);
       expect(items.find((i) => i.key === 'superadmin')).toBeDefined();
       expect(items.find((i) => i.key === 'superadmin')?.href).toBe(
         '/superadmin'
@@ -102,5 +104,11 @@ describe('AppNavbar rendering requirements', () => {
     const items = getNavbarItems(false);
     const pollsItem = items.find((i) => i.key === 'polls');
     expect(pollsItem?.href).toBe('/polls');
+  });
+
+  it('should have reports link', () => {
+    const items = getNavbarItems(false);
+    const reportsItem = items.find((i) => i.key === 'reports');
+    expect(reportsItem?.href).toBe('/reports');
   });
 });

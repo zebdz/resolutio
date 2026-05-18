@@ -25,6 +25,8 @@ export interface UserRepoForListReports {
 export interface ListReportsForViewerInput {
   viewerId: string | null;
   organizationIds?: string[];
+  attachedPollId?: string;
+  publishedOnly?: boolean;
   page?: number;
   pageSize?: number;
 }
@@ -66,6 +68,10 @@ export class ListReportsForViewerUseCase {
         filters.organizationIds = input.organizationIds;
       }
 
+      if (input.attachedPollId) {
+        filters.attachedPollId = input.attachedPollId;
+      }
+
       const result = await this.reports.search(filters);
 
       if (!result.success) {
@@ -90,7 +96,11 @@ export class ListReportsForViewerUseCase {
 
     // Superadmin: single pass, everything
     if (isSuperAdmin) {
-      const result = await this.reports.search({ includeArchived: false });
+      const result = await this.reports.search({
+        includeArchived: false,
+        attachedPollId: input.attachedPollId,
+        state: input.publishedOnly ? 'PUBLISHED' : undefined,
+      });
 
       if (!result.success) {
         return failure(result.error);
@@ -131,6 +141,8 @@ export class ListReportsForViewerUseCase {
       Promise<Result<{ reports: Report[]; totalCount: number }, string>>
     > = [];
 
+    const attachedPollId = input.attachedPollId;
+
     // Pass 1: public-anon + public-auth published
     passes.push(
       this.reports.search({
@@ -140,6 +152,7 @@ export class ListReportsForViewerUseCase {
         ],
         state: 'PUBLISHED',
         includeArchived: false,
+        attachedPollId,
       })
     );
 
@@ -156,6 +169,7 @@ export class ListReportsForViewerUseCase {
           ],
           state: 'PUBLISHED',
           includeArchived: false,
+          attachedPollId,
         })
       );
     }
@@ -168,28 +182,34 @@ export class ListReportsForViewerUseCase {
           visibilities: [ReportVisibility.WITHIN_BOARDS],
           state: 'PUBLISHED',
           includeArchived: false,
+          attachedPollId,
         })
       );
     }
 
-    // Pass 4: own drafts
-    passes.push(
-      this.reports.search({
-        authorId: viewerId,
-        state: 'DRAFT',
-        includeArchived: false,
-      })
-    );
-
-    // Pass 5: admin-org drafts (any author)
-    if (adminOrgIds.length > 0) {
+    // Draft passes — skipped when caller asks for published-only.
+    if (!input.publishedOnly) {
+      // Pass 4: own drafts
       passes.push(
         this.reports.search({
-          organizationIds: adminOrgIds,
+          authorId: viewerId,
           state: 'DRAFT',
           includeArchived: false,
+          attachedPollId,
         })
       );
+
+      // Pass 5: admin-org drafts (any author)
+      if (adminOrgIds.length > 0) {
+        passes.push(
+          this.reports.search({
+            organizationIds: adminOrgIds,
+            state: 'DRAFT',
+            includeArchived: false,
+            attachedPollId,
+          })
+        );
+      }
     }
 
     const passResults = await Promise.all(passes);

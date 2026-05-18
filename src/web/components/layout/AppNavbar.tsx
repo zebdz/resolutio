@@ -13,6 +13,7 @@ import {
 import {
   BuildingOffice2Icon,
   ChartBarIcon,
+  DocumentTextIcon,
   HomeIcon,
   ShieldCheckIcon,
   UserCircleIcon,
@@ -71,6 +72,13 @@ export function AppNavbar({
         <NavbarItem href="/polls" current={isItemCurrent('/polls', pathname)}>
           <ChartBarIcon data-slot="icon" />
           <NavbarLabel>{t('polls')}</NavbarLabel>
+        </NavbarItem>
+        <NavbarItem
+          href="/reports"
+          current={isItemCurrent('/reports', pathname)}
+        >
+          <DocumentTextIcon data-slot="icon" />
+          <NavbarLabel>{t('reports')}</NavbarLabel>
         </NavbarItem>
         {isSuperAdmin && (
           <NavbarItem

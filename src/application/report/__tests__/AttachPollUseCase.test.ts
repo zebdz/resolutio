@@ -4,16 +4,7 @@ import { Report, ReportProps } from '../../../domain/report/Report';
 import { ReportVisibility } from '../../../domain/report/ReportVisibility';
 import { ReportErrors } from '../ReportErrors';
 import { ReportDomainCodes } from '../../../domain/report/ReportDomainCodes';
-
-function unwrap<T>(
-  r: { success: true; value: T } | { success: false; error: string }
-): T {
-  if (!r.success) {
-    throw new Error(`Expected success, got: ${r.error}`);
-  }
-
-  return r.value;
-}
+import { PollState } from '../../../domain/poll/PollState';
 
 const makeReport = (overrides: Partial<ReportProps> = {}) =>
   Report.reconstitute({
@@ -36,10 +27,26 @@ const makeReport = (overrides: Partial<ReportProps> = {}) =>
     ...overrides,
   });
 
-// A poll whose audience covers WITHIN_ORG_ONLY (same org, no board)
-const validPoll = { id: 'poll-1', organizationId: 'org-1', boardId: null };
+// A poll whose audience covers WITHIN_ORG_ONLY (same org, no board, finished)
+const validPoll = {
+  id: 'poll-1',
+  organizationId: 'org-1',
+  boardId: null,
+  state: PollState.FINISHED,
+};
 // A poll from a different org
-const narrowPoll = { id: 'poll-2', organizationId: 'org-2', boardId: null };
+const narrowPoll = {
+  id: 'poll-2',
+  organizationId: 'org-2',
+  boardId: null,
+  state: PollState.FINISHED,
+};
+const activePoll = {
+  id: 'poll-3',
+  organizationId: 'org-1',
+  boardId: null,
+  state: PollState.ACTIVE,
+};
 
 class FakeReports {
   store = new Map<string, Report>();
@@ -155,6 +162,20 @@ describe('AttachPollUseCase', () => {
       reportId: 'r1',
       callerId: 'author-1',
       pollId: 'poll-2',
+    });
+    expect(r.success).toBe(false);
+
+    if (!r.success) {
+      expect(r.error).toBe(ReportDomainCodes.REPORT_POLL_AUDIENCE_TOO_NARROW);
+    }
+  });
+
+  it('non-FINISHED poll rejected with REPORT_POLL_AUDIENCE_TOO_NARROW', async () => {
+    polls.store.set('poll-3', activePoll);
+    const r = await uc.execute({
+      reportId: 'r1',
+      callerId: 'author-1',
+      pollId: 'poll-3',
     });
     expect(r.success).toBe(false);
 

@@ -105,6 +105,7 @@ export default async function EditReportPage({ params }: EditReportPageProps) {
         organizationId: p.organizationId,
         boardId: p.boardId ?? null,
         archivedAt: p.archivedAt?.toISOString() ?? null,
+        state: p.state,
       }))
     : [];
 

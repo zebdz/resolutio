@@ -45,7 +45,7 @@ export function BoardsMultiPicker({
               type="checkbox"
               checked={checked}
               onChange={() => toggle(board.id)}
-              className="h-4 w-4 rounded border-zinc-300 accent-zinc-900 dark:border-zinc-600"
+              className="h-4 w-4 cursor-pointer rounded border-zinc-300 accent-zinc-900 dark:border-zinc-600"
             />
             <span className="text-sm text-zinc-800 dark:text-zinc-200">
               {board.name}

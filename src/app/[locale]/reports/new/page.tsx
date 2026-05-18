@@ -3,7 +3,6 @@ import { redirect } from 'next/navigation';
 import { Link } from '@/src/i18n/routing';
 import { Heading } from '@/web/components/catalyst/heading';
 import { Text } from '@/web/components/catalyst/text';
-import { Button } from '@/web/components/catalyst/button';
 import {
   prisma,
   PrismaOrganizationRepository,
@@ -95,6 +94,7 @@ export default async function NewReportPage({
         organizationId: p.organizationId,
         boardId: p.boardId ?? null,
         archivedAt: p.archivedAt?.toISOString() ?? null,
+        state: p.state,
       }))
     : [];
 

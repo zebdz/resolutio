@@ -501,6 +501,8 @@ export async function getReportAction(input: { reportId: string }): Promise<
 
 export async function listReportsAction(input: {
   organizationIds?: string[];
+  attachedPollId?: string;
+  publishedOnly?: boolean;
   page?: number;
   pageSize?: number;
 }): Promise<
@@ -526,6 +528,8 @@ export async function listReportsAction(input: {
   const result = await listReports.execute({
     viewerId: auth.userId,
     organizationIds: input.organizationIds,
+    attachedPollId: input.attachedPollId,
+    publishedOnly: input.publishedOnly,
     page: input.page,
     pageSize: input.pageSize,
   });

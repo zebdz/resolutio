@@ -12,14 +12,21 @@ export const REPORT_ATTACHMENT_PDF_MAX_BYTES = 10 * 1024 * 1024;
 // Per-report attachment cap. Enforced in the use case, not in this entity.
 export const REPORT_ATTACHMENT_COUNT_LIMIT = 20;
 
-// Whitelist of accepted upload types — common image formats and PDF.
-// No ZIP: report attachments are individual documents, not bundles.
+// Whitelist of accepted upload types — common image formats, PDF, Excel
+// (legacy .xls + modern .xlsx), and Word (legacy .doc + modern .docx).
+// Generic ZIP is not allowed; the OOXML ZIP signature is accepted only when
+// the declared MIME is one of the listed OOXML subtypes. Polyglots between
+// ZIP-based Office formats are mitigated by Content-Disposition: attachment.
 // Adding a type here is intentional; do not loosen without a security review.
 export const REPORT_ATTACHMENT_ALLOWED_MIME_TYPES = [
   'image/png',
   'image/jpeg',
   'image/webp',
   'application/pdf',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ] as const;
 
 export type ReportAttachmentMimeType =
@@ -28,9 +35,21 @@ export type ReportAttachmentMimeType =
 const MAGIC_HEADER_PREFIX_BYTES = 12;
 
 function maxBytesFor(mimeType: string): number {
-  return mimeType === 'application/pdf'
-    ? REPORT_ATTACHMENT_PDF_MAX_BYTES
-    : REPORT_ATTACHMENT_IMAGE_MAX_BYTES;
+  // PDFs, Excel spreadsheets, and Word documents share the larger document
+  // cap; images get the smaller image cap.
+  if (
+    mimeType === 'application/pdf' ||
+    mimeType === 'application/vnd.ms-excel' ||
+    mimeType ===
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    mimeType === 'application/msword' ||
+    mimeType ===
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ) {
+    return REPORT_ATTACHMENT_PDF_MAX_BYTES;
+  }
+
+  return REPORT_ATTACHMENT_IMAGE_MAX_BYTES;
 }
 
 // Magic-number predicates for each allowed MIME type. The user can claim
@@ -79,6 +98,34 @@ function magicMatches(mimeType: string, head: Buffer): boolean {
       // of preamble, but virtually all real-world PDFs start with this
       // marker. Loosen only if false rejections show up.
       return head.length >= 5 && head.toString('ascii', 0, 5) === '%PDF-';
+    case 'application/vnd.ms-excel':
+    case 'application/msword':
+      // OLE2 compound document signature: D0 CF 11 E0 A1 B1 1A E1.
+      // Shared by legacy Office binary formats — the declared MIME pins the
+      // subtype.
+      return (
+        head.length >= 8 &&
+        head[0] === 0xd0 &&
+        head[1] === 0xcf &&
+        head[2] === 0x11 &&
+        head[3] === 0xe0 &&
+        head[4] === 0xa1 &&
+        head[5] === 0xb1 &&
+        head[6] === 0x1a &&
+        head[7] === 0xe1
+      );
+    case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+    case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+      // ZIP local-file-header signature: 50 4B 03 04 (PK\x03\x04).
+      // Shared by all OOXML / generic ZIP — the declared MIME pins the
+      // subtype.
+      return (
+        head.length >= 4 &&
+        head[0] === 0x50 &&
+        head[1] === 0x4b &&
+        head[2] === 0x03 &&
+        head[3] === 0x04
+      );
     default:
       // Unknown MIME — caller should reject earlier on the whitelist check.
       return false;
