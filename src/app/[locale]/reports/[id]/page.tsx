@@ -12,23 +12,52 @@ import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLa
 import { ReportDetail } from '@/web/components/report/ReportDetail';
 import { getReportAction } from '@/web/actions/report/report';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
+import { stripMarkdownToPlainText } from '@/application/report/StripMarkdownToPlainText';
+
+const SITE_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? 'https://resolutio.site';
 
 const orgRepo = new PrismaOrganizationRepository(prisma);
 const userRepo = new PrismaUserRepository(prisma);
 
 interface ReportDetailPageProps {
-  params: Promise<{ id: string }>;
+  params: Promise<{ id: string; locale: string }>;
 }
 
-export async function generateMetadata({ params }: ReportDetailPageProps) {
-  const { id } = await params;
+export async function generateMetadata({
+  params,
+}: ReportDetailPageProps): Promise<import('next').Metadata> {
+  const { id, locale } = await params;
   const result = await getReportAction({ reportId: id });
 
   if (!result.success) {
     return { title: 'Report' };
   }
 
-  return { title: result.data.report.title };
+  const { report, attachments } = result.data;
+
+  if (report.visibility !== 'PUBLIC_ANON') {
+    return { title: report.title };
+  }
+
+  const description = stripMarkdownToPlainText(report.body).slice(0, 160);
+  const firstImage = attachments.find((a) => a.mimeType.startsWith('image/'));
+  const imageUrl = firstImage
+    ? `${SITE_ORIGIN}/api/report-attachments/${firstImage.id}`
+    : undefined;
+
+  return {
+    title: report.title,
+    description,
+    openGraph: {
+      title: report.title,
+      description,
+      type: 'article',
+      url: `${SITE_ORIGIN}/${locale}/reports/${id}`,
+      locale,
+      publishedTime: report.lastPublishedAt ?? undefined,
+      images: imageUrl ? [{ url: imageUrl }] : undefined,
+    },
+  };
 }
 
 export default async function ReportDetailPage({

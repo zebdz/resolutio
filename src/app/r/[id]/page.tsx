@@ -16,6 +16,9 @@ import { ReportDetail } from '@/web/components/report/ReportDetail';
 import { ResolveReportVisibilityService } from '@/application/report/ResolveReportVisibilityService';
 import { GetReportForViewerUseCase } from '@/application/report/GetReportForViewerUseCase';
 import { serializeReport } from '@/web/actions/report/serializeReport';
+import { stripMarkdownToPlainText } from '@/application/report/StripMarkdownToPlainText';
+
+const SITE_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? 'https://resolutio.site';
 
 const reportRepo = new PrismaReportRepository(prisma);
 const attachmentRepo = new PrismaReportAttachmentRepository(prisma);
@@ -57,7 +60,9 @@ function resolveLocale(acceptLanguage: string | null) {
   return defaultLocale;
 }
 
-export async function generateMetadata({ params }: AnonReportPageProps) {
+export async function generateMetadata({
+  params,
+}: AnonReportPageProps): Promise<import('next').Metadata> {
   const { id } = await params;
   const result = await getReportUC.execute({ reportId: id, viewerId: null });
 
@@ -65,7 +70,36 @@ export async function generateMetadata({ params }: AnonReportPageProps) {
     return { title: 'Report' };
   }
 
-  return { title: result.value.report.title };
+  const { report, attachments } = result.value;
+
+  // Only emit rich OG metadata for public-anon reports; other visibilities
+  // shouldn't leak descriptions or images to unauthenticated scrapers.
+  if (report.visibility !== 'PUBLIC_ANON') {
+    return { title: report.title };
+  }
+
+  const description = stripMarkdownToPlainText(report.body).slice(0, 160);
+  const firstImage = attachments.find((a) => a.mimeType.startsWith('image/'));
+  const imageUrl = firstImage
+    ? `${SITE_ORIGIN}/api/report-attachments/${firstImage.id}`
+    : undefined;
+
+  const headerStore = await headers();
+  const locale = resolveLocale(headerStore.get('accept-language'));
+
+  return {
+    title: report.title,
+    description,
+    openGraph: {
+      title: report.title,
+      description,
+      type: 'article',
+      url: `${SITE_ORIGIN}/r/${id}`,
+      locale,
+      publishedTime: report.lastPublishedAt?.toISOString(),
+      images: imageUrl ? [{ url: imageUrl }] : undefined,
+    },
+  };
 }
 
 export default async function AnonReportPage({ params }: AnonReportPageProps) {
