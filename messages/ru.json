@@ -1071,6 +1071,10 @@
       "propertyClaimDenied": {
         "title": "Ваша заявка отклонена",
         "body": "Подробности см. в причине отклонения."
+      },
+      "reportPublished": {
+        "title": "Новый отчёт",
+        "body": "{title}"
       }
     },
     "page": {
@@ -1098,7 +1102,8 @@
         "viewResults": "Результаты",
         "respondToInvite": "Ответить на приглашение",
         "viewBoard": "Просмотреть орган управления",
-        "viewPropertyClaims": "Просмотреть заявки на имущество"
+        "viewPropertyClaims": "Просмотреть заявки на имущество",
+        "viewReport": "Открыть отчёт"
       }
     }
   },

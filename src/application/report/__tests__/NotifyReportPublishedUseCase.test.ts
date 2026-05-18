@@ -177,4 +177,13 @@ describe('NotifyReportPublishedUseCase', () => {
       title: 'Test Title',
     });
   });
+
+  it('uses i18n keys for title and body so the list can localize', async () => {
+    orgs.memberIdsForOrgs.set('org-1', ['u1']);
+    const r = Report.reconstitute(baseProps());
+    await uc.notifyPublished(r);
+    const n = notifications.saved[0];
+    expect(n.title).toBe('notification.types.reportPublished.title');
+    expect(n.body).toBe('notification.types.reportPublished.body');
+  });
 });

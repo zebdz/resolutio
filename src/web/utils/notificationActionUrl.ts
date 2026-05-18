@@ -143,6 +143,11 @@ const TYPE_CONFIG: Record<string, TypeConfigEntry> = {
     url: (id) => `/organizations/${id}`,
     actionKey: 'viewOrganization',
   },
+  report_published: {
+    dataKey: 'reportId',
+    url: (id) => `/reports/${id}`,
+    actionKey: 'viewReport',
+  },
 };
 
 export function getNotificationActionUrl(

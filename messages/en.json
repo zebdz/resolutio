@@ -1071,6 +1071,10 @@
       "propertyClaimDenied": {
         "title": "Your claim was denied",
         "body": "See the denial reason for details."
+      },
+      "reportPublished": {
+        "title": "New report",
+        "body": "{title}"
       }
     },
     "page": {
@@ -1098,7 +1102,8 @@
         "viewResults": "View results",
         "respondToInvite": "Respond to invitation",
         "viewBoard": "View board",
-        "viewPropertyClaims": "View property claims"
+        "viewPropertyClaims": "View property claims",
+        "viewReport": "View report"
       }
     }
   },

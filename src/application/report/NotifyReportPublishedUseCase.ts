@@ -36,8 +36,8 @@ export class NotifyReportPublishedUseCase {
       const result = Notification.create({
         userId,
         type: 'report_published',
-        title: report.title,
-        body: '',
+        title: 'notification.types.reportPublished.title',
+        body: 'notification.types.reportPublished.body',
         data: {
           reportId: report.id,
           organizationId: report.organizationId,
