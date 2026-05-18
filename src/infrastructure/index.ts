@@ -23,6 +23,8 @@ export { PrismaOrganizationPropertyRepository } from './repositories/PrismaOrgan
 export { PrismaPropertyClaimRepository } from './repositories/PrismaPropertyClaimRepository';
 export { PrismaPropertyClaimAttachmentRepository } from './repositories/PrismaPropertyClaimAttachmentRepository';
 export { PrismaPropertyLockRepository } from './repositories/PrismaPropertyLockRepository';
+export { PrismaReportRepository } from './repositories/PrismaReportRepository';
+export { PrismaReportAttachmentRepository } from './repositories/PrismaReportAttachmentRepository';
 
 // Auth
 export { Argon2PasswordHasher } from './auth/Argon2PasswordHasher';

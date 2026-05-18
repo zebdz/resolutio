@@ -5,6 +5,7 @@ function getSidebarItems(isSuperAdmin: boolean) {
   const items = [
     { key: 'organizations', href: '/organizations' },
     { key: 'polls', href: '/polls' },
+    { key: 'reports', href: '/reports' },
   ];
 
   if (isSuperAdmin) {
@@ -24,19 +25,20 @@ function isItemCurrent(itemHref: string, pathname: string): boolean {
 
 describe('MobileSidebar navigation logic', () => {
   describe('getSidebarItems', () => {
-    it('should return organizations and polls for regular users', () => {
+    it('should return organizations, polls and reports for regular users', () => {
       const items = getSidebarItems(false);
 
-      expect(items).toHaveLength(2);
+      expect(items).toHaveLength(3);
       expect(items.find((i) => i.key === 'organizations')).toBeDefined();
       expect(items.find((i) => i.key === 'polls')).toBeDefined();
+      expect(items.find((i) => i.key === 'reports')).toBeDefined();
       expect(items.find((i) => i.key === 'superadmin')).toBeUndefined();
     });
 
     it('should include superadmin link for superadmins', () => {
       const items = getSidebarItems(true);
 
-      expect(items).toHaveLength(3);
+      expect(items).toHaveLength(4);
       expect(items.find((i) => i.key === 'superadmin')).toBeDefined();
       expect(items.find((i) => i.key === 'superadmin')?.href).toBe(
         '/superadmin'

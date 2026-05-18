@@ -1,6 +1,6 @@
 {
   "name": "resolutio",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
@@ -48,6 +48,7 @@
     "@prisma/client": "^7.1.0",
     "@tanstack/react-virtual": "^3.13.18",
     "@types/pdfmake": "^0.3.1",
+    "@uiw/react-md-editor": "^4.1.0",
     "@zxcvbn-ts/core": "^3.0.4",
     "@zxcvbn-ts/language-common": "^3.0.4",
     "adm-zip": "^0.5.16",
@@ -67,7 +68,10 @@
     "pg": "^8.16.3",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-markdown": "^10.1.0",
     "react-phone-input-2": "^2.15.1",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
     "zod": "^4.1.13"
   },

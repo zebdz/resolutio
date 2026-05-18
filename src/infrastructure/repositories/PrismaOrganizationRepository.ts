@@ -180,6 +180,18 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return [rootId, ...allDescendants].filter((id) => id !== organizationId);
   }
 
+  async isUserExactMember(
+    userId: string,
+    organizationId: string
+  ): Promise<boolean> {
+    const membership = await this.prisma.organizationUser.findFirst({
+      where: { userId, organizationId, status: 'accepted' },
+      select: { id: true },
+    });
+
+    return membership !== null;
+  }
+
   async isUserMember(userId: string, organizationId: string): Promise<boolean> {
     // Check membership in this org or any descendant
     const descendantIds = await this.getDescendantIds(organizationId);
@@ -305,6 +317,20 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
     // Deduplicate
     return [...new Set(members.map((m: { userId: string }) => m.userId))];
+  }
+
+  async findAcceptedMemberUserIdsForOrgs(orgIds: string[]): Promise<string[]> {
+    if (orgIds.length === 0) {
+      return [];
+    }
+
+    const rows = await this.prisma.organizationUser.findMany({
+      where: { organizationId: { in: orgIds }, status: 'accepted' },
+      select: { userId: true },
+      distinct: ['userId'],
+    });
+
+    return rows.map((r: { userId: string }) => r.userId);
   }
 
   async removeUserFromOrganization(

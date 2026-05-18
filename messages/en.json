@@ -810,6 +810,7 @@
       "willingToSignProtocolCount": "{count} willing",
       "protocolNotWillingCount": "{count} not willing",
       "exportProtocolPdf": "Export signers PDF",
+      "attachedReportsHeading": "Reports citing this poll",
       "pdf": {
         "exportPdf": "Export as PDF",
         "exporting": "Exporting...",
@@ -1070,6 +1071,10 @@
       "propertyClaimDenied": {
         "title": "Your claim was denied",
         "body": "See the denial reason for details."
+      },
+      "reportPublished": {
+        "title": "New report",
+        "body": "{title}"
       }
     },
     "page": {
@@ -1097,7 +1102,8 @@
         "viewResults": "View results",
         "respondToInvite": "Respond to invitation",
         "viewBoard": "View board",
-        "viewPropertyClaims": "View property claims"
+        "viewPropertyClaims": "View property claims",
+        "viewReport": "View report"
       }
     }
   },
@@ -1107,6 +1113,7 @@
     "home": "Home",
     "organizations": "Organizations",
     "polls": "Polls",
+    "reports": "Reports",
     "superadmin": "Superadmin",
     "account": "Account",
     "notifications": "Notifications"
@@ -1264,6 +1271,28 @@
       "alreadyExpired": "Token is already expired",
       "notExpired": "Token is not expired",
       "tokenExhausted": "Token has reached its maximum number of uses"
+    },
+    "report": {
+      "titleEmpty": "Title cannot be empty",
+      "titleTooLong": "Title cannot exceed {maxLength} characters",
+      "bodyEmpty": "Body cannot be empty",
+      "bodyTooLong": "Body cannot exceed {maxLength} characters",
+      "bodyInvalidAttachmentRef": "Body references an attachment that doesn't belong to this report. Upload the file here and re-insert it.",
+      "invalidVisibility": "Invalid visibility",
+      "boardsEmpty": "Select at least one board",
+      "boardNotInOrg": "Board does not belong to the report's organization",
+      "mustBeDraft": "Report must be a draft",
+      "mustBePublished": "Report must be published",
+      "cannotEditPublished": "Cannot edit a published report",
+      "alreadyArchived": "Report is already archived",
+      "archived": "Report is archived",
+      "attachmentFilenameEmpty": "Attachment filename cannot be empty",
+      "attachmentTooLarge": "Attachment too large (images up to {imageMaxMb} MB, documents up to {documentMaxMb} MB)",
+      "attachmentTypeNotAllowed": "Attachment type is not allowed (use PNG, JPEG, WebP, PDF, XLS, XLSX, DOC, DOCX, ODT, or ODS)",
+      "attachmentMagicMismatch": "File contents do not match the declared type",
+      "attachmentLimitReached": "Maximum {maxCount} attachments per report",
+      "pollAudienceTooNarrow": "Poll audience must cover the report's audience",
+      "pollNotFound": "Poll not found"
     },
     "shared": {
       "containsProfanity": "Contains inappropriate language"
@@ -1986,6 +2015,106 @@
     },
     "banner": {
       "alreadyClaimed": "This asset is already under review for another claim."
+    }
+  },
+  "report": {
+    "errors": {
+      "notFound": "Report not found",
+      "notAuthorOrAdmin": "Only the report author or an organization admin can perform this action",
+      "attachmentNotFound": "Attachment not found",
+      "rateLimitedDaily": "You have reached the daily report creation limit. Please try again tomorrow."
+    },
+    "state": {
+      "draft": "Draft",
+      "published": "Published",
+      "archived": "Archived"
+    },
+    "visibility": {
+      "label": "Visibility",
+      "publicAnon": "Public — anyone (no login required)",
+      "publicAuth": "Public — any logged-in user",
+      "withinOrgOnly": "Org members only",
+      "withinOrgAncestors": "Org + parent orgs",
+      "withinOrgDescendants": "Org + sub-orgs",
+      "withinOrgTree": "Entire org tree",
+      "withinBoards": "Selected boards only"
+    },
+    "boards": {
+      "noneInOrg": "This organization has no boards yet."
+    },
+    "polls": {
+      "label": "Attached polls",
+      "noneAttachable": "Only finished polls in the same organization (and matching audience) can be attached.",
+      "archivedSuffix": " (archived)",
+      "noLongerAttachable": " (no longer attachable)"
+    },
+    "markdown": {
+      "externalImageBlocked": "External image not allowed — upload it via the attachment uploader instead."
+    },
+    "attachments": {
+      "uploadButton": "Choose file",
+      "uploading": "Uploading…",
+      "uploadError": "Upload failed: {error}"
+    },
+    "card": {
+      "by": "by {name}",
+      "publishedAt": "Published {date}",
+      "createdAt": "Created {date}"
+    },
+    "form": {
+      "titleLabel": "Title",
+      "titlePlaceholder": "Report title",
+      "bodyLabel": "Body (Markdown)",
+      "bodyHint": "You can paste or drop images and PDFs into the editor.",
+      "bodyCreateHint": "Attachments can be added after you save the draft.",
+      "attachmentsLabel": "Attachments",
+      "attachmentsRemove": "Remove",
+      "createSubmit": "Save draft",
+      "saveSubmit": "Save",
+      "cancel": "Cancel",
+      "submitting": "Saving…",
+      "savedToast": "Saved",
+      "createdToast": "Draft created"
+    },
+    "detail": {
+      "pollsHeader": "Attached polls",
+      "noPolls": "No polls attached.",
+      "imagesHeader": "Images",
+      "attachmentsHeader": "Files",
+      "fileSizeBytes": "{size} B",
+      "fileSizeKb": "{size} KB",
+      "fileSizeMb": "{size} MB",
+      "noAttachments": "No files attached.",
+      "openFile": "Open",
+      "publishButton": "Publish",
+      "notifyAudience": "Notify audience",
+      "downgradeButton": "Move back to draft",
+      "archiveButton": "Archive",
+      "archiveConfirm": "Archive this report? Archived reports are hidden from feeds and cannot be unarchived.",
+      "editButton": "Edit",
+      "publishedDate": "Published {date}",
+      "createdDate": "Created {date}"
+    },
+    "pages": {
+      "newTitle": "New report",
+      "newButton": "New report",
+      "feedTitle": "Reports",
+      "feedEmpty": "No reports yet.",
+      "pickOrg": "Choose an organization",
+      "filterByOrg": "Filter by organization",
+      "noOrgsCallout": "You aren't a member of any organization yet.",
+      "previous": "Previous",
+      "next": "Next",
+      "page": "Page {page}",
+      "cannotEditPublished": "This report is published. Downgrade to draft to edit.",
+      "backToDetail": "Back to report",
+      "unauthorized": "You don't have permission to perform this action."
+    },
+    "section": {
+      "heading": "Reports",
+      "empty": "No reports yet.",
+      "newButton": "New report",
+      "viewAll": "View all"
     }
   }
 }

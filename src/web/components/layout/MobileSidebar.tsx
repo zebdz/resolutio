@@ -15,6 +15,7 @@ import {
 import {
   BuildingOffice2Icon,
   ChartBarIcon,
+  DocumentTextIcon,
   HomeIcon,
   ShieldCheckIcon,
   UserCircleIcon,
@@ -91,6 +92,13 @@ export function MobileSidebar({
           >
             <ChartBarIcon data-slot="icon" />
             <SidebarLabel>{t('polls')}</SidebarLabel>
+          </SidebarItem>
+          <SidebarItem
+            href="/reports"
+            current={isItemCurrent('/reports', pathname)}
+          >
+            <DocumentTextIcon data-slot="icon" />
+            <SidebarLabel>{t('reports')}</SidebarLabel>
           </SidebarItem>
           {isSuperAdmin && (
             <SidebarItem

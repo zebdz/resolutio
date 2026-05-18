@@ -81,6 +81,14 @@ export interface OrganizationRepository {
   isUserMember(userId: string, organizationId: string): Promise<boolean>;
 
   /**
+   * Exact membership check — does NOT walk descendant orgs. Used by the
+   * report visibility service for the WITHIN_ORG_ONLY rule, where
+   * "member of orgX" must not silently include members of orgX's
+   * descendant orgs.
+   */
+  isUserExactMember(userId: string, organizationId: string): Promise<boolean>;
+
+  /**
    * Checks if a user is an admin of an organization
    */
   isUserAdmin(userId: string, organizationId: string): Promise<boolean>;
@@ -127,6 +135,13 @@ export interface OrganizationRepository {
   findAcceptedMemberUserIdsIncludingDescendants(
     organizationId: string
   ): Promise<string[]>;
+
+  /**
+   * Returns deduplicated user IDs of accepted members across the EXACT
+   * org IDs given (no hierarchy walk). Used by NotifyReportPublishedUseCase
+   * to fan out notifications to a precise audience set.
+   */
+  findAcceptedMemberUserIdsForOrgs(orgIds: string[]): Promise<string[]>;
 
   /**
    * Removes a user's membership from an organization (deletes OrganizationUser row)
