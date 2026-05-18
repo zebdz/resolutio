@@ -70,6 +70,7 @@ export const updateUserProfileSchema = (profanityChecker: ProfanityChecker) =>
 // Keep backward-compatible constant with a no-op profanity checker for tests
 export const UpdateUserProfileSchema = updateUserProfileSchema({
   containsProfanity: () => false,
+  findProfaneWords: () => [],
 });
 
 export type UpdateUserProfileInput = z.infer<typeof UpdateUserProfileSchema>;

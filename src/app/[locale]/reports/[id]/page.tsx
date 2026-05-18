@@ -6,11 +6,17 @@ import {
   prisma,
   PrismaOrganizationRepository,
   PrismaUserRepository,
+  PrismaReportRepository,
+  PrismaReportAttachmentRepository,
+  PrismaPollRepository,
+  PrismaBoardRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '@/web/lib/session';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { ReportDetail } from '@/web/components/report/ReportDetail';
 import { getReportAction } from '@/web/actions/report/report';
+import { GetReportForViewerUseCase } from '@/application/report/GetReportForViewerUseCase';
+import { ResolveReportVisibilityService } from '@/application/report/ResolveReportVisibilityService';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 import { stripMarkdownToPlainText } from '@/application/report/StripMarkdownToPlainText';
 
@@ -18,6 +24,19 @@ const SITE_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? 'https://resolutio.site';
 
 const orgRepo = new PrismaOrganizationRepository(prisma);
 const userRepo = new PrismaUserRepository(prisma);
+const reportRepo = new PrismaReportRepository(prisma);
+const attachmentRepo = new PrismaReportAttachmentRepository(prisma);
+const pollRepo = new PrismaPollRepository(prisma);
+const boardRepo = new PrismaBoardRepository(prisma);
+
+// Used for the anonymous-visibility peek that decides whether a logged-out
+// user should be sent to /r/[id] (publicly viewable) or to /login.
+const anonReportUC = new GetReportForViewerUseCase(
+  reportRepo,
+  new ResolveReportVisibilityService(orgRepo, boardRepo, userRepo),
+  attachmentRepo,
+  pollRepo
+);
 
 interface ReportDetailPageProps {
   params: Promise<{ id: string; locale: string }>;
@@ -63,14 +82,27 @@ export async function generateMetadata({
 export default async function ReportDetailPage({
   params,
 }: ReportDetailPageProps) {
+  const { id } = await params;
   const currentUser = await getCurrentUser();
 
   if (!currentUser) {
+    // Logged-out users get the anonymous route if the report is publicly
+    // viewable; otherwise we send them to login (the report may exist but be
+    // org-only, so the existence isn't leaked either way — /r/[id] 404s for
+    // non-public ids).
+    const anon = await anonReportUC.execute({
+      reportId: id,
+      viewerId: null,
+    });
+
+    if (anon.success) {
+      redirect(`/r/${id}`);
+    }
+
     redirect('/login');
   }
 
   const user = currentUser;
-  const { id } = await params;
   const t = await getTranslations('report');
   const result = await getReportAction({ reportId: id });
 

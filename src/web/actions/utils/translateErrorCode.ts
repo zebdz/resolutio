@@ -93,14 +93,36 @@ export async function translateErrorCode(
   paramsOrLocale?: Record<string, string | number> | { locale: string },
   maybeLocale?: { locale: string }
 ): Promise<string> {
-  const dotIndex = errorCode.indexOf('.');
+  // Domain errors may embed dynamic params via a query-string suffix:
+  //   domain.shared.containsProfanityWithWords?words=хуй%2C%20бля
+  // Detect, strip, and merge into params.
+  let bareCode = errorCode;
+  let embeddedParams: Record<string, string> | undefined;
+  const qIndex = errorCode.indexOf('?');
 
-  if (dotIndex === -1) {
-    return errorCode;
+  if (qIndex !== -1) {
+    bareCode = errorCode.substring(0, qIndex);
+    embeddedParams = {};
+    const query = errorCode.substring(qIndex + 1);
+
+    for (const pair of query.split('&')) {
+      if (!pair) {
+        continue;
+      }
+
+      const [k, v = ''] = pair.split('=');
+      embeddedParams[decodeURIComponent(k)] = decodeURIComponent(v);
+    }
   }
 
-  const namespace = errorCode.substring(0, dotIndex);
-  const key = errorCode.substring(dotIndex + 1);
+  const dotIndex = bareCode.indexOf('.');
+
+  if (dotIndex === -1) {
+    return bareCode;
+  }
+
+  const namespace = bareCode.substring(0, dotIndex);
+  const key = bareCode.substring(dotIndex + 1);
 
   // Caller may pass: (code), (code, params), (code, { locale }),
   // or (code, params, { locale }). Disambiguate.
@@ -117,7 +139,10 @@ export async function translateErrorCode(
     localeOpts = maybeLocale;
   }
 
-  const resolvedParams = params || ERROR_CODE_PARAMS[errorCode];
+  const baseParams = params || ERROR_CODE_PARAMS[bareCode];
+  const resolvedParams = embeddedParams
+    ? { ...(baseParams ?? {}), ...embeddedParams }
+    : baseParams;
 
   try {
     const t = localeOpts
