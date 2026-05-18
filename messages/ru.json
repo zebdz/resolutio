@@ -1288,7 +1288,7 @@
       "archived": "Отчёт в архиве",
       "attachmentFilenameEmpty": "Имя файла не может быть пустым",
       "attachmentTooLarge": "Файл слишком большой (изображения до {imageMaxMb} МБ, документы до {documentMaxMb} МБ)",
-      "attachmentTypeNotAllowed": "Недопустимый тип файла (используйте PNG, JPEG, WebP, PDF, XLS, XLSX, DOC или DOCX)",
+      "attachmentTypeNotAllowed": "Недопустимый тип файла (используйте PNG, JPEG, WebP, PDF, XLS, XLSX, DOC, DOCX, ODT или ODS)",
       "attachmentMagicMismatch": "Содержимое файла не соответствует заявленному типу",
       "attachmentLimitReached": "Максимум {maxCount} файлов на отчёт",
       "pollAudienceTooNarrow": "Аудитория голосования должна включать аудиторию отчёта",

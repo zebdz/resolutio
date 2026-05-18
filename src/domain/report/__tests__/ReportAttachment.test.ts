@@ -26,6 +26,8 @@ const XLSX_MIME =
 const DOC_MIME = 'application/msword';
 const DOCX_MIME =
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const ODT_MIME = 'application/vnd.oasis.opendocument.text';
+const ODS_MIME = 'application/vnd.oasis.opendocument.spreadsheet';
 
 describe('ReportAttachment', () => {
   it('accepts a valid PNG', () => {
@@ -103,6 +105,26 @@ describe('ReportAttachment', () => {
       reportId: 'r1',
       fileName: 'a.docx',
       mimeType: DOCX_MIME,
+      bytes: Buffer.concat([ZIP_HEADER, Buffer.alloc(10)]),
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('accepts a valid .odt (ZIP magic)', () => {
+    const r = ReportAttachment.createWithBytes({
+      reportId: 'r1',
+      fileName: 'a.odt',
+      mimeType: ODT_MIME,
+      bytes: Buffer.concat([ZIP_HEADER, Buffer.alloc(10)]),
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it('accepts a valid .ods (ZIP magic)', () => {
+    const r = ReportAttachment.createWithBytes({
+      reportId: 'r1',
+      fileName: 'a.ods',
+      mimeType: ODS_MIME,
       bytes: Buffer.concat([ZIP_HEADER, Buffer.alloc(10)]),
     });
     expect(r.success).toBe(true);

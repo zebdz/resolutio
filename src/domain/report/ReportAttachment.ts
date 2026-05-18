@@ -13,10 +13,11 @@ export const REPORT_ATTACHMENT_PDF_MAX_BYTES = 10 * 1024 * 1024;
 export const REPORT_ATTACHMENT_COUNT_LIMIT = 20;
 
 // Whitelist of accepted upload types — common image formats, PDF, Excel
-// (legacy .xls + modern .xlsx), and Word (legacy .doc + modern .docx).
-// Generic ZIP is not allowed; the OOXML ZIP signature is accepted only when
-// the declared MIME is one of the listed OOXML subtypes. Polyglots between
-// ZIP-based Office formats are mitigated by Content-Disposition: attachment.
+// (legacy .xls + modern .xlsx), Word (legacy .doc + modern .docx), and
+// LibreOffice/OpenDocument (.odt + .ods). Generic ZIP is not allowed; the
+// OOXML / ODF ZIP signature is accepted only when the declared MIME is
+// one of the listed subtypes. Polyglots between ZIP-based office formats
+// are mitigated by Content-Disposition: attachment.
 // Adding a type here is intentional; do not loosen without a security review.
 export const REPORT_ATTACHMENT_ALLOWED_MIME_TYPES = [
   'image/png',
@@ -27,6 +28,8 @@ export const REPORT_ATTACHMENT_ALLOWED_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.oasis.opendocument.text',
+  'application/vnd.oasis.opendocument.spreadsheet',
 ] as const;
 
 export type ReportAttachmentMimeType =
@@ -35,8 +38,8 @@ export type ReportAttachmentMimeType =
 const MAGIC_HEADER_PREFIX_BYTES = 12;
 
 function maxBytesFor(mimeType: string): number {
-  // PDFs, Excel spreadsheets, and Word documents share the larger document
-  // cap; images get the smaller image cap.
+  // PDFs, Excel/ODS spreadsheets, and Word/ODT documents share the larger
+  // document cap; images get the smaller image cap.
   if (
     mimeType === 'application/pdf' ||
     mimeType === 'application/vnd.ms-excel' ||
@@ -44,7 +47,9 @@ function maxBytesFor(mimeType: string): number {
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
     mimeType === 'application/msword' ||
     mimeType ===
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    mimeType === 'application/vnd.oasis.opendocument.text' ||
+    mimeType === 'application/vnd.oasis.opendocument.spreadsheet'
   ) {
     return REPORT_ATTACHMENT_PDF_MAX_BYTES;
   }
@@ -116,9 +121,11 @@ function magicMatches(mimeType: string, head: Buffer): boolean {
       );
     case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
     case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+    case 'application/vnd.oasis.opendocument.text':
+    case 'application/vnd.oasis.opendocument.spreadsheet':
       // ZIP local-file-header signature: 50 4B 03 04 (PK\x03\x04).
-      // Shared by all OOXML / generic ZIP — the declared MIME pins the
-      // subtype.
+      // Shared by all OOXML / ODF / generic ZIP — the declared MIME pins
+      // the subtype.
       return (
         head.length >= 4 &&
         head[0] === 0x50 &&

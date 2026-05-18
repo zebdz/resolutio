@@ -1288,7 +1288,7 @@
       "archived": "Report is archived",
       "attachmentFilenameEmpty": "Attachment filename cannot be empty",
       "attachmentTooLarge": "Attachment too large (images up to {imageMaxMb} MB, documents up to {documentMaxMb} MB)",
-      "attachmentTypeNotAllowed": "Attachment type is not allowed (use PNG, JPEG, WebP, PDF, XLS, XLSX, DOC, or DOCX)",
+      "attachmentTypeNotAllowed": "Attachment type is not allowed (use PNG, JPEG, WebP, PDF, XLS, XLSX, DOC, DOCX, ODT, or ODS)",
       "attachmentMagicMismatch": "File contents do not match the declared type",
       "attachmentLimitReached": "Maximum {maxCount} attachments per report",
       "pollAudienceTooNarrow": "Poll audience must cover the report's audience",
