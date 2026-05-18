@@ -3,6 +3,7 @@ export const ReportDomainCodes = {
   REPORT_TITLE_TOO_LONG: 'domain.report.titleTooLong',
   REPORT_BODY_EMPTY: 'domain.report.bodyEmpty',
   REPORT_BODY_TOO_LONG: 'domain.report.bodyTooLong',
+  REPORT_BODY_INVALID_ATTACHMENT_REF: 'domain.report.bodyInvalidAttachmentRef',
 
   REPORT_INVALID_VISIBILITY: 'domain.report.invalidVisibility',
   REPORT_BOARDS_EMPTY: 'domain.report.boardsEmpty',

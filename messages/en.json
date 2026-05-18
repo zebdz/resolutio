@@ -1272,6 +1272,7 @@
       "titleTooLong": "Title cannot exceed {maxLength} characters",
       "bodyEmpty": "Body cannot be empty",
       "bodyTooLong": "Body cannot exceed {maxLength} characters",
+      "bodyInvalidAttachmentRef": "Body references an attachment that doesn't belong to this report. Upload the file here and re-insert it.",
       "invalidVisibility": "Invalid visibility",
       "boardsEmpty": "Select at least one board",
       "boardNotInOrg": "Board does not belong to the report's organization",

@@ -18,10 +18,27 @@ const SANITIZE_SCHEMA = {
 
 interface Props {
   source: string;
+  /**
+   * Optional allowlist of attachment ids that belong to *this* report.
+   * When provided, inline images whose src points to an attachment id not in
+   * this set are treated like external images (placeholder instead of <img>).
+   * Defense-in-depth: the save-time guard in Report.updateBody already
+   * prevents new cross-report refs, but pre-existing bodies might still
+   * carry stale URLs.
+   */
+  allowedAttachmentIds?: string[];
 }
 
-export function ReportMarkdownRenderer({ source }: Props) {
+const ATTACHMENT_ID_FROM_SRC = /\/api\/report-attachments\/([A-Za-z0-9_-]+)/;
+
+export function ReportMarkdownRenderer({
+  source,
+  allowedAttachmentIds,
+}: Props) {
   const t = useTranslations('report.markdown');
+  const allowedSet = allowedAttachmentIds
+    ? new Set(allowedAttachmentIds)
+    : null;
 
   return (
     <div className="prose prose-zinc max-w-none dark:prose-invert">
@@ -70,6 +87,21 @@ export function ReportMarkdownRenderer({ source }: Props) {
                   {t('externalImageBlocked')}
                 </span>
               );
+            }
+
+            // If the parent passed an allowlist, only render attachments that
+            // belong to *this* report. Other ids → placeholder.
+            if (allowedSet) {
+              const m = src.match(ATTACHMENT_ID_FROM_SRC);
+              const id = m?.[1];
+
+              if (!id || !allowedSet.has(id)) {
+                return (
+                  <span className="block rounded-md border border-dashed border-zinc-300 bg-zinc-50 p-3 text-xs italic text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+                    {t('externalImageBlocked')}
+                  </span>
+                );
+              }
             }
 
             return (

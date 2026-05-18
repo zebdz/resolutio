@@ -129,7 +129,10 @@ export async function ReportDetail({
 
       {/* Body */}
       <div className="prose prose-zinc max-w-none dark:prose-invert">
-        <ReportMarkdownRenderer source={report.body} />
+        <ReportMarkdownRenderer
+          source={report.body}
+          allowedAttachmentIds={attachments.map((a) => a.id)}
+        />
       </div>
 
       {/* Image attachments */}

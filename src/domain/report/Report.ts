@@ -3,6 +3,7 @@ import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
 import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 import { ReportDomainCodes } from './ReportDomainCodes';
 import { ReportVisibility, isPublicVisibility } from './ReportVisibility';
+import { extractReportAttachmentIdsFromBody } from './extractReportAttachmentIdsFromBody';
 
 export const REPORT_TITLE_MAX_LENGTH = 200;
 export const REPORT_BODY_MAX_LENGTH = 50_000;
@@ -57,6 +58,14 @@ export class Report {
 
     if (!bodyCheck.success) {
       return failure(bodyCheck.error);
+    }
+
+    // No attachments exist for a brand-new report, so any inline image ref
+    // is automatically foreign.
+    const refCheck = validateBodyAttachmentRefs(input.body, []);
+
+    if (!refCheck.success) {
+      return failure(refCheck.error);
     }
 
     if (
@@ -189,6 +198,15 @@ export class Report {
 
     if (!v.success) {
       return failure(v.error);
+    }
+
+    const refCheck = validateBodyAttachmentRefs(
+      newBody,
+      this.props.attachmentIds
+    );
+
+    if (!refCheck.success) {
+      return failure(refCheck.error);
     }
 
     this.props.body = newBody;
@@ -361,6 +379,30 @@ function validateBody(
 
     if (profanityChecker.containsProfanity(text)) {
       return failure(SharedDomainCodes.CONTAINS_PROFANITY);
+    }
+  }
+
+  return success(undefined);
+}
+
+// Body may only reference attachments that belong to this report. This
+// prevents leaks where pasting a URL from another (private) report would
+// render fine for the author but 404 for everyone else.
+function validateBodyAttachmentRefs(
+  body: string,
+  ownAttachmentIds: string[]
+): Result<void, string> {
+  const refIds = extractReportAttachmentIdsFromBody(body);
+
+  if (refIds.length === 0) {
+    return success(undefined);
+  }
+
+  const ownSet = new Set(ownAttachmentIds);
+
+  for (const id of refIds) {
+    if (!ownSet.has(id)) {
+      return failure(ReportDomainCodes.REPORT_BODY_INVALID_ATTACHMENT_REF);
     }
   }
 

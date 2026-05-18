@@ -79,6 +79,19 @@ describe('Report.create', () => {
     }
   });
 
+  it('rejects body that references any attachment at create time', () => {
+    const r = make({
+      body: 'See ![pic](/api/report-attachments/some-id)',
+    });
+    expect(r.success).toBe(false);
+
+    if (!r.success) {
+      expect(r.error).toBe(
+        ReportDomainCodes.REPORT_BODY_INVALID_ATTACHMENT_REF
+      );
+    }
+  });
+
   it('rejects WITHIN_BOARDS visibility without boardIds', () => {
     const r = make({
       visibility: ReportVisibility.WITHIN_BOARDS,
@@ -251,5 +264,61 @@ describe('Report editing constraints', () => {
     const res = r.setVisibility(ReportVisibility.WITHIN_ORG_ONLY, []);
     expect(res.success).toBe(true);
     expect(r.boardIds).toEqual([]);
+  });
+
+  it('updateBody: accepts attachment ref that belongs to this report', () => {
+    const r = Report.reconstitute({
+      id: 'r1',
+      organizationId: 'org-1',
+      createdById: 'user-1',
+      title: 't',
+      body: 'before',
+      visibility: ReportVisibility.WITHIN_ORG_ONLY,
+      state: 'DRAFT',
+      publishedById: null,
+      lastPublishedAt: null,
+      notifyAudience: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: null,
+      boardIds: [],
+      pollIds: [],
+      attachmentIds: ['own-id'],
+    });
+    const res = r.updateBody(
+      '![ok](/api/report-attachments/own-id)\n\nMore text'
+    );
+    expect(res.success).toBe(true);
+  });
+
+  it('updateBody: rejects attachment ref from another report', () => {
+    const r = Report.reconstitute({
+      id: 'r1',
+      organizationId: 'org-1',
+      createdById: 'user-1',
+      title: 't',
+      body: 'before',
+      visibility: ReportVisibility.WITHIN_ORG_ONLY,
+      state: 'DRAFT',
+      publishedById: null,
+      lastPublishedAt: null,
+      notifyAudience: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      archivedAt: null,
+      boardIds: [],
+      pollIds: [],
+      attachmentIds: ['own-id'],
+    });
+    const res = r.updateBody(
+      '![nope](/api/report-attachments/foreign-id)\n\nMore text'
+    );
+    expect(res.success).toBe(false);
+
+    if (!res.success) {
+      expect(res.error).toBe(
+        ReportDomainCodes.REPORT_BODY_INVALID_ATTACHMENT_REF
+      );
+    }
   });
 });
