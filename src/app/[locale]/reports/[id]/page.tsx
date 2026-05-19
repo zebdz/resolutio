@@ -19,6 +19,7 @@ import { GetReportForViewerUseCase } from '@/application/report/GetReportForView
 import { ResolveReportVisibilityService } from '@/application/report/ResolveReportVisibilityService';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 import { stripMarkdownToPlainText } from '@/application/report/StripMarkdownToPlainText';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 
 const SITE_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? 'https://resolutio.site';
 
@@ -102,10 +103,12 @@ export default async function ReportDetailPage({
       redirect('/login');
     }
 
+    const errorMessage = await translateErrorCode(result.error);
+
     return (
       <AuthenticatedLayout>
         <div className="rounded-lg border border-red-200 bg-red-50 p-6 dark:border-red-900 dark:bg-red-950">
-          <Text className="text-red-800 dark:text-red-200">{result.error}</Text>
+          <Text className="text-red-800 dark:text-red-200">{errorMessage}</Text>
         </div>
       </AuthenticatedLayout>
     );
