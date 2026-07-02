@@ -1391,6 +1391,22 @@
         "dailyTokenCapDescription": "Maximum combined input+output tokens an admin can consume per calendar day. Set to 0 to disable.",
         "minOrgSize": "Minimum organization size",
         "minOrgSizeDescription": "Organizations with fewer members (tree-wide) cannot run AI legality checks. Set to 0 to disable."
+      },
+      "smsDelivery": {
+        "title": "SMS / OTP delivery",
+        "subtitle": "Effective SMS configuration the running server is enforcing.",
+        "readOnlyTag": "Read-only · set via environment",
+        "channelLabel": "SMS channel",
+        "channelActive": "Active (sms.ru)",
+        "channelStub": "Disabled — stub (no SMS sent)",
+        "testModeLabel": "Test mode",
+        "on": "On",
+        "off": "Off",
+        "maxCostLabel": "Max cost per SMS",
+        "maxCostValue": "{value} ₽",
+        "maxCostNoLimit": "No limit",
+        "maxCostInvalid": "Invalid value — treated as no limit",
+        "notApplicable": "—"
       }
     },
     "organizations": {

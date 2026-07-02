@@ -10,8 +10,7 @@ import {
   PrismaUserRepository,
   PrismaOtpRepository,
   OtpCodeHasherImpl,
-  StubSmsOtpDeliveryChannel,
-  SmsRuOtpDeliveryChannel,
+  createSmsDeliveryChannelFromEnv,
   TurnstileCaptchaVerifier,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '@/web/lib/session';
@@ -25,15 +24,7 @@ const otpRepository = new PrismaOtpRepository(prisma);
 const otpCodeHasher = new OtpCodeHasherImpl(
   process.env.OTP_CODE_SECRET || 'dev-otp-secret'
 );
-const deliveryChannel = process.env.SMS_RU_API_ID
-  ? new SmsRuOtpDeliveryChannel({
-      apiId: process.env.SMS_RU_API_ID,
-      testMode: process.env.SMS_RU_TEST_MODE === 'true',
-      maxCost: process.env.SMS_RU_MAX_COST_RUBLES
-        ? Number(process.env.SMS_RU_MAX_COST_RUBLES)
-        : undefined,
-    })
-  : new StubSmsOtpDeliveryChannel();
+const deliveryChannel = createSmsDeliveryChannelFromEnv();
 const captchaVerifier = new TurnstileCaptchaVerifier(
   process.env.TURNSTILE_SECRET_KEY || ''
 );
