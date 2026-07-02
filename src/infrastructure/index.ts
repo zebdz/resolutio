@@ -32,4 +32,5 @@ export { Argon2PasswordVerifier } from './auth/Argon2PasswordVerifier';
 export { OtpCodeHasherImpl } from './auth/OtpCodeHasherImpl';
 export { StubSmsOtpDeliveryChannel } from './auth/StubSmsOtpDeliveryChannel';
 export { SmsRuOtpDeliveryChannel } from './auth/SmsRuOtpDeliveryChannel';
+export { createSmsDeliveryChannelFromEnv } from './auth/smsDeliveryChannelFactory';
 export { TurnstileCaptchaVerifier } from './auth/TurnstileCaptchaVerifier';
