@@ -3,6 +3,8 @@ import { Heading } from '@/src/web/components/catalyst/heading';
 import { Text } from '@/src/web/components/catalyst/text';
 import { Link } from '@/src/i18n/routing';
 import { SystemSettingsPanel } from './SystemSettingsPanel';
+import { SmsDeliveryConfigCard } from './SmsDeliveryConfigCard';
+import { resolveSmsDeliveryConfig } from '@/infrastructure/auth/smsDeliveryConfig';
 
 export default async function SuperadminSettingsPage() {
   const t = await getTranslations('superadmin.settings');
@@ -26,6 +28,14 @@ export default async function SuperadminSettingsPage() {
       </div>
 
       <SystemSettingsPanel />
+
+      <SmsDeliveryConfigCard
+        config={resolveSmsDeliveryConfig({
+          apiId: process.env.SMS_RU_API_ID,
+          testMode: process.env.SMS_RU_TEST_MODE,
+          maxCost: process.env.SMS_RU_MAX_COST_RUBLES,
+        })}
+      />
     </div>
   );
 }
