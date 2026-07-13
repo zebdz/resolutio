@@ -8,12 +8,16 @@ type Props = {
   organizationId: string;
   initialMembers: OrgMember[];
   initialTotalCount: number;
+  canRemoveMembers?: boolean;
+  currentUserId?: string | null;
 };
 
 export function OrgMembersList({
   organizationId,
   initialMembers,
   initialTotalCount,
+  canRemoveMembers = false,
+  currentUserId = null,
 }: Props) {
   const t = useTranslations('organization.detail');
 
@@ -48,6 +52,8 @@ export function OrgMembersList({
           organizationId={organizationId}
           initialMembers={initialMembers}
           initialTotalCount={initialTotalCount}
+          canRemoveMembers={canRemoveMembers}
+          currentUserId={currentUserId}
         />
       </div>
     </details>

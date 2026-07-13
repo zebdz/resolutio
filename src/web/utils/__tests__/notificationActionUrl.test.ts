@@ -162,6 +162,19 @@ describe('getNotificationActionUrl', () => {
       });
     });
 
+    it('member_removed_from_organization → /organizations/{id}', () => {
+      const result = getNotificationActionUrl(
+        'member_removed_from_organization',
+        {
+          organizationId: 'org-11',
+        }
+      );
+      expect(result).toEqual({
+        href: '/organizations/org-11',
+        actionKey: 'viewOrganization',
+      });
+    });
+
     it('invite_declined → /organizations/{id}', () => {
       const result = getNotificationActionUrl('invite_declined', {
         organizationId: 'org-9',

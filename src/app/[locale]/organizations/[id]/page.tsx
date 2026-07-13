@@ -175,6 +175,8 @@ export default async function OrganizationDetailPage({
             organizationId={id}
             initialMembers={initialMembers}
             initialTotalCount={initialMembersTotalCount}
+            canRemoveMembers={isSuperAdmin}
+            currentUserId={user?.id ?? null}
           />
         )}
 

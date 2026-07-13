@@ -118,6 +118,11 @@ const TYPE_CONFIG: Record<string, TypeConfigEntry> = {
     url: (id) => `/organizations/${id}`,
     actionKey: 'viewOrganization',
   },
+  member_removed_from_organization: {
+    dataKey: 'organizationId',
+    url: (id) => `/organizations/${id}`,
+    actionKey: 'viewOrganization',
+  },
   invite_declined: {
     dataKey: 'organizationId',
     url: (id) => `/organizations/${id}`,

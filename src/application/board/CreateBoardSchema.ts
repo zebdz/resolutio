@@ -13,7 +13,7 @@ export const createBoardSchema = (profanityChecker: ProfanityChecker) =>
       .refine((val) => !profanityChecker.containsProfanity(val), {
         message: SharedDomainCodes.CONTAINS_PROFANITY,
       }),
-    organizationId: z.string().cuid('Invalid organization ID'),
+    organizationId: z.string().min(1, 'Invalid organization ID'),
   });
 
 // Keep backward-compatible constant with a no-op profanity checker for tests

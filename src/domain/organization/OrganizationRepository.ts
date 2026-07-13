@@ -152,6 +152,17 @@ export interface OrganizationRepository {
   ): Promise<void>;
 
   /**
+   * Superadmin/admin removal of a member: hard-deletes the OrganizationUser
+   * row and writes an OrganizationMemberRemoval audit row, in one transaction.
+   */
+  removeMemberFromOrganization(
+    organizationId: string,
+    userId: string,
+    removedByUserId: string,
+    reason: string
+  ): Promise<void>;
+
+  /**
    * Finds organizations where user has a pending join request
    */
   findPendingRequestsByUserId(userId: string): Promise<Organization[]>;

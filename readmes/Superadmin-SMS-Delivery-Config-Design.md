@@ -36,12 +36,12 @@ The env var alone is not the whole story. The "working value" is derived from
 three env vars, mirroring the existing channel-construction logic in
 `auth.ts` and `confirmPhone.ts`:
 
-| `SMS_RU_API_ID` | `SMS_RU_MAX_COST_RUBLES` | Effective state |
-|---|---|---|
-| unset/empty | (any) | **Stub channel** — no real SMS sent; cost cap irrelevant |
-| set | unset/empty | Real channel, **no cost cap** (`maxCost: undefined` → check skipped) |
-| set | numeric (e.g. `10`) | Real channel, cap = that number of ₽ |
-| set | non-numeric (e.g. `abc`) | Real channel, **invalid** — currently behaves as no cap (`NaN`); surfaced as a misconfiguration |
+| `SMS_RU_API_ID` | `SMS_RU_MAX_COST_RUBLES` | Effective state                                                                                 |
+| --------------- | ------------------------ | ----------------------------------------------------------------------------------------------- |
+| unset/empty     | (any)                    | **Stub channel** — no real SMS sent; cost cap irrelevant                                        |
+| set             | unset/empty              | Real channel, **no cost cap** (`maxCost: undefined` → check skipped)                            |
+| set             | numeric (e.g. `10`)      | Real channel, cap = that number of ₽                                                            |
+| set             | non-numeric (e.g. `abc`) | Real channel, **invalid** — currently behaves as no cap (`NaN`); surfaced as a misconfiguration |
 
 Verified against `SmsRuOtpDeliveryChannel.ts:413` — the cost check runs only
 when `maxCost !== undefined`.
@@ -58,10 +58,10 @@ the duplicated inline logic in the two actions is removed.
 
 ```ts
 export interface SmsDeliveryConfig {
-  channelActive: boolean;        // true = real sms.ru; false = stub (SMS disabled)
-  testMode: boolean;             // sms.ru test mode
-  maxCostRubles: number | null;  // effective cap; null = no limit
-  maxCostInvalid: boolean;       // env set but not a finite number
+  channelActive: boolean; // true = real sms.ru; false = stub (SMS disabled)
+  testMode: boolean; // sms.ru test mode
+  maxCostRubles: number | null; // effective cap; null = no limit
+  maxCostInvalid: boolean; // env set but not a finite number
 }
 
 export function resolveSmsDeliveryConfig(raw: {
@@ -72,6 +72,7 @@ export function resolveSmsDeliveryConfig(raw: {
 ```
 
 Behavior-preserving mapping (matches current `env ? Number(env) : undefined`):
+
 - `channelActive = Boolean(raw.apiId)`
 - `testMode = raw.testMode === 'true'`
 - `raw.maxCost` falsy → `maxCostRubles = null`, `maxCostInvalid = false`
@@ -91,7 +92,9 @@ inline `process.env` reads. No behavior change.
 `src/web/actions/superadmin/smsDeliveryConfig.ts`
 
 ```ts
-export async function getSmsDeliveryConfigAction(): Promise<ActionResult<SmsDeliveryConfig>>;
+export async function getSmsDeliveryConfigAction(): Promise<
+  ActionResult<SmsDeliveryConfig>
+>;
 ```
 
 Mirrors `systemSettings.ts`: `checkRateLimit()` → `requireSuperadmin()` →

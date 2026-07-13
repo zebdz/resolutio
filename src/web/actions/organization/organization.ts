@@ -24,6 +24,8 @@ import { CancelJoinRequestSchema } from '@/application/organization/CancelJoinRe
 import { UpdateOrganizationUseCase } from '@/application/organization/UpdateOrganizationUseCase';
 import { updateOrganizationSchema } from '@/application/organization/UpdateOrganizationSchema';
 import { RemoveOrgAdminUseCase } from '@/application/organization/RemoveOrgAdminUseCase';
+import { RemoveOrgMemberUseCase } from '@/application/organization/RemoveOrgMemberUseCase';
+import { RemoveOrgMemberSchema } from '@/application/organization/RemoveOrgMemberSchema';
 import { LeaveOrganizationUseCase } from '@/application/organization/LeaveOrganizationUseCase';
 import { GetOrgAdminsPaginatedUseCase } from '@/application/organization/GetOrgAdminsPaginatedUseCase';
 import {
@@ -135,6 +137,13 @@ const updateOrganizationUseCase = new UpdateOrganizationUseCase({
 
 const removeOrgAdminUseCase = new RemoveOrgAdminUseCase({
   organizationRepository,
+  userRepository,
+  notificationRepository,
+});
+
+const removeOrgMemberUseCase = new RemoveOrgMemberUseCase({
+  organizationRepository,
+  boardRepository,
   userRepository,
   notificationRepository,
 });
@@ -1413,6 +1422,61 @@ export async function removeOrgAdminAction(
     return { success: true, data: undefined };
   } catch (error) {
     console.error('Error removing org admin:', error);
+
+    return { success: false, error: t('generic') };
+  }
+}
+
+export async function removeOrgMemberAction(
+  organizationId: string,
+  targetUserId: string,
+  reason: string
+): Promise<ActionResult> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return { success: false, error: t('unauthorized') };
+    }
+
+    const validation = RemoveOrgMemberSchema.safeParse({
+      organizationId,
+      targetUserId,
+      reason,
+    });
+
+    if (!validation.success) {
+      return {
+        success: false,
+        error: t('validationFailed'),
+      };
+    }
+
+    const result = await removeOrgMemberUseCase.execute({
+      organizationId: validation.data.organizationId,
+      targetUserId: validation.data.targetUserId,
+      actorUserId: user.id,
+      reason: validation.data.reason,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: await translateErrorCode(result.error),
+      };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error removing org member:', error);
 
     return { success: false, error: t('generic') };
   }
