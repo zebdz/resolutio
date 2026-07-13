@@ -7,6 +7,7 @@ import { User } from '../../../domain/user/User';
 import { PhoneNumber } from '../../../domain/user/PhoneNumber';
 import { NotificationRepository } from '../../../domain/notification/NotificationRepository';
 import { Notification } from '../../../domain/notification/Notification';
+import { LastAdminError } from '../../../domain/organization/LastAdminError';
 
 class MockOrganizationRepository implements OrganizationRepository {
   private organizations: Map<string, Organization> = new Map();
@@ -65,6 +66,13 @@ class MockOrganizationRepository implements OrganizationRepository {
     return [];
   }
   async removeUserFromOrganization(): Promise<void> {}
+  async isUserExactMember(): Promise<boolean> {
+    return false;
+  }
+  async findAcceptedMemberUserIdsForOrgs(): Promise<string[]> {
+    return [];
+  }
+  async removeMemberFromOrganization(): Promise<void> {}
   async findPendingRequestsByUserId(): Promise<Organization[]> {
     return [];
   }
@@ -97,7 +105,7 @@ class MockOrganizationRepository implements OrganizationRepository {
     const admins = this.adminRoles.get(organizationId);
 
     if (admins && admins.size <= 1) {
-      throw new Error('LAST_ADMIN');
+      throw new LastAdminError();
     }
 
     admins?.delete(userId);
@@ -373,9 +381,9 @@ describe('RemoveOrgAdminUseCase', () => {
     orgRepo.setAdmin('org-1', 'admin-1');
     orgRepo.setAdmin('org-1', 'only-other-admin');
 
-    // Override removeAdmin to simulate the transaction guard
+    // Override removeAdmin to simulate the transaction guard racing
     orgRepo.removeAdmin = async () => {
-      throw new Error('LAST_ADMIN');
+      throw new LastAdminError();
     };
 
     const result = await useCase.execute({
@@ -387,7 +395,7 @@ describe('RemoveOrgAdminUseCase', () => {
     expect(result.success).toBe(false);
 
     if (!result.success) {
-      expect(result.error).toBe('organization.errors.lastAdmin');
+      expect(result.error).toBe('domain.organization.lastAdmin');
     }
   });
 

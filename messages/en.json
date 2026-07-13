@@ -241,7 +241,6 @@
       "childOrgNotFound": "Child organization not found",
       "childOrgArchived": "Child organization is archived",
       "rejectionReasonRequired": "Rejection reason is required",
-      "lastAdmin": "Cannot remove the last admin of an organization",
       "alreadyAdmin": "User is already an admin of this organization",
       "notOrgAdmin": "User is not an admin of this organization",
       "cannotRemoveSelf": "You cannot remove yourself as admin",
@@ -249,7 +248,8 @@
       "multiMembershipConflict": "Cannot merge organizations: some users are members of both trees and at least one tree does not allow multi-membership",
       "multiMembershipConflictsExist": "Cannot disable multi-membership: some users are members of multiple organizations in this tree. Remove duplicate memberships first.",
       "notRootOrg": "This setting can only be modified on the root organization",
-      "notMember": "You are not a member of this organization"
+      "notMember": "You are not a member of this organization",
+      "reasonRequired": "Removal reason is required"
     },
     "create": {
       "title": "Create Organization",
@@ -361,6 +361,13 @@
       "previousPage": "Previous",
       "nextPage": "Next",
       "noMembersFound": "No members found",
+      "removeMember": "Remove",
+      "removeMemberDialogTitle": "Remove member",
+      "removeMemberDialogDescription": "Remove {name} from this organization? They will also be removed from all boards of this organization.",
+      "removeMemberReasonLabel": "Reason for removal (required)",
+      "removeMemberReasonPlaceholder": "Explain why this member is being removed…",
+      "removeMemberConfirm": "Remove member",
+      "removingMember": "Removing…",
       "adminsSection": "Administrators",
       "searchAdmins": "Search administrators...",
       "showingAdmins": "Showing {from}–{to} of {total}",
@@ -1040,6 +1047,10 @@
         "title": "Removed from board",
         "body": "{actorName} removed you from the board \"{boardName}\" in {organizationName}"
       },
+      "memberRemovedFromOrganization": {
+        "title": "Removed from organization",
+        "body": "You have been removed from the organization {organizationName}"
+      },
       "inviteDeclined": {
         "title": "Invitation declined",
         "body": "{inviteeName} declined the invitation to {organizationName}"
@@ -1163,7 +1174,8 @@
       "propertyClaimTargetOwnershipInvalid": "The selected ownership slot is invalid for this asset",
       "propertyClaimAttachmentFileNameEmpty": "Proof file name is required",
       "propertyClaimAttachmentNotFound": "Proof file not found",
-      "notOrgMember": "You are not a member of this organization"
+      "notOrgMember": "You are not a member of this organization",
+      "lastAdmin": "Cannot remove the last admin of an organization"
     },
     "joinParentRequest": {
       "messageEmpty": "Message cannot be empty",

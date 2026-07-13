@@ -79,6 +79,9 @@ export const OrganizationDomainCodes = {
   // Authorization
   NOT_ORG_MEMBER: 'domain.organization.notOrgMember',
   NOT_ORG_ADMIN_DOMAIN: 'domain.organization.notOrgAdmin',
+
+  // Admin management
+  LAST_ADMIN: 'domain.organization.lastAdmin',
 } as const;
 
 export type OrganizationDomainCode =
