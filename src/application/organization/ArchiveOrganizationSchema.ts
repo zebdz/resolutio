@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const ArchiveOrganizationSchema = z.object({
-  organizationId: z.string().cuid('Invalid organization ID'),
+  organizationId: z.string().min(1, 'Invalid organization ID'),
 });
 
 export type ArchiveOrganizationInput = z.infer<

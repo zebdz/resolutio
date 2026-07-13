@@ -102,6 +102,8 @@ model User {
   propertyClaimsDecided   PropertyClaim[] @relation("PropertyClaimDecidedBy")
   reportsAuthored         Report[]        @relation("ReportAuthor")
   reportsPublished        Report[]        @relation("ReportPublisher")
+  orgMemberRemovals       OrganizationMemberRemoval[] @relation("RemovedOrgMember")
+  orgMemberRemovalsActed  OrganizationMemberRemoval[] @relation("RemovedOrgMemberBy")
 
   @@map("users")
 }
@@ -173,6 +175,7 @@ model Organization {
   properties          OrganizationProperty[]
   propertyClaims      PropertyClaim[]
   reports             Report[]
+  memberRemovals      OrganizationMemberRemoval[]
 
   @@index([parentId])
   @@index([createdById])
@@ -235,6 +238,24 @@ model OrganizationAdminUser {
   @@id([organizationId, userId])
   @@index([userId])
   @@map("organization_admin_users")
+}
+
+// Organization member removals (append-only audit log)
+model OrganizationMemberRemoval {
+  id              String   @id @default(cuid())
+  organizationId  String   @map("organization_id")
+  userId          String   @map("user_id")
+  removedByUserId String   @map("removed_by_user_id")
+  reason          String
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation("RemovedOrgMember", fields: [userId], references: [id], onDelete: Cascade)
+  removedBy    User         @relation("RemovedOrgMemberBy", fields: [removedByUserId], references: [id])
+
+  @@index([organizationId])
+  @@index([userId])
+  @@map("organization_member_removals")
 }
 
 // Board Models

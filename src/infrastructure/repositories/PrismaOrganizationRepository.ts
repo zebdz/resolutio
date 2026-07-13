@@ -7,6 +7,7 @@ import {
   OrganizationSearchFilters,
   OrganizationWithStats,
 } from '../../domain/organization/OrganizationRepository';
+import { LastAdminError } from '../../domain/organization/LastAdminError';
 
 export class PrismaOrganizationRepository implements OrganizationRepository {
   constructor(private prisma: PrismaClient) {}
@@ -347,6 +348,22 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
+  async removeMemberFromOrganization(
+    organizationId: string,
+    userId: string,
+    removedByUserId: string,
+    reason: string
+  ): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.organizationUser.delete({
+        where: { organizationId_userId: { organizationId, userId } },
+      }),
+      this.prisma.organizationMemberRemoval.create({
+        data: { organizationId, userId, removedByUserId, reason },
+      }),
+    ]);
+  }
+
   async findPendingRequestsByUserId(userId: string): Promise<Organization[]> {
     const memberships = await this.prisma.organizationUser.findMany({
       where: {
@@ -586,7 +603,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       });
 
       if (adminCount <= 1) {
-        throw new Error('LAST_ADMIN');
+        throw new LastAdminError();
       }
 
       await tx.organizationAdminUser.delete({

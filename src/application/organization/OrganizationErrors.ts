@@ -35,7 +35,9 @@ export const OrganizationErrors = {
   REJECTION_REASON_REQUIRED: 'organization.errors.rejectionReasonRequired',
 
   // Admin management
-  LAST_ADMIN: 'organization.errors.lastAdmin',
+  // NOTE: the "last admin" invariant now lives in the domain
+  // (OrganizationAdminPolicy → OrganizationDomainCodes.LAST_ADMIN); the old
+  // application-layer LAST_ADMIN code was removed with that refactor.
   ALREADY_ADMIN: 'organization.errors.alreadyAdmin',
   NOT_ORG_ADMIN: 'organization.errors.notOrgAdmin',
   CANNOT_REMOVE_SELF: 'organization.errors.cannotRemoveSelf',
@@ -47,6 +49,7 @@ export const OrganizationErrors = {
     'organization.errors.multiMembershipConflictsExist',
   NOT_ROOT_ORG: 'organization.errors.notRootOrg',
   NOT_MEMBER: 'organization.errors.notMember',
+  REASON_REQUIRED: 'organization.errors.reasonRequired',
 } as const;
 
 export type OrganizationError =
