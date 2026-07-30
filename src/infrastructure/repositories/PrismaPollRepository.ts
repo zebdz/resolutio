@@ -1,6 +1,7 @@
 import {
   PrismaClient,
   PollState as PrismaPollState,
+  PollType as PrismaPollType,
 } from '@/generated/prisma/client';
 import { Poll } from '../../domain/poll/Poll';
 import { Question } from '../../domain/poll/Question';
@@ -12,6 +13,7 @@ import {
 import { Result, success, failure } from '../../domain/shared/Result';
 import { QuestionType } from '../../domain/poll/QuestionType';
 import { PollState } from '../../domain/poll/PollState';
+import { PollType } from '../../domain/poll/PollType';
 
 export class PrismaPollRepository implements PollRepository {
   constructor(private prisma: PrismaClient) {}
@@ -24,6 +26,7 @@ export class PrismaPollRepository implements PollRepository {
           description: poll.description,
           organizationId: poll.organizationId,
           boardId: poll.boardId,
+          pollType: this.toPrismaPollType(poll.pollType),
           createdBy: poll.createdBy,
           startDate: poll.startDate,
           endDate: poll.endDate,
@@ -355,6 +358,7 @@ export class PrismaPollRepository implements PollRepository {
           description: poll.description,
           startDate: poll.startDate,
           endDate: poll.endDate,
+          pollType: this.toPrismaPollType(poll.pollType),
           state: this.toPrismaState(poll.state),
           weightCriteria: poll.weightCriteria,
           distributionType: poll.distributionType,
@@ -397,6 +401,7 @@ export class PrismaPollRepository implements PollRepository {
       description: prismaData.description,
       organizationId: prismaData.organizationId,
       boardId: prismaData.boardId,
+      pollType: this.toDomainPollType(prismaData.pollType),
       startDate: prismaData.startDate,
       endDate: prismaData.endDate,
       state: this.toDomainState(prismaData.state),
@@ -437,6 +442,19 @@ export class PrismaPollRepository implements PollRepository {
       case PollState.FINISHED:
         return 'FINISHED';
     }
+  }
+
+  private toDomainPollType(prismaPollType: PrismaPollType): string {
+    switch (prismaPollType) {
+      case 'ORGANIZATION':
+        return PollType.ORGANIZATION;
+      case 'OPEN':
+        return PollType.OPEN;
+    }
+  }
+
+  private toPrismaPollType(domainPollType: string): PrismaPollType {
+    return domainPollType === PollType.OPEN ? 'OPEN' : 'ORGANIZATION';
   }
 
   private toDomainQuestion(prismaData: any): Question {

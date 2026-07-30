@@ -718,7 +718,9 @@
       "loadBoards": "Failed to load boards",
       "resultsAdminOnly": "Only admins can view voter breakdown for active polls",
       "notOrganizationMember": "You must be a member of the organization to view results",
-      "cannotChangeWeightConfig": "Cannot change weight configuration for this poll"
+      "cannotChangeWeightConfig": "Cannot change weight configuration for this poll",
+      "openParticipantsImmutable": "Voters of an open poll cannot be edited or removed",
+      "openConfigFixed": "Weight settings of an open poll cannot be changed"
     },
     "voting": {
       "title": "Vote on Poll",
@@ -1251,7 +1253,11 @@
       "ownershipDataMissing": "Organization has no ownership data",
       "propertyNotInOrg": "Selected property does not belong to this organization",
       "votesCastCannotChangeWeightConfig": "Weight config cannot be changed after votes are cast",
-      "weightConfigLockedAfterActivation": "Weight config can only be changed before the poll is activated"
+      "weightConfigLockedAfterActivation": "Weight config can only be changed before the poll is activated",
+      "pollTypeInvalid": "Invalid poll type",
+      "openCannotBeBoardScoped": "An open poll cannot be limited to a governing body",
+      "openMustBeEqual": "An open poll always uses equal weight — one vote per person",
+      "userNotConfirmed": "Confirm your phone number to vote"
     },
     "user": {
       "userNotFound": "User not found",
