@@ -1,8 +1,17 @@
 import { getTranslations } from 'next-intl/server';
+import { redirect } from 'next/navigation';
 import {
   getUserVotingProgressAction,
   canUserVoteAction,
 } from '@/src/web/actions/poll/vote';
+import { getCurrentUser } from '@/web/lib/session';
+import {
+  prisma,
+  PrismaPollRepository,
+  PrismaOrganizationRepository,
+} from '@/infrastructure/index';
+import { GetOpenPollPreviewUseCase } from '@/application/poll/GetOpenPollPreviewUseCase';
+import { PublicOpenPollPreview } from '@/src/web/components/polls/PublicOpenPollPreview';
 import VotingInterface from '@/src/web/components/polls/voting/VotingInterface';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
@@ -21,6 +30,26 @@ export default async function VotePage({ params }: VotePageProps) {
   const { pollId } = await params;
   const commonT = await getTranslations('common');
   const votingT = await getTranslations('poll.voting');
+
+  // Anonymous visitor following a shared link: an open poll shows a public
+  // headline so the link explains itself, while every other poll — regular,
+  // archived or nonexistent — is answered identically with the login screen.
+  const currentUser = await getCurrentUser();
+
+  if (!currentUser) {
+    const previewUseCase = new GetOpenPollPreviewUseCase(
+      new PrismaPollRepository(prisma),
+      new PrismaOrganizationRepository(prisma)
+    );
+    const previewResult = await previewUseCase.execute({ pollId });
+    const preview = previewResult.success ? previewResult.value : null;
+
+    if (!preview) {
+      redirect('/login');
+    }
+
+    return <PublicOpenPollPreview pollId={pollId} preview={preview} />;
+  }
 
   // Check if user can vote
   const canVoteResult = await canUserVoteAction(pollId);
