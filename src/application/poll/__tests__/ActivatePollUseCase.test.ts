@@ -752,4 +752,69 @@ describe('ActivatePollUseCase', () => {
     expect(result.success).toBe(false);
     expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
   });
+  describe('open polls', () => {
+    function createReadyOpenPoll(id: string, createdBy: string): Poll {
+      const poll = Poll.create(
+        'Open Poll',
+        'Everyone may vote',
+        'org-1',
+        null,
+        createdBy,
+        new Date('2026-01-01'),
+        new Date('2026-02-01'),
+        undefined,
+        'OPEN'
+      ).value;
+      (poll as any).props.id = id;
+
+      const question = Question.create(
+        'Question 1',
+        id,
+        1,
+        1,
+        'single-choice'
+      ).value;
+      (question as any).props.id = 'question-open-1';
+      question.addAnswer(Answer.create('Answer 1', 1, question.id).value);
+      poll.addQuestion(question);
+      poll.takeSnapshot();
+
+      return poll;
+    }
+
+    it('notifies org members including descendants, not participants', async () => {
+      const poll = createReadyOpenPoll('poll-open', 'admin-1');
+      await pollRepository.createPoll(poll);
+
+      organizationRepository.findAcceptedMemberUserIdsIncludingDescendants =
+        async () => ['member-1', 'member-2'];
+
+      const result = await useCase.execute({
+        pollId: 'poll-open',
+        userId: 'admin-1',
+      });
+
+      expect(result.success).toBe(true);
+
+      const saved = notificationRepository.getSavedBatch();
+      expect(saved.map((n) => n.userId)).toEqual(['member-1', 'member-2']);
+      expect(saved[0].type).toBe('poll_activated');
+    });
+
+    it('sends nothing when the organization has no members', async () => {
+      const poll = createReadyOpenPoll('poll-open', 'admin-1');
+      await pollRepository.createPoll(poll);
+
+      organizationRepository.findAcceptedMemberUserIdsIncludingDescendants =
+        async () => [];
+
+      const result = await useCase.execute({
+        pollId: 'poll-open',
+        userId: 'admin-1',
+      });
+
+      expect(result.success).toBe(true);
+      expect(notificationRepository.getSavedBatch()).toHaveLength(0);
+    });
+  });
 });

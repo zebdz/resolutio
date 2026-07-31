@@ -52,6 +52,12 @@ export class UpdatePollWeightConfigUseCase {
       return failure(PollErrors.NOT_FOUND);
     }
 
+    // The weight configuration of an open poll is fixed: EQUAL / RAW_SUM /
+    // no property scope. One person, one vote.
+    if (poll.isOpen()) {
+      return failure(PollErrors.OPEN_CONFIG_FIXED);
+    }
+
     // Auth
     const isSuper = await this.userRepository.isSuperAdmin(input.adminUserId);
 

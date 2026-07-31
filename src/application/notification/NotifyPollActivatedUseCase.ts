@@ -1,35 +1,35 @@
-import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { Notification } from '../../domain/notification/Notification';
 
 export interface NotifyPollActivatedDependencies {
-  participantRepository: ParticipantRepository;
   notificationRepository: NotificationRepository;
+}
+
+export interface NotifyPollActivatedInput {
+  pollId: string;
+  pollTitle: string;
+  /**
+   * Resolved by the caller: snapshot participants for organization polls,
+   * organization members (including descendants) for open polls, which have
+   * no participants until people vote.
+   */
+  recipientUserIds: string[];
 }
 
 export class NotifyPollActivatedUseCase {
   constructor(private deps: NotifyPollActivatedDependencies) {}
 
-  async execute(input: { pollId: string; pollTitle: string }): Promise<void> {
-    const { pollId, pollTitle } = input;
+  async execute(input: NotifyPollActivatedInput): Promise<void> {
+    const { pollId, pollTitle, recipientUserIds } = input;
 
-    const participantsResult =
-      await this.deps.participantRepository.getParticipants(pollId);
-
-    if (!participantsResult.success) {
+    if (recipientUserIds.length === 0) {
       return;
     }
 
-    const participants = participantsResult.value;
-
-    if (participants.length === 0) {
-      return;
-    }
-
-    const notifications = participants
-      .map((p) =>
+    const notifications = recipientUserIds
+      .map((userId) =>
         Notification.create({
-          userId: p.userId,
+          userId,
           type: 'poll_activated',
           title: 'notification.types.pollActivated.title',
           body: 'notification.types.pollActivated.body',

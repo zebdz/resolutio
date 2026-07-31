@@ -63,6 +63,13 @@ export class UpdateParticipantWeightUseCase {
       return failure(PollErrors.NOT_FOUND);
     }
 
+    // Open polls are one person = one vote, and a participant row exists only
+    // because that person already voted — changing its weight would rewrite a
+    // vote that was already cast.
+    if (poll.isOpen()) {
+      return failure(PollErrors.OPEN_PARTICIPANTS_IMMUTABLE);
+    }
+
     // 3. Check admin permissions: superadmin or org admin
     const isSuperAdmin = await this.userRepository.isSuperAdmin(adminUserId);
 

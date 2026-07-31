@@ -72,6 +72,13 @@ export function CreatePollForm() {
   >([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // An open poll is voted on by every verified platform user, always at
+  // weight 1 — it has no board scope and no weight configuration.
+  const [pollType, setPollType] = useState<'ORGANIZATION' | 'OPEN'>(
+    'ORGANIZATION'
+  );
+  const isOpenPoll = pollType === 'OPEN';
+
   // Weight config state
   const [distributionType, setDistributionType] = useState<
     'EQUAL' | 'OWNERSHIP_UNIT_COUNT' | 'OWNERSHIP_SIZE_WEIGHTED'
@@ -397,6 +404,7 @@ export function CreatePollForm() {
 
       pollFormData.append('startDate', pollData.startDate);
       pollFormData.append('endDate', pollData.endDate);
+      pollFormData.append('pollType', pollType);
       pollFormData.append('distributionType', distributionType);
       pollFormData.append('propertyAggregation', propertyAggregation);
       pollFormData.append('propertyIds', JSON.stringify(propertyIds));
@@ -574,6 +582,35 @@ export function CreatePollForm() {
       {/* Poll Basic Info */}
       <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-4">
         <Field>
+          <Label>{t('type.label')}</Label>
+          <Select
+            name="pollType"
+            value={pollType}
+            onChange={(e) => {
+              const next = e.target.value as 'ORGANIZATION' | 'OPEN';
+              setPollType(next);
+
+              // Open polls are org-wide and always equal-weight; drop any
+              // board or weight choices made before the switch.
+              if (next === 'OPEN') {
+                setPollData((prev) => ({ ...prev, boardId: '' }));
+                setDistributionType('EQUAL');
+                setPropertyAggregation('RAW_SUM');
+                setPropertyIds([]);
+              }
+            }}
+          >
+            <option value="ORGANIZATION">{t('type.organization')}</option>
+            <option value="OPEN">{t('type.open')}</option>
+          </Select>
+          {isOpenPoll && (
+            <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+              {t('type.openExplainer')}
+            </p>
+          )}
+        </Field>
+
+        <Field>
           <Label>{t('selectOrganization')}</Label>
           <Select
             name="organizationId"
@@ -605,24 +642,26 @@ export function CreatePollForm() {
           </Select>
         </Field>
 
-        <Field>
-          <Label>{t('selectBoard')}</Label>
-          <Select
-            name="boardId"
-            value={pollData.boardId}
-            onChange={(e) =>
-              setPollData({ ...pollData, boardId: e.target.value })
-            }
-            disabled={isLoading || !pollData.organizationId}
-          >
-            <option value="">{t('orgWidePoll')}</option>
-            {filteredBoards.map((board) => (
-              <option key={board.id} value={board.id}>
-                {board.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        {!isOpenPoll && (
+          <Field>
+            <Label>{t('selectBoard')}</Label>
+            <Select
+              name="boardId"
+              value={pollData.boardId}
+              onChange={(e) =>
+                setPollData({ ...pollData, boardId: e.target.value })
+              }
+              disabled={isLoading || !pollData.organizationId}
+            >
+              <option value="">{t('orgWidePoll')}</option>
+              {filteredBoards.map((board) => (
+                <option key={board.id} value={board.id}>
+                  {board.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
 
         <Field>
           <Label>{t('pollTitle')}</Label>
@@ -686,8 +725,10 @@ export function CreatePollForm() {
         </div>
       </div>
 
-      {/* Weight distribution section — only if org has ownership data or user is admin */}
-      {(userHasOwnership || adminOrgIds.has(pollData.organizationId)) &&
+      {/* Weight distribution section — only if org has ownership data or user
+          is admin. Open polls are fixed at one person, one vote. */}
+      {!isOpenPoll &&
+        (userHasOwnership || adminOrgIds.has(pollData.organizationId)) &&
         pollData.organizationId && (
           <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-4">
             <h3 className="font-semibold text-zinc-900 dark:text-white">

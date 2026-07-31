@@ -235,6 +235,7 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
         isPollCreator={isPollCreator}
         canViewVoters={canViewVoters}
         buildingTotal={buildingTotal}
+        isOpenPoll={poll.pollType === 'OPEN'}
       />
 
       {attachedReports.length > 0 && (

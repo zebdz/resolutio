@@ -58,6 +58,9 @@ interface PollResultsProps {
   // Theoretical max Σ weights if every owner were registered. 0 for EQUAL
   // polls — the UI then collapses Building/Registered into a single number.
   buildingTotal: number;
+  // Open polls have no fixed electorate: percentages are shares of the votes
+  // cast, and every weight is 1, so the weight card carries no information.
+  isOpenPoll?: boolean;
 }
 
 export default function PollResults({
@@ -66,6 +69,7 @@ export default function PollResults({
   isPollCreator,
   canViewVoters,
   buildingTotal,
+  isOpenPoll = false,
 }: PollResultsProps) {
   const isActive = pollState === 'ACTIVE';
   const isFinished = pollState === 'FINISHED';
@@ -93,31 +97,47 @@ export default function PollResults({
     <>
       <div className="space-y-6">
         {/* Summary stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div
+          className={`grid grid-cols-1 gap-4 ${
+            isOpenPoll ? 'md:grid-cols-2' : 'md:grid-cols-3'
+          }`}
+        >
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 bg-white dark:bg-zinc-900">
             <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              {t('totalParticipants')}
+              {isOpenPoll ? t('voters') : t('totalParticipants')}
             </div>
             <div className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-white">
-              {results.votedParticipants} / {results.totalParticipants}
+              {isOpenPoll
+                ? results.totalParticipants
+                : `${results.votedParticipants} / ${results.totalParticipants}`}
             </div>
-          </div>
-
-          <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 bg-white dark:bg-zinc-900">
-            <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              {buildingTotal > 0 ? t('registeredOfBuilding') : t('totalWeight')}
-            </div>
-            <div className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-white">
-              {buildingTotal > 0
-                ? `${results.totalWeight.toFixed(2)} / ${buildingTotal.toFixed(2)}`
-                : results.totalWeight.toFixed(2)}
-            </div>
-            {buildingTotal > 0 && (
+            {isOpenPoll && (
               <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                {`${((results.totalWeight / buildingTotal) * 100).toFixed(2)}% ${t('ofBuilding')}`}
+                {t('openPollDenominatorNote')}
               </div>
             )}
           </div>
+
+          {/* Total weight is just the voter count when every weight is 1 */}
+          {!isOpenPoll && (
+            <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 bg-white dark:bg-zinc-900">
+              <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                {buildingTotal > 0
+                  ? t('registeredOfBuilding')
+                  : t('totalWeight')}
+              </div>
+              <div className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-white">
+                {buildingTotal > 0
+                  ? `${results.totalWeight.toFixed(2)} / ${buildingTotal.toFixed(2)}`
+                  : results.totalWeight.toFixed(2)}
+              </div>
+              {buildingTotal > 0 && (
+                <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  {`${((results.totalWeight / buildingTotal) * 100).toFixed(2)}% ${t('ofBuilding')}`}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-4 bg-white dark:bg-zinc-900">
             <div className="text-sm font-medium text-zinc-700 dark:text-zinc-300">

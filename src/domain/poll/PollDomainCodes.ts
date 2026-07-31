@@ -75,6 +75,12 @@ export const PollDomainCodes = {
     'domain.poll.votesCastCannotChangeWeightConfig',
   WEIGHT_CONFIG_LOCKED_AFTER_ACTIVATION:
     'domain.poll.weightConfigLockedAfterActivation',
+
+  // Poll type
+  POLL_TYPE_INVALID: 'domain.poll.pollTypeInvalid',
+  POLL_OPEN_CANNOT_BE_BOARD_SCOPED: 'domain.poll.openCannotBeBoardScoped',
+  POLL_OPEN_MUST_BE_EQUAL: 'domain.poll.openMustBeEqual',
+  USER_NOT_CONFIRMED: 'domain.poll.userNotConfirmed',
 } as const;
 
 export type PollDomainCode =

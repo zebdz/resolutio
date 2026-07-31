@@ -234,6 +234,7 @@ export async function createPollAction(
       | string
       | null;
     const propertyIdsRaw = formData.get('propertyIds') as string | null;
+    const pollTypeRaw = formData.get('pollType') as string | null;
     const input = {
       title: formData.get('title') as string,
       description: formData.get('description') as string,
@@ -252,6 +253,7 @@ export async function createPollAction(
       propertyIds: propertyIdsRaw
         ? (JSON.parse(propertyIdsRaw) as string[])
         : undefined,
+      pollType: pollTypeRaw && pollTypeRaw.trim() ? pollTypeRaw : undefined,
     };
 
     // Validate with Zod
@@ -640,7 +642,10 @@ export async function getPollByIdAction(
     const poll = result.value;
     const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
 
-    if (!isSuperAdmin) {
+    // Open polls are distributed by link and voted on by outsiders, so any
+    // authenticated user may read the poll itself. Who may read its *results*
+    // is decided separately in GetPollResultsUseCase.
+    if (!isSuperAdmin && !poll.isOpen()) {
       const isMember = await organizationRepository.isUserMember(
         user.id,
         poll.organizationId
@@ -1531,26 +1536,24 @@ export async function searchPollsAction(
           pollJson.isBoardArchived = false;
         }
 
-        // canVote
+        // canVote + hasFinishedVoting. An open poll has no participants until
+        // people vote, so eligibility there is "authenticated and not done
+        // yet" — otherwise even the org's own members would see no way in.
         const participant = await prisma.pollParticipant.findFirst({
           where: { pollId: poll.id, userId: user.id },
         });
-        pollJson.canVote = !!participant;
 
-        // hasFinishedVoting
-        if (participant) {
-          const votesCount = await prisma.vote.count({
-            where: {
-              userId: user.id,
-              question: { pollId: poll.id },
-            },
-          });
-          const totalQuestions = pollJson.questions?.length || 0;
-          pollJson.hasFinishedVoting =
-            votesCount >= totalQuestions && totalQuestions > 0;
-        } else {
-          pollJson.hasFinishedVoting = false;
-        }
+        const votesCount = await prisma.vote.count({
+          where: {
+            userId: user.id,
+            question: { pollId: poll.id },
+          },
+        });
+        const totalQuestions = pollJson.questions?.length || 0;
+
+        pollJson.hasFinishedVoting =
+          votesCount >= totalQuestions && totalQuestions > 0;
+        pollJson.canVote = pollJson.pollType === 'OPEN' || !!participant;
 
         return pollJson;
       })

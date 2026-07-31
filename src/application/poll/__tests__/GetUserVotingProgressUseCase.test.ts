@@ -13,12 +13,18 @@ import { PollErrors } from '../PollErrors';
 import { Answer } from '../../../domain/poll/Answer';
 import { Decimal } from 'decimal.js';
 import { PollState } from '../../../domain/poll/PollState';
+import { UserRepository } from '../../../domain/user/UserRepository';
+import { User } from '../../../domain/user/User';
+
+const confirmedUser = { isConfirmed: () => true } as unknown as User;
+const unconfirmedUser = { isConfirmed: () => false } as unknown as User;
 
 describe('GetUserVotingProgressUseCase', () => {
   let pollRepository: Partial<PollRepository>;
   let participantRepository: Partial<ParticipantRepository>;
   let voteRepository: Partial<VoteRepository>;
   let draftRepository: Partial<DraftRepository>;
+  let userRepository: Partial<UserRepository>;
   let useCase: GetUserVotingProgressUseCase;
   let poll: Poll;
   let question1: Question;
@@ -84,6 +90,7 @@ describe('GetUserVotingProgressUseCase', () => {
       description: poll.description,
       organizationId: poll.organizationId,
       boardId: poll.boardId,
+      pollType: poll.pollType,
       startDate: poll.startDate,
       endDate: poll.endDate,
       state: PollState.ACTIVE,
@@ -126,11 +133,16 @@ describe('GetUserVotingProgressUseCase', () => {
       getUserDrafts: vi.fn().mockResolvedValue(success([])),
     };
 
+    userRepository = {
+      findById: vi.fn().mockResolvedValue(confirmedUser),
+    };
+
     useCase = new GetUserVotingProgressUseCase(
       pollRepository as PollRepository,
       participantRepository as ParticipantRepository,
       voteRepository as VoteRepository,
-      draftRepository as DraftRepository
+      draftRepository as DraftRepository,
+      userRepository as UserRepository
     );
   });
 
@@ -209,6 +221,7 @@ describe('GetUserVotingProgressUseCase', () => {
       description: poll.description,
       organizationId: poll.organizationId,
       boardId: poll.boardId,
+      pollType: poll.pollType,
       startDate: poll.startDate,
       endDate: poll.endDate,
       state: PollState.READY,
@@ -246,6 +259,7 @@ describe('GetUserVotingProgressUseCase', () => {
       description: poll.description,
       organizationId: poll.organizationId,
       boardId: poll.boardId,
+      pollType: poll.pollType,
       startDate: poll.startDate,
       endDate: poll.endDate,
       state: PollState.FINISHED,
@@ -359,5 +373,72 @@ describe('GetUserVotingProgressUseCase', () => {
       ).toBe(1);
       expect(progress.drafts.length).toBe(2);
     }
+  });
+  describe('open polls', () => {
+    let openPoll: Poll;
+
+    beforeEach(() => {
+      openPoll = Poll.reconstitute({
+        id: 'poll-1',
+        title: 'Open Poll',
+        description: 'Everyone may vote',
+        organizationId: 'org-1',
+        boardId: null,
+        pollType: 'OPEN',
+        startDate: poll.startDate,
+        endDate: poll.endDate,
+        state: PollState.ACTIVE,
+        weightCriteria: null,
+        distributionType: 'EQUAL',
+        propertyAggregation: 'RAW_SUM',
+        propertyIds: [],
+        createdBy: poll.createdBy,
+        createdAt: poll.createdAt,
+        archivedAt: null,
+        questions: [question1, question2],
+      });
+
+      pollRepository.getPollById = vi.fn().mockResolvedValue(success(openPoll));
+      participantRepository.getParticipantByUserAndPoll = vi
+        .fn()
+        .mockResolvedValue(success(null));
+    });
+
+    it('canVote is true for a confirmed non-participant', async () => {
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        userId: 'outsider-1',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.value.canVote).toBe(true);
+    });
+
+    it('canVote is false for an unconfirmed user', async () => {
+      userRepository.findById = vi.fn().mockResolvedValue(unconfirmedUser);
+
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        userId: 'outsider-1',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.value.canVote).toBe(false);
+    });
+
+    it('canVote is false once the user has finished voting', async () => {
+      voteRepository.hasUserFinishedVoting = vi
+        .fn()
+        .mockResolvedValue(success(true));
+
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        userId: 'outsider-1',
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.value.canVote).toBe(false);
+      expect(result.value.hasFinished).toBe(true);
+    });
   });
 });

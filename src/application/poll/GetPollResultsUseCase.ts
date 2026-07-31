@@ -107,13 +107,28 @@ export class GetPollResultsUseCase {
         return failure('poll.errors.resultsAdminOnly');
       }
     } else {
-      // Poll is finished, check if user is organization member or admin
+      // Poll is finished: organization members and admins may read. An open
+      // poll is voted on by outsiders too, so anyone who actually cast a vote
+      // in it may see the outcome they took part in.
       const isMember = await this.organizationRepository.isUserMember(
         userId,
         poll.organizationId
       );
 
-      if (!isMember && !isAdmin) {
+      let isOpenPollVoter = false;
+
+      if (!isMember && !isAdmin && poll.isOpen()) {
+        const participantResult =
+          await this.participantRepository.getParticipantByUserAndPoll(
+            pollId,
+            userId
+          );
+
+        isOpenPollVoter =
+          participantResult.success && !!participantResult.value;
+      }
+
+      if (!isMember && !isAdmin && !isOpenPollVoter) {
         return failure('poll.errors.notOrganizationMember');
       }
     }

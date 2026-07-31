@@ -17,6 +17,7 @@ export interface CreatePollInput {
   distributionType?: string;
   propertyAggregation?: string;
   propertyIds?: string[];
+  pollType?: string;
 }
 
 export class CreatePollUseCase {
@@ -65,7 +66,8 @@ export class CreatePollUseCase {
       input.createdBy,
       input.startDate,
       input.endDate,
-      this.profanityChecker
+      this.profanityChecker,
+      input.pollType
     );
 
     if (!pollResult.success) {
@@ -78,11 +80,15 @@ export class CreatePollUseCase {
       input.propertyAggregation !== undefined ||
       input.propertyIds !== undefined
     ) {
-      pollResult.value.applyWeightConfig(
+      const configResult = pollResult.value.applyWeightConfig(
         input.distributionType ?? pollResult.value.distributionType,
         input.propertyAggregation ?? pollResult.value.propertyAggregation,
         input.propertyIds ?? pollResult.value.propertyIds
       );
+
+      if (!configResult.success) {
+        return failure(configResult.error);
+      }
     }
 
     // 3. Persist the validated domain object

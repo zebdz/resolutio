@@ -1,6 +1,7 @@
 import { Poll } from './Poll';
 import { PollParticipant } from './PollParticipant';
 import { ParticipantWeightHistory } from './ParticipantWeightHistory';
+import { Vote } from './Vote';
 import { Result } from '../shared/Result';
 
 export interface ParticipantRepository {
@@ -43,6 +44,18 @@ export interface ParticipantRepository {
     participants: PollParticipant[],
     historyRecords: ParticipantWeightHistory[]
   ): Promise<Result<PollParticipant[], string>>;
+
+  /**
+   * Join-on-vote for open polls: creates the participant (weight 1), its
+   * initial weight-history row and the user's votes in one transaction.
+   * Idempotent on (pollId, userId) for the participant row.
+   */
+  joinAndVote(
+    participant: PollParticipant,
+    history: ParticipantWeightHistory,
+    votes: Vote[],
+    willingToSignProtocol: boolean
+  ): Promise<Result<void, string>>;
 
   pollHasVotes(pollId: string): Promise<Result<boolean, string>>;
 
