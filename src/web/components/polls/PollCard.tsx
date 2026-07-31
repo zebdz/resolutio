@@ -43,6 +43,7 @@ export function PollCard({
   const isReady = poll.state === 'READY';
   const isFinished = poll.state === 'FINISHED';
   const isCreator = poll.createdBy === userId;
+  const isOpenPoll = poll.pollType === 'OPEN';
   const isOrgArchived = poll.isOrgArchived;
   const isBoardArchived = poll.isBoardArchived;
   const isParentArchived = isOrgArchived || isBoardArchived;
@@ -144,6 +145,17 @@ export function PollCard({
     }
   };
 
+  const handleCopyLink = async () => {
+    const url = `${window.location.origin}/polls/${poll.id}/vote`;
+
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(t('type.linkCopied'));
+    } catch {
+      toast.error(t('type.copyLinkError'));
+    }
+  };
+
   const handleFinish = async () => {
     setIsFinishing(true);
 
@@ -190,6 +202,11 @@ export function PollCard({
           </h3>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <PollStateBadge state={poll.state} />
+            {isOpenPoll && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-sky-700 bg-sky-100 dark:text-sky-300 dark:bg-sky-900/40 rounded-full">
+                {t('type.openBadge')}
+              </span>
+            )}
             {isOrgArchived && (
               <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-pink-700 bg-pink-200 dark:text-pink-400 dark:bg-pink-900/40 rounded-full">
                 {t('orgArchived')}
@@ -247,6 +264,17 @@ export function PollCard({
                   {t('viewResults')}
                 </Button>
               </Link>
+            )}
+
+            {/* Copy the voting link — the only way an open poll is shared */}
+            {isOpenPoll && canManage && (
+              <Button
+                color="zinc"
+                onClick={handleCopyLink}
+                className="flex-1 cursor-pointer"
+              >
+                {t('type.copyLink')}
+              </Button>
             )}
 
             {/* Manage participants */}

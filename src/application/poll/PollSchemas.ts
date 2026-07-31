@@ -44,10 +44,17 @@ export const createPollSchema = (profanityChecker: ProfanityChecker) =>
         .enum(['RAW_SUM', 'NORMALIZE_PER_PROPERTY'])
         .optional(),
       propertyIds: z.array(z.string()).optional(),
+      pollType: z.enum(['ORGANIZATION', 'OPEN']).optional(),
     })
     .refine((data) => data.startDate < data.endDate, {
       message: 'Start date must be before end date',
       path: ['endDate'],
+    })
+    // An open poll is voted on by the whole platform, so it cannot also be
+    // narrowed to one governing body.
+    .refine((data) => !(data.pollType === 'OPEN' && data.boardId !== null), {
+      message: PollDomainCodes.POLL_OPEN_CANNOT_BE_BOARD_SCOPED,
+      path: ['boardId'],
     });
 
 export type CreatePollInput = z.input<ReturnType<typeof createPollSchema>>;

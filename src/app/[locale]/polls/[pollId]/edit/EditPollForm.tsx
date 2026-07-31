@@ -64,6 +64,7 @@ interface PollData {
   startDate: string;
   endDate: string;
   state: PollState;
+  pollType: string;
 }
 
 export function EditPollForm() {
@@ -80,6 +81,7 @@ export function EditPollForm() {
     startDate: '',
     endDate: '',
     state: PollState.DRAFT,
+    pollType: 'ORGANIZATION',
   });
 
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -202,6 +204,7 @@ export function EditPollForm() {
           startDate: new Date(poll.startDate).toISOString().split('T')[0],
           endDate: new Date(poll.endDate).toISOString().split('T')[0],
           state: poll.state,
+          pollType: poll.pollType,
         });
         setOriginalTitle(poll.title);
         setOriginalDescription(poll.description);
@@ -839,6 +842,15 @@ export function EditPollForm() {
 
       {/* Poll Basic Info */}
       <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-4">
+        {/* Read-only: switching type would invalidate a taken snapshot or
+            votes already cast. */}
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          {t('type.label')}:{' '}
+          {pollData.pollType === 'OPEN'
+            ? t('type.open')
+            : t('type.organization')}
+        </p>
+
         <Field>
           <Label>{t('pollTitle')}</Label>
           <Input

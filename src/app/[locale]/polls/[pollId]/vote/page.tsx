@@ -95,6 +95,7 @@ export default async function VotePage({ params }: VotePageProps) {
     id: poll.id,
     title: poll.title,
     description: poll.description,
+    pollType: poll.pollType,
     questions: poll.questions.map((q: any) => ({
       id: q.id,
       text: q.text,
@@ -126,6 +127,14 @@ export default async function VotePage({ params }: VotePageProps) {
           </p>
         )}
       </div>
+
+      {serializedPoll.pollType === 'OPEN' && (
+        <div className="mb-6 rounded-lg bg-sky-50 p-4 dark:bg-sky-900/20">
+          <p className="text-sm text-sky-900 dark:text-sky-200">
+            {votingT('openPollBanner')}
+          </p>
+        </div>
+      )}
 
       <VotingInterface
         poll={serializedPoll}

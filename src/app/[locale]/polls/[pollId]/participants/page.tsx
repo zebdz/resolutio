@@ -173,6 +173,7 @@ export default async function ParticipantsPage({
           canModify: participantsData.canModify,
         }}
         pollState={poll.state}
+        isOpenPoll={poll.pollType === 'OPEN'}
         weightConfig={weightConfig}
         properties={properties}
         descendantGroups={descendantGroups}
