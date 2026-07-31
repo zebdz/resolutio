@@ -13,8 +13,12 @@ import {
   isSuperadminSession,
 } from './infrastructure/rateLimit/superadminWhitelist';
 import { checkSuperadminBySessionFallback } from './infrastructure/rateLimit/superadminFallbackCheck';
+import { resolveReturnToPath } from './web/lib/returnToCapture';
+import { RETURN_TO_COOKIE_NAME } from './web/lib/returnToValidation';
 
 const intlMiddleware = createMiddleware(routing);
+
+const RETURN_TO_MAX_AGE = 1800; // 30 minutes, matches the join-link flow
 
 // Matches /{locale}/rate-limited or /{locale}/ip-blocked to skip checks on error pages
 const RATE_LIMITED_PATH = /^\/[a-z]{2}\/rate-limited/;
@@ -35,6 +39,38 @@ function extractLocale(request: NextRequest): string {
   }
 
   return routing.defaultLocale;
+}
+
+// Remembers where the visitor was heading so the login / registration chain can
+// land them there afterwards. Records only — never redirects — so it cannot
+// make a previously public page private.
+//
+// Call sites await the intl middleware before handing its response here: it is
+// typed synchronous, but awaiting costs nothing and keeps this working if it
+// (or a test double) hands back a promise.
+function captureReturnTo(
+  request: NextRequest,
+  response: NextResponse
+): NextResponse {
+  const path = resolveReturnToPath({
+    pathname: request.nextUrl.pathname,
+    method: request.method,
+    accept: request.headers.get('accept'),
+  });
+
+  if (!path) {
+    return response;
+  }
+
+  response.cookies.set(RETURN_TO_COOKIE_NAME, path, {
+    httpOnly: false, // the client helper reads it after login
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: RETURN_TO_MAX_AGE,
+    path: '/',
+  });
+
+  return response;
 }
 
 export default async function middleware(request: NextRequest) {
@@ -58,7 +94,7 @@ export default async function middleware(request: NextRequest) {
       return NextResponse.next();
     }
 
-    return intlMiddleware(request);
+    return captureReturnTo(request, await intlMiddleware(request));
   }
 
   const ip = extractIpFromRequest(request);
@@ -144,7 +180,7 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  return intlMiddleware(request);
+  return captureReturnTo(request, await intlMiddleware(request));
 }
 
 export const config = {
