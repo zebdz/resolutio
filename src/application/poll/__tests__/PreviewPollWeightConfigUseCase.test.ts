@@ -332,4 +332,36 @@ describe('PreviewPollWeightConfigUseCase', () => {
       expect(result.error).toBe(PollDomainCodes.PROPERTY_AGGREGATION_INVALID);
     });
   });
+
+  function makeOpenPoll(): Poll {
+    const openPoll = Poll.create(
+      'Open Poll',
+      'Everyone may vote',
+      'org-1',
+      null,
+      'user-admin',
+      new Date('2026-01-15'),
+      new Date('2026-02-15'),
+      undefined,
+      'OPEN'
+    ).value;
+    (openPoll as any).props.id = 'poll-1';
+
+    return openPoll;
+  }
+
+  it('rejects a preview on an open poll', async () => {
+    pollRepository.getPollById = vi
+      .fn()
+      .mockResolvedValue(success(makeOpenPoll()));
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      newConfig: { distributionType: 'OWNERSHIP_UNIT_COUNT' },
+      actingUserId: 'admin-user',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollErrors.OPEN_CONFIG_FIXED);
+  });
 });

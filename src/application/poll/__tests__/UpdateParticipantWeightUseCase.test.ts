@@ -291,4 +291,37 @@ describe('UpdateParticipantWeightUseCase', () => {
     expect(result.success).toBe(false);
     expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
   });
+
+  function makeOpenPoll(): Poll {
+    const openPoll = Poll.create(
+      'Open Poll',
+      'Everyone may vote',
+      'org-1',
+      null,
+      'user-admin',
+      new Date('2026-01-15'),
+      new Date('2026-02-15'),
+      undefined,
+      'OPEN'
+    ).value;
+    (openPoll as any).props.id = 'poll-1';
+
+    return openPoll;
+  }
+
+  it('rejects a weight change on an open poll', async () => {
+    pollRepository.getPollById = vi
+      .fn()
+      .mockResolvedValue(success(makeOpenPoll()));
+
+    const result = await useCase.execute({
+      participantId: 'participant-1',
+      newWeight: 5,
+      adminUserId: 'user-admin',
+      reason: 'because',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollErrors.OPEN_PARTICIPANTS_IMMUTABLE);
+  });
 });

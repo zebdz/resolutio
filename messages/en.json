@@ -736,6 +736,7 @@
       "allQuestionsRequired": "Please answer all questions before finishing",
       "votingComplete": "Thank you for voting!",
       "cannotVote": "You are not eligible to vote on this poll",
+      "notConfirmed": "Confirm your phone number to vote in this poll",
       "alreadyVoted": "You have already completed this poll",
       "pollNotActive": "This poll is not currently active",
       "pollFinished": "This poll has ended",

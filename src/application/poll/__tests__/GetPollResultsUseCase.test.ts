@@ -570,4 +570,85 @@ describe('GetPollResultsUseCase', () => {
       expect(result.value.protocolSignWillingness).toHaveLength(0);
     }
   });
+  describe('open poll access', () => {
+    let openPoll: Poll;
+
+    beforeEach(() => {
+      openPoll = Poll.create(
+        'Open Poll',
+        'Everyone may vote',
+        'org-1',
+        null,
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15'),
+        undefined,
+        'OPEN'
+      ).value;
+      (openPoll as any).props.id = 'poll-1';
+      (openPoll as any).props.state = PollState.FINISHED;
+      (openPoll as any).props.questions = [question];
+
+      pollRepository.getPollById = vi.fn().mockResolvedValue(success(openPoll));
+      organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
+      organizationRepository.isUserMember = vi.fn().mockResolvedValue(false);
+    });
+
+    it('lets a non-member who voted read the results', async () => {
+      participantRepository.getParticipantByUserAndPoll = vi
+        .fn()
+        .mockResolvedValue(success(participant1));
+
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        userId: 'outsider-1',
+      });
+
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects a non-member who did not vote', async () => {
+      participantRepository.getParticipantByUserAndPoll = vi
+        .fn()
+        .mockResolvedValue(success(null));
+
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        userId: 'outsider-2',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('poll.errors.notOrganizationMember');
+    });
+
+    it('still lets org members read the results without a participant lookup', async () => {
+      organizationRepository.isUserMember = vi.fn().mockResolvedValue(true);
+      participantRepository.getParticipantByUserAndPoll = vi.fn();
+
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        userId: 'member-1',
+      });
+
+      expect(result.success).toBe(true);
+      expect(
+        participantRepository.getParticipantByUserAndPoll
+      ).not.toHaveBeenCalled();
+    });
+
+    it('does not open an ACTIVE poll to a voter who is not an admin', async () => {
+      (openPoll as any).props.state = PollState.ACTIVE;
+      participantRepository.getParticipantByUserAndPoll = vi
+        .fn()
+        .mockResolvedValue(success(participant1));
+
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        userId: 'outsider-1',
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('poll.errors.resultsAdminOnly');
+    });
+  });
 });

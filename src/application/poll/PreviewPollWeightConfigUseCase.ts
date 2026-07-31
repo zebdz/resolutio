@@ -70,6 +70,12 @@ export class PreviewPollWeightConfigUseCase {
       return failure(PollErrors.NOT_FOUND);
     }
 
+    // Nothing to preview: an open poll's weight configuration is fixed at
+    // EQUAL / RAW_SUM / no property scope.
+    if (poll.isOpen()) {
+      return failure(PollErrors.OPEN_CONFIG_FIXED);
+    }
+
     // Auth
     const isSuper = await this.userRepository.isSuperAdmin(input.actingUserId);
 

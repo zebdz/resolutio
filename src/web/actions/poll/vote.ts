@@ -16,6 +16,8 @@ import {
   PrismaDraftRepository,
   PrismaBoardRepository,
 } from '@/infrastructure/index';
+import { PollVotingPolicy } from '@/domain/poll/PollVotingPolicy';
+import { PollDomainCodes } from '@/domain/poll/PollDomainCodes';
 import { getCurrentUser } from '../../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
@@ -346,49 +348,27 @@ export async function canUserVoteAction(
       };
     }
 
-    // Check if poll is active and not finished
-    if (!poll.isActive()) {
-      return {
-        success: true,
-        data: {
-          canVote: false,
-          reasonCode: 'pollNotActive',
-        },
-      };
+    // Organization polls gate on the snapshot participant; open polls gate on
+    // the user being confirmed, since they join the poll only when they vote.
+    let isParticipant = false;
+
+    if (!poll.isOpen()) {
+      const participantResult =
+        await participantRepository.getParticipantByUserAndPoll(
+          pollId,
+          user.id
+        );
+
+      if (!participantResult.success) {
+        return {
+          success: false,
+          error: await translateErrorCode(participantResult.error),
+        };
+      }
+
+      isParticipant = !!participantResult.value;
     }
 
-    if (poll.isFinished()) {
-      return {
-        success: true,
-        data: {
-          canVote: false,
-          reasonCode: 'pollFinished',
-        },
-      };
-    }
-
-    // Check if user is a participant
-    const participantResult =
-      await participantRepository.getParticipantByUserAndPoll(pollId, user.id);
-
-    if (!participantResult.success) {
-      return {
-        success: false,
-        error: await translateErrorCode(participantResult.error),
-      };
-    }
-
-    if (!participantResult.value) {
-      return {
-        success: true,
-        data: {
-          canVote: false,
-          reasonCode: 'cannotVote',
-        },
-      };
-    }
-
-    // Check if user has already finished voting
     const hasFinishedResult = await voteRepository.hasUserFinishedVoting(
       pollId,
       user.id
@@ -401,20 +381,36 @@ export async function canUserVoteAction(
       };
     }
 
-    if (hasFinishedResult.value) {
+    const eligibility = PollVotingPolicy.canVote(poll, {
+      isParticipant,
+      isConfirmedUser: user.isConfirmed(),
+      hasFinishedVoting: hasFinishedResult.value,
+    });
+
+    if (eligibility.success) {
       return {
         success: true,
         data: {
-          canVote: false,
-          reasonCode: 'alreadyVoted',
+          canVote: true,
         },
       };
     }
 
+    // Reason codes are keys under the `poll.voting` namespace — the vote page
+    // renders them with votingT().
+    const reasonByCode: Record<string, string> = {
+      [PollDomainCodes.POLL_FINISHED]: 'pollFinished',
+      [PollDomainCodes.POLL_NOT_ACTIVE]: 'pollNotActive',
+      [PollDomainCodes.NOT_PARTICIPANT]: 'cannotVote',
+      [PollDomainCodes.USER_NOT_CONFIRMED]: 'notConfirmed',
+      [PollDomainCodes.ALREADY_VOTED]: 'alreadyVoted',
+    };
+
     return {
       success: true,
       data: {
-        canVote: true,
+        canVote: false,
+        reasonCode: reasonByCode[eligibility.error] ?? 'cannotVote',
       },
     };
   } catch (error) {

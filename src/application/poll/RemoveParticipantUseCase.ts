@@ -56,6 +56,12 @@ export class RemoveParticipantUseCase {
       return failure(PollErrors.NOT_FOUND);
     }
 
+    // A participant of an open poll has by definition already voted, so
+    // removing the row would destroy a cast vote.
+    if (poll.isOpen()) {
+      return failure(PollErrors.OPEN_PARTICIPANTS_IMMUTABLE);
+    }
+
     // 3. Check admin permissions: superadmin or org admin
     const isSuperAdmin = await this.userRepository.isSuperAdmin(adminUserId);
 

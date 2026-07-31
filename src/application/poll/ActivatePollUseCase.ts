@@ -86,13 +86,30 @@ export class ActivatePollUseCase {
       return failure(updateResult.error);
     }
 
-    // Notify participants
+    // Notify. Organization polls reach their snapshot participants; open polls
+    // have none yet, so the organization's own members (including descendants)
+    // are told instead — outsiders arrive through the shared link.
+    let recipientUserIds: string[] = [];
+
+    if (poll.isOpen()) {
+      recipientUserIds =
+        await this.organizationRepository.findAcceptedMemberUserIdsIncludingDescendants(
+          poll.organizationId
+        );
+    } else {
+      const participantsResult =
+        await this.participantRepository.getParticipants(poll.id);
+
+      if (participantsResult.success) {
+        recipientUserIds = participantsResult.value.map((p) => p.userId);
+      }
+    }
+
     const notifyUseCase = new NotifyPollActivatedUseCase({
       notificationRepository: this.notificationRepository,
-      participantRepository: this.participantRepository,
     });
     await notifyUseCase
-      .execute({ pollId: poll.id, pollTitle: poll.title })
+      .execute({ pollId: poll.id, pollTitle: poll.title, recipientUserIds })
       .catch((err) => {
         console.error('Failed to send poll activated notifications:', err);
       });

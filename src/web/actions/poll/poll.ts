@@ -640,7 +640,10 @@ export async function getPollByIdAction(
     const poll = result.value;
     const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
 
-    if (!isSuperAdmin) {
+    // Open polls are distributed by link and voted on by outsiders, so any
+    // authenticated user may read the poll itself. Who may read its *results*
+    // is decided separately in GetPollResultsUseCase.
+    if (!isSuperAdmin && !poll.isOpen()) {
       const isMember = await organizationRepository.isUserMember(
         user.id,
         poll.organizationId
