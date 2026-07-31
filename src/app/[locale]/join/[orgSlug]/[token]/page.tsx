@@ -14,7 +14,7 @@ import { GetJoinTokenPublicInfoUseCase } from '@/application/organization/GetJoi
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { buildJoinUrl } from '@/web/lib/buildJoinUrl';
 import { JoinConfirmButton } from './JoinConfirmButton';
-import { SetReturnTo } from './SetReturnTo';
+import { SetReturnTo } from '@/web/components/shared/SetReturnTo';
 
 export async function generateMetadata({
   params,

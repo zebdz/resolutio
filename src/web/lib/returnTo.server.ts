@@ -4,33 +4,22 @@ import {
   isValidReturnToPath,
 } from './returnToValidation';
 
-const MAX_AGE = 1800; // 30 minutes
-
-export async function setReturnToCookie(path: string): Promise<void> {
-  if (!isValidReturnToPath(path)) {
-    return;
-  }
-
-  const cookieStore = await cookies();
-  cookieStore.set(RETURN_TO_COOKIE_NAME, path, {
-    httpOnly: false,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    maxAge: MAX_AGE,
-    path: '/',
-  });
-}
-
-export async function consumeReturnToCookieServer(): Promise<string | null> {
+/**
+ * Read-only on purpose: a Server Component may not write cookies in Next 15,
+ * and deleting here throws "Cookies can only be modified in a Server Action or
+ * Route Handler". The middleware overwrites the cookie on the next navigation
+ * and it expires on its own, so treat it as a hint about where the visitor was
+ * heading, not as a one-shot token.
+ *
+ * Client-side consumption (returnTo.client.ts) still clears the cookie — the
+ * browser may write document.cookie freely.
+ */
+export async function readReturnToCookieServer(): Promise<string | null> {
   const cookieStore = await cookies();
   const value = cookieStore.get(RETURN_TO_COOKIE_NAME)?.value ?? null;
 
-  if (value) {
-    cookieStore.delete(RETURN_TO_COOKIE_NAME);
-
-    if (!isValidReturnToPath(value)) {
-      return null;
-    }
+  if (!value || !isValidReturnToPath(value)) {
+    return null;
   }
 
   return value;
