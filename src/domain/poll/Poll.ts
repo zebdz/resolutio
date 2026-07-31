@@ -5,6 +5,9 @@ import { PollDomainCodes } from './PollDomainCodes';
 import { PollState } from './PollState';
 import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
 import { SharedDomainCodes } from '../shared/SharedDomainCodes';
+import { PollType, parsePollType } from './PollType';
+import { DistributionType } from './DistributionType';
+import { PropertyAggregation } from './PropertyAggregation';
 
 export const POLL_TITLE_MAX_LENGTH = 500;
 export const POLL_DESCRIPTION_MAX_LENGTH = 500;
@@ -15,6 +18,7 @@ export interface PollProps {
   description: string;
   organizationId: string;
   boardId: string | null;
+  pollType: string; // 'ORGANIZATION' | 'OPEN'
   startDate: Date;
   endDate: Date;
   state: PollState;
@@ -39,7 +43,8 @@ export class Poll {
     createdBy: string,
     startDate: Date,
     endDate: Date,
-    profanityChecker?: ProfanityChecker
+    profanityChecker?: ProfanityChecker,
+    pollType: string = PollType.ORGANIZATION
   ): Result<Poll, string> {
     // Validate title
     if (!title || title.trim().length === 0) {
@@ -64,6 +69,18 @@ export class Poll {
       return failure(PollDomainCodes.POLL_INVALID_DATES);
     }
 
+    // Validate poll type. An open poll is voted on by the whole platform, so
+    // narrowing it to a board's members would contradict its own definition.
+    const pollTypeResult = parsePollType(pollType);
+
+    if (!pollTypeResult.success) {
+      return failure(pollTypeResult.error);
+    }
+
+    if (pollTypeResult.value === PollType.OPEN && boardId !== null) {
+      return failure(PollDomainCodes.POLL_OPEN_CANNOT_BE_BOARD_SCOPED);
+    }
+
     if (profanityChecker?.containsProfanity(title.trim())) {
       return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
@@ -78,6 +95,7 @@ export class Poll {
       description: description.trim(),
       organizationId,
       boardId,
+      pollType: pollTypeResult.value,
       startDate,
       endDate,
       state: PollState.DRAFT,
@@ -117,6 +135,10 @@ export class Poll {
 
   public get boardId(): string | null {
     return this.props.boardId;
+  }
+
+  public get pollType(): string {
+    return this.props.pollType;
   }
 
   public get startDate(): Date {
@@ -165,6 +187,14 @@ export class Poll {
 
   public isArchived(): boolean {
     return this.props.archivedAt !== null;
+  }
+
+  /**
+   * Open polls are voted on by every verified platform user — no snapshot,
+   * one vote per person, results tallied live from the votes cast.
+   */
+  public isOpen(): boolean {
+    return this.props.pollType === PollType.OPEN;
   }
 
   public isDraft(): boolean {
@@ -479,9 +509,24 @@ export class Poll {
     distributionType: string,
     propertyAggregation: string,
     propertyIds: string[]
-  ): void {
+  ): Result<void, string> {
+    // One person, one vote is what makes an open poll open: any other weight
+    // configuration would silently change who counts for how much.
+    if (this.isOpen()) {
+      const isEqualDefaults =
+        distributionType === DistributionType.EQUAL &&
+        propertyAggregation === PropertyAggregation.RAW_SUM &&
+        propertyIds.length === 0;
+
+      if (!isEqualDefaults) {
+        return failure(PollDomainCodes.POLL_OPEN_MUST_BE_EQUAL);
+      }
+    }
+
     this.props.distributionType = distributionType;
     this.props.propertyAggregation = propertyAggregation;
     this.props.propertyIds = [...propertyIds];
+
+    return success(undefined);
   }
 }

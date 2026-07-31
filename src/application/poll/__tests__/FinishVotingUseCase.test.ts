@@ -18,6 +18,9 @@ import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
 import { Answer } from '../../../domain/poll/Answer';
 import { Vote } from '../../../domain/poll/Vote';
 import { Decimal } from 'decimal.js';
+import { ParticipantWeightHistory } from '../../../domain/poll/ParticipantWeightHistory';
+import { UserRepository } from '../../../domain/user/UserRepository';
+import { User } from '../../../domain/user/User';
 
 // Mock PollRepository - only implements methods used by FinishVotingUseCase
 class MockPollRepository implements Pick<PollRepository, 'getPollById'> {
@@ -123,6 +126,35 @@ class MockParticipantRepository implements Pick<
 
   getParticipant(id: string): PollParticipant | undefined {
     return this.participants.get(id);
+  }
+
+  // Join-on-vote (open polls): records the call so tests can assert on the
+  // participant, history and votes that were persisted together.
+  joinAndVoteCalls: Array<{
+    participant: PollParticipant;
+    history: ParticipantWeightHistory;
+    votes: Vote[];
+    willingToSignProtocol: boolean;
+  }> = [];
+
+  async joinAndVote(
+    participant: PollParticipant,
+    history: ParticipantWeightHistory,
+    votes: Vote[],
+    willingToSignProtocol: boolean
+  ): Promise<Result<void, string>> {
+    this.joinAndVoteCalls.push({
+      participant,
+      history,
+      votes,
+      willingToSignProtocol,
+    });
+
+    const id = `participant-${this.nextId++}`;
+    (participant as any).props.id = id;
+    this.participants.set(id, participant);
+
+    return success(undefined);
   }
 }
 
@@ -283,6 +315,9 @@ class MockBoardRepository implements Pick<BoardRepository, 'findById'> {
   }
 }
 
+const confirmedUser = { isConfirmed: () => true } as unknown as User;
+const unconfirmedUser = { isConfirmed: () => false } as unknown as User;
+
 describe('FinishVotingUseCase', () => {
   let pollRepository: MockPollRepository;
   let participantRepository: MockParticipantRepository;
@@ -290,6 +325,7 @@ describe('FinishVotingUseCase', () => {
   let draftRepository: MockDraftRepository;
   let organizationRepository: MockOrganizationRepository;
   let boardRepository: MockBoardRepository;
+  let userRepository: Partial<UserRepository>;
   let useCase: FinishVotingUseCase;
   let poll: Poll;
   let question1: Question;
@@ -410,6 +446,10 @@ describe('FinishVotingUseCase', () => {
     // Create voteRepository after questions are set up
     voteRepository = new MockVoteRepository(pollRepository.getQuestions());
 
+    userRepository = {
+      findById: async () => confirmedUser,
+    };
+
     // Create use case with all repositories
     useCase = new FinishVotingUseCase(
       pollRepository as unknown as PollRepository,
@@ -417,7 +457,8 @@ describe('FinishVotingUseCase', () => {
       voteRepository as unknown as VoteRepository,
       draftRepository as unknown as DraftRepository,
       organizationRepository as unknown as OrganizationRepository,
-      boardRepository as unknown as BoardRepository
+      boardRepository as unknown as BoardRepository,
+      userRepository as UserRepository
     );
   });
 
@@ -811,5 +852,115 @@ describe('FinishVotingUseCase', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
+  });
+  describe('open polls', () => {
+    // The poll built in the outer beforeEach is reused as an open poll: same
+    // questions and drafts machinery, different electorate rules.
+    beforeEach(async () => {
+      (poll as any).props.pollType = 'OPEN';
+
+      const draft1 = VoteDraft.create(
+        poll.id,
+        question1.id,
+        answer1.id,
+        'outsider-1'
+      );
+      const draft2 = VoteDraft.create(
+        poll.id,
+        question2.id,
+        answer2.id,
+        'outsider-1'
+      );
+      await draftRepository.saveDraft(draft1.value);
+      await draftRepository.saveDraft(draft2.value);
+    });
+
+    it('creates participant, history and votes in one call', async () => {
+      const result = await useCase.execute({
+        userId: 'outsider-1',
+        pollId: poll.id,
+        willingToSignProtocol: true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(participantRepository.joinAndVoteCalls).toHaveLength(1);
+
+      const call = participantRepository.joinAndVoteCalls[0];
+      expect(call.participant.pollId).toBe(poll.id);
+      expect(call.participant.userId).toBe('outsider-1');
+      expect(call.participant.userWeight).toBe(1);
+      expect(call.history.oldWeight).toBe(0);
+      expect(call.history.newWeight).toBe(1);
+      expect(call.history.changedBy).toBe('outsider-1');
+      expect(call.history.reason).toBe('open-poll-join');
+      expect(call.votes).toHaveLength(2);
+      expect(call.votes.every((v) => v.userWeight === 1)).toBe(true);
+      expect(call.willingToSignProtocol).toBe(true);
+    });
+
+    it('does not use the organization vote path', async () => {
+      await useCase.execute({
+        userId: 'outsider-1',
+        pollId: poll.id,
+        willingToSignProtocol: false,
+      });
+
+      const votesResult = await voteRepository.getUserVotes(
+        poll.id,
+        'outsider-1'
+      );
+      expect(votesResult.success).toBe(true);
+      expect(votesResult.value.length).toBe(0);
+    });
+
+    it('deletes the drafts after joining', async () => {
+      await useCase.execute({
+        userId: 'outsider-1',
+        pollId: poll.id,
+        willingToSignProtocol: false,
+      });
+
+      const draftsResult = await draftRepository.getUserDrafts(
+        poll.id,
+        'outsider-1'
+      );
+      expect(draftsResult.success).toBe(true);
+      expect(draftsResult.value.length).toBe(0);
+    });
+
+    it('rejects an unconfirmed user', async () => {
+      userRepository.findById = async () => unconfirmedUser;
+
+      const result = await useCase.execute({
+        userId: 'outsider-1',
+        pollId: poll.id,
+        willingToSignProtocol: false,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollDomainCodes.USER_NOT_CONFIRMED);
+      expect(participantRepository.joinAndVoteCalls).toHaveLength(0);
+    });
+
+    it('still requires every question to be answered', async () => {
+      // A different outsider who answered only the first question.
+      const partialDraft = VoteDraft.create(
+        poll.id,
+        question1.id,
+        answer1.id,
+        'outsider-2'
+      );
+      await draftRepository.saveDraft(partialDraft.value);
+
+      const result = await useCase.execute({
+        userId: 'outsider-2',
+        pollId: poll.id,
+        willingToSignProtocol: false,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollDomainCodes.MUST_ANSWER_ALL_QUESTIONS);
+      expect(participantRepository.joinAndVoteCalls).toHaveLength(0);
+    });
   });
 });

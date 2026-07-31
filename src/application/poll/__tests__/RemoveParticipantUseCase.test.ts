@@ -255,4 +255,35 @@ describe('RemoveParticipantUseCase', () => {
     expect(result.success).toBe(false);
     expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
   });
+
+  function makeOpenPoll(): Poll {
+    const openPoll = Poll.create(
+      'Open Poll',
+      'Everyone may vote',
+      'org-1',
+      null,
+      'user-admin',
+      new Date('2026-01-15'),
+      new Date('2026-02-15'),
+      undefined,
+      'OPEN'
+    ).value;
+    (openPoll as any).props.id = 'poll-1';
+
+    return openPoll;
+  }
+
+  it('rejects removing a voter of an open poll', async () => {
+    pollRepository.getPollById = vi
+      .fn()
+      .mockResolvedValue(success(makeOpenPoll()));
+
+    const result = await useCase.execute({
+      participantId: 'participant-1',
+      adminUserId: 'user-admin',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollErrors.OPEN_PARTICIPANTS_IMMUTABLE);
+  });
 });

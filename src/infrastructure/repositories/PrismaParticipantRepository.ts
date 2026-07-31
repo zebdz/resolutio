@@ -7,6 +7,7 @@ import { Poll } from '../../domain/poll/Poll';
 import { PollState } from '../../domain/poll/PollState';
 import { PollParticipant } from '../../domain/poll/PollParticipant';
 import { ParticipantWeightHistory } from '../../domain/poll/ParticipantWeightHistory';
+import { Vote } from '../../domain/poll/Vote';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 
@@ -286,6 +287,64 @@ export class PrismaParticipantRepository implements ParticipantRepository {
       return success(savedParticipants.map((p) => this.toDomainParticipant(p)));
     } catch (error) {
       console.error('Failed to execute activation:', error);
+
+      return failure('common.errors.unexpected');
+    }
+  }
+
+  async joinAndVote(
+    participant: PollParticipant,
+    history: ParticipantWeightHistory,
+    votes: Vote[],
+    willingToSignProtocol: boolean
+  ): Promise<Result<void, string>> {
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        // Upsert keeps a double submit from creating a second participant row;
+        // the unique (questionId, userId, answerId) constraint stops duplicate
+        // votes, aborting the whole transaction if one slips through.
+        const saved = await tx.pollParticipant.upsert({
+          where: {
+            pollId_userId: {
+              pollId: participant.pollId,
+              userId: participant.userId,
+            },
+          },
+          create: {
+            pollId: participant.pollId,
+            userId: participant.userId,
+            userWeight: new Prisma.Decimal(participant.userWeight),
+            snapshotAt: participant.snapshotAt,
+            willingToSignProtocol,
+          },
+          update: { willingToSignProtocol },
+        });
+
+        await tx.participantWeightHistory.create({
+          data: {
+            participantId: saved.id,
+            pollId: history.pollId,
+            userId: history.userId,
+            oldWeight: new Prisma.Decimal(history.oldWeight),
+            newWeight: new Prisma.Decimal(history.newWeight),
+            changedBy: history.changedBy,
+            reason: history.reason,
+          },
+        });
+
+        await tx.vote.createMany({
+          data: votes.map((vote) => ({
+            questionId: vote.questionId,
+            answerId: vote.answerId,
+            userId: vote.userId,
+            userWeight: new Prisma.Decimal(vote.userWeight),
+          })),
+        });
+      });
+
+      return success(undefined);
+    } catch (error) {
+      console.error('Failed to join and vote:', error);
 
       return failure('common.errors.unexpected');
     }

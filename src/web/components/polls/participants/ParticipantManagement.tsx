@@ -53,6 +53,9 @@ interface ParticipantManagementProps {
   pollId: string;
   participantsData: { participants: Participant[]; canModify: boolean };
   pollState: PollState;
+  // Open polls have a fixed EQUAL config and their participants are people who
+  // already voted — neither may be edited here.
+  isOpenPoll?: boolean;
   weightConfig: WeightConfig;
   properties: Array<{ id: string; name: string }>;
   descendantGroups?: DescendantGroup[];
@@ -67,6 +70,7 @@ export default function ParticipantManagement({
   pollId,
   participantsData,
   pollState,
+  isOpenPoll = false,
   weightConfig,
   properties,
   descendantGroups,
@@ -75,6 +79,7 @@ export default function ParticipantManagement({
   buildingTotal,
 }: ParticipantManagementProps) {
   const t = useTranslations('poll.participants');
+  const tPoll = useTranslations('poll');
   const router = useRouter();
   const [participants, setParticipants] = useState(
     participantsData.participants
@@ -177,34 +182,69 @@ export default function ParticipantManagement({
     setHistoryOpen(true);
   };
 
+  const handleCopyLink = async () => {
+    const url = `${window.location.origin}/polls/${pollId}/vote`;
+
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(tPoll('type.linkCopied'));
+    } catch {
+      toast.error(tPoll('type.copyLinkError'));
+    }
+  };
+
   const canModify = participantsData.canModify && pollState !== 'FINISHED';
+
+  // Shown in both the empty and populated states: an open poll's list is empty
+  // until someone votes, which is exactly when the admin needs the link.
+  const openPollHeader = isOpenPoll ? (
+    <div className="mb-4 space-y-2">
+      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+        {t('openPollHint')}
+      </p>
+      <button
+        type="button"
+        onClick={handleCopyLink}
+        className="text-sm text-sky-700 dark:text-sky-300 underline cursor-pointer"
+      >
+        {tPoll('type.copyLink')}
+      </button>
+    </div>
+  ) : null;
 
   if (participants.length === 0) {
     return (
-      <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 bg-white dark:bg-zinc-900 text-center">
-        <p className="text-zinc-600 dark:text-zinc-400">
-          {t('noParticipants')}
-        </p>
-      </div>
+      <>
+        {openPollHeader}
+        <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 bg-white dark:bg-zinc-900 text-center">
+          <p className="text-zinc-600 dark:text-zinc-400">
+            {t('noParticipants')}
+          </p>
+        </div>
+      </>
     );
   }
 
   return (
     <>
       <div className="space-y-4">
-        {/* Weight config editor */}
-        <WeightConfigEditor
-          pollId={pollId}
-          initialConfig={weightConfig}
-          properties={properties}
-          descendantGroups={descendantGroups}
-          orgHasOwnershipData={orgHasOwnershipData}
-          votesCast={votesCast}
-          pollState={pollState}
-          onSaved={() => router.refresh()}
-          previewAction={previewPollWeightConfigAction}
-          updateAction={updatePollWeightConfigAction}
-        />
+        {openPollHeader}
+
+        {/* Weight config editor — an open poll's config is fixed at EQUAL */}
+        {!isOpenPoll && (
+          <WeightConfigEditor
+            pollId={pollId}
+            initialConfig={weightConfig}
+            properties={properties}
+            descendantGroups={descendantGroups}
+            orgHasOwnershipData={orgHasOwnershipData}
+            votesCast={votesCast}
+            pollState={pollState}
+            onSaved={() => router.refresh()}
+            previewAction={previewPollWeightConfigAction}
+            updateAction={updatePollWeightConfigAction}
+          />
+        )}
 
         {/* Totals banner. For ownership polls the building-vs-registered gap
             is the headline number — admins use it to spot how much voting
@@ -277,20 +317,22 @@ export default function ParticipantManagement({
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        color="zinc"
-                        onClick={() => {
-                          setSelectedParticipant(participant);
-                          setEditWeightOpen(true);
-                        }}
-                        disabled={!canModify}
-                        title={
-                          !canModify ? t('cannotModifyHasVotes') : undefined
-                        }
-                      >
-                        {t('editWeight')}
-                      </Button>
+                      {!isOpenPoll && (
+                        <Button
+                          type="button"
+                          color="zinc"
+                          onClick={() => {
+                            setSelectedParticipant(participant);
+                            setEditWeightOpen(true);
+                          }}
+                          disabled={!canModify}
+                          title={
+                            !canModify ? t('cannotModifyHasVotes') : undefined
+                          }
+                        >
+                          {t('editWeight')}
+                        </Button>
+                      )}
                       <Button
                         type="button"
                         color="zinc"
@@ -298,20 +340,22 @@ export default function ParticipantManagement({
                       >
                         {t('viewHistory')}
                       </Button>
-                      <Button
-                        type="button"
-                        color="red"
-                        onClick={() => {
-                          setSelectedParticipant(participant);
-                          setRemoveOpen(true);
-                        }}
-                        disabled={!canModify}
-                        title={
-                          !canModify ? t('cannotModifyHasVotes') : undefined
-                        }
-                      >
-                        {t('remove')}
-                      </Button>
+                      {!isOpenPoll && (
+                        <Button
+                          type="button"
+                          color="red"
+                          onClick={() => {
+                            setSelectedParticipant(participant);
+                            setRemoveOpen(true);
+                          }}
+                          disabled={!canModify}
+                          title={
+                            !canModify ? t('cannotModifyHasVotes') : undefined
+                          }
+                        >
+                          {t('remove')}
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

@@ -484,6 +484,72 @@ describe('CreatePollUseCase', () => {
     });
   });
 
+  describe('open polls', () => {
+    it('should create an OPEN poll for an org member', async () => {
+      organizationRepository.addMember('user-1', 'org-1');
+
+      const result = await useCase.execute({
+        title: 'Open Poll',
+        description: 'Everyone may vote',
+        organizationId: 'org-1',
+        boardId: null,
+        createdBy: 'user-1',
+        startDate: new Date('2026-01-01'),
+        endDate: new Date('2026-02-01'),
+        pollType: 'OPEN',
+      });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.isOpen()).toBe(true);
+        expect(result.value.distributionType).toBe('EQUAL');
+      }
+    });
+
+    it('should default to an ORGANIZATION poll when no type is given', async () => {
+      organizationRepository.addMember('user-1', 'org-1');
+
+      const result = await useCase.execute({
+        title: 'Regular Poll',
+        description: 'Members only',
+        organizationId: 'org-1',
+        boardId: null,
+        createdBy: 'user-1',
+        startDate: new Date('2026-01-01'),
+        endDate: new Date('2026-02-01'),
+      });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.isOpen()).toBe(false);
+      }
+    });
+
+    it('should reject an OPEN poll with ownership weighting', async () => {
+      organizationRepository.addMember('user-1', 'org-1');
+
+      const result = await useCase.execute({
+        title: 'Open Poll',
+        description: 'Everyone may vote',
+        organizationId: 'org-1',
+        boardId: null,
+        createdBy: 'user-1',
+        startDate: new Date('2026-01-01'),
+        endDate: new Date('2026-02-01'),
+        pollType: 'OPEN',
+        distributionType: 'OWNERSHIP_UNIT_COUNT',
+      });
+
+      expect(result.success).toBe(false);
+
+      if (!result.success) {
+        expect(result.error).toBe(PollDomainCodes.POLL_OPEN_MUST_BE_EQUAL);
+      }
+    });
+  });
+
   describe('validation', () => {
     it('should fail when title is empty', async () => {
       const boardResult = Board.create('Test Board', 'org-1');

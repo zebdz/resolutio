@@ -23,6 +23,10 @@ export const PollErrors = {
   ANSWER_NOT_FOUND: 'poll.errors.answerNotFound',
 
   CANNOT_CHANGE_WEIGHT_CONFIG: 'poll.errors.cannotChangeWeightConfig',
+
+  // Open polls
+  OPEN_PARTICIPANTS_IMMUTABLE: 'poll.errors.openParticipantsImmutable',
+  OPEN_CONFIG_FIXED: 'poll.errors.openConfigFixed',
 } as const;
 
 export type PollError = (typeof PollErrors)[keyof typeof PollErrors];

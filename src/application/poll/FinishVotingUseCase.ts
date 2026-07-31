@@ -1,5 +1,9 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { Vote } from '../../domain/poll/Vote';
+import { PollParticipant } from '../../domain/poll/PollParticipant';
+import { ParticipantWeightHistory } from '../../domain/poll/ParticipantWeightHistory';
+import { UserRepository } from '../../domain/user/UserRepository';
+import { PollVotingPolicy } from '../../domain/poll/PollVotingPolicy';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
@@ -22,7 +26,8 @@ export class FinishVotingUseCase {
     private voteRepository: VoteRepository,
     private draftRepository: DraftRepository,
     private organizationRepository: OrganizationRepository,
-    private boardRepository: BoardRepository
+    private boardRepository: BoardRepository,
+    private userRepository: UserRepository
   ) {}
 
   async execute(input: FinishVotingInput): Promise<Result<void, string>> {
@@ -59,33 +64,34 @@ export class FinishVotingUseCase {
       }
     }
 
-    // 4. Check if poll is active and not finished
-    if (poll.isFinished()) {
-      return failure(PollDomainCodes.POLL_FINISHED);
+    // 4. Check voting eligibility. Organization polls vote as the snapshot
+    // participant they already are; open polls become a participant only once
+    // this vote is persisted (join-on-vote below).
+    const isOpen = poll.isOpen();
+
+    let participant: PollParticipant | null = null;
+
+    if (!isOpen) {
+      const participantResult =
+        await this.participantRepository.getParticipantByUserAndPoll(
+          pollId,
+          userId
+        );
+
+      if (!participantResult.success) {
+        return failure(participantResult.error);
+      }
+
+      participant = participantResult.value;
     }
 
-    if (!poll.isActive()) {
-      return failure(PollDomainCodes.POLL_NOT_ACTIVE);
+    let isConfirmedUser = false;
+
+    if (isOpen) {
+      const user = await this.userRepository.findById(userId);
+      isConfirmedUser = user?.isConfirmed() ?? false;
     }
 
-    // 3. Check if user is a participant
-    const participantResult =
-      await this.participantRepository.getParticipantByUserAndPoll(
-        pollId,
-        userId
-      );
-
-    if (!participantResult.success) {
-      return failure(participantResult.error);
-    }
-
-    const participant = participantResult.value;
-
-    if (!participant) {
-      return failure(PollDomainCodes.NOT_PARTICIPANT);
-    }
-
-    // 4. Check if user has already finished voting
     const hasFinishedResult = await this.voteRepository.hasUserFinishedVoting(
       pollId,
       userId
@@ -95,8 +101,14 @@ export class FinishVotingUseCase {
       return failure(hasFinishedResult.error);
     }
 
-    if (hasFinishedResult.value) {
-      return failure(PollDomainCodes.ALREADY_VOTED);
+    const eligibility = PollVotingPolicy.canVote(poll, {
+      isParticipant: !!participant,
+      isConfirmedUser,
+      hasFinishedVoting: hasFinishedResult.value,
+    });
+
+    if (!eligibility.success) {
+      return failure(eligibility.error);
     }
 
     // 5. Get user's drafts
@@ -139,7 +151,10 @@ export class FinishVotingUseCase {
       }
     }
 
-    // 7. Create votes from drafts with participant weight
+    // 7. Create votes from drafts. Open polls are one person = one vote;
+    // organization polls use the weight the snapshot assigned.
+    const voteWeight = isOpen ? 1 : participant!.userWeight;
+
     const votes: Vote[] = [];
 
     for (const draft of drafts) {
@@ -147,7 +162,7 @@ export class FinishVotingUseCase {
         draft.questionId,
         draft.answerId,
         userId,
-        participant.userWeight
+        voteWeight
       );
 
       if (!voteResult.success) {
@@ -157,22 +172,57 @@ export class FinishVotingUseCase {
       votes.push(voteResult.value);
     }
 
-    // 8. Save all votes
-    const createVotesResult = await this.voteRepository.createVotes(votes);
+    // 8. Persist the vote. An open-poll voter joins the poll at this moment:
+    // participant row, its initial weight-history entry and the votes are
+    // written in a single transaction so a voter never exists without a vote.
+    if (isOpen) {
+      const newParticipantResult = PollParticipant.create(poll.id, userId, 1);
 
-    if (!createVotesResult.success) {
-      return failure(createVotesResult.error);
-    }
+      if (!newParticipantResult.success) {
+        return failure(newParticipantResult.error);
+      }
 
-    // 9. Save willingToSignProtocol
-    const protocolResult =
-      await this.participantRepository.updateWillingToSignProtocol(
-        participant.id,
+      const historyResult = ParticipantWeightHistory.create(
+        '', // participantId assigned inside the transaction
+        poll.id,
+        userId,
+        0,
+        1,
+        userId, // the voter joins on their own initiative
+        'open-poll-join'
+      );
+
+      if (!historyResult.success) {
+        return failure(historyResult.error);
+      }
+
+      const joinResult = await this.participantRepository.joinAndVote(
+        newParticipantResult.value,
+        historyResult.value,
+        votes,
         input.willingToSignProtocol
       );
 
-    if (!protocolResult.success) {
-      return failure(protocolResult.error);
+      if (!joinResult.success) {
+        return failure(joinResult.error);
+      }
+    } else {
+      const createVotesResult = await this.voteRepository.createVotes(votes);
+
+      if (!createVotesResult.success) {
+        return failure(createVotesResult.error);
+      }
+
+      // 9. Save willingToSignProtocol
+      const protocolResult =
+        await this.participantRepository.updateWillingToSignProtocol(
+          participant!.id,
+          input.willingToSignProtocol
+        );
+
+      if (!protocolResult.success) {
+        return failure(protocolResult.error);
+      }
     }
 
     // 10. Delete user's drafts

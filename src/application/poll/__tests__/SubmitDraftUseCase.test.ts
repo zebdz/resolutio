@@ -11,6 +11,8 @@ import { DraftRepository } from '../../../domain/poll/DraftRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { Organization } from '../../../domain/organization/Organization';
 import { BoardRepository } from '../../../domain/board/BoardRepository';
+import { UserRepository } from '../../../domain/user/UserRepository';
+import { User } from '../../../domain/user/User';
 import { Board } from '../../../domain/board/Board';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
@@ -19,6 +21,9 @@ import { Answer } from '../../../domain/poll/Answer';
 import { Vote } from '../../../domain/poll/Vote';
 import { Decimal } from 'decimal.js';
 
+const confirmedUser = { isConfirmed: () => true } as unknown as User;
+const unconfirmedUser = { isConfirmed: () => false } as unknown as User;
+
 describe('SubmitDraftUseCase', () => {
   let pollRepository: Partial<PollRepository>;
   let participantRepository: Partial<ParticipantRepository>;
@@ -26,6 +31,7 @@ describe('SubmitDraftUseCase', () => {
   let draftRepository: Partial<DraftRepository>;
   let organizationRepository: Partial<OrganizationRepository>;
   let boardRepository: Partial<BoardRepository>;
+  let userRepository: Partial<UserRepository>;
   let useCase: SubmitDraftUseCase;
   let poll: Poll;
   let question: Question;
@@ -121,13 +127,18 @@ describe('SubmitDraftUseCase', () => {
       findById: vi.fn().mockResolvedValue(null),
     };
 
+    userRepository = {
+      findById: vi.fn().mockResolvedValue(confirmedUser),
+    };
+
     useCase = new SubmitDraftUseCase(
       pollRepository as PollRepository,
       participantRepository as ParticipantRepository,
       voteRepository as VoteRepository,
       draftRepository as DraftRepository,
       organizationRepository as OrganizationRepository,
-      boardRepository as BoardRepository
+      boardRepository as BoardRepository,
+      userRepository as UserRepository
     );
   });
 
@@ -352,5 +363,90 @@ describe('SubmitDraftUseCase', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
+  });
+  describe('open polls', () => {
+    let openPoll: Poll;
+
+    beforeEach(() => {
+      openPoll = Poll.create(
+        'Open Poll',
+        'Everyone may vote',
+        'org-1',
+        null,
+        'user-admin',
+        new Date('2026-01-15'),
+        new Date('2026-02-15'),
+        undefined,
+        'OPEN'
+      ).value;
+      (openPoll as any).props.id = 'poll-1';
+      (openPoll as any).props.questions = [question];
+      openPoll.takeSnapshot();
+      openPoll.activate();
+
+      pollRepository.getPollById = vi.fn().mockResolvedValue(success(openPoll));
+      participantRepository.getParticipantByUserAndPoll = vi
+        .fn()
+        .mockResolvedValue(success(null));
+    });
+
+    it('lets a confirmed non-participant save a draft', async () => {
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        questionId: question.id,
+        answerId: answer.id,
+        userId: 'outsider-1',
+        isSingleChoice: true,
+      });
+
+      expect(result.success).toBe(true);
+      expect(draftRepository.saveDraft).toHaveBeenCalled();
+    });
+
+    it('does not query the participant repository', async () => {
+      await useCase.execute({
+        pollId: 'poll-1',
+        questionId: question.id,
+        answerId: answer.id,
+        userId: 'outsider-1',
+        isSingleChoice: true,
+      });
+
+      expect(
+        participantRepository.getParticipantByUserAndPoll
+      ).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unconfirmed user', async () => {
+      userRepository.findById = vi.fn().mockResolvedValue(unconfirmedUser);
+
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        questionId: question.id,
+        answerId: answer.id,
+        userId: 'outsider-1',
+        isSingleChoice: true,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollDomainCodes.USER_NOT_CONFIRMED);
+    });
+
+    it('rejects a user who already finished voting', async () => {
+      voteRepository.hasUserFinishedVoting = vi
+        .fn()
+        .mockResolvedValue(success(true));
+
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        questionId: question.id,
+        answerId: answer.id,
+        userId: 'outsider-1',
+        isSingleChoice: true,
+      });
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollDomainCodes.ALREADY_VOTED);
+    });
   });
 });

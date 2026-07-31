@@ -86,6 +86,19 @@ export class TakeSnapshotUseCase {
       return failure(snapshotResult.error);
     }
 
+    // Open polls have no fixed electorate: no snapshot of members, no
+    // eligible-member rows and no weights to compute. Voters join the poll at
+    // the moment they finish voting, always with weight 1.
+    if (poll.isOpen()) {
+      const updateResult = await this.pollRepository.updatePoll(poll);
+
+      if (!updateResult.success) {
+        return failure(updateResult.error);
+      }
+
+      return success(undefined);
+    }
+
     // Get member user IDs based on poll type
     let memberUserIds: string[];
 

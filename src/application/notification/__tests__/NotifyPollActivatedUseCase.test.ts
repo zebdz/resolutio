@@ -1,10 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NotifyPollActivatedUseCase } from '../NotifyPollActivatedUseCase';
 import { NotificationRepository } from '../../../domain/notification/NotificationRepository';
-import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
 import { Notification } from '../../../domain/notification/Notification';
-import { PollParticipant } from '../../../domain/poll/PollParticipant';
-import { Result, success } from '../../../domain/shared/Result';
 
 // Mock NotificationRepository
 class MockNotificationRepository implements NotificationRepository {
@@ -40,88 +37,23 @@ class MockNotificationRepository implements NotificationRepository {
   }
 }
 
-// Mock ParticipantRepository
-class MockParticipantRepository implements ParticipantRepository {
-  private participants: Map<string, PollParticipant[]> = new Map();
-
-  async createParticipants(): Promise<Result<void, string>> {
-    return success(undefined);
-  }
-  async getParticipants(
-    pollId: string
-  ): Promise<Result<PollParticipant[], string>> {
-    return success(this.participants.get(pollId) || []);
-  }
-  async getParticipantById(): Promise<Result<PollParticipant | null, string>> {
-    return success(null);
-  }
-  async getParticipantByUserAndPoll(): Promise<
-    Result<PollParticipant | null, string>
-  > {
-    return success(null);
-  }
-  async updateParticipantWeight(): Promise<Result<void, string>> {
-    return success(undefined);
-  }
-  async deleteParticipant(): Promise<Result<void, string>> {
-    return success(undefined);
-  }
-  async deleteParticipantsByPollId(): Promise<Result<void, string>> {
-    return success(undefined);
-  }
-  async createWeightHistory(): Promise<Result<any, string>> {
-    return success({} as any);
-  }
-  async getWeightHistory(): Promise<Result<any[], string>> {
-    return success([]);
-  }
-  async getParticipantWeightHistory(): Promise<Result<any[], string>> {
-    return success([]);
-  }
-  async executeActivation(): Promise<Result<PollParticipant[], string>> {
-    return success([]);
-  }
-
-  // Test helper
-  setParticipants(pollId: string, participants: PollParticipant[]) {
-    this.participants.set(pollId, participants);
-  }
-}
-
-function createParticipant(pollId: string, userId: string): PollParticipant {
-  return PollParticipant.reconstitute({
-    id: `participant-${userId}`,
-    pollId,
-    userId,
-    userWeight: 1.0,
-    willingToSignProtocol: null,
-    snapshotAt: new Date(),
-    createdAt: new Date(),
-  });
-}
-
 describe('NotifyPollActivatedUseCase', () => {
   let useCase: NotifyPollActivatedUseCase;
   let notifRepo: MockNotificationRepository;
-  let participantRepo: MockParticipantRepository;
 
   beforeEach(() => {
     notifRepo = new MockNotificationRepository();
-    participantRepo = new MockParticipantRepository();
     useCase = new NotifyPollActivatedUseCase({
       notificationRepository: notifRepo,
-      participantRepository: participantRepo,
     });
   });
 
-  it('should notify all poll participants', async () => {
-    participantRepo.setParticipants('poll-1', [
-      createParticipant('poll-1', 'user-1'),
-      createParticipant('poll-1', 'user-2'),
-      createParticipant('poll-1', 'user-3'),
-    ]);
-
-    await useCase.execute({ pollId: 'poll-1', pollTitle: 'Budget Vote' });
+  it('should notify every recipient the caller resolved', async () => {
+    await useCase.execute({
+      pollId: 'poll-1',
+      pollTitle: 'Budget Vote',
+      recipientUserIds: ['user-1', 'user-2', 'user-3'],
+    });
 
     const saved = notifRepo.getSavedBatch();
     expect(saved).toHaveLength(3);
@@ -142,22 +74,12 @@ describe('NotifyPollActivatedUseCase', () => {
     expect(userIds).toContain('user-3');
   });
 
-  it('should not create notifications when no participants', async () => {
-    participantRepo.setParticipants('poll-1', []);
-
-    await useCase.execute({ pollId: 'poll-1', pollTitle: 'Budget Vote' });
-
-    expect(notifRepo.getSavedBatch()).toHaveLength(0);
-  });
-
-  it('should handle getParticipants failure gracefully', async () => {
-    // Override to return failure
-    participantRepo.getParticipants = async () => ({
-      success: false as const,
-      error: 'db error',
+  it('should not create notifications when there are no recipients', async () => {
+    await useCase.execute({
+      pollId: 'poll-1',
+      pollTitle: 'Budget Vote',
+      recipientUserIds: [],
     });
-
-    await useCase.execute({ pollId: 'poll-1', pollTitle: 'Budget Vote' });
 
     expect(notifRepo.getSavedBatch()).toHaveLength(0);
   });

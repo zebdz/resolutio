@@ -1434,3 +1434,103 @@ describe('Poll Domain', () => {
     });
   });
 });
+
+describe('Poll type', () => {
+  const startDate = new Date('2026-01-01');
+  const endDate = new Date('2026-02-01');
+
+  function createPoll(boardId: string | null, pollType?: string) {
+    return Poll.create(
+      'Title',
+      'Description',
+      'org-1',
+      boardId,
+      'user-1',
+      startDate,
+      endDate,
+      undefined,
+      pollType
+    );
+  }
+
+  it('should default to ORGANIZATION', () => {
+    const result = createPoll(null);
+
+    expect(result.success).toBe(true);
+    expect(result.value.pollType).toBe('ORGANIZATION');
+    expect(result.value.isOpen()).toBe(false);
+  });
+
+  it('should create an OPEN poll with equal weight defaults', () => {
+    const result = createPoll(null, 'OPEN');
+
+    expect(result.success).toBe(true);
+    expect(result.value.isOpen()).toBe(true);
+    expect(result.value.distributionType).toBe('EQUAL');
+    expect(result.value.propertyAggregation).toBe('RAW_SUM');
+    expect(result.value.propertyIds).toEqual([]);
+  });
+
+  it('should reject an OPEN poll scoped to a board', () => {
+    const result = createPoll('board-1', 'OPEN');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollDomainCodes.POLL_OPEN_CANNOT_BE_BOARD_SCOPED);
+  });
+
+  it('should reject an unknown poll type', () => {
+    const result = createPoll(null, 'WHATEVER');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollDomainCodes.POLL_TYPE_INVALID);
+  });
+
+  describe('applyWeightConfig', () => {
+    it('should accept the equal defaults on an OPEN poll', () => {
+      const poll = createPoll(null, 'OPEN').value;
+
+      const result = poll.applyWeightConfig('EQUAL', 'RAW_SUM', []);
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject ownership weighting on an OPEN poll', () => {
+      const poll = createPoll(null, 'OPEN').value;
+
+      const result = poll.applyWeightConfig(
+        'OWNERSHIP_UNIT_COUNT',
+        'RAW_SUM',
+        []
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollDomainCodes.POLL_OPEN_MUST_BE_EQUAL);
+      expect(poll.distributionType).toBe('EQUAL');
+    });
+
+    it('should reject a property scope on an OPEN poll', () => {
+      const poll = createPoll(null, 'OPEN').value;
+
+      const result = poll.applyWeightConfig('EQUAL', 'RAW_SUM', ['prop-1']);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollDomainCodes.POLL_OPEN_MUST_BE_EQUAL);
+      expect(poll.propertyIds).toEqual([]);
+    });
+
+    it('should still work normally on an ORGANIZATION poll', () => {
+      const poll = createPoll(null).value;
+
+      const result = poll.applyWeightConfig(
+        'OWNERSHIP_UNIT_COUNT',
+        'NORMALIZE_PER_PROPERTY',
+        ['prop-1']
+      );
+
+      expect(result.success).toBe(true);
+      expect(poll.distributionType).toBe('OWNERSHIP_UNIT_COUNT');
+      expect(poll.propertyAggregation).toBe('NORMALIZE_PER_PROPERTY');
+      expect(poll.propertyIds).toEqual(['prop-1']);
+    });
+  });
+});

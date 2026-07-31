@@ -6,8 +6,9 @@ import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { DraftRepository } from '../../domain/poll/DraftRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
+import { UserRepository } from '../../domain/user/UserRepository';
+import { PollVotingPolicy } from '../../domain/poll/PollVotingPolicy';
 import { PollErrors } from './PollErrors';
-import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
 
 export interface SubmitDraftInput {
   pollId: string;
@@ -25,7 +26,8 @@ export class SubmitDraftUseCase {
     private voteRepository: VoteRepository,
     private draftRepository: DraftRepository,
     private organizationRepository: OrganizationRepository,
-    private boardRepository: BoardRepository
+    private boardRepository: BoardRepository,
+    private userRepository: UserRepository
   ) {}
 
   async execute(input: SubmitDraftInput): Promise<Result<VoteDraft, string>> {
@@ -69,31 +71,32 @@ export class SubmitDraftUseCase {
       }
     }
 
-    // 4. Check if poll is active and not finished
-    if (poll.isFinished()) {
-      return failure(PollDomainCodes.POLL_FINISHED);
+    // 4. Check voting eligibility. Organization polls need a snapshot
+    // participant; open polls need a confirmed user, since the voter only
+    // becomes a participant once they finish voting.
+    let isParticipant = false;
+
+    if (!poll.isOpen()) {
+      const participantResult =
+        await this.participantRepository.getParticipantByUserAndPoll(
+          pollId,
+          userId
+        );
+
+      if (!participantResult.success) {
+        return failure(participantResult.error);
+      }
+
+      isParticipant = !!participantResult.value;
     }
 
-    if (!poll.isActive()) {
-      return failure(PollDomainCodes.POLL_NOT_ACTIVE);
+    let isConfirmedUser = false;
+
+    if (poll.isOpen()) {
+      const user = await this.userRepository.findById(userId);
+      isConfirmedUser = user?.isConfirmed() ?? false;
     }
 
-    // 3. Check if user is a participant
-    const participantResult =
-      await this.participantRepository.getParticipantByUserAndPoll(
-        pollId,
-        userId
-      );
-
-    if (!participantResult.success) {
-      return failure(participantResult.error);
-    }
-
-    if (!participantResult.value) {
-      return failure(PollDomainCodes.NOT_PARTICIPANT);
-    }
-
-    // 4. Check if user has already finished voting
     const hasFinishedResult = await this.voteRepository.hasUserFinishedVoting(
       pollId,
       userId
@@ -103,8 +106,14 @@ export class SubmitDraftUseCase {
       return failure(hasFinishedResult.error);
     }
 
-    if (hasFinishedResult.value) {
-      return failure(PollDomainCodes.ALREADY_VOTED);
+    const eligibility = PollVotingPolicy.canVote(poll, {
+      isParticipant,
+      isConfirmedUser,
+      hasFinishedVoting: hasFinishedResult.value,
+    });
+
+    if (!eligibility.success) {
+      return failure(eligibility.error);
     }
 
     // 5. If shouldRemove is true, delete the specific draft and return

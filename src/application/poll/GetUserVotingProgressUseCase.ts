@@ -5,8 +5,9 @@ import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { DraftRepository } from '../../domain/poll/DraftRepository';
+import { UserRepository } from '../../domain/user/UserRepository';
+import { PollVotingPolicy } from '../../domain/poll/PollVotingPolicy';
 import { PollErrors } from './PollErrors';
-import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
 
 export interface GetUserVotingProgressInput {
   pollId: string;
@@ -27,7 +28,8 @@ export class GetUserVotingProgressUseCase {
     private pollRepository: PollRepository,
     private participantRepository: ParticipantRepository,
     private voteRepository: VoteRepository,
-    private draftRepository: DraftRepository
+    private draftRepository: DraftRepository,
+    private userRepository: UserRepository
   ) {}
 
   async execute(
@@ -48,18 +50,31 @@ export class GetUserVotingProgressUseCase {
       return failure(PollErrors.NOT_FOUND);
     }
 
-    // 2. Check if user is a participant
-    const participantResult =
-      await this.participantRepository.getParticipantByUserAndPoll(
-        pollId,
-        userId
-      );
+    // 2. Gather the facts the voting policy needs. Only organization polls
+    // have participants before the vote is cast; open polls gate on the user
+    // being confirmed instead.
+    let isParticipant = false;
 
-    if (!participantResult.success) {
-      return failure(participantResult.error);
+    if (!poll.isOpen()) {
+      const participantResult =
+        await this.participantRepository.getParticipantByUserAndPoll(
+          pollId,
+          userId
+        );
+
+      if (!participantResult.success) {
+        return failure(participantResult.error);
+      }
+
+      isParticipant = !!participantResult.value;
     }
 
-    const isParticipant = !!participantResult.value;
+    let isConfirmedUser = false;
+
+    if (poll.isOpen()) {
+      const user = await this.userRepository.findById(userId);
+      isConfirmedUser = user?.isConfirmed() ?? false;
+    }
 
     // 3. Check if user has finished voting
     const hasFinishedResult = await this.voteRepository.hasUserFinishedVoting(
@@ -93,8 +108,11 @@ export class GetUserVotingProgressUseCase {
     const activeQuestions = poll.questions.filter((q) => !q.isArchived());
 
     // 6. Determine if user can vote
-    const canVote =
-      isParticipant && poll.isActive() && !poll.isFinished() && !hasFinished;
+    const canVote = PollVotingPolicy.canVote(poll, {
+      isParticipant,
+      isConfirmedUser,
+      hasFinishedVoting: hasFinished,
+    }).success;
 
     return success({
       poll,

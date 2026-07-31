@@ -20,6 +20,11 @@ enum PollState {
   FINISHED
 }
 
+enum PollType {
+  ORGANIZATION
+  OPEN
+}
+
 enum OverallRisk {
   low
   medium
@@ -307,6 +312,7 @@ model Poll {
   description    String
   organizationId String    @map("organization_id")
   boardId        String?   @map("board_id")
+  pollType       PollType  @default(ORGANIZATION) @map("poll_type")
   startDate      DateTime  @map("start_date")
   endDate        DateTime  @map("end_date")
   state                PollState @default(DRAFT)
