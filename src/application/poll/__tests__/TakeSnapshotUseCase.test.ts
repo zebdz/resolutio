@@ -13,6 +13,8 @@ import { UserRepository } from '../../../domain/user/UserRepository';
 import { PropertyAssetRepository } from '../../../domain/organization/PropertyAssetRepository';
 import { PollEligibleMemberRepository } from '../../../domain/poll/PollEligibleMemberRepository';
 import { success } from '../../../domain/shared/Result';
+import { PollState } from '../../../domain/poll/PollState';
+import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
 import { PollErrors } from '../PollErrors';
 import { PollWeightCalculator } from '../PollWeightCalculator';
 
@@ -390,5 +392,81 @@ describe('TakeSnapshotUseCase', () => {
         candidates: ['user-1', 'user-2', 'user-3'],
       })
     );
+  });
+  // ── Open polls ─────────────────────────────────────────────────────────────
+
+  function makeOpenPoll(withQuestion = true): Poll {
+    const openPoll = Poll.create(
+      'Open Poll',
+      'Everyone may vote',
+      'org-1',
+      null,
+      'admin-1',
+      new Date('2026-01-01'),
+      new Date('2026-02-01'),
+      undefined,
+      'OPEN'
+    ).value;
+    (openPoll as any).props.id = 'poll-open';
+
+    if (withQuestion) {
+      const question = Question.create(
+        'Question 1',
+        openPoll.id,
+        1,
+        1,
+        'single-choice'
+      ).value;
+      (question as any).props.id = 'question-open-1';
+      question.addAnswer(Answer.create('Answer 1', 1, question.id).value);
+      openPoll.addQuestion(question);
+    }
+
+    return openPoll;
+  }
+
+  it('OPEN poll: transitions to READY without creating participants or eligible members', async () => {
+    const openPoll = makeOpenPoll();
+    pollRepository.getPollById = vi.fn().mockResolvedValue(success(openPoll));
+
+    const result = await useCase.execute({
+      pollId: 'poll-open',
+      userId: 'admin-1',
+    });
+
+    expect(result.success).toBe(true);
+    expect(openPoll.state).toBe(PollState.READY);
+    expect(pollRepository.updatePoll).toHaveBeenCalledWith(openPoll);
+    expect(participantRepository.executeActivation).not.toHaveBeenCalled();
+    expect(eligibleMemberRepository.createMany).not.toHaveBeenCalled();
+    expect(pollWeightCalculator.compute).not.toHaveBeenCalled();
+  });
+
+  it('OPEN poll: does not resolve org members', async () => {
+    const openPoll = makeOpenPoll();
+    pollRepository.getPollById = vi.fn().mockResolvedValue(success(openPoll));
+    organizationRepository.findAcceptedMemberUserIdsIncludingDescendants = vi
+      .fn()
+      .mockResolvedValue(['user-1']);
+
+    await useCase.execute({ pollId: 'poll-open', userId: 'admin-1' });
+
+    expect(
+      organizationRepository.findAcceptedMemberUserIdsIncludingDescendants
+    ).not.toHaveBeenCalled();
+  });
+
+  it('OPEN poll with no questions is still rejected', async () => {
+    const openPoll = makeOpenPoll(false);
+    pollRepository.getPollById = vi.fn().mockResolvedValue(success(openPoll));
+
+    const result = await useCase.execute({
+      pollId: 'poll-open',
+      userId: 'admin-1',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBe(PollDomainCodes.POLL_NO_QUESTIONS);
+    expect(pollRepository.updatePoll).not.toHaveBeenCalled();
   });
 });

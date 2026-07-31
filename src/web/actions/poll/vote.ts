@@ -42,7 +42,8 @@ const submitDraftUseCase = new SubmitDraftUseCase(
   voteRepository,
   draftRepository,
   organizationRepository,
-  boardRepository
+  boardRepository,
+  userRepository
 );
 const finishVotingUseCase = new FinishVotingUseCase(
   pollRepository,
@@ -50,13 +51,15 @@ const finishVotingUseCase = new FinishVotingUseCase(
   voteRepository,
   draftRepository,
   organizationRepository,
-  boardRepository
+  boardRepository,
+  userRepository
 );
 const getUserVotingProgressUseCase = new GetUserVotingProgressUseCase(
   pollRepository,
   participantRepository,
   voteRepository,
-  draftRepository
+  draftRepository,
+  userRepository
 );
 const getPollResultsUseCase = new GetPollResultsUseCase(
   pollRepository,
