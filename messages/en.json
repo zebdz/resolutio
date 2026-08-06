@@ -759,8 +759,8 @@
       "pollNotActive": "This poll is not currently active",
       "pollFinished": "This poll has ended",
       "pollNotFound": "Poll not found",
-      "willingToSignProtocolTitle": "Willing to sign the final protocol",
-      "willingToSignProtocolDescription": "By enabling this, you confirm willingness to sign the final protocol of this vote",
+      "willingToSignProtocolTitle": "Willing to sign the protocol and share my phone number for contact",
+      "willingToSignProtocolDescription": "I confirm my willingness to sign the final protocol of this vote and allow organization admins to see my phone number so they can contact me",
       "openPollBanner": "Open poll: anyone with the link can vote once. Your vote counts as one."
     },
     "participants": {
@@ -835,7 +835,7 @@
       "close": "Close",
       "weight": "Weight",
       "protocolSignWillingness": "Protocol Sign Willingness",
-      "willingToSignProtocol": "Willing to sign",
+      "willingToSignProtocol": "Willing to sign and share phone",
       "protocolNotWilling": "Not willing to sign",
       "willingToSignProtocolCount": "{count} willing",
       "protocolNotWillingCount": "{count} not willing",
@@ -887,6 +887,7 @@
         "notWillingSection": "NOT WILLING TO SIGN",
         "columnNumber": "#",
         "columnFullName": "Full Name",
+        "columnPhone": "Phone",
         "pageOf": "Page {current} of {total}",
         "generatedOn": "Generated: {date}"
       },

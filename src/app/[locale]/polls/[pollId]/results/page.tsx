@@ -203,6 +203,7 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
             lastName: entry.lastName,
             middleName: entry.middleName,
             willingToSignProtocol: entry.willingToSignProtocol,
+            phoneNumber: entry.phoneNumber,
           })
         )
       : [],

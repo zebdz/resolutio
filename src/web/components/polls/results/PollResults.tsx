@@ -39,6 +39,8 @@ interface ProtocolSignWillingnessEntry {
   lastName: string;
   middleName: string | null;
   willingToSignProtocol: boolean;
+  // Server sends this only for admins, and only for willing participants.
+  phoneNumber: string | null;
 }
 
 interface PollResultsData {
@@ -338,12 +340,22 @@ export default function PollResults({
                         .map((p) => (
                           <li
                             key={p.userId}
-                            className="text-sm text-zinc-700 dark:text-zinc-300"
+                            className="flex flex-wrap items-baseline gap-x-2 text-sm text-zinc-700 dark:text-zinc-300"
                           >
-                            {User.formatFullName(
-                              p.firstName,
-                              p.lastName,
-                              p.middleName
+                            <span>
+                              {User.formatFullName(
+                                p.firstName,
+                                p.lastName,
+                                p.middleName
+                              )}
+                            </span>
+                            {p.phoneNumber && (
+                              <a
+                                href={`tel:${p.phoneNumber}`}
+                                className="cursor-pointer text-zinc-500 hover:underline dark:text-zinc-400"
+                              >
+                                {p.phoneNumber}
+                              </a>
                             )}
                           </li>
                         ))}

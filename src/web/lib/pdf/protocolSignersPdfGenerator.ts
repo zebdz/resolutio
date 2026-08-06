@@ -6,6 +6,7 @@ export interface ProtocolSignerEntry {
   lastName: string;
   middleName: string | null;
   willingToSignProtocol: boolean;
+  phoneNumber: string | null;
 }
 
 export interface ProtocolSignersPdfData {
@@ -24,6 +25,7 @@ export interface ProtocolSignersPdfTranslations {
   notWillingSection: string;
   columnNumber: string;
   columnFullName: string;
+  columnPhone: string;
   pageOf: string;
   generatedOn: string;
 }
@@ -35,7 +37,8 @@ function formatFullName(entry: ProtocolSignerEntry): string {
 function buildSignersTable(
   entries: ProtocolSignerEntry[],
   sectionTitle: string,
-  t: ProtocolSignersPdfTranslations
+  t: ProtocolSignersPdfTranslations,
+  showPhone: boolean
 ): Content {
   if (entries.length === 0) {
     return { text: '' };
@@ -50,10 +53,24 @@ function buildSignersTable(
     { text: t.columnFullName, style: 'tableHeader' },
   ];
 
-  const tableRows = entries.map((entry, i) => [
-    { text: String(i + 1), alignment: 'center' as const },
-    { text: formatFullName(entry) },
-  ]);
+  if (showPhone) {
+    tableHeader.push({ text: t.columnPhone, style: 'tableHeader' });
+  }
+
+  const tableRows = entries.map((entry, i) => {
+    const row = [
+      { text: String(i + 1), alignment: 'center' as const },
+      { text: formatFullName(entry) },
+    ];
+
+    if (showPhone) {
+      row.push({ text: entry.phoneNumber ?? '' });
+    }
+
+    return row;
+  });
+
+  const widths: (string | number)[] = showPhone ? [30, '*', 110] : [30, '*'];
 
   return {
     stack: [
@@ -65,7 +82,7 @@ function buildSignersTable(
       {
         table: {
           headerRows: 1,
-          widths: [30, '*'],
+          widths,
           body: [tableHeader, ...tableRows],
         },
         layout: 'lightHorizontalLines',
@@ -114,13 +131,13 @@ export function buildProtocolSignersPdfDefinition(
 
   content.push(...infoLines);
 
-  // Willing table
+  // Willing table — phones shown, since these voters consented to sharing them
   const willing = data.entries.filter((e) => e.willingToSignProtocol);
-  content.push(buildSignersTable(willing, t.willingSection, t));
+  content.push(buildSignersTable(willing, t.willingSection, t, true));
 
-  // Not willing table
+  // Not willing table — names only, no phone column
   const notWilling = data.entries.filter((e) => !e.willingToSignProtocol);
-  content.push(buildSignersTable(notWilling, t.notWillingSection, t));
+  content.push(buildSignersTable(notWilling, t.notWillingSection, t, false));
 
   return {
     content,
