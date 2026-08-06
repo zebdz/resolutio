@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UpdateUserProfileUseCase } from '../UpdateUserProfileUseCase';
+import { UpdateUserProfileSchema } from '../UpdateUserProfileSchema';
 import { User } from '@/src/domain/user/User';
 import { PhoneNumber } from '@/src/domain/user/PhoneNumber';
 import { Nickname } from '@/src/domain/user/Nickname';
 import { UserDomainCodes } from '@/src/domain/user/UserDomainCodes';
-import { Address } from '@/src/domain/user/Address';
+import { Address, AddressDomainCodes } from '@/src/domain/user/Address';
 import type { UserRepository } from '@/src/domain/user/UserRepository';
 
 describe('UpdateUserProfileUseCase', () => {
@@ -336,6 +337,80 @@ describe('UpdateUserProfileUseCase', () => {
       });
 
       expect(result.success).toBe(false);
+    });
+
+    it('should pass DaData provenance fields through to the domain address', async () => {
+      vi.mocked(userRepository.findById).mockResolvedValue(existingUser);
+      vi.mocked(userRepository.save).mockImplementation((user) =>
+        Promise.resolve(user)
+      );
+
+      const result = await useCase.execute({
+        userId: 'user-123',
+        address: {
+          country: 'Россия',
+          city: 'Ростов-на-Дону',
+          street: 'Гвардейский пер',
+          building: '13',
+          isPrivateHouse: false,
+          apartment: '2',
+          oneLine:
+            '344011, Ростовская обл, г Ростов-на-Дону, Гвардейский пер, д 13, кв 2',
+          houseFiasId: 'c1bfc52f-e9a7-4d67-a1bd-b418f495d3f5',
+          flatFiasId: '9d9d7e0a-e49f-4ebf-a962-00cfa892b1ee',
+        },
+      });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.address!.isPrivateHouse).toBe(false);
+        expect(result.value.address!.oneLine).toContain('Гвардейский пер');
+        expect(result.value.address!.houseFiasId).toBe(
+          'c1bfc52f-e9a7-4d67-a1bd-b418f495d3f5'
+        );
+        expect(result.value.address!.flatFiasId).toBe(
+          '9d9d7e0a-e49f-4ebf-a962-00cfa892b1ee'
+        );
+      }
+    });
+  });
+
+  describe('UpdateUserProfileSchema', () => {
+    it('should reject an address with no apartment when not a private house', () => {
+      const result = UpdateUserProfileSchema.safeParse({
+        userId: 'user-1',
+        address: {
+          country: 'Россия',
+          city: 'Ростов-на-Дону',
+          street: 'Гвардейский пер',
+          building: '13',
+          isPrivateHouse: false,
+        },
+      });
+
+      expect(result.success).toBe(false);
+
+      const issue = result.error!.issues.find(
+        (i) => i.path.join('.') === 'address.apartment'
+      );
+
+      expect(issue?.message).toBe(AddressDomainCodes.APARTMENT_REQUIRED);
+    });
+
+    it('should accept an address with no apartment for a private house', () => {
+      const result = UpdateUserProfileSchema.safeParse({
+        userId: 'user-1',
+        address: {
+          country: 'Россия',
+          city: 'Ростов-на-Дону',
+          street: 'Гвардейский пер',
+          building: '13',
+          isPrivateHouse: true,
+        },
+      });
+
+      expect(result.success).toBe(true);
     });
   });
 });

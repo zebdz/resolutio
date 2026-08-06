@@ -106,6 +106,17 @@ export async function updateProfileAction(
                 postalCode: formData.get('addressPostalCode')
                   ? String(formData.get('addressPostalCode'))
                   : undefined,
+                isPrivateHouse:
+                  formData.get('addressIsPrivateHouse') === 'true',
+                oneLine: formData.get('addressOneLine')
+                  ? String(formData.get('addressOneLine'))
+                  : undefined,
+                houseFiasId: formData.get('addressHouseFiasId')
+                  ? String(formData.get('addressHouseFiasId'))
+                  : undefined,
+                flatFiasId: formData.get('addressFlatFiasId')
+                  ? String(formData.get('addressFlatFiasId'))
+                  : undefined,
               }
             : undefined,
     };
