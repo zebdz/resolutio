@@ -122,7 +122,11 @@ model Address {
   street     String
   building   String
   apartment  String?
-  postalCode String?  @map("postal_code")
+  postalCode     String?  @map("postal_code")
+  isPrivateHouse Boolean  @default(false) @map("is_private_house")
+  oneLine        String?  @map("one_line")
+  houseFiasId    String?  @map("house_fias_id")
+  flatFiasId     String?  @map("flat_fias_id")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 

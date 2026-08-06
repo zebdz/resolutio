@@ -135,6 +135,33 @@ UPDATE addresses SET is_private_house = true WHERE apartment IS NULL;
 The backfill is required for correctness, not convenience: without it, every existing
 apartment-less row would violate the new invariant and throw on load.
 
+### Accepted risk: the deploy write window
+
+Migrations run automatically in production — `deploy-on-server.sh:58` calls
+`migrate-production.sh`, which runs `prisma migrate deploy`. That happens **before** the
+old server is killed (line 61), so there is a window of seconds to a minute in which the
+backfill has run but old code is still serving and still writing.
+
+Old code does not know about `is_private_house`, so an address it saves in that window
+gets the column default `false` with a possibly-NULL `apartment`. Reconstitution calls
+`Address.create()`, which throws `APARTMENT_REQUIRED` — that user's pages then 500 until
+the row is fixed by hand.
+
+**Decision: accepted.** Reconstitution stays strict; there is deliberately no
+`fromPersistence` escape hatch. The invariant is enforced everywhere without exception,
+at the cost of tolerating this window. The same exposure applies to a restored backup
+predating the migration, or a rollback-then-roll-forward.
+
+Recovery, should it ever fire — the backfill is idempotent and safe to re-run:
+
+```sql
+UPDATE addresses SET is_private_house = true
+ WHERE apartment IS NULL AND is_private_house = false;
+```
+
+A row hitting this is identifiable in logs by the thrown code
+`domain.user.address.apartmentRequired` on a read path rather than a write path.
+
 Run `yarn prisma:generate` after `prisma migrate dev` — this repo does not regenerate
 the client automatically.
 
