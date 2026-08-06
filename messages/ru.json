@@ -759,8 +759,8 @@
       "pollNotActive": "Это голосование в настоящее время не активно",
       "pollFinished": "Это голосование завершено",
       "pollNotFound": "Голосование не найдено",
-      "willingToSignProtocolTitle": "Готов подписать финальный протокол",
-      "willingToSignProtocolDescription": "Включая это, вы подтверждаете готовность подписать финальный протокол данного голосования",
+      "willingToSignProtocolTitle": "Готов подписать протокол и поделиться номером телефона для связи",
+      "willingToSignProtocolDescription": "Подтверждаю готовность подписать финальный протокол данного голосования и разрешаю администраторам видеть мой номер телефона для связи",
       "openPollBanner": "Открытое голосование: проголосовать может любой, у кого есть ссылка, один раз. Ваш голос считается как один."
     },
     "participants": {
@@ -835,7 +835,7 @@
       "close": "Закрыть",
       "weight": "Вес",
       "protocolSignWillingness": "Готовность к подписанию протокола",
-      "willingToSignProtocol": "Готовы подписать",
+      "willingToSignProtocol": "Готовы подписать и поделиться телефоном",
       "protocolNotWilling": "Не готовы подписать",
       "willingToSignProtocolCount": "{count} готовы",
       "protocolNotWillingCount": "{count} не готовы",
@@ -887,6 +887,7 @@
         "notWillingSection": "НЕ ГОТОВЫ ПОДПИСАТЬ",
         "columnNumber": "№",
         "columnFullName": "ФИО",
+        "columnPhone": "Телефон",
         "pageOf": "Стр. {current} из {total}",
         "generatedOn": "Сформировано: {date}"
       },

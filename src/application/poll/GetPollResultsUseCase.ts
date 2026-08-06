@@ -51,6 +51,9 @@ export interface ProtocolSignWillingnessEntry {
   lastName: string;
   middleName: string | null;
   willingToSignProtocol: boolean;
+  // Non-null only when willingToSignProtocol is true — the voter consented to
+  // signing and to sharing their phone as a single combined statement.
+  phoneNumber: string | null;
 }
 
 export interface GetPollResultsResult {
@@ -280,13 +283,19 @@ export class GetPollResultsUseCase {
 
       protocolSignWillingness = votedParticipants.map((p) => {
         const user = users?.find((u) => u.id === p.userId);
+        const isWilling = p.willingToSignProtocol!;
 
         return {
           userId: p.userId,
           firstName: user?.firstName ?? 'Unknown',
           lastName: user?.lastName ?? 'Unknown',
           middleName: user?.middleName ?? null,
-          willingToSignProtocol: p.willingToSignProtocol!,
+          willingToSignProtocol: isWilling,
+          // Someone who declined refused the whole combined consent, so their
+          // number stays hidden even though we hold it.
+          phoneNumber: isWilling
+            ? (user?.phoneNumber.getValue() ?? null)
+            : null,
         };
       });
     }

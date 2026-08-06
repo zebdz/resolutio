@@ -533,6 +533,11 @@ describe('GetPollResultsUseCase', () => {
       );
       expect(notWilling?.willingToSignProtocol).toBe(false);
       expect(notWilling?.middleName).toBeNull();
+
+      // Consent is combined — willing means "sign AND share my phone".
+      expect(willing?.phoneNumber).toBe('+79001234567');
+      // Declining covers both halves, so no phone for the not-willing.
+      expect(notWilling?.phoneNumber).toBeNull();
     }
   });
 
@@ -570,6 +575,27 @@ describe('GetPollResultsUseCase', () => {
       expect(result.value.protocolSignWillingness).toHaveLength(0);
     }
   });
+
+  it('should not expose any phone number to a non-admin', async () => {
+    participant1.setWillingToSignProtocol(true);
+    organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
+    organizationRepository.isUserMember = vi.fn().mockResolvedValue(true);
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      userId: 'user-member',
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.protocolSignWillingness).toHaveLength(0);
+      // Scan the whole payload, not just protocolSignWillingness — a phone
+      // must not reach a non-admin through any other field either.
+      expect(JSON.stringify(result.value)).not.toContain('+7900');
+    }
+  });
+
   describe('open poll access', () => {
     let openPoll: Poll;
 
