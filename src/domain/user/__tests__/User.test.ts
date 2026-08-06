@@ -471,6 +471,7 @@ describe('User', () => {
         city: 'Moscow',
         street: 'Tverskaya',
         building: '12',
+        isPrivateHouse: true,
       });
       const user = User.reconstitute({
         id: 'user-123',
@@ -493,6 +494,7 @@ describe('User', () => {
         city: 'Moscow',
         street: 'Tverskaya',
         building: '12',
+        isPrivateHouse: true,
       });
       const updated = user.updateAddress(address);
       expect(updated.address).toBeDefined();
@@ -507,6 +509,7 @@ describe('User', () => {
         city: 'Moscow',
         street: 'Tverskaya',
         building: '12',
+        isPrivateHouse: true,
       });
       const user = User.reconstitute({
         id: 'user-123',

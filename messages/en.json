@@ -1303,7 +1303,8 @@
         "countryRequired": "Country is required",
         "cityRequired": "City is required",
         "streetRequired": "Street is required",
-        "buildingRequired": "Building is required"
+        "buildingRequired": "Building is required",
+        "apartmentRequired": "Apartment number is required"
       }
     },
     "joinToken": {

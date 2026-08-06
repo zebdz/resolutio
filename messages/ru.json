@@ -1303,7 +1303,8 @@
         "countryRequired": "Укажите страну",
         "cityRequired": "Укажите город",
         "streetRequired": "Укажите улицу",
-        "buildingRequired": "Укажите дом"
+        "buildingRequired": "Укажите дом",
+        "apartmentRequired": "Укажите номер квартиры"
       }
     },
     "joinToken": {

@@ -247,6 +247,7 @@ describe('UpdateUserProfileUseCase', () => {
           city: 'Moscow',
           street: 'Tverskaya',
           building: '12',
+          isPrivateHouse: true,
         },
       });
 
@@ -276,6 +277,7 @@ describe('UpdateUserProfileUseCase', () => {
           city: 'Moscow',
           street: 'Tverskaya',
           building: '12',
+          isPrivateHouse: true,
         }),
       });
 
