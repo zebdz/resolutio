@@ -31,6 +31,10 @@ const USER_SELECT = {
       building: true,
       apartment: true,
       postalCode: true,
+      isPrivateHouse: true,
+      oneLine: true,
+      houseFiasId: true,
+      flatFiasId: true,
     },
   },
 } as const;
@@ -123,6 +127,10 @@ export class PrismaUserRepository implements UserRepository {
                   building: user.address.building,
                   apartment: user.address.apartment,
                   postalCode: user.address.postalCode,
+                  isPrivateHouse: user.address.isPrivateHouse,
+                  oneLine: user.address.oneLine,
+                  houseFiasId: user.address.houseFiasId,
+                  flatFiasId: user.address.flatFiasId,
                 },
               },
             }
@@ -148,6 +156,10 @@ export class PrismaUserRepository implements UserRepository {
                     building: user.address.building,
                     apartment: user.address.apartment,
                     postalCode: user.address.postalCode,
+                    isPrivateHouse: user.address.isPrivateHouse,
+                    oneLine: user.address.oneLine,
+                    houseFiasId: user.address.houseFiasId,
+                    flatFiasId: user.address.flatFiasId,
                   },
                   update: {
                     country: user.address.country,
@@ -157,6 +169,10 @@ export class PrismaUserRepository implements UserRepository {
                     building: user.address.building,
                     apartment: user.address.apartment,
                     postalCode: user.address.postalCode,
+                    isPrivateHouse: user.address.isPrivateHouse,
+                    oneLine: user.address.oneLine,
+                    houseFiasId: user.address.houseFiasId,
+                    flatFiasId: user.address.flatFiasId,
                   },
                 },
               },
@@ -388,6 +404,10 @@ export class PrismaUserRepository implements UserRepository {
       building: string;
       apartment: string | null;
       postalCode: string | null;
+      isPrivateHouse: boolean;
+      oneLine: string | null;
+      houseFiasId: string | null;
+      flatFiasId: string | null;
     } | null;
   }): User {
     // PhoneNumber.create throws if invalid, which is correct here
@@ -419,6 +439,10 @@ export class PrismaUserRepository implements UserRepository {
             building: user.address.building,
             apartment: user.address.apartment ?? undefined,
             postalCode: user.address.postalCode ?? undefined,
+            isPrivateHouse: user.address.isPrivateHouse,
+            oneLine: user.address.oneLine ?? undefined,
+            houseFiasId: user.address.houseFiasId ?? undefined,
+            flatFiasId: user.address.flatFiasId ?? undefined,
           })
         : undefined,
     });
