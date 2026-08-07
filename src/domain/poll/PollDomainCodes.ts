@@ -81,6 +81,12 @@ export const PollDomainCodes = {
   POLL_OPEN_CANNOT_BE_BOARD_SCOPED: 'domain.poll.openCannotBeBoardScoped',
   POLL_OPEN_MUST_BE_EQUAL: 'domain.poll.openMustBeEqual',
   USER_NOT_CONFIRMED: 'domain.poll.userNotConfirmed',
+
+  // Results visibility
+  POLL_RESULTS_ADMIN_ONLY: 'domain.poll.pollResultsAdminOnly',
+  POLL_RESULTS_NOT_ORG_MEMBER: 'domain.poll.pollResultsNotOrgMember',
+  POLL_PROTOCOL_NOT_AVAILABLE: 'domain.poll.pollProtocolNotAvailable',
+  POLL_IS_ANONYMOUS: 'domain.poll.pollIsAnonymous',
 } as const;
 
 export type PollDomainCode =

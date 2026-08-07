@@ -323,6 +323,10 @@ model Poll {
   weightCriteria       String?   @map("weight_criteria")
   distributionType     String    @default("EQUAL")   @map("distribution_type")
   propertyAggregation  String    @default("RAW_SUM") @map("property_aggregation")
+  // Opt-in secrecy. Default false = named: voter identities are part of the
+  // record and the org can read them while the poll runs. Set once at
+  // creation; there is deliberately no update path.
+  anonymous            Boolean   @default(false)
   createdBy      String    @map("created_by")
   createdAt      DateTime  @default(now()) @map("created_at")
   archivedAt     DateTime? @map("archived_at")

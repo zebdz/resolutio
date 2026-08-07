@@ -631,6 +631,12 @@
     "noMembership": "You are not a member of any organization or board yet. To create a poll, you need to first join an organization.",
     "browseOrganizations": "Browse Organizations",
     "orgWidePoll": "Organization-wide poll (no specific board)",
+    "anonymous": {
+      "label": "Anonymous poll",
+      "description": "Only administrators will see how each person voted, and nobody can open the results until the poll is finished. Leave this off and every member can read the named protocol while the vote is running. This cannot be changed later.",
+      "namedBadge": "Named",
+      "anonymousBadge": "Anonymous"
+    },
     "selectQuestionToEdit": "Select a question from the sidebar to edit",
     "selectBoard": "Select Board (optional)",
     "pollDetails": "Poll Details",
@@ -741,8 +747,6 @@
       "atLeastOneAnswer": "Question must have at least one answer",
       "answerTextRequired": "Answer text is required",
       "loadBoards": "Failed to load boards",
-      "resultsAdminOnly": "Only admins can view voter breakdown for active polls",
-      "notOrganizationMember": "You must be a member of the organization to view results",
       "cannotChangeWeightConfig": "Cannot change weight configuration for this poll",
       "openParticipantsImmutable": "Voters of an open poll cannot be edited or removed",
       "openConfigFixed": "Weight settings of an open poll cannot be changed"
@@ -768,7 +772,9 @@
       "pollNotFound": "Poll not found",
       "willingToSignProtocolTitle": "Willing to sign the protocol and share my phone number for contact",
       "willingToSignProtocolDescription": "I confirm my willingness to sign the final protocol of this vote and allow organization admins to see my phone number so they can contact me",
-      "openPollBanner": "Open poll: anyone with the link can vote once. Your vote counts as one."
+      "openPollBanner": "Open poll: anyone with the link can vote once. Your vote counts as one.",
+      "namedNotice": "This poll is not anonymous. Your name will be listed next to the answers you choose, in a protocol every member of the organization can read.",
+      "namedNoticeProperty": "This poll is not anonymous. Your name and your property in the organization (building, unit, area) will be listed next to the answers you choose, in a protocol every member of the organization can read."
     },
     "participants": {
       "title": "Manage Participants",
@@ -895,6 +901,39 @@
         "columnNumber": "#",
         "columnFullName": "Full Name",
         "columnPhone": "Phone",
+        "pageOf": "Page {current} of {total}",
+        "generatedOn": "Generated: {date}"
+      },
+      "exportNamedPdf": "Export named protocol",
+      "preliminaryNote": "The poll is still running — these results are preliminary, and any protocol exported now is marked as such.",
+      "namedPdf": {
+        "exporting": "Exporting...",
+        "title": "NAMED VOTING PROTOCOL",
+        "preliminary": "PRELIMINARY",
+        "organization": "Organization",
+        "board": "Board",
+        "pollName": "Poll",
+        "description": "Description",
+        "period": "Period",
+        "register": "PARTICIPANT REGISTER",
+        "columnNumber": "#",
+        "columnFullName": "Full Name",
+        "columnHoldings": "Property",
+        "columnWeight": "Weight",
+        "share": "share {percent}%",
+        "question": "Question {number}. {text}",
+        "questionDetails": "Details",
+        "questionType": "Question type",
+        "singleChoice": "single choice",
+        "multipleChoice": "multiple choice",
+        "answerLine": "{number}. {text} — {votes} votes, weight {weight} ({percentage}%)",
+        "winnerMark": "adopted",
+        "didNotVote": "Did not vote ({count})",
+        "signaturesAndStamps": "SIGNATURES AND SEALS",
+        "chairman": "Chairman",
+        "secretary": "Secretary",
+        "date": "Date",
+        "stamp": "Seal",
         "pageOf": "Page {current} of {total}",
         "generatedOn": "Generated: {date}"
       },
@@ -1288,7 +1327,11 @@
       "pollTypeInvalid": "Invalid poll type",
       "openCannotBeBoardScoped": "An open poll cannot be limited to a governing body",
       "openMustBeEqual": "An open poll always uses equal weight — one vote per person",
-      "userNotConfirmed": "Confirm your phone number to vote"
+      "userNotConfirmed": "Confirm your phone number to vote",
+      "pollResultsAdminOnly": "Only organization administrators can view these results",
+      "pollResultsNotOrgMember": "You are not a member of this organization",
+      "pollProtocolNotAvailable": "The protocol is not available for this poll yet",
+      "pollIsAnonymous": "This poll is anonymous — there is no named protocol"
     },
     "user": {
       "userNotFound": "User not found",

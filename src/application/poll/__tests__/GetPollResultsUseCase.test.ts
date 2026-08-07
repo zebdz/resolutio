@@ -13,6 +13,7 @@ import { OrganizationRepository } from '../../../domain/organization/Organizatio
 import { UserRepository } from '../../../domain/user/UserRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
+import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
 import { Decimal } from 'decimal.js';
 import { User } from '../../../domain/user/User';
 import { PhoneNumber } from '../../../domain/user/PhoneNumber';
@@ -122,6 +123,9 @@ describe('GetPollResultsUseCase', () => {
       getParticipants: vi
         .fn()
         .mockResolvedValue(success([participant1, participant2])),
+      // The policy needs isPollVoter for every viewer now, not just open-poll
+      // outsiders, so this lookup always runs.
+      getParticipantByUserAndPoll: vi.fn().mockResolvedValue(success(null)),
     };
 
     voteRepository = {
@@ -201,7 +205,7 @@ describe('GetPollResultsUseCase', () => {
     expect(result.success).toBe(true);
 
     if (result.success) {
-      expect(result.value.canViewVoters).toBe(true);
+      expect(result.value.canViewVoterNames).toBe(true);
       const answer1Result = result.value.results[0].answers.find(
         (a) => a.answerId === 'answer-1'
       );
@@ -223,9 +227,10 @@ describe('GetPollResultsUseCase', () => {
     expect(result.success).toBe(true);
   });
 
-  it('should reject non-admin viewing results of active poll', async () => {
+  it('should reject non-admin viewing results of an active anonymous poll', async () => {
     // Make poll active but not finished
     (poll as any).props.state = PollState.ACTIVE;
+    (poll as any).props.anonymous = true;
     organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
 
     const result = await useCase.execute({
@@ -236,7 +241,27 @@ describe('GetPollResultsUseCase', () => {
     expect(result.success).toBe(false);
 
     if (!result.success) {
-      expect(result.error).toBe('poll.errors.resultsAdminOnly');
+      expect(result.error).toBe(PollDomainCodes.POLL_RESULTS_ADMIN_ONLY);
+    }
+  });
+
+  it('should allow a member to view results of an active named poll', async () => {
+    (poll as any).props.state = PollState.ACTIVE;
+    organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      userId: 'user-member',
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.canViewVoterNames).toBe(true);
+      // Phone numbers ride along with sign-willingness under a separate
+      // consent, so they stay admin-only even on a named poll.
+      expect(result.value.canViewSignWillingness).toBe(false);
+      expect(result.value.protocolSignWillingness).toEqual([]);
     }
   });
 
@@ -266,8 +291,9 @@ describe('GetPollResultsUseCase', () => {
     expect(result.success).toBe(true);
   });
 
-  it('SECURITY: should NOT allow non-creators to view voter breakdown', async () => {
+  it('SECURITY: should NOT allow non-creators to view voter breakdown of an anonymous poll', async () => {
     // Non-admin, non-creator user
+    (poll as any).props.anonymous = true;
     organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
     organizationRepository.isUserMember = vi.fn().mockResolvedValue(true);
 
@@ -279,12 +305,12 @@ describe('GetPollResultsUseCase', () => {
     expect(result.success).toBe(true);
 
     if (result.success) {
-      // canViewVoters should be false for non-creators
-      expect(result.value.canViewVoters).toBe(false);
+      expect(result.value.canViewVoterNames).toBe(false);
     }
   });
 
-  it('SECURITY: should NOT allow poll creator to view voter breakdown', async () => {
+  it('SECURITY: should NOT allow poll creator to view voter breakdown of an anonymous poll', async () => {
+    (poll as any).props.anonymous = true;
     organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
     organizationRepository.isUserMember = vi.fn().mockResolvedValue(true);
 
@@ -296,8 +322,28 @@ describe('GetPollResultsUseCase', () => {
     expect(result.success).toBe(true);
 
     if (result.success) {
-      // canViewVoters should be false for the poll creator
-      expect(result.value.canViewVoters).toBe(false);
+      // Creating a poll is not a licence to read its ballots.
+      expect(result.value.canViewVoterNames).toBe(false);
+    }
+  });
+
+  it('SECURITY: should NOT leak sign-willingness to a member of a named poll', async () => {
+    organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
+    organizationRepository.isUserMember = vi.fn().mockResolvedValue(true);
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      userId: 'user-2',
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      // Names open up on a named poll; the phone numbers behind
+      // sign-willingness do not.
+      expect(result.value.canViewVoterNames).toBe(true);
+      expect(result.value.canViewSignWillingness).toBe(false);
+      expect(result.value.protocolSignWillingness).toEqual([]);
     }
   });
 
@@ -313,8 +359,8 @@ describe('GetPollResultsUseCase', () => {
     expect(result.success).toBe(true);
 
     if (result.success) {
-      // canViewVoters should be true for admins
-      expect(result.value.canViewVoters).toBe(true);
+      expect(result.value.canViewVoterNames).toBe(true);
+      expect(result.value.canViewSignWillingness).toBe(true);
     }
   });
 
@@ -330,7 +376,7 @@ describe('GetPollResultsUseCase', () => {
     expect(result.success).toBe(false);
 
     if (!result.success) {
-      expect(result.error).toBe('poll.errors.notOrganizationMember');
+      expect(result.error).toBe(PollDomainCodes.POLL_RESULTS_NOT_ORG_MEMBER);
     }
   });
 
@@ -644,12 +690,11 @@ describe('GetPollResultsUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('poll.errors.notOrganizationMember');
+      expect(result.error).toBe(PollDomainCodes.POLL_RESULTS_NOT_ORG_MEMBER);
     });
 
-    it('still lets org members read the results without a participant lookup', async () => {
+    it('still lets org members read the results', async () => {
       organizationRepository.isUserMember = vi.fn().mockResolvedValue(true);
-      participantRepository.getParticipantByUserAndPoll = vi.fn();
 
       const result = await useCase.execute({
         pollId: 'poll-1',
@@ -657,13 +702,11 @@ describe('GetPollResultsUseCase', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(
-        participantRepository.getParticipantByUserAndPoll
-      ).not.toHaveBeenCalled();
     });
 
-    it('does not open an ACTIVE poll to a voter who is not an admin', async () => {
+    it('does not open an ACTIVE anonymous poll to a voter who is not an admin', async () => {
       (openPoll as any).props.state = PollState.ACTIVE;
+      (openPoll as any).props.anonymous = true;
       participantRepository.getParticipantByUserAndPoll = vi
         .fn()
         .mockResolvedValue(success(participant1));
@@ -674,7 +717,25 @@ describe('GetPollResultsUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('poll.errors.resultsAdminOnly');
+      expect(result.error).toBe(PollDomainCodes.POLL_RESULTS_ADMIN_ONLY);
+    });
+
+    it('opens an ACTIVE named poll to a voter who took part in it', async () => {
+      (openPoll as any).props.state = PollState.ACTIVE;
+      participantRepository.getParticipantByUserAndPoll = vi
+        .fn()
+        .mockResolvedValue(success(participant1));
+
+      const result = await useCase.execute({
+        pollId: 'poll-1',
+        userId: 'outsider-1',
+      });
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.canViewVoterNames).toBe(true);
+      }
     });
   });
 });

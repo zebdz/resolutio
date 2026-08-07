@@ -34,6 +34,7 @@ export class PrismaPollRepository implements PollRepository {
           weightCriteria: poll.weightCriteria,
           distributionType: poll.distributionType,
           propertyAggregation: poll.propertyAggregation,
+          anonymous: poll.isAnonymous(),
           properties:
             poll.propertyIds.length > 0
               ? {
@@ -363,6 +364,9 @@ export class PrismaPollRepository implements PollRepository {
           weightCriteria: poll.weightCriteria,
           distributionType: poll.distributionType,
           propertyAggregation: poll.propertyAggregation,
+          // The domain exposes no mutator, so this only ever rewrites the
+          // value it loaded — it exists so a round-trip cannot drop the flag.
+          anonymous: poll.isAnonymous(),
           archivedAt: poll.archivedAt,
         },
       });
@@ -411,6 +415,7 @@ export class PrismaPollRepository implements PollRepository {
       propertyIds: (prismaData.properties ?? []).map(
         (p: { propertyId: string }) => p.propertyId
       ),
+      anonymous: prismaData.anonymous ?? false,
       createdBy: prismaData.createdBy,
       createdAt: prismaData.createdAt,
       archivedAt: prismaData.archivedAt,

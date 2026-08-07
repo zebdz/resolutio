@@ -139,8 +139,12 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
   );
 
   // IMPORTANT: Only send voter data to client if user has permission to view it
-  // This prevents unauthorized access to sensitive voting data via browser console
-  const canViewVoters = results.canViewVoters;
+  // This prevents unauthorized access to sensitive voting data via browser console.
+  // Two independent gates: voter names open up to members on a named poll,
+  // while sign-willingness carries phone numbers under a separate consent and
+  // stays admin-only in every case.
+  const canViewVoters = results.canViewVoterNames;
+  const canViewSignWillingness = results.canViewSignWillingness;
 
   // Serialize results data for client component
   const serializedResults = {
@@ -195,7 +199,7 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
       })),
     })),
     // SECURITY: Only include protocol sign willingness if user has admin permission
-    protocolSignWillingness: canViewVoters
+    protocolSignWillingness: canViewSignWillingness
       ? results.protocolSignWillingness.map(
           (entry: ProtocolSignWillingnessEntry) => ({
             userId: entry.userId,
@@ -234,7 +238,9 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
         results={serializedResults}
         pollState={poll.state}
         isPollCreator={isPollCreator}
-        canViewVoters={canViewVoters}
+        canViewVoterNames={canViewVoters}
+        canViewSignWillingness={canViewSignWillingness}
+        isAnonymous={!!poll.anonymous}
         buildingTotal={buildingTotal}
         isOpenPoll={poll.pollType === 'OPEN'}
       />

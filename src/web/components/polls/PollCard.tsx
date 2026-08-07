@@ -44,6 +44,7 @@ export function PollCard({
   const isFinished = poll.state === 'FINISHED';
   const isCreator = poll.createdBy === userId;
   const isOpenPoll = poll.pollType === 'OPEN';
+  const isAnonymousPoll = !!poll.anonymous;
   const isOrgArchived = poll.isOrgArchived;
   const isBoardArchived = poll.isBoardArchived;
   const isParentArchived = isOrgArchived || isBoardArchived;
@@ -51,7 +52,9 @@ export function PollCard({
   const canEditPoll = isCreator;
   const canManageParticipants = canManage;
   const canActivateAndDeactivatePoll = canManage;
-  const canViewResultsBeforePollEnds = canManage;
+  // A named poll is readable by every member while it runs — the card must
+  // offer the link. The results page enforces the rule server-side regardless.
+  const canViewResultsBeforePollEnds = canManage || !isAnonymousPoll;
 
   const handleTakeSnapshot = async () => {
     if (!confirm(t('confirmTakeSnapshot'))) {
@@ -207,6 +210,19 @@ export function PollCard({
                 {t('type.openBadge')}
               </span>
             )}
+            {/* Both states get a badge: a voter must never have to infer
+                whether their ballot will carry their name. */}
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
+                isAnonymousPoll
+                  ? 'text-zinc-700 bg-zinc-100 dark:text-zinc-300 dark:bg-zinc-800'
+                  : 'text-amber-700 bg-amber-100 dark:text-amber-300 dark:bg-amber-900/40'
+              }`}
+            >
+              {isAnonymousPoll
+                ? t('anonymous.anonymousBadge')
+                : t('anonymous.namedBadge')}
+            </span>
             {isOrgArchived && (
               <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-pink-700 bg-pink-200 dark:text-pink-400 dark:bg-pink-900/40 rounded-full">
                 {t('orgArchived')}
