@@ -7,13 +7,14 @@ import {
   middlewareIpLimiter,
   serverActionSessionLimiter,
   serverActionIpLimiter,
+  addressSuggestLimiter,
 } from '../registry';
 
 describe('limiterRegistry', () => {
-  it('has 9 entries with unique labels', () => {
-    expect(limiterRegistry).toHaveLength(9);
+  it('has 10 entries with unique labels', () => {
+    expect(limiterRegistry).toHaveLength(10);
     const labels = limiterRegistry.map((e) => e.label);
-    expect(new Set(labels).size).toBe(9);
+    expect(new Set(labels).size).toBe(10);
   });
 
   it('each entry has a limiter instance', () => {
@@ -35,6 +36,10 @@ describe('limiterRegistry', () => {
     expect(middlewareIpLimiter).toBe(limiterRegistry[1].limiter);
     expect(serverActionSessionLimiter).toBe(limiterRegistry[2].limiter);
     expect(serverActionIpLimiter).toBe(limiterRegistry[3].limiter);
+    // Guards the positional-export risk directly: named exports are derived
+    // by array index, so inserting an entry anywhere but the end would
+    // silently repoint every export after it.
+    expect(addressSuggestLimiter).toBe(limiterRegistry[9].limiter);
   });
 });
 
@@ -61,6 +66,13 @@ describe('getLimiterByLabel', () => {
     const entry = getLimiterByLabel('reportCreate');
     expect(entry).toBeDefined();
     expect(entry!.maxRequests).toBe(10);
+    expect(entry!.windowMs).toBe(24 * 60 * 60_000);
+  });
+
+  it('addressSuggest configured at 9,500 per day (daily quota, not per-minute)', () => {
+    const entry = getLimiterByLabel('addressSuggest');
+    expect(entry).toBeDefined();
+    expect(entry!.maxRequests).toBe(9_500);
     expect(entry!.windowMs).toBe(24 * 60 * 60_000);
   });
 });

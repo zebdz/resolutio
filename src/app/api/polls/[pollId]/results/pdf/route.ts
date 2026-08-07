@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { GetPollResultsUseCase } from '@/application/poll/GetPollResultsUseCase';
+import { PollResultsPolicy } from '@/domain/poll/PollResultsPolicy';
 import type { QuestionType } from '@/src/domain/poll/QuestionType';
 import {
   prisma,
@@ -76,14 +77,22 @@ export async function GET(
       );
     }
 
-    const { poll, results, totalParticipants, totalParticipantWeight } =
-      result.value;
+    const {
+      poll,
+      results,
+      totalParticipants,
+      totalParticipantWeight,
+      viewerFacts,
+    } = result.value;
 
-    // 3. Only allow PDF export for finished polls
-    if (!poll.isFinished()) {
+    // 3. A named poll may be exported mid-vote; an anonymous one stays sealed
+    // until it finishes.
+    const exportable = PollResultsPolicy.canExportProtocol(poll, viewerFacts);
+
+    if (!exportable.success) {
       return NextResponse.json(
-        { error: 'poll.errors.notFinished' },
-        { status: 400 }
+        { error: await translateErrorCode(exportable.error) },
+        { status: 403 }
       );
     }
 

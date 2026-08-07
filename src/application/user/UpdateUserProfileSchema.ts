@@ -62,7 +62,18 @@ export const updateUserProfileSchema = (profanityChecker: ProfanityChecker) =>
           })
           .optional(),
         postalCode: z.string().optional(),
+        isPrivateHouse: z.boolean().optional(),
+        oneLine: z.string().optional(),
+        houseFiasId: z.string().optional(),
+        flatFiasId: z.string().optional(),
       })
+      .refine(
+        (addr) => (addr.isPrivateHouse ?? false) || !!addr.apartment?.trim(),
+        {
+          message: AddressDomainCodes.APARTMENT_REQUIRED,
+          path: ['apartment'],
+        }
+      )
       .nullable()
       .optional(),
   });

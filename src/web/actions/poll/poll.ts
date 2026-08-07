@@ -235,6 +235,7 @@ export async function createPollAction(
       | null;
     const propertyIdsRaw = formData.get('propertyIds') as string | null;
     const pollTypeRaw = formData.get('pollType') as string | null;
+    const anonymousRaw = formData.get('anonymous') as string | null;
     const input = {
       title: formData.get('title') as string,
       description: formData.get('description') as string,
@@ -254,6 +255,9 @@ export async function createPollAction(
         ? (JSON.parse(propertyIdsRaw) as string[])
         : undefined,
       pollType: pollTypeRaw && pollTypeRaw.trim() ? pollTypeRaw : undefined,
+      // FormData carries strings, and z.coerce.boolean() treats any non-empty
+      // string as true — including "false". Compare explicitly.
+      anonymous: anonymousRaw === 'true',
     };
 
     // Validate with Zod

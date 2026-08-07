@@ -19,11 +19,17 @@ import {
 import { toast } from 'sonner';
 import { Link } from '@/src/i18n/routing';
 import { PollState } from '@/src/domain/poll/PollState';
+import {
+  getPollControlLabelKeys,
+  shouldShowReadyHint,
+  shouldShowManageParticipants,
+} from '@/src/web/components/polls/pollControlLabels';
 
 interface PollControlsProps {
   pollId: string;
   state: PollState;
   hasQuestions: boolean;
+  isOpenPoll: boolean;
   onStateChange: () => void;
 }
 
@@ -31,9 +37,11 @@ export default function PollControls({
   pollId,
   state,
   hasQuestions,
+  isOpenPoll,
   onStateChange,
 }: PollControlsProps) {
   const t = useTranslations('poll');
+  const labelKeys = getPollControlLabelKeys(isOpenPoll);
   const [isTakingSnapshot, setIsTakingSnapshot] = useState(false);
   const [isDiscardingSnapshot, setIsDiscardingSnapshot] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
@@ -54,7 +62,7 @@ export default function PollControls({
       const result = await takeSnapshotAction(pollId);
 
       if (result.success) {
-        toast.success(t('snapshotTaken'));
+        toast.success(t(labelKeys.prepared));
         onStateChange();
       } else {
         toast.error(result.error);
@@ -73,7 +81,7 @@ export default function PollControls({
       const result = await discardSnapshotAction(pollId);
 
       if (result.success) {
-        toast.success(t('snapshotDiscarded'));
+        toast.success(t(labelKeys.reverted));
         onStateChange();
       } else {
         toast.error(result.error);
@@ -189,6 +197,11 @@ export default function PollControls({
             <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
               {getStatusLabel()}
             </p>
+            {shouldShowReadyHint(isOpenPoll, state) && (
+              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                {t('type.readyHint')}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -198,7 +211,9 @@ export default function PollControls({
                 onClick={handleTakeSnapshot}
                 disabled={isTakingSnapshot || !hasQuestions}
               >
-                {isTakingSnapshot ? t('takingSnapshot') : t('takeSnapshot')}
+                {isTakingSnapshot
+                  ? t(labelKeys.preparing)
+                  : t(labelKeys.prepare)}
               </Button>
             )}
 
@@ -217,8 +232,8 @@ export default function PollControls({
                   disabled={isDiscardingSnapshot}
                 >
                   {isDiscardingSnapshot
-                    ? t('discardingSnapshot')
-                    : t('discardSnapshot')}
+                    ? t(labelKeys.reverting)
+                    : t(labelKeys.revert)}
                 </Button>
               </>
             )}
@@ -242,9 +257,11 @@ export default function PollControls({
               </>
             )}
 
-            <Link href={`/polls/${pollId}/participants`}>
-              <Button color="zinc">{t('manageParticipants')}</Button>
-            </Link>
+            {shouldShowManageParticipants(isOpenPoll, state) && (
+              <Link href={`/polls/${pollId}/participants`}>
+                <Button color="zinc">{t('manageParticipants')}</Button>
+              </Link>
+            )}
 
             {state === 'ACTIVE' && (
               <Link href={`/polls/${pollId}/results`}>

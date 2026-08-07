@@ -6,6 +6,7 @@ import { Badge } from '@/src/web/components/catalyst/badge';
 import VoterBreakdownDialog from './VoterBreakdownDialog';
 import ExportPdfButton from './ExportPdfButton';
 import ExportProtocolPdfButton from './ExportProtocolPdfButton';
+import ExportNamedProtocolPdfButton from './ExportNamedProtocolPdfButton';
 import { PollState } from '@/src/domain/poll/PollState';
 import { User } from '@/domain/user/User';
 import type { QuestionType } from '@/src/domain/poll/QuestionType';
@@ -56,7 +57,14 @@ interface PollResultsProps {
   results: PollResultsData;
   pollState: PollState;
   isPollCreator: boolean;
-  canViewVoters: boolean;
+  // Two independent gates. Voter names open up to members on a named poll;
+  // sign-willingness carries phone numbers under a separate consent and is
+  // admin-only in every case.
+  canViewVoterNames: boolean;
+  canViewSignWillingness: boolean;
+  // An anonymous poll keeps the old behaviour: no named protocol, and nothing
+  // exportable until the poll finishes.
+  isAnonymous: boolean;
   // Theoretical max Σ weights if every owner were registered. 0 for EQUAL
   // polls — the UI then collapses Building/Registered into a single number.
   buildingTotal: number;
@@ -69,7 +77,9 @@ export default function PollResults({
   results,
   pollState,
   isPollCreator,
-  canViewVoters,
+  canViewVoterNames,
+  canViewSignWillingness,
+  isAnonymous,
   buildingTotal,
   isOpenPoll = false,
 }: PollResultsProps) {
@@ -159,10 +169,14 @@ export default function PollResults({
           </div>
         </div>
 
-        {/* Export PDF button — only for finished polls */}
-        {isFinished && (
-          <div className="flex justify-end">
+        {/* Protocol exports. A named poll may be exported mid-vote; the
+            documents are marked preliminary until the poll is finished. */}
+        {(isFinished || (!isAnonymous && isActive)) && (
+          <div className="flex flex-wrap justify-end gap-2">
             <ExportPdfButton pollId={results.pollId} />
+            {!isAnonymous && canViewVoterNames && (
+              <ExportNamedProtocolPdfButton pollId={results.pollId} />
+            )}
           </div>
         )}
 
@@ -252,7 +266,7 @@ export default function PollResults({
                         </div>
                       </div>
 
-                      {canViewVoters && answer.voteCount > 0 && (
+                      {canViewVoterNames && answer.voteCount > 0 && (
                         <button
                           type="button"
                           onClick={() => handleViewVoters(answer)}
@@ -282,122 +296,134 @@ export default function PollResults({
         })}
 
         {/* Protocol sign willingness section (admin only) */}
-        {canViewVoters && results.protocolSignWillingness.length > 0 && (
-          <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-6">
-              <button
-                type="button"
-                onClick={() => setProtocolOpen(!protocolOpen)}
-                className="flex flex-wrap items-center gap-3 text-left cursor-pointer"
-              >
-                <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">
-                  {t('protocolSignWillingness')}
-                </h3>
-                <Badge color="green">
-                  {t('willingToSignProtocolCount', {
-                    count: results.protocolSignWillingness.filter(
-                      (p) => p.willingToSignProtocol
-                    ).length,
-                  })}
-                </Badge>
-                <Badge color="red">
-                  {t('protocolNotWillingCount', {
-                    count: results.protocolSignWillingness.filter(
-                      (p) => !p.willingToSignProtocol
-                    ).length,
-                  })}
-                </Badge>
-                <svg
-                  className={`h-5 w-5 text-zinc-500 transition-transform ${protocolOpen ? 'rotate-180' : ''}`}
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  strokeWidth={1.5}
-                  stroke="currentColor"
+        {canViewSignWillingness &&
+          results.protocolSignWillingness.length > 0 && (
+            <div className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-6">
+                <button
+                  type="button"
+                  onClick={() => setProtocolOpen(!protocolOpen)}
+                  className="flex flex-wrap items-center gap-3 text-left cursor-pointer"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                  />
-                </svg>
-              </button>
-              <ExportProtocolPdfButton pollId={results.pollId} />
-            </div>
+                  <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">
+                    {t('protocolSignWillingness')}
+                  </h3>
+                  <Badge color="green">
+                    {t('willingToSignProtocolCount', {
+                      count: results.protocolSignWillingness.filter(
+                        (p) => p.willingToSignProtocol
+                      ).length,
+                    })}
+                  </Badge>
+                  <Badge color="red">
+                    {t('protocolNotWillingCount', {
+                      count: results.protocolSignWillingness.filter(
+                        (p) => !p.willingToSignProtocol
+                      ).length,
+                    })}
+                  </Badge>
+                  <svg
+                    className={`h-5 w-5 text-zinc-500 transition-transform ${protocolOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                    />
+                  </svg>
+                </button>
+                <ExportProtocolPdfButton pollId={results.pollId} />
+              </div>
 
-            {protocolOpen && (
-              <div className="px-6 pb-6 space-y-4">
-                {/* Willing */}
-                {results.protocolSignWillingness.some(
-                  (p) => p.willingToSignProtocol
-                ) && (
-                  <div>
-                    <h4 className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">
-                      {t('willingToSignProtocol')}
-                    </h4>
-                    <ul className="space-y-1">
-                      {results.protocolSignWillingness
-                        .filter((p) => p.willingToSignProtocol)
-                        .map((p) => (
-                          <li
-                            key={p.userId}
-                            className="flex flex-wrap items-baseline gap-x-2 text-sm text-zinc-700 dark:text-zinc-300"
-                          >
-                            <span>
+              {protocolOpen && (
+                <div className="px-6 pb-6 space-y-4">
+                  {/* Willing */}
+                  {results.protocolSignWillingness.some(
+                    (p) => p.willingToSignProtocol
+                  ) && (
+                    <div>
+                      <h4 className="text-sm font-medium text-green-700 dark:text-green-400 mb-2">
+                        {t('willingToSignProtocol')}
+                      </h4>
+                      <ul className="space-y-1">
+                        {results.protocolSignWillingness
+                          .filter((p) => p.willingToSignProtocol)
+                          .map((p) => (
+                            <li
+                              key={p.userId}
+                              className="flex flex-wrap items-baseline gap-x-2 text-sm text-zinc-700 dark:text-zinc-300"
+                            >
+                              <span>
+                                {User.formatFullName(
+                                  p.firstName,
+                                  p.lastName,
+                                  p.middleName
+                                )}
+                              </span>
+                              {p.phoneNumber && (
+                                <a
+                                  href={`tel:${p.phoneNumber}`}
+                                  className="cursor-pointer text-zinc-500 hover:underline dark:text-zinc-400"
+                                >
+                                  {p.phoneNumber}
+                                </a>
+                              )}
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Not willing */}
+                  {results.protocolSignWillingness.some(
+                    (p) => !p.willingToSignProtocol
+                  ) && (
+                    <div>
+                      <h4 className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">
+                        {t('protocolNotWilling')}
+                      </h4>
+                      <ul className="space-y-1">
+                        {results.protocolSignWillingness
+                          .filter((p) => !p.willingToSignProtocol)
+                          .map((p) => (
+                            <li
+                              key={p.userId}
+                              className="text-sm text-zinc-700 dark:text-zinc-300"
+                            >
                               {User.formatFullName(
                                 p.firstName,
                                 p.lastName,
                                 p.middleName
                               )}
-                            </span>
-                            {p.phoneNumber && (
-                              <a
-                                href={`tel:${p.phoneNumber}`}
-                                className="cursor-pointer text-zinc-500 hover:underline dark:text-zinc-400"
-                              >
-                                {p.phoneNumber}
-                              </a>
-                            )}
-                          </li>
-                        ))}
-                    </ul>
-                  </div>
-                )}
+                            </li>
+                          ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
-                {/* Not willing */}
-                {results.protocolSignWillingness.some(
-                  (p) => !p.willingToSignProtocol
-                ) && (
-                  <div>
-                    <h4 className="text-sm font-medium text-red-700 dark:text-red-400 mb-2">
-                      {t('protocolNotWilling')}
-                    </h4>
-                    <ul className="space-y-1">
-                      {results.protocolSignWillingness
-                        .filter((p) => !p.willingToSignProtocol)
-                        .map((p) => (
-                          <li
-                            key={p.userId}
-                            className="text-sm text-zinc-700 dark:text-zinc-300"
-                          >
-                            {User.formatFullName(
-                              p.firstName,
-                              p.lastName,
-                              p.middleName
-                            )}
-                          </li>
-                        ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {!isFinished && canViewVoters && (
+        {/* On an anonymous poll only admins are here at all before it ends;
+            on a named one everybody is, so the note explains the numbers are
+            not final rather than who may see them. */}
+        {!isFinished && isAnonymous && canViewVoterNames && (
           <div className="rounded-lg border border-amber-200 dark:border-amber-700 p-4 bg-amber-50 dark:bg-amber-950/20">
             <p className="text-sm text-amber-800 dark:text-amber-200">
               {t('adminOnly')}
+            </p>
+          </div>
+        )}
+
+        {!isFinished && !isAnonymous && (
+          <div className="rounded-lg border border-amber-200 dark:border-amber-700 p-4 bg-amber-50 dark:bg-amber-950/20">
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              {t('preliminaryNote')}
             </p>
           </div>
         )}

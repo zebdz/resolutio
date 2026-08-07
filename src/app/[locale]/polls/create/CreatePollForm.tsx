@@ -7,8 +7,13 @@ import { Heading } from '@/src/web/components/catalyst/heading';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Input } from '@/src/web/components/catalyst/input';
 import { Textarea } from '@/src/web/components/catalyst/textarea';
-import { Field, Label } from '@/src/web/components/catalyst/fieldset';
+import {
+  Description,
+  Field,
+  Label,
+} from '@/src/web/components/catalyst/fieldset';
 import { Select } from '@/src/web/components/catalyst/select';
+import { Switch, SwitchField } from '@/src/web/components/catalyst/switch';
 import { PollSidebar } from '@/src/web/components/polls/draft/PollSidebar';
 import { QuestionForm } from '@/src/web/components/polls/draft/QuestionForm';
 import { Link } from '@/src/i18n/routing';
@@ -78,6 +83,11 @@ export function CreatePollForm() {
     'ORGANIZATION'
   );
   const isOpenPoll = pollType === 'OPEN';
+
+  // Opt-in secrecy. Named is the default: the org reads who voted for what
+  // while the poll runs. Immutable after creation, so this is the only place
+  // it is ever set.
+  const [anonymous, setAnonymous] = useState(false);
 
   // Weight config state
   const [distributionType, setDistributionType] = useState<
@@ -405,6 +415,7 @@ export function CreatePollForm() {
       pollFormData.append('startDate', pollData.startDate);
       pollFormData.append('endDate', pollData.endDate);
       pollFormData.append('pollType', pollType);
+      pollFormData.append('anonymous', String(anonymous));
       pollFormData.append('distributionType', distributionType);
       pollFormData.append('propertyAggregation', propertyAggregation);
       pollFormData.append('propertyIds', JSON.stringify(propertyIds));
@@ -609,6 +620,16 @@ export function CreatePollForm() {
             </p>
           )}
         </Field>
+
+        <SwitchField>
+          <Label>{t('anonymous.label')}</Label>
+          <Description>{t('anonymous.description')}</Description>
+          <Switch
+            name="anonymous"
+            checked={anonymous}
+            onChange={setAnonymous}
+          />
+        </SwitchField>
 
         <Field>
           <Label>{t('selectOrganization')}</Label>

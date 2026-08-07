@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "polls" ADD COLUMN     "anonymous" BOOLEAN NOT NULL DEFAULT false;

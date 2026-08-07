@@ -6,6 +6,7 @@ export const AddressDomainCodes = {
   CITY_REQUIRED: 'domain.user.address.cityRequired',
   STREET_REQUIRED: 'domain.user.address.streetRequired',
   BUILDING_REQUIRED: 'domain.user.address.buildingRequired',
+  APARTMENT_REQUIRED: 'domain.user.address.apartmentRequired',
 } as const;
 
 export type AddressDomainCode =
@@ -19,6 +20,10 @@ export interface AddressProps {
   building: string;
   apartment?: string;
   postalCode?: string;
+  isPrivateHouse?: boolean;
+  oneLine?: string;
+  houseFiasId?: string;
+  flatFiasId?: string;
 }
 
 export class Address {
@@ -44,6 +49,12 @@ export class Address {
       throw new Error(AddressDomainCodes.BUILDING_REQUIRED);
     }
 
+    const isPrivateHouse = props.isPrivateHouse ?? false;
+
+    if (!isPrivateHouse && !props.apartment?.trim()) {
+      throw new Error(AddressDomainCodes.APARTMENT_REQUIRED);
+    }
+
     const textFields = [
       props.country,
       props.region,
@@ -65,8 +76,18 @@ export class Address {
       city: props.city.trim(),
       street: props.street.trim(),
       building: props.building.trim(),
-      apartment: props.apartment?.trim() || undefined,
+      // A private house has no flat — never persist a contradictory pair
+      apartment: isPrivateHouse
+        ? undefined
+        : props.apartment?.trim() || undefined,
       postalCode: props.postalCode?.trim() || undefined,
+      isPrivateHouse,
+      oneLine: props.oneLine?.trim() || undefined,
+      houseFiasId: props.houseFiasId?.trim() || undefined,
+      // A private house has no flat — never persist a contradictory pair
+      flatFiasId: isPrivateHouse
+        ? undefined
+        : props.flatFiasId?.trim() || undefined,
     });
   }
 
@@ -98,6 +119,22 @@ export class Address {
     return this.props.postalCode;
   }
 
+  get isPrivateHouse(): boolean {
+    return this.props.isPrivateHouse ?? false;
+  }
+
+  get oneLine(): string | undefined {
+    return this.props.oneLine;
+  }
+
+  get houseFiasId(): string | undefined {
+    return this.props.houseFiasId;
+  }
+
+  get flatFiasId(): string | undefined {
+    return this.props.flatFiasId;
+  }
+
   equals(other: Address): boolean {
     return (
       this.props.country === other.props.country &&
@@ -106,7 +143,11 @@ export class Address {
       this.props.street === other.props.street &&
       this.props.building === other.props.building &&
       this.props.apartment === other.props.apartment &&
-      this.props.postalCode === other.props.postalCode
+      this.props.postalCode === other.props.postalCode &&
+      this.props.isPrivateHouse === other.props.isPrivateHouse &&
+      this.props.oneLine === other.props.oneLine &&
+      this.props.houseFiasId === other.props.houseFiasId &&
+      this.props.flatFiasId === other.props.flatFiasId
     );
   }
 

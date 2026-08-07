@@ -49,12 +49,18 @@ interface VotingInterfaceProps {
   poll: Poll;
   userDrafts: VoteDraft[];
   pollId: string;
+  // A voter has to know before they choose whether their name — and, on an
+  // ownership-weighted poll, their property — lands in the protocol.
+  isAnonymous: boolean;
+  isPropertyBased: boolean;
 }
 
 export default function VotingInterface({
   poll,
   userDrafts: initialDrafts,
   pollId,
+  isAnonymous,
+  isPropertyBased,
 }: VotingInterfaceProps) {
   const t = useTranslations('poll.voting');
   const router = useRouter();
@@ -206,6 +212,14 @@ export default function VotingInterface({
 
   return (
     <div className="space-y-6">
+      {!isAnonymous && (
+        <div className="rounded-lg border border-amber-200 dark:border-amber-700 p-4 bg-amber-50 dark:bg-amber-950/20">
+          <p className="text-sm text-amber-800 dark:text-amber-200">
+            {isPropertyBased ? t('namedNoticeProperty') : t('namedNotice')}
+          </p>
+        </div>
+      )}
+
       {/* Progress */}
       <VotingProgress
         current={answeredQuestions}
