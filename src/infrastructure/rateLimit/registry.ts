@@ -51,6 +51,12 @@ const REGISTRATION_DEVICE_WINDOW_MS = 60 * 60_000;
 const REPORT_CREATE_MAX = 10;
 const REPORT_CREATE_WINDOW_MS = 24 * 60 * 60_000;
 
+// 300 / min — protects the DaData daily quota (free tier: 10,000/day).
+// The middleware session limiter (120/min) already protects the app; this one
+// exists so a single session cannot burn the shared external quota.
+const ADDRESS_SUGGEST_MAX = 300;
+const ADDRESS_SUGGEST_WINDOW_MS = 60_000;
+
 function createRegistry(): LimiterEntry[] {
   return [
     {
@@ -131,6 +137,15 @@ function createRegistry(): LimiterEntry[] {
       maxRequests: REPORT_CREATE_MAX,
       windowMs: REPORT_CREATE_WINDOW_MS,
     },
+    {
+      label: 'addressSuggest',
+      limiter: new InMemoryRateLimiter(
+        ADDRESS_SUGGEST_MAX,
+        ADDRESS_SUGGEST_WINDOW_MS
+      ),
+      maxRequests: ADDRESS_SUGGEST_MAX,
+      windowMs: ADDRESS_SUGGEST_WINDOW_MS,
+    },
   ];
 }
 
@@ -149,6 +164,7 @@ export const loginLimiter = limiterRegistry[5].limiter;
 export const registrationIpLimiter = limiterRegistry[6].limiter;
 export const registrationDeviceLimiter = limiterRegistry[7].limiter;
 export const reportCreateLimiter = limiterRegistry[8].limiter;
+export const addressSuggestLimiter = limiterRegistry[9].limiter;
 
 export function getLimiterByLabel(label: string): LimiterEntry | undefined {
   return limiterRegistry.find((entry) => entry.label === label);
