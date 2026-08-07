@@ -59,6 +59,12 @@ export class NominatimAddressProvider implements AddressProvider {
         postalCode: row.address.postcode ?? '',
         // Nominatim has no ГАР ids — flats can never be suggested for these
         houseFiasId: undefined,
+        // Nominatim has no flat data at all (see design doc, "Nominatim has
+        // no flat data") — nothing to map, and nothing to strip from the
+        // label, so houseLabel is simply the label itself.
+        flat: '',
+        flatFiasId: undefined,
+        houseLabel: row.display_name,
       }));
     } catch {
       // Caller (resolver) treats this the same as "no results"

@@ -22,6 +22,78 @@ const HOUSE_PAYLOAD = {
   ],
 };
 
+// Block-level (строение/корпус) row — a house row is not the only shape
+// suggest/address returns for one query; see design doc "Empirical findings"
+const BLOCK_PAYLOAD = {
+  suggestions: [
+    {
+      value: 'г Ростов-на-Дону, Гвардейский пер, д 13 стр 3',
+      unrestricted_value:
+        '344011, Ростовская обл, г Ростов-на-Дону, Гвардейский пер, д 13 стр 3',
+      data: {
+        country: 'Россия',
+        region_with_type: 'Ростовская обл',
+        city: 'Ростов-на-Дону',
+        street_with_type: 'Гвардейский пер',
+        house: '13',
+        block: '3',
+        block_type: 'стр',
+        postal_code: '344011',
+        house_fias_id: 'block-uuid',
+        flat: null,
+      },
+    },
+  ],
+};
+
+// Flat-level row for the exact building from the reported bug: DaData mixes
+// house/block/flat levels in one suggest response, and this is the shape
+// that produced the malformed probe query (see design doc "Bug 1").
+const FLAT_LEVEL_PICK_PAYLOAD = {
+  suggestions: [
+    {
+      value: 'г Ростов-на-Дону, Гвардейский пер, д 13 стр 3, кв 738',
+      unrestricted_value:
+        '344011, Ростовская обл, г Ростов-на-Дону, Гвардейский пер, д 13 стр 3, кв 738',
+      data: {
+        country: 'Россия',
+        region_with_type: 'Ростовская обл',
+        city: 'Ростов-на-Дону',
+        street_with_type: 'Гвардейский пер',
+        house: '13',
+        block: '3',
+        block_type: 'стр',
+        postal_code: '344011',
+        house_fias_id: 'block-uuid',
+        flat: '738',
+        flat_type: 'кв',
+        flat_fias_id: 'flat-uuid',
+      },
+    },
+  ],
+};
+
+// value deliberately does NOT end with ", кв 738" — a stand-in for a DaData
+// response whose formatting doesn't match our stripping assumption. houseLabel
+// must fall back to the full value rather than truncate the wrong substring.
+const MISMATCHED_SUFFIX_PAYLOAD = {
+  suggestions: [
+    {
+      value: 'г Ростов-на-Дону, Гвардейский пер, д 13 стр 3',
+      unrestricted_value:
+        '344011, Ростовская обл, г Ростов-на-Дону, Гвардейский пер, д 13 стр 3',
+      data: {
+        house: '13',
+        block: '3',
+        block_type: 'стр',
+        flat: '738',
+        flat_type: 'кв',
+        flat_fias_id: 'flat-uuid',
+      },
+    },
+  ],
+};
+
 // DaData returns the house row alongside flats — to_bound does NOT filter it out
 const FLAT_PAYLOAD = {
   suggestions: [
@@ -70,6 +142,42 @@ describe('DaDataAddressProvider', () => {
     expect(suggestion.postalCode).toBe('344011');
     expect(suggestion.houseFiasId).toBe('c1bfc52f-e9a7-4d67-a1bd-b418f495d3f5');
     expect(suggestion.oneLine).toContain('344011');
+  });
+
+  it('folds block (строение/корпус) into building, since «Дом / Строение» is one field — a bare `house` mapping would collapse "д 13 стр 3" to "13"', async () => {
+    const fetchMock = mockFetchOnce(BLOCK_PAYLOAD);
+    const provider = new DaDataAddressProvider(fetchMock);
+
+    const [suggestion] = await provider.suggestAddress('Гвардейский 13 стр 3');
+
+    expect(suggestion.building).toBe('13 стр 3');
+    expect(suggestion.houseLabel).toBe(BLOCK_PAYLOAD.suggestions[0].value);
+  });
+
+  it('maps a flat-level pick and derives houseLabel by stripping the flat suffix — regression guard for the reported bug (empty Квартира, «Частный дом» switched on)', async () => {
+    const fetchMock = mockFetchOnce(FLAT_LEVEL_PICK_PAYLOAD);
+    const provider = new DaDataAddressProvider(fetchMock);
+
+    const [suggestion] = await provider.suggestAddress(
+      'Гвардейский 13 стр 3 кв 738'
+    );
+
+    expect(suggestion.flat).toBe('738');
+    expect(suggestion.flatFiasId).toBe('flat-uuid');
+    expect(suggestion.houseLabel).toBe(
+      'г Ростов-на-Дону, Гвардейский пер, д 13 стр 3'
+    );
+  });
+
+  it('falls back to the full value for houseLabel when it does not end with the expected flat suffix, rather than truncating the wrong substring', async () => {
+    const fetchMock = mockFetchOnce(MISMATCHED_SUFFIX_PAYLOAD);
+    const provider = new DaDataAddressProvider(fetchMock);
+
+    const [suggestion] = await provider.suggestAddress('anything');
+
+    expect(suggestion.houseLabel).toBe(
+      MISMATCHED_SUFFIX_PAYLOAD.suggestions[0].value
+    );
   });
 
   it('always requests Russian and enables foreign countries', async () => {

@@ -94,17 +94,44 @@ export class DaDataAddressProvider implements AddressProvider {
   async suggestAddress(query: string): Promise<AddressSuggestion[]> {
     const rows = await this.query(query, HOUSE_COUNT, 'suggest');
 
-    return rows.map((row) => ({
-      label: row.value,
-      oneLine: row.unrestricted_value,
-      country: row.data.country ?? '',
-      region: row.data.region_with_type ?? '',
-      city: row.data.city ?? '',
-      street: row.data.street_with_type ?? '',
-      building: row.data.house ?? '',
-      postalCode: row.data.postal_code ?? '',
-      houseFiasId: row.data.house_fias_id ?? undefined,
-    }));
+    return rows.map((row) => {
+      // Строение / корпус is a separate DaData field from the house number —
+      // fold it into `building` (labelled «Дом / Строение» in the UI) rather
+      // than dropping it, so "д 13 стр 3" doesn't collapse to "13".
+      const house = row.data.house ?? '';
+      const building = row.data.block
+        ? [house, row.data.block_type, row.data.block].filter(Boolean).join(' ')
+        : house;
+
+      // DaData formats a flat-level row's `value` as the house label plus
+      // exactly `, {flat_type} {flat}` — deterministic, so this strips it
+      // without a regex, and falls back to the full label if the format ever
+      // differs. Flat lookups must be built from this, never from `label`:
+      // appending " кв N" to a label that already ends in ", кв 738" produces
+      // a query DaData answers with zero results, which reads as "no flats".
+      const flatSuffix = row.data.flat
+        ? `, ${row.data.flat_type ?? ''} ${row.data.flat}`
+        : '';
+      const houseLabel =
+        flatSuffix && row.value.endsWith(flatSuffix)
+          ? row.value.slice(0, -flatSuffix.length)
+          : row.value;
+
+      return {
+        label: row.value,
+        oneLine: row.unrestricted_value,
+        country: row.data.country ?? '',
+        region: row.data.region_with_type ?? '',
+        city: row.data.city ?? '',
+        street: row.data.street_with_type ?? '',
+        building,
+        postalCode: row.data.postal_code ?? '',
+        houseFiasId: row.data.house_fias_id ?? undefined,
+        flat: row.data.flat ?? '',
+        flatFiasId: row.data.flat_fias_id ?? undefined,
+        houseLabel,
+      };
+    });
   }
 
   async suggestFlats(

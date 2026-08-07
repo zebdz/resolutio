@@ -14,6 +14,9 @@ interface AddressSuggestion {
   building: string;
   postalCode: string;
   houseFiasId?: string;
+  flat: string;
+  flatFiasId?: string;
+  houseLabel: string;
 }
 
 export interface AddressFields {
@@ -111,16 +114,24 @@ export function AddressSearch({ onSelect, disabled }: Props) {
         city: result.city,
         street: result.street,
         building: result.building,
-        // Reset — a new building invalidates any previously entered flat.
-        // This also fixes the stale-apartment carry-over bug.
-        apartment: '',
+        // A flat-level pick carries its own apartment (result.flat is '' for
+        // house/block-level picks, so this also still resets on an ordinary
+        // building change — a new building must not carry over a previously
+        // entered flat. This is also what fixes the stale-apartment
+        // carry-over bug).
+        apartment: result.flat,
         postalCode: result.postalCode,
         isPrivateHouse: false,
         oneLine: result.oneLine,
         houseFiasId: result.houseFiasId ?? '',
-        flatFiasId: '',
+        flatFiasId: result.flatFiasId ?? '',
       },
-      result.label
+      // houseLabel, never label: label may carry a ", кв N" suffix for a
+      // flat-level pick, and that string feeds later flat probes (see
+      // AddressForm.handleAddressSelect and ApartmentSearch) — appending
+      // another " кв N" to an already-flat-suffixed label is the malformed
+      // query that caused «Частный дом» to switch on incorrectly.
+      result.houseLabel
     );
     setQuery(result.label);
     setShowDropdown(false);

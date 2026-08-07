@@ -124,6 +124,14 @@ export function AddressForm({ address }: Props) {
     setError(null);
     setSuccess(null);
 
+    // A flat-level pick is itself proof the building has flats, so no probe is
+    // needed — and probing would be actively wrong: the query is built from the
+    // house label, and we already know the answer. Toggle stays off (apartment
+    // required) and the apartment is already filled from the suggestion.
+    if (fields.apartment) {
+      return;
+    }
+
     // Probe ГАР for flats. Found → it is demonstrably an apartment block, so
     // apartment stays required. None found → most likely a private house.
     // Nominatim results have no houseFiasId and cannot be probed, so they keep

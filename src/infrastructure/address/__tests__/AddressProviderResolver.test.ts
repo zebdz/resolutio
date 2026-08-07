@@ -12,6 +12,8 @@ const daDataHit: AddressSuggestion = {
   building: '13',
   postalCode: '344011',
   houseFiasId: 'house-uuid',
+  flat: '',
+  houseLabel: 'г Ростов-на-Дону, Гвардейский пер, д 13',
 };
 
 const nominatimHit: AddressSuggestion = {
@@ -23,6 +25,8 @@ const nominatimHit: AddressSuggestion = {
   street: 'Alexanderplatz',
   building: '1',
   postalCode: '10178',
+  flat: '',
+  houseLabel: 'Alexanderplatz 1, Berlin',
 };
 
 describe('AddressProviderResolver', () => {

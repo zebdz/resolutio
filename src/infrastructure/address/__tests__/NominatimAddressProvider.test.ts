@@ -55,6 +55,25 @@ describe('NominatimAddressProvider', () => {
     expect(suggestion.houseFiasId).toBeUndefined();
   });
 
+  it('never populates flat/flatFiasId — Nominatim has no flat data at all', async () => {
+    const fetchMock = mockFetchOnce([ALEXANDERPLATZ_ROW]);
+    const provider = new NominatimAddressProvider(fetchMock);
+
+    const [suggestion] = await provider.suggestAddress('Alexanderplatz');
+
+    expect(suggestion.flat).toBe('');
+    expect(suggestion.flatFiasId).toBeUndefined();
+  });
+
+  it('sets houseLabel equal to label — there is no flat suffix to strip', async () => {
+    const fetchMock = mockFetchOnce([ALEXANDERPLATZ_ROW]);
+    const provider = new NominatimAddressProvider(fetchMock);
+
+    const [suggestion] = await provider.suggestAddress('Alexanderplatz');
+
+    expect(suggestion.houseLabel).toBe(suggestion.label);
+  });
+
   it('never populates oneLine — its presence elsewhere in the app is what signals "this is a DaData selection" (design doc, Data model), and an OSM display_name is a differently-shaped string that resolves to nothing, or the wrong address, if ever fed back into DaData\'s suggest', async () => {
     const fetchMock = mockFetchOnce([ALEXANDERPLATZ_ROW]);
     const provider = new NominatimAddressProvider(fetchMock);
