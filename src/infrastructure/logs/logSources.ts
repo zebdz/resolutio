@@ -24,6 +24,12 @@ export const LOG_SOURCES: LogSource[] = [
     label: 'Address Quota',
     json: true,
   },
+  {
+    id: 'address-integrity',
+    path: 'logs/address-integrity.log',
+    label: 'Address Integrity',
+    json: true,
+  },
 ];
 
 export const ARCHIVE_DIR = path.join(process.cwd(), 'logs', 'archive');

@@ -4,6 +4,7 @@ import { PhoneNumber } from '@/domain/user/PhoneNumber';
 import { Nickname } from '@/domain/user/Nickname';
 import { Address } from '@/domain/user/Address';
 import type { PrismaClient } from '@/generated/prisma/client';
+import { AddressIntegrityLogger } from '@/infrastructure/address/AddressIntegrityLogger';
 
 const USER_SELECT = {
   id: true,
@@ -39,8 +40,45 @@ const USER_SELECT = {
   },
 } as const;
 
+// Shape returned by USER_SELECT, and the input to toDomain /
+// toDomainSkippingInvalid. Named so both can share one signature.
+type UserRow = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  middleName: string | null;
+  phoneNumber: string;
+  password: string;
+  language: string;
+  consentGivenAt: Date | null;
+  createdAt: Date;
+  nickname: string;
+  allowFindByName: boolean;
+  allowFindByPhone: boolean;
+  allowFindByAddress: boolean;
+  privacySetupCompleted: boolean;
+  confirmedAt: Date | null;
+  address: {
+    id: string;
+    country: string;
+    region: string | null;
+    city: string;
+    street: string;
+    building: string;
+    apartment: string | null;
+    postalCode: string | null;
+    isPrivateHouse: boolean;
+    oneLine: string | null;
+    houseFiasId: string | null;
+    flatFiasId: string | null;
+  } | null;
+};
+
 export class PrismaUserRepository implements UserRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly addressIntegrityLogger: AddressIntegrityLogger = new AddressIntegrityLogger()
+  ) {}
 
   async findById(id: string): Promise<User | null> {
     const user = await this.prisma.user.findUnique({
@@ -61,6 +99,8 @@ export class PrismaUserRepository implements UserRepository {
       select: USER_SELECT,
     });
 
+    // Deliberately strict, NOT toDomainSkippingInvalid — see that method's
+    // doc comment for why this list method must not swallow a bad row.
     return users.map((user) => this.toDomain(user));
   }
 
@@ -281,7 +321,9 @@ export class PrismaUserRepository implements UserRepository {
       take: 20,
     });
 
-    return users.map((user) => this.toDomain(user));
+    // Not the strict findByIds path — see toDomainSkippingInvalid's doc
+    // comment for why this list method deliberately skips bad rows instead.
+    return this.toDomainSkippingInvalid(users, 'searchUsers');
   }
 
   async searchUserByPhone(phone: string): Promise<User | null> {
@@ -379,37 +421,7 @@ export class PrismaUserRepository implements UserRepository {
     return { blocked: false };
   }
 
-  private toDomain(user: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    middleName: string | null;
-    phoneNumber: string;
-    password: string;
-    language: string;
-    consentGivenAt: Date | null;
-    createdAt: Date;
-    nickname: string;
-    allowFindByName: boolean;
-    allowFindByPhone: boolean;
-    allowFindByAddress: boolean;
-    privacySetupCompleted: boolean;
-    confirmedAt: Date | null;
-    address: {
-      id: string;
-      country: string;
-      region: string | null;
-      city: string;
-      street: string;
-      building: string;
-      apartment: string | null;
-      postalCode: string | null;
-      isPrivateHouse: boolean;
-      oneLine: string | null;
-      houseFiasId: string | null;
-      flatFiasId: string | null;
-    } | null;
-  }): User {
+  private toDomain(user: UserRow): User {
     // PhoneNumber.create throws if invalid, which is correct here
     // because database should always have valid phone numbers
     const phoneNumber = PhoneNumber.create(user.phoneNumber);
@@ -446,6 +458,52 @@ export class PrismaUserRepository implements UserRepository {
           })
         : undefined,
     });
+  }
+
+  /**
+   * Same mapping as toDomain, but for a list: one row that fails
+   * reconstitution (e.g. Address.create() throwing APARTMENT_REQUIRED for a
+   * row written by old code during a deploy write window — see "Accepted
+   * risk" in readmes/2026-08-06-address-dadata-design.md) is skipped and
+   * logged instead of taking down the entire result set.
+   *
+   * ONLY wired up for searchUsers. Deliberately NOT used by findByIds, even
+   * though both return User[] — this asymmetry is intentional, not an
+   * oversight:
+   *
+   * - findByIds feeds GetPollResultsUseCase to resolve voter names for a
+   *   poll's results protocol, which is a legal document. Silently dropping
+   *   a participant there would produce an incomplete protocol. This
+   *   project's rule is that who voted, when, and in what manner must
+   *   always be preserved — a hard error on a bad row is strictly better
+   *   than a silently incomplete legal document, so findByIds stays on the
+   *   strict `users.map((user) => this.toDomain(user))` path.
+   * - searchUsers is a discovery feature. A missing search result is
+   *   degraded UX, not a corrupted record, so here it is fine — better,
+   *   even — to skip the bad row, log it for an operator to fix, and keep
+   *   serving the rest.
+   */
+  private async toDomainSkippingInvalid(
+    users: UserRow[],
+    method: string
+  ): Promise<User[]> {
+    const result: User[] = [];
+
+    for (const user of users) {
+      try {
+        result.push(this.toDomain(user));
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+
+        await this.addressIntegrityLogger.logUnreadableAddress({
+          userId: user.id,
+          reason,
+          method,
+        });
+      }
+    }
+
+    return result;
   }
 
   async getBlockedUserIds(): Promise<string[]> {
