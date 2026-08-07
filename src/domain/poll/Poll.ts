@@ -10,7 +10,7 @@ import { DistributionType } from './DistributionType';
 import { PropertyAggregation } from './PropertyAggregation';
 
 export const POLL_TITLE_MAX_LENGTH = 500;
-export const POLL_DESCRIPTION_MAX_LENGTH = 500;
+export const POLL_DESCRIPTION_MAX_LENGTH = 1000;
 
 export interface PollProps {
   id: string;
