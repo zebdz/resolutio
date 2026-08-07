@@ -52,6 +52,9 @@ describe('DaDataAddressProvider', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Some tests delete DADATA_API_KEY; restore it so later tests can't
+    // inherit a missing key regardless of execution order.
+    process.env.DADATA_API_KEY = 'test-key';
   });
 
   it('maps a house suggestion onto AddressSuggestion', async () => {
@@ -129,11 +132,23 @@ describe('DaDataAddressProvider', () => {
   });
 
   it('returns an empty list when DaData errors, so the caller can fall back', async () => {
+    // The body below would map onto a real suggestion if the res.ok guard were
+    // ignored — that's what makes this assertion actually pin the guard,
+    // instead of merely reflecting an empty `suggestions` key.
     const fetchMock = vi
       .fn()
-      .mockResolvedValue({ ok: false, json: async () => ({}) });
+      .mockResolvedValue({ ok: false, json: async () => HOUSE_PAYLOAD });
     const provider = new DaDataAddressProvider(fetchMock);
 
     expect(await provider.suggestAddress('anything')).toEqual([]);
+  });
+
+  it('throws when DADATA_API_KEY is not configured, so misconfiguration is loud', async () => {
+    delete process.env.DADATA_API_KEY;
+    const provider = new DaDataAddressProvider(mockFetchOnce(HOUSE_PAYLOAD));
+
+    await expect(provider.suggestAddress('Гвардейский 13')).rejects.toThrow(
+      'DADATA_API_KEY is not configured'
+    );
   });
 });

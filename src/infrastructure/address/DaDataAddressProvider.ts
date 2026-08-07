@@ -26,7 +26,19 @@ export class DaDataAddressProvider implements AddressProvider {
   private async query(query: string, count: number): Promise<DaDataRow[]> {
     const token = process.env.DADATA_API_KEY;
 
-    if (!token || !query.trim()) {
+    // Misconfiguration must fail loudly. An empty array is the resolver's signal
+    // to fall back to Nominatim, which has NO apartment data — so silently
+    // returning [] here would route all Russian traffic to a provider that
+    // cannot do the one thing this feature exists for, with no operator signal.
+    // Thrown BEFORE the try/catch below so it propagates rather than being
+    // swallowed into an empty result.
+    if (!token) {
+      throw new Error(
+        'DADATA_API_KEY is not configured — address suggestions cannot work'
+      );
+    }
+
+    if (!query.trim()) {
       return [];
     }
 

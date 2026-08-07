@@ -205,6 +205,11 @@ dropdown already uses — a dedicated method would be a second name for one beha
 
 - All calls send `language: "ru"` and `locations: [{ country: "*" }]`.
 - `suggestFlats` filters `data.flat !== null`.
+- **A missing `DADATA_API_KEY` throws.** It must not return an empty array: an empty
+  array is the resolver's signal to fall back to Nominatim, which has no apartment data
+  at all. Silently falling back on a misconfiguration would leave the feature looking
+  functional while quietly losing the only thing it was built for, with nothing in the
+  logs. Failing loudly is the correct trade here.
 - Nominatim stays behind `src/infrastructure/address/NominatimAddressProvider.ts`,
   also requesting `Accept-Language: ru` so both providers store Russian consistently.
 
