@@ -124,6 +124,7 @@ jobs:
           SMS_RU_MAX_COST_RUBLES: ${{ vars.SMS_RU_MAX_COST_RUBLES || '' }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           GOOGLE_GENERATIVE_AI_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_KEY }}
+          DADATA_API_KEY: ${{ secrets.DADATA_API_KEY }}
           PORT: ${{ inputs.port }}
         run: |
           # Create .env file for deployment
@@ -137,6 +138,10 @@ jobs:
           echo "SMS_RU_MAX_COST_RUBLES=$SMS_RU_MAX_COST_RUBLES" >> .env
           echo "DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY" >> .env
           echo "GOOGLE_GENERATIVE_AI_KEY=$GOOGLE_GENERATIVE_AI_KEY" >> .env
+          # Required: a missing DADATA_API_KEY makes the address suggestion
+          # routes throw rather than silently fall back to Nominatim (which has
+          # no apartment data). See readmes/2026-08-06-address-dadata-design.md
+          echo "DADATA_API_KEY=$DADATA_API_KEY" >> .env
           echo "PORT=$PORT" >> .env
 
           tar -czf deploy.tar.gz \
