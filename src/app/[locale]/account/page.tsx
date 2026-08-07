@@ -90,10 +90,13 @@ export default async function AccountPage() {
                           building: user.address.building,
                           apartment: user.address.apartment,
                           postalCode: user.address.postalCode,
+                          isPrivateHouse: user.address.isPrivateHouse,
+                          oneLine: user.address.oneLine,
+                          houseFiasId: user.address.houseFiasId,
+                          flatFiasId: user.address.flatFiasId,
                         }
                       : null
                   }
-                  locale={user.language}
                 />
               </div>
             </details>

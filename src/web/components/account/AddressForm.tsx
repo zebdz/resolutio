@@ -7,11 +7,14 @@ import {
   Field,
   Label,
   FieldGroup,
+  Description,
 } from '@/src/web/components/catalyst/fieldset';
+import { Switch, SwitchField } from '@/src/web/components/catalyst/switch';
 import { Input } from '@/src/web/components/catalyst/input';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { updateProfileAction } from '@/src/web/actions/user/user';
 import { AddressSearch, type AddressFields } from './AddressSearch';
+import { ApartmentSearch } from './ApartmentSearch';
 
 type AddressData = {
   country: string;
@@ -21,14 +24,17 @@ type AddressData = {
   building: string;
   apartment?: string;
   postalCode?: string;
+  isPrivateHouse: boolean;
+  oneLine?: string;
+  houseFiasId?: string;
+  flatFiasId?: string;
 };
 
 type Props = {
   address?: AddressData | null;
-  locale: string;
 };
 
-export function AddressForm({ address, locale }: Props) {
+export function AddressForm({ address }: Props) {
   const t = useTranslations('account');
 
   const [isPending, startTransition] = useTransition();
@@ -36,6 +42,7 @@ export function AddressForm({ address, locale }: Props) {
   const [success, setSuccess] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [showManualAddress, setShowManualAddress] = useState(!!address);
+  const [houseLabel, setHouseLabel] = useState(address?.oneLine || '');
   const [values, setValues] = useState<AddressFields>({
     country: address?.country || '',
     region: address?.region || '',
@@ -44,12 +51,19 @@ export function AddressForm({ address, locale }: Props) {
     building: address?.building || '',
     apartment: address?.apartment || '',
     postalCode: address?.postalCode || '',
+    isPrivateHouse: address?.isPrivateHouse ?? false,
+    oneLine: address?.oneLine || '',
+    houseFiasId: address?.houseFiasId || '',
+    flatFiasId: address?.flatFiasId || '',
   });
 
   const hasAddress =
     values.country.trim() !== '' ||
     values.city.trim() !== '' ||
     values.street.trim() !== '';
+
+  const apartmentMissing =
+    !values.isPrivateHouse && values.apartment.trim() === '';
 
   const changed =
     values.country !== (address?.country || '') ||
@@ -58,11 +72,23 @@ export function AddressForm({ address, locale }: Props) {
     values.street !== (address?.street || '') ||
     values.building !== (address?.building || '') ||
     values.apartment !== (address?.apartment || '') ||
-    values.postalCode !== (address?.postalCode || '');
+    values.postalCode !== (address?.postalCode || '') ||
+    values.isPrivateHouse !== (address?.isPrivateHouse ?? false) ||
+    values.oneLine !== (address?.oneLine || '') ||
+    values.houseFiasId !== (address?.houseFiasId || '') ||
+    values.flatFiasId !== (address?.flatFiasId || '');
 
   function handleFieldChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
-    setValues((prev) => ({ ...prev, [name]: value }));
+    setValues((prev) => ({
+      ...prev,
+      [name]: value,
+      // Hand-edited addresses carry no ГАР provenance
+      oneLine: '',
+      houseFiasId: '',
+      flatFiasId: '',
+    }));
+    setHouseLabel('');
 
     if (fieldErrors[name]) {
       setFieldErrors((prev) => {
@@ -82,16 +108,34 @@ export function AddressForm({ address, locale }: Props) {
     }
   }
 
-  function handleNominatimSelect(fields: Partial<AddressFields>) {
-    setValues((prev) => ({ ...prev, ...fields }));
+  async function handleAddressSelect(fields: AddressFields, label: string) {
+    setValues(fields);
+    setHouseLabel(label);
     setShowManualAddress(true);
+    setError(null);
+    setSuccess(null);
 
-    if (error) {
-      setError(null);
+    // Probe ГАР for flats. Found → it is demonstrably an apartment block, so
+    // apartment stays required. None found → most likely a private house.
+    // Nominatim results have no houseFiasId and cannot be probed, so they keep
+    // the safe default of "apartment required".
+    if (!fields.houseFiasId) {
+      return;
     }
 
-    if (success) {
-      setSuccess(null);
+    try {
+      const res = await fetch('/api/address/flats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ houseLabel: label, fragment: '' }),
+      });
+
+      if (res.ok) {
+        const { flats } = (await res.json()) as { flats: unknown[] };
+        setValues((prev) => ({ ...prev, isPrivateHouse: flats.length === 0 }));
+      }
+    } catch {
+      // Leave the safe default in place
     }
   }
 
@@ -110,6 +154,10 @@ export function AddressForm({ address, locale }: Props) {
     formData.set('addressBuilding', values.building);
     formData.set('addressApartment', values.apartment);
     formData.set('addressPostalCode', values.postalCode);
+    formData.set('addressIsPrivateHouse', String(values.isPrivateHouse));
+    formData.set('addressOneLine', values.oneLine);
+    formData.set('addressHouseFiasId', values.houseFiasId);
+    formData.set('addressFlatFiasId', values.flatFiasId);
 
     startTransition(async () => {
       const result = await updateProfileAction(formData);
@@ -156,7 +204,12 @@ export function AddressForm({ address, locale }: Props) {
           building: '',
           apartment: '',
           postalCode: '',
+          isPrivateHouse: false,
+          oneLine: '',
+          houseFiasId: '',
+          flatFiasId: '',
         });
+        setHouseLabel('');
         setShowManualAddress(false);
         setSuccess(t('addressSuccess'));
       }
@@ -171,11 +224,7 @@ export function AddressForm({ address, locale }: Props) {
       <FieldGroup>
         <Field>
           <Label>{t('addressSearchPlaceholder')}</Label>
-          <AddressSearch
-            locale={locale}
-            onSelect={handleNominatimSelect}
-            disabled={isPending}
-          />
+          <AddressSearch onSelect={handleAddressSelect} disabled={isPending} />
           {!showManualAddress && (
             <button
               type="button"
@@ -252,15 +301,60 @@ export function AddressForm({ address, locale }: Props) {
                 </p>
               )}
             </Field>
-            <Field>
-              <Label>{t('addressApartment')}</Label>
-              <Input
-                name="apartment"
-                value={values.apartment}
-                onChange={handleFieldChange}
+
+            <SwitchField>
+              <Label>{t('addressPrivateHouse')}</Label>
+              <Description>{t('addressPrivateHouseDescription')}</Description>
+              <Switch
+                color="brand-green"
+                checked={values.isPrivateHouse}
+                onChange={(checked) => {
+                  setValues((prev) => ({
+                    ...prev,
+                    isPrivateHouse: checked,
+                    // A private house has no flat
+                    apartment: checked ? '' : prev.apartment,
+                    flatFiasId: checked ? '' : prev.flatFiasId,
+                  }));
+                  setError(null);
+                  setSuccess(null);
+                }}
                 disabled={isPending}
               />
-            </Field>
+            </SwitchField>
+
+            {!values.isPrivateHouse && (
+              <Field>
+                <Label>{t('addressApartment')}</Label>
+                <ApartmentSearch
+                  value={values.apartment}
+                  houseLabel={houseLabel}
+                  houseFiasId={values.houseFiasId}
+                  disabled={isPending}
+                  invalid={apartmentMissing || !!fieldErrors.apartment}
+                  onChange={(flat, flatFiasId) => {
+                    setValues((prev) => ({
+                      ...prev,
+                      apartment: flat,
+                      flatFiasId,
+                    }));
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                />
+                {apartmentMissing && (
+                  <p className="text-sm text-red-600">
+                    {t('addressApartmentRequired')}
+                  </p>
+                )}
+                {fieldErrors.apartment && (
+                  <p className="text-sm text-red-600">
+                    {fieldErrors.apartment[0]}
+                  </p>
+                )}
+              </Field>
+            )}
+
             <Field>
               <Label>{t('addressPostalCode')}</Label>
               <Input
@@ -285,7 +379,10 @@ export function AddressForm({ address, locale }: Props) {
             {t('addressClear')}
           </Button>
         )}
-        <Button type="submit" disabled={isPending || !changed || !hasAddress}>
+        <Button
+          type="submit"
+          disabled={isPending || !changed || !hasAddress || apartmentMissing}
+        >
           {isPending ? t('addressSaving') : t('addressSave')}
         </Button>
       </div>

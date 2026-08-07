@@ -4,21 +4,16 @@ import { useTranslations } from 'next-intl';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Input } from '@/src/web/components/catalyst/input';
 
-interface NominatimResult {
-  place_id: number;
-  display_name: string;
-  address: {
-    country?: string;
-    state?: string;
-    city?: string;
-    town?: string;
-    village?: string;
-    road?: string;
-    house_number?: string;
-    postcode?: string;
-    suburb?: string;
-    county?: string;
-  };
+interface AddressSuggestion {
+  label: string;
+  oneLine: string;
+  country: string;
+  region: string;
+  city: string;
+  street: string;
+  building: string;
+  postalCode: string;
+  houseFiasId?: string;
 }
 
 export interface AddressFields {
@@ -29,64 +24,71 @@ export interface AddressFields {
   building: string;
   apartment: string;
   postalCode: string;
+  isPrivateHouse: boolean;
+  oneLine: string;
+  houseFiasId: string;
+  flatFiasId: string;
 }
 
 type Props = {
-  locale: string;
-  onSelect: (fields: Partial<AddressFields>) => void;
+  onSelect: (fields: AddressFields, houseLabel: string) => void;
   disabled?: boolean;
 };
 
-export function AddressSearch({ locale, onSelect, disabled }: Props) {
+export function AddressSearch({ onSelect, disabled }: Props) {
   const t = useTranslations('account');
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<NominatimResult[]>([]);
+  const [results, setResults] = useState<AddressSuggestion[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const cacheRef = useRef<Map<string, AddressSuggestion[]>>(new Map());
 
-  const search = useCallback(
-    async (q: string) => {
-      if (q.trim().length < 3) {
-        setResults([]);
-        setShowDropdown(false);
+  const search = useCallback(async (q: string) => {
+    const key = q.trim();
 
-        return;
+    if (key.length < 3) {
+      setResults([]);
+      setShowDropdown(false);
+
+      return;
+    }
+
+    // Typing "Ростов" then backspacing to "Росто" must not re-hit the API —
+    // each call costs one middleware session hit out of 120/min
+    const cached = cacheRef.current.get(key);
+
+    if (cached) {
+      setResults(cached);
+      setShowDropdown(cached.length > 0);
+
+      return;
+    }
+
+    setIsSearching(true);
+
+    try {
+      const res = await fetch('/api/address/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: key }),
+      });
+
+      if (res.ok) {
+        const { suggestions } = (await res.json()) as {
+          suggestions: AddressSuggestion[];
+        };
+        cacheRef.current.set(key, suggestions);
+        setResults(suggestions);
+        setShowDropdown(suggestions.length > 0);
       }
-
-      setIsSearching(true);
-
-      try {
-        const params = new URLSearchParams({
-          q,
-          format: 'jsonv2',
-          addressdetails: '1',
-          limit: '5',
-        });
-
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?${params}`,
-          {
-            headers: {
-              'Accept-Language': locale,
-            },
-          }
-        );
-
-        if (res.ok) {
-          const data: NominatimResult[] = await res.json();
-          setResults(data);
-          setShowDropdown(data.length > 0);
-        }
-      } catch {
-        // Silently fail — user can fill manually
-      } finally {
-        setIsSearching(false);
-      }
-    },
-    [locale]
-  );
+    } catch {
+      // Silently fail — user can fill manually
+    } finally {
+      setIsSearching(false);
+    }
+  }, []);
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
@@ -101,17 +103,26 @@ export function AddressSearch({ locale, onSelect, disabled }: Props) {
     }, 300);
   }
 
-  function handleSelect(result: NominatimResult) {
-    const addr = result.address;
-    onSelect({
-      country: addr.country || '',
-      region: addr.state || '',
-      city: addr.city || addr.town || addr.village || '',
-      street: addr.road || '',
-      building: addr.house_number || '',
-      postalCode: addr.postcode || '',
-    });
-    setQuery(result.display_name);
+  function handleSelect(result: AddressSuggestion) {
+    onSelect(
+      {
+        country: result.country,
+        region: result.region,
+        city: result.city,
+        street: result.street,
+        building: result.building,
+        // Reset — a new building invalidates any previously entered flat.
+        // This also fixes the stale-apartment carry-over bug.
+        apartment: '',
+        postalCode: result.postalCode,
+        isPrivateHouse: false,
+        oneLine: result.oneLine,
+        houseFiasId: result.houseFiasId ?? '',
+        flatFiasId: '',
+      },
+      result.label
+    );
+    setQuery(result.label);
     setShowDropdown(false);
   }
 
@@ -154,13 +165,13 @@ export function AddressSearch({ locale, onSelect, disabled }: Props) {
       {showDropdown && results.length > 0 && (
         <ul className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
           {results.map((result) => (
-            <li key={result.place_id}>
+            <li key={result.oneLine}>
               <button
                 type="button"
-                className="w-full px-3 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                className="w-full cursor-pointer px-3 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"
                 onClick={() => handleSelect(result)}
               >
-                {result.display_name}
+                {result.label}
               </button>
             </li>
           ))}
