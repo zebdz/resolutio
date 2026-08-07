@@ -72,10 +72,10 @@ export function AddressSearch({ onSelect, disabled }: Props) {
     setIsSearching(true);
 
     try {
-      const res = await fetch('/api/address/suggest', {
+      const res = await fetch('/api/address', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: key }),
+        body: JSON.stringify({ mode: 'address', query: key }),
       });
 
       if (res.ok) {

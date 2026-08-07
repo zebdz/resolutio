@@ -151,10 +151,14 @@ export function AddressForm({ address }: Props) {
     toggleTouchedRef.current = false;
 
     try {
-      const res = await fetch('/api/address/flats', {
+      const res = await fetch('/api/address', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ houseLabel: label, fragment: '' }),
+        body: JSON.stringify({
+          mode: 'flats',
+          houseLabel: label,
+          fragment: '',
+        }),
       });
 
       if (res.ok) {

@@ -79,10 +79,10 @@ export function ApartmentSearch({
       }
 
       try {
-        const res = await fetch('/api/address/flats', {
+        const res = await fetch('/api/address', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ houseLabel, fragment: key }),
+          body: JSON.stringify({ mode: 'flats', houseLabel, fragment: key }),
         });
 
         if (res.ok) {
