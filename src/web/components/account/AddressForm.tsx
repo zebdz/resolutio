@@ -139,11 +139,50 @@ export function AddressForm({ address }: Props) {
     }
   }
 
+  // Mirrors Address.create's checks (country, city, street, building, then
+  // apartment-unless-private-house) so the client never sends a submission
+  // the domain would reject anyway. Unlike Address.create, which throws on
+  // the first failing check, this collects every missing field so the user
+  // sees all of them at once instead of one-at-a-time whack-a-mole.
+  function validateAddress(): Record<string, string[]> {
+    const errors: Record<string, string[]> = {};
+
+    if (values.country.trim() === '') {
+      errors.country = [t('addressCountryRequired')];
+    }
+
+    if (values.city.trim() === '') {
+      errors.city = [t('addressCityRequired')];
+    }
+
+    if (values.street.trim() === '') {
+      errors.street = [t('addressStreetRequired')];
+    }
+
+    if (values.building.trim() === '') {
+      errors.building = [t('addressBuildingRequired')];
+    }
+
+    if (apartmentMissing) {
+      errors.apartment = [t('addressApartmentRequired')];
+    }
+
+    return errors;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setSuccess(null);
     setFieldErrors({});
+
+    const validationErrors = validateAddress();
+
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors);
+
+      return;
+    }
 
     const formData = new FormData();
     formData.set('addressAction', 'save');
@@ -347,7 +386,12 @@ export function AddressForm({ address }: Props) {
                     {t('addressApartmentRequired')}
                   </p>
                 )}
-                {fieldErrors.apartment && (
+                {/* apartmentMissing already covers the "required" case (and
+                    validateAddress uses the same message key for it) — only
+                    show fieldErrors.apartment here for a different reason,
+                    e.g. a server-side profanity rejection, so the same text
+                    never renders twice. */}
+                {!apartmentMissing && fieldErrors.apartment && (
                   <p className="text-sm text-red-600">
                     {fieldErrors.apartment[0]}
                   </p>
@@ -379,10 +423,7 @@ export function AddressForm({ address }: Props) {
             {t('addressClear')}
           </Button>
         )}
-        <Button
-          type="submit"
-          disabled={isPending || !changed || !hasAddress || apartmentMissing}
-        >
+        <Button type="submit" disabled={isPending || !changed || !hasAddress}>
           {isPending ? t('addressSaving') : t('addressSave')}
         </Button>
       </div>
