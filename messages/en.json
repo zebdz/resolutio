@@ -663,7 +663,7 @@
     },
     "publicPreview": {
       "openPollBadge": "Open poll",
-      "explainer": "Anyone with the link can vote once. Log in or create an account to cast your vote.",
+      "explainer": "Only a registered user can vote. Log in or create an account to cast your vote.",
       "loginToVote": "Log in to vote",
       "registerToVote": "Create an account",
       "votingNotStarted": "Voting has not started yet",
