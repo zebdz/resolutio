@@ -34,15 +34,47 @@ export function ApartmentSearch({
   const [showDropdown, setShowDropdown] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Keyed by `${houseFiasId}:${fragment}`, not fragment alone — this
+  // component stays mounted across a house change (AddressForm renders it
+  // without a `key`), so a bare fragment key would serve one house's cached
+  // flats for a different house.
+  const cacheRef = useRef<Map<string, FlatSuggestion[]>>(new Map());
 
   const search = useCallback(
     async (fragment: string) => {
       // houseFiasId — not houseLabel — is the signal that flats can be
-      // probed at all: only DaData house-level hits carry one. oneLine (and
-      // therefore houseLabel) is set for Nominatim picks too, so gating on
-      // houseLabel alone would fire a query DaData can never answer and
-      // burn a quota slot for nothing.
+      // probed at all: only DaData house-level hits carry one. houseLabel
+      // is set for Nominatim picks too (it comes from the suggestion's
+      // display label, not from oneLine, which Nominatim leaves blank), so
+      // gating on houseLabel alone would fire a query DaData can never
+      // answer and burn a quota slot for nothing.
       if (!houseLabel || !houseFiasId) {
+        return;
+      }
+
+      const key = fragment.trim();
+
+      // AddressForm's probe (handleAddressSelect) already asked for '' right
+      // after the house was picked. Re-asking here on every backspace down to
+      // empty would waste a slot of the global DaData daily quota on a
+      // question already answered. No minimum beyond that — unlike
+      // AddressSearch's 3 chars, flat numbers are legitimately 1-2 characters.
+      if (!key) {
+        setResults([]);
+        setShowDropdown(false);
+
+        return;
+      }
+
+      const cacheKey = `${houseFiasId}:${key}`;
+      // Typing "12" then backspacing to "1" must not re-hit the API — each
+      // call costs one slot of the global 9,500/day cap shared by every user.
+      const cached = cacheRef.current.get(cacheKey);
+
+      if (cached) {
+        setResults(cached);
+        setShowDropdown(cached.length > 0);
+
         return;
       }
 
@@ -50,11 +82,12 @@ export function ApartmentSearch({
         const res = await fetch('/api/address/flats', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ houseLabel, fragment }),
+          body: JSON.stringify({ houseLabel, fragment: key }),
         });
 
         if (res.ok) {
           const { flats } = (await res.json()) as { flats: FlatSuggestion[] };
+          cacheRef.current.set(cacheKey, flats);
           setResults(flats);
           setShowDropdown(flats.length > 0);
         }

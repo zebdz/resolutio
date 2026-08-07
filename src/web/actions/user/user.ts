@@ -92,13 +92,13 @@ export async function updateProfileAction(
           ? null
           : addressAction === 'save'
             ? {
-                country: String(formData.get('addressCountry')),
+                country: String(formData.get('addressCountry') ?? ''),
                 region: formData.get('addressRegion')
                   ? String(formData.get('addressRegion'))
                   : undefined,
-                city: String(formData.get('addressCity')),
-                street: String(formData.get('addressStreet')),
-                building: String(formData.get('addressBuilding')),
+                city: String(formData.get('addressCity') ?? ''),
+                street: String(formData.get('addressStreet') ?? ''),
+                building: String(formData.get('addressBuilding') ?? ''),
                 apartment: formData.get('addressApartment')
                   ? String(formData.get('addressApartment'))
                   : undefined,

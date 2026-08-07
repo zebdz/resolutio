@@ -119,6 +119,16 @@ Deliberately **not** stored:
 
 - `fias_actuality_state` — always `0` at capture time, so it tells us nothing later.
 - a `provider` column — presence of `oneLine` already implies a DaData selection.
+  This holds because `NominatimAddressProvider` deliberately never writes
+  `oneLine` (it maps every other field but leaves this one `''`, which the
+  domain then normalizes to `undefined`) — an OSM `display_name` is a
+  differently-shaped string that would resolve to nothing, or the wrong
+  address, if fed back into DaData's `suggest`. Only the provider that
+  produced a suggestion can tell them apart, which is why this is enforced
+  in `NominatimAddressProvider` itself rather than by, say, gating on
+  `houseFiasId` — DaData's own city-only foreign results also lack a
+  `houseFiasId`, and those `oneLine` values are legitimate DaData strings
+  worth keeping.
 
 ### Migration
 

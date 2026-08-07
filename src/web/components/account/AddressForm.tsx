@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useState, useTransition } from 'react';
+import { useState, useRef, useTransition } from 'react';
 import { Button } from '@/src/web/components/catalyst/button';
 import {
   Field,
@@ -56,6 +56,11 @@ export function AddressForm({ address }: Props) {
     houseFiasId: address?.houseFiasId || '',
     flatFiasId: address?.flatFiasId || '',
   });
+  // Whether the user has touched the «Частный дом» switch since the current
+  // probe (see handleAddressSelect) started. A ref, not state: flipping it
+  // must not trigger a re-render, and the probe's async continuation needs
+  // to read its *current* value, not the one captured when the probe began.
+  const toggleTouchedRef = useRef(false);
 
   const hasAddress =
     values.country.trim() !== '' ||
@@ -87,6 +92,10 @@ export function AddressForm({ address }: Props) {
       oneLine: '',
       houseFiasId: '',
       flatFiasId: '',
+      // No provenance means no probe was possible for whatever the fields
+      // now describe — fall back to the safe default (apartment required)
+      // rather than leaving a toggle decided by the address before the edit.
+      isPrivateHouse: false,
     }));
     setHouseLabel('');
 
@@ -123,6 +132,16 @@ export function AddressForm({ address }: Props) {
       return;
     }
 
+    // Identity of the selection this probe was started for. If the user edits
+    // a field (which clears houseFiasId, see handleFieldChange) or picks a
+    // different house before this resolves, applying the response later would
+    // silently stamp a toggle derived from a *different* address onto the
+    // current one — re-opening the exact hole this probe exists to close.
+    const probedHouseFiasId = fields.houseFiasId;
+    // A fresh probe cycle starts "untouched" — see the Switch's onChange,
+    // which is the only other place this ref is written.
+    toggleTouchedRef.current = false;
+
     try {
       const res = await fetch('/api/address/flats', {
         method: 'POST',
@@ -132,7 +151,14 @@ export function AddressForm({ address }: Props) {
 
       if (res.ok) {
         const { flats } = (await res.json()) as { flats: unknown[] };
-        setValues((prev) => ({ ...prev, isPrivateHouse: flats.length === 0 }));
+        setValues((prev) =>
+          // An explicit user choice always wins over an inferred one: if the
+          // user flipped the switch by hand while this was in flight, leave
+          // it alone even though houseFiasId still matches.
+          prev.houseFiasId === probedHouseFiasId && !toggleTouchedRef.current
+            ? { ...prev, isPrivateHouse: flats.length === 0 }
+            : prev
+        );
       }
     } catch {
       // Leave the safe default in place
@@ -348,6 +374,10 @@ export function AddressForm({ address }: Props) {
                 color="brand-green"
                 checked={values.isPrivateHouse}
                 onChange={(checked) => {
+                  // Marks this an explicit user choice so a flat probe still
+                  // in flight for the current house does not overwrite it —
+                  // see the guard in handleAddressSelect.
+                  toggleTouchedRef.current = true;
                   setValues((prev) => ({
                     ...prev,
                     isPrivateHouse: checked,

@@ -168,6 +168,42 @@ describe('updateProfileAction - address handling', () => {
     expect(input.address).toBeNull();
   });
 
+  it('rejects a save with addressAction=save and no address fields at all, instead of persisting the literal string "null" (data-integrity bug)', async () => {
+    // String(formData.get('addressCountry')) is String(null) = "null" when the
+    // key is entirely absent — a non-empty string that used to sail past Zod's
+    // .min(1). Deliberately does NOT go through baseAddressFields(), which
+    // always sets every key (even to ''): this reproduces a request that omits
+    // the address keys entirely, per the reported bug.
+    mockGetCurrentUser.mockResolvedValue({ id: 'user-1' });
+    mockUpdateUserProfileExecute.mockResolvedValue({
+      success: true,
+      value: {},
+    });
+
+    const formData = new FormData();
+    formData.set('addressAction', 'save');
+
+    const result = await updateProfileAction(formData);
+
+    expect(result.success).toBe(false);
+    expect(mockUpdateUserProfileExecute).not.toHaveBeenCalled();
+
+    if (!result.success) {
+      expect(result.fieldErrors?.['address.country']).toEqual([
+        AddressDomainCodes.COUNTRY_REQUIRED.replace('domain.', ''),
+      ]);
+      expect(result.fieldErrors?.['address.city']).toEqual([
+        AddressDomainCodes.CITY_REQUIRED.replace('domain.', ''),
+      ]);
+      expect(result.fieldErrors?.['address.street']).toEqual([
+        AddressDomainCodes.STREET_REQUIRED.replace('domain.', ''),
+      ]);
+      expect(result.fieldErrors?.['address.building']).toEqual([
+        AddressDomainCodes.BUILDING_REQUIRED.replace('domain.', ''),
+      ]);
+    }
+  });
+
   it('reaches the use case with the full address on a complete save (happy path)', async () => {
     mockGetCurrentUser.mockResolvedValue({ id: 'user-1' });
     mockUpdateUserProfileExecute.mockResolvedValue({

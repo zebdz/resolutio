@@ -42,7 +42,15 @@ export class NominatimAddressProvider implements AddressProvider {
 
       return rows.map((row) => ({
         label: row.display_name,
-        oneLine: row.display_name,
+        // Deliberately blank, not row.display_name. Elsewhere in the app the
+        // presence of oneLine is read as "this address came from DaData"
+        // (design doc, Data model: "presence of oneLine already implies a
+        // DaData selection"). An OSM display_name is a structurally
+        // different string (comma-joined, no postal-code-first ordering,
+        // sometimes English) — feeding it back into DaData's suggest
+        // resolves to nothing or the wrong address, so it must never be
+        // stored as if it were a DaData unrestricted_value.
+        oneLine: '',
         country: row.address.country ?? '',
         region: row.address.state ?? '',
         city: row.address.city ?? row.address.town ?? row.address.village ?? '',

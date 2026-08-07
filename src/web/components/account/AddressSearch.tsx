@@ -164,8 +164,11 @@ export function AddressSearch({ onSelect, disabled }: Props) {
       )}
       {showDropdown && results.length > 0 && (
         <ul className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
-          {results.map((result) => (
-            <li key={result.oneLine}>
+          {results.map((result, index) => (
+            // oneLine is blank for every Nominatim row (see
+            // NominatimAddressProvider) and would collide as a key, so pair
+            // the label with its position instead.
+            <li key={`${result.label}-${index}`}>
               <button
                 type="button"
                 className="w-full cursor-pointer px-3 py-2 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700"

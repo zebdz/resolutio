@@ -38,7 +38,6 @@ describe('NominatimAddressProvider', () => {
     const [suggestion] = await provider.suggestAddress('Alexanderplatz');
 
     expect(suggestion.label).toBe(ALEXANDERPLATZ_ROW.display_name);
-    expect(suggestion.oneLine).toBe(ALEXANDERPLATZ_ROW.display_name);
     expect(suggestion.country).toBe('Германия');
     expect(suggestion.region).toBe('Берлин');
     expect(suggestion.city).toBe('Берлин');
@@ -54,6 +53,15 @@ describe('NominatimAddressProvider', () => {
     const [suggestion] = await provider.suggestAddress('Alexanderplatz');
 
     expect(suggestion.houseFiasId).toBeUndefined();
+  });
+
+  it('never populates oneLine — its presence elsewhere in the app is what signals "this is a DaData selection" (design doc, Data model), and an OSM display_name is a differently-shaped string that resolves to nothing, or the wrong address, if ever fed back into DaData\'s suggest', async () => {
+    const fetchMock = mockFetchOnce([ALEXANDERPLATZ_ROW]);
+    const provider = new NominatimAddressProvider(fetchMock);
+
+    const [suggestion] = await provider.suggestAddress('Alexanderplatz');
+
+    expect(suggestion.oneLine).toBe('');
   });
 
   it('always requests Russian, so both providers store addresses consistently', async () => {

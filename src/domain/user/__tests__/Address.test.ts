@@ -232,6 +232,19 @@ describe('Address', () => {
       expect(address.apartment).toBeUndefined();
     });
 
+    it('should force flatFiasId to undefined for a private house', () => {
+      // A private house has no flat, so a flat-level ГАР id would be a
+      // contradictory pair with the (also forced-undefined) apartment.
+      const address = Address.create({
+        ...validProps,
+        isPrivateHouse: true,
+        apartment: '12',
+        flatFiasId: 'flat-uuid',
+      });
+
+      expect(address.flatFiasId).toBeUndefined();
+    });
+
     it('should accept an apartment when not a private house', () => {
       const address = Address.create({
         ...validProps,

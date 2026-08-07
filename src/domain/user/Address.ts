@@ -84,7 +84,10 @@ export class Address {
       isPrivateHouse,
       oneLine: props.oneLine?.trim() || undefined,
       houseFiasId: props.houseFiasId?.trim() || undefined,
-      flatFiasId: props.flatFiasId?.trim() || undefined,
+      // A private house has no flat — never persist a contradictory pair
+      flatFiasId: isPrivateHouse
+        ? undefined
+        : props.flatFiasId?.trim() || undefined,
     });
   }
 
