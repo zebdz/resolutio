@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { GetPollResultsUseCase } from '@/application/poll/GetPollResultsUseCase';
+import { PollDomainCodes } from '@/domain/poll/PollDomainCodes';
 import {
   prisma,
   PrismaPollRepository,
@@ -74,12 +75,19 @@ export async function GET(
       );
     }
 
-    const { poll, protocolSignWillingness, canViewVoters } = result.value;
+    const { poll, protocolSignWillingness, canViewSignWillingness } =
+      result.value;
 
-    // 3. Only admins can export protocol PDF
-    if (!canViewVoters) {
+    // 3. Only admins can export protocol PDF. This document carries phone
+    // numbers, so it stays admin-only even on a named poll where voter names
+    // are open to the whole organization.
+    if (!canViewSignWillingness) {
       return NextResponse.json(
-        { error: 'poll.errors.resultsAdminOnly' },
+        {
+          error: await translateErrorCode(
+            PollDomainCodes.POLL_RESULTS_ADMIN_ONLY
+          ),
+        },
         { status: 403 }
       );
     }

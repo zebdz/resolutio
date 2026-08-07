@@ -1,13 +1,16 @@
 import { Result, success, failure } from '../../domain/shared/Result';
 import { Poll } from '../../domain/poll/Poll';
 import { Vote } from '../../domain/poll/Vote';
-import { PollParticipant } from '../../domain/poll/PollParticipant';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { PollErrors } from './PollErrors';
 import { UserRepository } from '@/src/domain/user/UserRepository';
+import {
+  PollResultsPolicy,
+  ResultsViewerFacts,
+} from '../../domain/poll/PollResultsPolicy';
 
 export interface GetPollResultsInput {
   pollId: string;
@@ -61,7 +64,14 @@ export interface GetPollResultsResult {
   results: QuestionResult[];
   totalParticipants: number;
   totalParticipantWeight: number;
-  canViewVoters: boolean;
+  canViewVoterNames: boolean;
+  // Sign-willingness carries phone numbers gathered under a separate consent,
+  // so it is gated apart from the voting record and stays admin-only even when
+  // a named poll opens voter names to the whole organization.
+  canViewSignWillingness: boolean;
+  // SERVER-SIDE ONLY. PDF routes re-ask the policy about export rights with
+  // these. Never serialize this to a Client Component.
+  viewerFacts: ResultsViewerFacts;
   protocolSignWillingness: ProtocolSignWillingnessEntry[];
 }
 
@@ -92,49 +102,35 @@ export class GetPollResultsUseCase {
       return failure(PollErrors.NOT_FOUND);
     }
 
-    // 2. Check authorization
-    // If poll is active (not finished), only admins can view results
-    // If poll is finished, any organization member can view
+    // 2. Assemble the viewer's facts, then let the domain policy decide.
+    // The participant lookup used to run only for open polls; a named poll now
+    // grants access on the strength of it too, so it is resolved up front.
+    const [isSuperAdmin, isOrganizationAdmin, isMember, participantResult] =
+      await Promise.all([
+        this.userRepository.isSuperAdmin(userId),
+        this.organizationRepository.isUserAdmin(userId, poll.organizationId),
+        this.organizationRepository.isUserMember(userId, poll.organizationId),
+        this.participantRepository.getParticipantByUserAndPoll(pollId, userId),
+      ]);
 
-    const isSuperAdmin = await this.userRepository.isSuperAdmin(userId);
+    const viewerFacts: ResultsViewerFacts = {
+      isAdmin: isSuperAdmin || isOrganizationAdmin,
+      isOrgMember: isMember,
+      isPollVoter: participantResult.success && !!participantResult.value,
+    };
 
-    const isOrganizationAdmin = await this.organizationRepository.isUserAdmin(
-      userId,
-      poll.organizationId
-    );
+    const readable = PollResultsPolicy.canViewResults(poll, viewerFacts);
 
-    const isAdmin = isSuperAdmin || isOrganizationAdmin;
-
-    if (poll.isActive() && !poll.isFinished()) {
-      if (!isAdmin) {
-        return failure('poll.errors.resultsAdminOnly');
-      }
-    } else {
-      // Poll is finished: organization members and admins may read. An open
-      // poll is voted on by outsiders too, so anyone who actually cast a vote
-      // in it may see the outcome they took part in.
-      const isMember = await this.organizationRepository.isUserMember(
-        userId,
-        poll.organizationId
-      );
-
-      let isOpenPollVoter = false;
-
-      if (!isMember && !isAdmin && poll.isOpen()) {
-        const participantResult =
-          await this.participantRepository.getParticipantByUserAndPoll(
-            pollId,
-            userId
-          );
-
-        isOpenPollVoter =
-          participantResult.success && !!participantResult.value;
-      }
-
-      if (!isMember && !isAdmin && !isOpenPollVoter) {
-        return failure('poll.errors.notOrganizationMember');
-      }
+    if (!readable.success) {
+      return failure(readable.error);
     }
+
+    const canViewVoterNames = PollResultsPolicy.canViewVoterNames(
+      poll,
+      viewerFacts
+    );
+    const canViewSignWillingness =
+      PollResultsPolicy.canViewSignWillingness(viewerFacts);
 
     // 4. Get all votes and participants
     const votesResult = await this.voteRepository.getVotesByPoll(pollId);
@@ -276,7 +272,7 @@ export class GetPollResultsUseCase {
     // 9. Build protocol sign willingness data (admin only)
     let protocolSignWillingness: ProtocolSignWillingnessEntry[] = [];
 
-    if (isAdmin) {
+    if (canViewSignWillingness) {
       const votedParticipants = participants.filter(
         (p) => p.willingToSignProtocol !== null
       );
@@ -305,7 +301,9 @@ export class GetPollResultsUseCase {
       results,
       totalParticipants: participants.length,
       totalParticipantWeight,
-      canViewVoters: isAdmin,
+      canViewVoterNames,
+      canViewSignWillingness,
+      viewerFacts,
       protocolSignWillingness,
     });
   }

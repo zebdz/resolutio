@@ -45,6 +45,9 @@ export const createPollSchema = (profanityChecker: ProfanityChecker) =>
         .optional(),
       propertyIds: z.array(z.string()).optional(),
       pollType: z.enum(['ORGANIZATION', 'OPEN']).optional(),
+      // Named is the default. Deliberately absent from updatePollSchema: the
+      // flag is set once at creation and never changes.
+      anonymous: z.coerce.boolean().default(false),
     })
     .refine((data) => data.startDate < data.endDate, {
       message: 'Start date must be before end date',

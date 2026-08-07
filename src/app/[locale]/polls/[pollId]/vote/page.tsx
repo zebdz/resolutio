@@ -125,6 +125,12 @@ export default async function VotePage({ params }: VotePageProps) {
     title: poll.title,
     description: poll.description,
     pollType: poll.pollType,
+    anonymous: !!poll.anonymous,
+    // The notice has to warn about the property listing too, and only an
+    // ownership-weighted poll puts holdings in the named protocol.
+    isPropertyBased:
+      poll.distributionType === 'OWNERSHIP_UNIT_COUNT' ||
+      poll.distributionType === 'OWNERSHIP_SIZE_WEIGHTED',
     questions: poll.questions.map((q: any) => ({
       id: q.id,
       text: q.text,
@@ -169,6 +175,8 @@ export default async function VotePage({ params }: VotePageProps) {
         poll={serializedPoll}
         userDrafts={serializedDrafts}
         pollId={pollId}
+        isAnonymous={serializedPoll.anonymous}
+        isPropertyBased={serializedPoll.isPropertyBased}
       />
     </AuthenticatedLayout>
   );

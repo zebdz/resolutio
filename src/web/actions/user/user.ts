@@ -68,8 +68,7 @@ export async function updateProfileAction(
 
     const allowFindByAddressValue = formData.get('allowFindByAddress');
 
-    // Address fields — present when user submits the address form
-    const addressCountry = formData.get('addressCountry');
+    // Address form intent — present when user submits the address form
     const addressAction = formData.get('addressAction'); // 'save' | 'clear' | absent
 
     const input = {
@@ -91,20 +90,31 @@ export async function updateProfileAction(
       address:
         addressAction === 'clear'
           ? null
-          : addressCountry
+          : addressAction === 'save'
             ? {
-                country: String(formData.get('addressCountry')),
+                country: String(formData.get('addressCountry') ?? ''),
                 region: formData.get('addressRegion')
                   ? String(formData.get('addressRegion'))
                   : undefined,
-                city: String(formData.get('addressCity')),
-                street: String(formData.get('addressStreet')),
-                building: String(formData.get('addressBuilding')),
+                city: String(formData.get('addressCity') ?? ''),
+                street: String(formData.get('addressStreet') ?? ''),
+                building: String(formData.get('addressBuilding') ?? ''),
                 apartment: formData.get('addressApartment')
                   ? String(formData.get('addressApartment'))
                   : undefined,
                 postalCode: formData.get('addressPostalCode')
                   ? String(formData.get('addressPostalCode'))
+                  : undefined,
+                isPrivateHouse:
+                  formData.get('addressIsPrivateHouse') === 'true',
+                oneLine: formData.get('addressOneLine')
+                  ? String(formData.get('addressOneLine'))
+                  : undefined,
+                houseFiasId: formData.get('addressHouseFiasId')
+                  ? String(formData.get('addressHouseFiasId'))
+                  : undefined,
+                flatFiasId: formData.get('addressFlatFiasId')
+                  ? String(formData.get('addressFlatFiasId'))
                   : undefined,
               }
             : undefined,

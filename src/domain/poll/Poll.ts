@@ -26,6 +26,7 @@ export interface PollProps {
   distributionType: string; // 'EQUAL' | 'OWNERSHIP_UNIT_COUNT' | 'OWNERSHIP_SIZE_WEIGHTED'
   propertyAggregation: string; // 'RAW_SUM' | 'NORMALIZE_PER_PROPERTY'
   propertyIds: string[]; // empty = no filter (all properties)
+  anonymous: boolean;
   createdBy: string;
   createdAt: Date;
   archivedAt: Date | null;
@@ -44,7 +45,8 @@ export class Poll {
     startDate: Date,
     endDate: Date,
     profanityChecker?: ProfanityChecker,
-    pollType: string = PollType.ORGANIZATION
+    pollType: string = PollType.ORGANIZATION,
+    anonymous: boolean = false
   ): Result<Poll, string> {
     // Validate title
     if (!title || title.trim().length === 0) {
@@ -103,6 +105,7 @@ export class Poll {
       distributionType: 'EQUAL',
       propertyAggregation: 'RAW_SUM',
       propertyIds: [],
+      anonymous,
       createdBy,
       createdAt: new Date(),
       archivedAt: null,
@@ -195,6 +198,19 @@ export class Poll {
    */
   public isOpen(): boolean {
     return this.props.pollType === PollType.OPEN;
+  }
+
+  /**
+   * An anonymous poll keeps the behaviour every poll had before this flag
+   * existed: only admins ever see who voted how, and nothing is readable until
+   * the poll is finished. A named poll puts the voter identities into the
+   * record and opens them to the organization while the vote is still running.
+   *
+   * Set once at creation and never mutated — a voter decides whether to vote
+   * based on this label, so it must not be able to change under them.
+   */
+  public isAnonymous(): boolean {
+    return this.props.anonymous;
   }
 
   public isDraft(): boolean {

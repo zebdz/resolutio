@@ -40,6 +40,18 @@ export interface AllOwnershipFilter {
   propertyId?: string;
 }
 
+// One owned asset, as it stood at a point in time. Feeds the named protocol's
+// participant register, which must describe the holdings that produced the
+// weight printed beside them — not whatever the person owns today.
+export interface HoldingRow {
+  userId: string;
+  propertyName: string;
+  assetName: string;
+  size: number;
+  sizeUnit: string;
+  share: number;
+}
+
 export interface PropertyAssetRepository {
   findCurrentOwnershipByOrg(
     organizationId: string,
@@ -65,6 +77,16 @@ export interface PropertyAssetRepository {
   ): Promise<
     Result<Array<{ id: string; propertyId: string; size: number }>, string>
   >;
+
+  // Point-in-time ownership for a fixed set of users. `asOf` is normally a
+  // poll participant's snapshotAt. External-owner rows (userId null) are
+  // excluded — they have no participant to attribute holdings to.
+  findHoldingsAsOf(input: {
+    organizationIds: string[];
+    propertyIds: string[];
+    userIds: string[];
+    asOf: Date;
+  }): Promise<Result<HoldingRow[], string>>;
 
   // Tree-aware: returns true if the org OR any descendant org has any active
   // ownership row. Reflects what a poll on this org could actually scope into,

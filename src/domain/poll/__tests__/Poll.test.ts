@@ -1533,4 +1533,63 @@ describe('Poll type', () => {
       expect(poll.propertyIds).toEqual(['prop-1']);
     });
   });
+
+  describe('anonymous flag', () => {
+    function create(pollType?: string, anonymous?: boolean) {
+      return Poll.create(
+        'Title',
+        'Description',
+        'org-1',
+        null,
+        'user-1',
+        new Date('2026-01-01'),
+        new Date('2026-02-01'),
+        undefined,
+        pollType,
+        anonymous
+      );
+    }
+
+    it('should default to named', () => {
+      const result = create();
+
+      expect(result.success).toBe(true);
+      expect(result.value.isAnonymous()).toBe(false);
+    });
+
+    it('should create an anonymous poll when asked', () => {
+      const result = create('ORGANIZATION', true);
+
+      expect(result.success).toBe(true);
+      expect(result.value.isAnonymous()).toBe(true);
+    });
+
+    it('should allow an anonymous OPEN poll', () => {
+      const result = create('OPEN', true);
+
+      expect(result.success).toBe(true);
+      expect(result.value.isAnonymous()).toBe(true);
+    });
+
+    it('should allow a named OPEN poll', () => {
+      const result = create('OPEN', false);
+
+      expect(result.success).toBe(true);
+      expect(result.value.isAnonymous()).toBe(false);
+    });
+
+    it('should round-trip through reconstitute', () => {
+      const created = create('ORGANIZATION', true).value;
+
+      const restored = Poll.reconstitute(created.toJSON() as any);
+
+      expect(restored.isAnonymous()).toBe(true);
+    });
+
+    it('should expose no mutator for the flag', () => {
+      const poll = create().value;
+
+      expect((poll as any).setAnonymous).toBeUndefined();
+    });
+  });
 });

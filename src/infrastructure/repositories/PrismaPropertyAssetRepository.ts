@@ -8,6 +8,7 @@ import {
   AllOwnershipRow,
   AllOwnershipFilter,
   OwnershipRowToInsert,
+  HoldingRow,
 } from '../../domain/organization/PropertyAssetRepository';
 import { OrganizationDomainCodes } from '../../domain/organization/OrganizationDomainCodes';
 
@@ -186,6 +187,68 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
           size: Number(r.size),
         }))
       );
+    } catch (e) {
+      return failure((e as Error).message);
+    }
+  }
+
+  async findHoldingsAsOf(input: {
+    organizationIds: string[];
+    propertyIds: string[];
+    userIds: string[];
+    asOf: Date;
+  }): Promise<Result<HoldingRow[], string>> {
+    try {
+      if (input.userIds.length === 0 || input.organizationIds.length === 0) {
+        return success([]);
+      }
+
+      // SCD-2 window: the row was already in force at `asOf` and had not yet
+      // been end-dated. `effectiveUntil` is exclusive, matching replaceOwners,
+      // which stamps the closing row and the opening row with the same instant.
+      const where: Prisma.PropertyAssetOwnershipWhereInput = {
+        userId: { in: input.userIds },
+        effectiveFrom: { lte: input.asOf },
+        OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: input.asOf } }],
+        asset: {
+          archivedAt: null,
+          property: {
+            archivedAt: null,
+            organizationId: { in: input.organizationIds },
+            ...(input.propertyIds.length > 0
+              ? { id: { in: input.propertyIds } }
+              : {}),
+          },
+        },
+      };
+
+      const rows = await this.prisma.propertyAssetOwnership.findMany({
+        where,
+        include: {
+          asset: {
+            include: { property: { select: { name: true, sizeUnit: true } } },
+          },
+        },
+      });
+
+      const holdings: HoldingRow[] = rows.map((r) => ({
+        userId: r.userId as string,
+        propertyName: r.asset.property.name,
+        assetName: r.asset.name,
+        size: Number(r.asset.size),
+        sizeUnit: r.asset.property.sizeUnit,
+        share: Number(r.share),
+      }));
+
+      // Sorted here rather than in SQL: ordering across two nested to-one
+      // relations is fragile in Prisma, and the row count per poll is small.
+      holdings.sort(
+        (a, b) =>
+          a.propertyName.localeCompare(b.propertyName) ||
+          a.assetName.localeCompare(b.assetName)
+      );
+
+      return success(holdings);
     } catch (e) {
       return failure((e as Error).message);
     }

@@ -18,6 +18,7 @@ export interface CreatePollInput {
   propertyAggregation?: string;
   propertyIds?: string[];
   pollType?: string;
+  anonymous?: boolean;
 }
 
 export class CreatePollUseCase {
@@ -67,7 +68,8 @@ export class CreatePollUseCase {
       input.startDate,
       input.endDate,
       this.profanityChecker,
-      input.pollType
+      input.pollType,
+      input.anonymous ?? false
     );
 
     if (!pollResult.success) {

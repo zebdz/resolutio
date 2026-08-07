@@ -795,6 +795,7 @@ export function EditPollForm() {
           pollId={pollId}
           state={pollData.state}
           hasQuestions={questions.length > 0}
+          isOpenPoll={pollData.pollType === 'OPEN'}
           onStateChange={loadPoll}
         />
       )}

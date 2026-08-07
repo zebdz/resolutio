@@ -623,4 +623,55 @@ describe('CreatePollUseCase', () => {
       }
     });
   });
+
+  describe('anonymous flag', () => {
+    async function createWith(anonymous?: boolean) {
+      const boardResult = Board.create('Test Board', 'org-1');
+      const board = boardResult.value;
+      (board as any).props.id = 'board-1';
+      boardRepository.addBoard(board);
+      await boardRepository.addUserToBoard('user-1', 'board-1');
+
+      return useCase.execute({
+        title: 'Test Poll',
+        description: 'This is a test poll',
+        organizationId: 'org-1',
+        boardId: 'board-1',
+        createdBy: 'user-1',
+        startDate: new Date('2025-01-01'),
+        endDate: new Date('2025-12-31'),
+        anonymous,
+      });
+    }
+
+    it('should create a named poll by default', async () => {
+      const result = await createWith();
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.isAnonymous()).toBe(false);
+      }
+    });
+
+    it('should create an anonymous poll when the input says so', async () => {
+      const result = await createWith(true);
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.isAnonymous()).toBe(true);
+      }
+    });
+
+    it('should create a named poll when the input says false', async () => {
+      const result = await createWith(false);
+
+      expect(result.success).toBe(true);
+
+      if (result.success) {
+        expect(result.value.isAnonymous()).toBe(false);
+      }
+    });
+  });
 });
