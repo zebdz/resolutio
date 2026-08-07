@@ -158,19 +158,32 @@ export class PrismaUserRepository implements UserRepository {
         confirmedAt: user.confirmedAt,
         ...(user.address
           ? {
+              // Prisma treats `undefined` in a create/update payload as "skip
+              // this column" — only `null` writes NULL. Address.create()
+              // normalizes cleared optional fields to `undefined` (see
+              // Address.ts), so every optional field below is coalesced with
+              // `?? null` before reaching Prisma. Without this, clearing a
+              // field in the UI (e.g. postal code, or apartment/flatFiasId
+              // when switching to "private house") would silently leave the
+              // stale value in the database while the action reports
+              // success. Applies to all three field lists in this method
+              // (create, upsert.create, upsert.update) — keep them
+              // identical; required fields (country/city/street/building)
+              // and isPrivateHouse are non-nullable and must NOT be
+              // coalesced.
               address: {
                 create: {
                   country: user.address.country,
-                  region: user.address.region,
+                  region: user.address.region ?? null,
                   city: user.address.city,
                   street: user.address.street,
                   building: user.address.building,
-                  apartment: user.address.apartment,
-                  postalCode: user.address.postalCode,
+                  apartment: user.address.apartment ?? null,
+                  postalCode: user.address.postalCode ?? null,
                   isPrivateHouse: user.address.isPrivateHouse,
-                  oneLine: user.address.oneLine,
-                  houseFiasId: user.address.houseFiasId,
-                  flatFiasId: user.address.flatFiasId,
+                  oneLine: user.address.oneLine ?? null,
+                  houseFiasId: user.address.houseFiasId ?? null,
+                  flatFiasId: user.address.flatFiasId ?? null,
                 },
               },
             }
@@ -187,32 +200,34 @@ export class PrismaUserRepository implements UserRepository {
         ...(user.address
           ? {
               address: {
+                // See the `?? null` comment on the create block above —
+                // same reasoning applies to both branches below.
                 upsert: {
                   create: {
                     country: user.address.country,
-                    region: user.address.region,
+                    region: user.address.region ?? null,
                     city: user.address.city,
                     street: user.address.street,
                     building: user.address.building,
-                    apartment: user.address.apartment,
-                    postalCode: user.address.postalCode,
+                    apartment: user.address.apartment ?? null,
+                    postalCode: user.address.postalCode ?? null,
                     isPrivateHouse: user.address.isPrivateHouse,
-                    oneLine: user.address.oneLine,
-                    houseFiasId: user.address.houseFiasId,
-                    flatFiasId: user.address.flatFiasId,
+                    oneLine: user.address.oneLine ?? null,
+                    houseFiasId: user.address.houseFiasId ?? null,
+                    flatFiasId: user.address.flatFiasId ?? null,
                   },
                   update: {
                     country: user.address.country,
-                    region: user.address.region,
+                    region: user.address.region ?? null,
                     city: user.address.city,
                     street: user.address.street,
                     building: user.address.building,
-                    apartment: user.address.apartment,
-                    postalCode: user.address.postalCode,
+                    apartment: user.address.apartment ?? null,
+                    postalCode: user.address.postalCode ?? null,
                     isPrivateHouse: user.address.isPrivateHouse,
-                    oneLine: user.address.oneLine,
-                    houseFiasId: user.address.houseFiasId,
-                    flatFiasId: user.address.flatFiasId,
+                    oneLine: user.address.oneLine ?? null,
+                    houseFiasId: user.address.houseFiasId ?? null,
+                    flatFiasId: user.address.flatFiasId ?? null,
                   },
                 },
               },
