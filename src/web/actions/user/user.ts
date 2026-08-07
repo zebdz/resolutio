@@ -68,8 +68,7 @@ export async function updateProfileAction(
 
     const allowFindByAddressValue = formData.get('allowFindByAddress');
 
-    // Address fields — present when user submits the address form
-    const addressCountry = formData.get('addressCountry');
+    // Address form intent — present when user submits the address form
     const addressAction = formData.get('addressAction'); // 'save' | 'clear' | absent
 
     const input = {
@@ -91,7 +90,7 @@ export async function updateProfileAction(
       address:
         addressAction === 'clear'
           ? null
-          : addressCountry
+          : addressAction === 'save'
             ? {
                 country: String(formData.get('addressCountry')),
                 region: formData.get('addressRegion')
