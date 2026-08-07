@@ -69,10 +69,10 @@ describe('getLimiterByLabel', () => {
     expect(entry!.windowMs).toBe(24 * 60 * 60_000);
   });
 
-  it('addressSuggest configured at 300 per min', () => {
+  it('addressSuggest configured at 9,500 per day (daily quota, not per-minute)', () => {
     const entry = getLimiterByLabel('addressSuggest');
     expect(entry).toBeDefined();
-    expect(entry!.maxRequests).toBe(300);
-    expect(entry!.windowMs).toBe(60_000);
+    expect(entry!.maxRequests).toBe(9_500);
+    expect(entry!.windowMs).toBe(24 * 60 * 60_000);
   });
 });

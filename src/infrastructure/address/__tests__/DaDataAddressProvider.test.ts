@@ -151,4 +151,38 @@ describe('DaDataAddressProvider', () => {
       'DADATA_API_KEY is not configured'
     );
   });
+
+  it('logs and returns [] on a 429, without trusting the body', async () => {
+    const logQuotaRejected = vi.fn().mockResolvedValue(undefined);
+    // Body WOULD map to results if the 429 branch were missing
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => HOUSE_PAYLOAD,
+    });
+    const provider = new DaDataAddressProvider(fetchMock, {
+      logQuotaRejected,
+    } as never);
+
+    expect(await provider.suggestAddress('Гвардейский 13')).toEqual([]);
+    expect(logQuotaRejected).toHaveBeenCalledWith({
+      route: 'suggest',
+      statusCode: 429,
+    });
+  });
+
+  it('does not log a quota rejection for an ordinary non-2xx', async () => {
+    const logQuotaRejected = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: async () => HOUSE_PAYLOAD,
+    });
+    const provider = new DaDataAddressProvider(fetchMock, {
+      logQuotaRejected,
+    } as never);
+
+    expect(await provider.suggestAddress('Гвардейский 13')).toEqual([]);
+    expect(logQuotaRejected).not.toHaveBeenCalled();
+  });
 });

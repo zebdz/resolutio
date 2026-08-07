@@ -18,6 +18,12 @@ export const LOG_SOURCES: LogSource[] = [
     json: true,
   },
   { id: 'ai', path: 'logs/ai.log', label: 'AI Log', json: true },
+  {
+    id: 'address-quota',
+    path: 'logs/address-quota.log',
+    label: 'Address Quota',
+    json: true,
+  },
 ];
 
 export const ARCHIVE_DIR = path.join(process.cwd(), 'logs', 'archive');

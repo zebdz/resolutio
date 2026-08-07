@@ -3,6 +3,7 @@ import type {
   AddressSuggestion,
   FlatSuggestion,
 } from './types';
+import type { AddressQuotaLogger } from './AddressQuotaLogger';
 
 const SUGGEST_URL =
   'https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address';
@@ -18,12 +19,20 @@ interface DaDataRow {
 }
 
 type Fetch = typeof fetch;
+type Route = 'suggest' | 'flats';
 
 export class DaDataAddressProvider implements AddressProvider {
   // fetch is injected so tests never touch the network
-  constructor(private readonly fetchFn: Fetch = fetch) {}
+  constructor(
+    private readonly fetchFn: Fetch = fetch,
+    private readonly quotaLogger?: AddressQuotaLogger
+  ) {}
 
-  private async query(query: string, count: number): Promise<DaDataRow[]> {
+  private async query(
+    query: string,
+    count: number,
+    route: Route
+  ): Promise<DaDataRow[]> {
     const token = process.env.DADATA_API_KEY;
 
     // Misconfiguration must fail loudly. An empty array is the resolver's signal
@@ -60,6 +69,15 @@ export class DaDataAddressProvider implements AddressProvider {
         }),
       });
 
+      // 429 is DaData telling us the account quota is exhausted — the authoritative
+      // signal, versus our own cap which is only an estimate. Logged distinctly so a
+      // superadmin can tell "our guard fired" from "we actually ran out".
+      if (res.status === 429) {
+        await this.quotaLogger?.logQuotaRejected({ route, statusCode: 429 });
+
+        return [];
+      }
+
       if (!res.ok) {
         return [];
       }
@@ -74,7 +92,7 @@ export class DaDataAddressProvider implements AddressProvider {
   }
 
   async suggestAddress(query: string): Promise<AddressSuggestion[]> {
-    const rows = await this.query(query, HOUSE_COUNT);
+    const rows = await this.query(query, HOUSE_COUNT, 'suggest');
 
     return rows.map((row) => ({
       label: row.value,
@@ -98,7 +116,8 @@ export class DaDataAddressProvider implements AddressProvider {
     // approach that works. See readmes/2026-08-06-address-dadata-design.md
     const rows = await this.query(
       `${houseLabel} кв ${fragment}`.trim(),
-      FLAT_COUNT
+      FLAT_COUNT,
+      'flats'
     );
 
     return rows

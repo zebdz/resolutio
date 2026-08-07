@@ -51,11 +51,17 @@ const REGISTRATION_DEVICE_WINDOW_MS = 60 * 60_000;
 const REPORT_CREATE_MAX = 10;
 const REPORT_CREATE_WINDOW_MS = 24 * 60 * 60_000;
 
-// 300 / min — protects the DaData daily quota (free tier: 10,000/day).
-// The middleware session limiter (120/min) already protects the app; this one
-// exists so a single session cannot burn the shared external quota.
-const ADDRESS_SUGGEST_MAX = 300;
-const ADDRESS_SUGGEST_WINDOW_MS = 60_000;
+// DaData free tier allows 10,000 requests/day. This is a DAILY cap, not a per-minute
+// one — a per-minute limiter cannot protect a daily quota (300/min would be 432,000/day).
+// Keyed globally, not per session: the quota belongs to our DaData account and is shared
+// by every user, so a per-user limit would not protect it.
+// 9,500 leaves ~5% headroom for two known sources of drift: this counter lives in process
+// memory and resets on deploy, and beta shares the same DaData key as production. The 429
+// handling in DaDataAddressProvider is the backstop for anything that slips past.
+// Exported (unlike the other *_MAX constants) so the address routes can log
+// the real configured number instead of duplicating it as a literal.
+export const ADDRESS_SUGGEST_MAX = 9_500;
+const ADDRESS_SUGGEST_WINDOW_MS = 24 * 60 * 60_000;
 
 function createRegistry(): LimiterEntry[] {
   return [
