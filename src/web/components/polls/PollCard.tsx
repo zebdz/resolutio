@@ -14,6 +14,10 @@ import {
   finishPollAction,
 } from '@/src/web/actions/poll/poll';
 import { toast } from 'sonner';
+import {
+  getPollControlLabelKeys,
+  shouldShowManageParticipants,
+} from '@/src/web/components/polls/pollControlLabels';
 
 interface PollCardProps {
   poll: any;
@@ -48,6 +52,7 @@ export function PollCard({
   const isOrgArchived = poll.isOrgArchived;
   const isBoardArchived = poll.isBoardArchived;
   const isParentArchived = isOrgArchived || isBoardArchived;
+  const labelKeys = getPollControlLabelKeys(isOpenPoll);
 
   const canEditPoll = isCreator;
   const canManageParticipants = canManage;
@@ -57,7 +62,7 @@ export function PollCard({
   const canViewResultsBeforePollEnds = canManage || !isAnonymousPoll;
 
   const handleTakeSnapshot = async () => {
-    if (!confirm(t('confirmTakeSnapshot'))) {
+    if (!confirm(t(labelKeys.confirmPrepare))) {
       return;
     }
 
@@ -67,7 +72,7 @@ export function PollCard({
       const result = await takeSnapshotAction(poll.id);
 
       if (result.success) {
-        toast.success(t('snapshotTaken'));
+        toast.success(t(labelKeys.prepared));
         onPollStateChange();
       } else {
         toast.error(result.error);
@@ -80,7 +85,7 @@ export function PollCard({
   };
 
   const handleDiscardSnapshot = async () => {
-    if (!confirm(t('confirmDiscardSnapshot'))) {
+    if (!confirm(t(labelKeys.confirmRevert))) {
       return;
     }
 
@@ -90,7 +95,7 @@ export function PollCard({
       const result = await discardSnapshotAction(poll.id);
 
       if (result.success) {
-        toast.success(t('snapshotDiscarded'));
+        toast.success(t(labelKeys.reverted));
         onPollStateChange();
       } else {
         toast.error(result.error);
@@ -294,13 +299,17 @@ export function PollCard({
             )}
 
             {/* Manage participants */}
-            {canManageParticipants && (
-              <Link href={`/polls/${poll.id}/participants`} className="flex-1">
-                <Button color="zinc" className="w-full text-sm">
-                  {t('manageParticipants')}
-                </Button>
-              </Link>
-            )}
+            {canManageParticipants &&
+              shouldShowManageParticipants(isOpenPoll, poll.state) && (
+                <Link
+                  href={`/polls/${poll.id}/participants`}
+                  className="flex-1"
+                >
+                  <Button color="zinc" className="w-full text-sm">
+                    {t('manageParticipants')}
+                  </Button>
+                </Link>
+              )}
           </div>
 
           {/* Take Snapshot button for DRAFT polls */}
@@ -311,7 +320,7 @@ export function PollCard({
               disabled={isTakingSnapshot}
               className="w-full"
             >
-              {isTakingSnapshot ? t('takingSnapshot') : t('takeSnapshot')}
+              {isTakingSnapshot ? t(labelKeys.preparing) : t(labelKeys.prepare)}
             </Button>
           )}
 
@@ -333,8 +342,8 @@ export function PollCard({
                 className="w-full"
               >
                 {isDiscardingSnapshot
-                  ? t('discardingSnapshot')
-                  : t('discardSnapshot')}
+                  ? t(labelKeys.reverting)
+                  : t(labelKeys.revert)}
               </Button>
             </>
           )}

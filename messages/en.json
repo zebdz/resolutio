@@ -650,7 +650,16 @@
       "openBadge": "Open poll",
       "copyLink": "Copy voting link",
       "linkCopied": "Voting link copied",
-      "copyLinkError": "Could not copy the link"
+      "copyLinkError": "Could not copy the link",
+      "markReady": "Mark as ready",
+      "markingReady": "Marking as ready...",
+      "markedReady": "Poll marked as ready",
+      "confirmMarkReady": "Mark this poll ready to activate?",
+      "backToDraft": "Back to draft",
+      "returningToDraft": "Returning to draft...",
+      "returnedToDraft": "Poll returned to draft",
+      "confirmBackToDraft": "Return this poll to draft?",
+      "readyHint": "Anyone verified can vote — no participant list."
     },
     "publicPreview": {
       "openPollBadge": "Open poll",
@@ -714,7 +723,6 @@
     "pollDeactivated": "Poll deactivated successfully",
     "pollFinished": "Poll finished successfully",
     "confirmTakeSnapshot": "Take participant snapshot?",
-    "confirmTakeSnapshotDescription": "This will freeze the participant list. You can still modify participants before activating.",
     "confirmDiscardSnapshot": "Discard participant snapshot?",
     "confirmDiscardSnapshotDescription": "This will return the poll to draft state. Not available if votes have been cast.",
     "confirmFinishPoll": "Finish this poll?",
