@@ -780,7 +780,7 @@
       "pollNotFound": "Poll not found",
       "willingToSignProtocolTitle": "Willing to sign the protocol and share my phone number for contact",
       "willingToSignProtocolDescription": "I confirm my willingness to sign the final protocol of this vote and allow organization admins to see my phone number so they can contact me",
-      "openPollBanner": "Open poll: anyone with the link can vote once. Your vote counts as one.",
+      "openPollBanner": "Open poll: any registered user can vote.",
       "namedNotice": "This poll is not anonymous. Your name will be listed next to the answers you choose, in a protocol every member of the organization can read.",
       "namedNoticeProperty": "This poll is not anonymous. Your name and your property in the organization (building, unit, area) will be listed next to the answers you choose, in a protocol every member of the organization can read."
     },
