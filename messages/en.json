@@ -995,6 +995,24 @@
         "propertyAggregation": "Property aggregation changed to {aggregation}",
         "combined": "Weight config changed"
       }
+    },
+    "saveDraftModal": {
+      "title": "Save a draft first",
+      "body": "The poll must be saved as a draft before files can be attached. Everything you have entered will be kept, and you can carry on editing here.",
+      "save": "Save draft",
+      "cancel": "Cancel",
+      "lockedAfterDraft": "Poll type, anonymity, organization and board are fixed once a draft is saved, and cannot be changed here."
+    },
+    "descriptionCharacterCount": "You typed {current} characters, the limit is {max}.",
+    "attachments": {
+      "label": "Attached files",
+      "uploadButton": "Attach a file",
+      "uploading": "Uploading…",
+      "hint": "PNG, JPEG, WebP or PDF. You can also paste or drag a file into the editor. Images appear inline; PDFs become a download link.",
+      "remove": "Remove",
+      "removing": "Removing…",
+      "empty": "No files attached yet.",
+      "saveDraftFirst": "Save a draft first to attach files."
     }
   },
   "legalCheck": {
