@@ -6,6 +6,8 @@ import { Link } from '@/src/i18n/routing';
 import { PollState } from '@/src/domain/poll/PollState';
 import { SetReturnTo } from '@/web/components/shared/SetReturnTo';
 import type { OpenPollPreview } from '@/application/poll/GetOpenPollPreviewUseCase';
+import { MarkdownRenderer } from '@/web/components/markdown/MarkdownRenderer';
+import { POLL_ATTACHMENT_API_PREFIX } from '@/domain/poll/PollAttachment';
 
 interface PublicOpenPollPreviewProps {
   pollId: string;
@@ -43,8 +45,14 @@ export async function PublicOpenPollPreview({
         <Text>{preview.organizationName}</Text>
       </div>
 
+      {/* Not centred: a long description reads badly centre-aligned, and the
+          description may now carry paragraphs, lists and inline images. */}
       {preview.description && (
-        <Text className="text-center">{preview.description}</Text>
+        <MarkdownRenderer
+          source={preview.description}
+          apiPrefix={POLL_ATTACHMENT_API_PREFIX}
+          allowedAttachmentIds={preview.attachmentIds}
+        />
       )}
 
       {statusNote && (

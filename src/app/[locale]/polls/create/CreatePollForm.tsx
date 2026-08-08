@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Input } from '@/src/web/components/catalyst/input';
-import { Textarea } from '@/src/web/components/catalyst/textarea';
 import {
   Description,
   Field,
@@ -21,6 +20,8 @@ import { PlusIcon } from '@heroicons/react/20/solid';
 import { QuestionType } from '@/domain/poll/QuestionType';
 import {
   createPollAction,
+  updatePollAction,
+  updatePollWeightConfigAction,
   addQuestionAction,
 } from '@/src/web/actions/poll/poll';
 import { getUserBoardsAction } from '@/src/web/actions/board/board';
@@ -33,6 +34,18 @@ import {
 import { DistributionTypeSelector } from '@/src/web/components/polls/participants/DistributionTypeSelector';
 import { PropertyScopeSelector } from '@/src/web/components/polls/participants/PropertyScopeSelector';
 import { PropertyAggregationSelector } from '@/src/web/components/polls/participants/PropertyAggregationSelector';
+import { MarkdownEditor } from '@/web/components/markdown/MarkdownEditor';
+import { SaveDraftBeforeAttachModal } from '@/web/components/polls/SaveDraftBeforeAttachModal';
+import { POLL_ATTACHMENT_API_PREFIX } from '@/domain/poll/PollAttachment';
+import { POLL_DESCRIPTION_MAX_LENGTH } from '@/domain/poll/Poll';
+import { PollAttachmentUploader } from '@/web/components/polls/PollAttachmentUploader';
+import {
+  listPollAttachmentsAction,
+  removePollAttachmentAction,
+  type PollAttachmentSummary,
+} from '@/web/actions/poll/pollAttachments';
+import { buildAttachmentRef } from '@/web/components/markdown/buildAttachmentRef';
+import { removeAttachmentRefs } from '@/web/components/markdown/removeAttachmentRefs';
 
 interface Answer {
   id: string;
@@ -63,6 +76,7 @@ export function CreatePollForm() {
   const router = useRouter();
   const t = useTranslations('poll');
   const tCommon = useTranslations('common');
+  const locale = useLocale();
 
   const [organizations, setOrganizations] = useState<
     Array<{ id: string; name: string }>
@@ -146,6 +160,166 @@ export function CreatePollForm() {
     questionId: string;
     errors: Record<string, string[]>;
   } | null>(null);
+
+  // Captured once, when a save is rejected for length — not recomputed as the
+  // author types. Cleared on the next save attempt.
+  const [descriptionLengthAtError, setDescriptionLengthAtError] = useState<
+    number | null
+  >(null);
+
+  // Single place where field errors land, so the length snapshot cannot be
+  // forgotten on one of the save paths.
+  const applyFieldErrors = (errors?: Record<string, string[]>) => {
+    setFieldErrors(errors);
+    setDescriptionLengthAtError(
+      errors?.description ? pollData.description.length : null
+    );
+  };
+
+  // Deferred-attachment state. A poll row must exist before a file can be
+  // linked to it, so the first upload attempt on an unsaved poll parks the
+  // file here, opens the modal, and resolves once a draft has been saved.
+  const [draftPollId, setDraftPollId] = useState<string | null>(null);
+  // Mirrors draftPollId for async callbacks: handlePickAttachment is created
+  // before the modal saves the draft, so reading the state after an await
+  // would still see null.
+  const draftPollIdRef = useRef<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const pendingFileRef = useRef<File | null>(null);
+  const pendingResolveRef = useRef<
+    ((r: { id: string } | { error: string }) => void) | null
+  >(null);
+
+  const [attachments, setAttachments] = useState<PollAttachmentSummary[]>([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [removingAttachmentId, setRemovingAttachmentId] = useState<
+    string | null
+  >(null);
+
+  const refreshAttachments = async (pollId: string) => {
+    const result = await listPollAttachmentsAction(pollId);
+
+    if (result.success) {
+      setAttachments(result.data);
+    }
+  };
+
+  // Routes through handleUploadAttachment, so an unsaved poll still gets the
+  // draft-save modal before the file is linked.
+  const handlePickAttachment = async (file: File) => {
+    setUploadingAttachment(true);
+
+    const result = await handleUploadAttachment(file);
+
+    setUploadingAttachment(false);
+
+    if ('id' in result) {
+      setPollData((prev) => ({
+        ...prev,
+        description:
+          prev.description +
+          buildAttachmentRef({
+            fileName: file.name,
+            mimeType: file.type,
+            apiPrefix: POLL_ATTACHMENT_API_PREFIX,
+            id: result.id,
+          }),
+      }));
+
+      // draftPollId is set by the modal flow before the upload resolves.
+      const owner = draftPollIdRef.current;
+
+      if (owner) {
+        await refreshAttachments(owner);
+      }
+    }
+  };
+
+  const handleRemoveAttachment = async (id: string) => {
+    setRemovingAttachmentId(id);
+    setAttachmentError(null);
+
+    const result = await removePollAttachmentAction(id);
+
+    setRemovingAttachmentId(null);
+
+    if (!result.success) {
+      setAttachmentError(result.error);
+
+      return;
+    }
+
+    setPollData((prev) => ({
+      ...prev,
+      description: removeAttachmentRefs(
+        prev.description,
+        POLL_ATTACHMENT_API_PREFIX,
+        id
+      ),
+    }));
+
+    if (draftPollIdRef.current) {
+      await refreshAttachments(draftPollIdRef.current);
+    }
+  };
+
+  // Once the poll row exists, poll type, anonymity, organization and board can
+  // no longer change: `anonymous` is set once at creation by design and the
+  // others have no update path. Locking the controls is honest about that;
+  // leaving them editable would silently discard the author's choice on save.
+  const draftSaved = draftPollId !== null;
+
+  const uploadAttachment = async (
+    pollId: string,
+    file: File
+  ): Promise<{ id: string } | { error: string }> => {
+    setAttachmentError(null);
+
+    const formData = new FormData();
+    formData.append('pollId', pollId);
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/poll-attachments', {
+        method: 'POST',
+        body: formData,
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        const message = json.error ?? tCommon('generic');
+        setAttachmentError(message);
+
+        return { error: message };
+      }
+
+      return { id: json.id as string };
+    } catch {
+      setAttachmentError(tCommon('generic'));
+
+      return { error: tCommon('generic') };
+    }
+  };
+
+  const handleUploadAttachment = (
+    file: File
+  ): Promise<{ id: string } | { error: string }> => {
+    if (draftPollId) {
+      return uploadAttachment(draftPollId, file);
+    }
+
+    // No poll id yet — hold the file, open the modal, and resolve this promise
+    // once the draft has been saved or the author has cancelled.
+    return new Promise((resolve) => {
+      pendingFileRef.current = file;
+      pendingResolveRef.current = resolve;
+      setDraftError(null);
+      setModalOpen(true);
+    });
+  };
 
   // Load organizations and boards
   useEffect(() => {
@@ -347,11 +521,156 @@ export function CreatePollForm() {
     setActiveQuestionId(newQuestion.id);
   };
 
+  // Poll fields shared by the create and update paths. Both the final submit
+  // and the just-in-time draft save go through here, so they cannot drift.
+  const buildPollFormData = (): FormData => {
+    const fd = new FormData();
+    fd.append('title', pollData.title);
+    fd.append('description', pollData.description);
+    fd.append('organizationId', pollData.organizationId);
+
+    if (pollData.boardId) {
+      fd.append('boardId', pollData.boardId);
+    }
+
+    fd.append('startDate', pollData.startDate);
+    fd.append('endDate', pollData.endDate);
+    fd.append('pollType', pollType);
+    fd.append('anonymous', String(anonymous));
+    fd.append('distributionType', distributionType);
+    fd.append('propertyAggregation', propertyAggregation);
+    fd.append('propertyIds', JSON.stringify(propertyIds));
+
+    return fd;
+  };
+
+  type PersistResult =
+    | { success: true; pollId: string }
+    | { success: false; error: string };
+
+  const persistPoll = async (): Promise<PersistResult> => {
+    const result = await createPollAction(buildPollFormData());
+
+    if (!result.success) {
+      applyFieldErrors(result.fieldErrors);
+
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, pollId: result.data.pollId };
+  };
+
+  // The draft already exists, so push the current field values onto it rather
+  // than creating a second poll.
+  //
+  // updatePollAction only persists title, description and dates, so the weight
+  // configuration is synced separately — otherwise a weighting chosen after
+  // the draft was saved would be silently discarded. Poll type, anonymity,
+  // organization and board have no update path at all, which is why the form
+  // locks those controls once a draft exists.
+  const updateExistingDraft = async (
+    pollId: string
+  ): Promise<PersistResult> => {
+    const fd = buildPollFormData();
+    fd.append('pollId', pollId);
+
+    const result = await updatePollAction(fd);
+
+    if (!result.success) {
+      applyFieldErrors(result.fieldErrors);
+
+      return { success: false, error: result.error };
+    }
+
+    if (!isOpenPoll) {
+      const weightResult = await updatePollWeightConfigAction({
+        pollId,
+        distributionType,
+        propertyAggregation,
+        propertyIds,
+      });
+
+      if (!weightResult.success) {
+        return { success: false, error: weightResult.error };
+      }
+    }
+
+    return { success: true, pollId };
+  };
+
+  // Validates only the poll's own fields — a DRAFT with no questions is
+  // valid, since POLL_NO_QUESTIONS is enforced on the DRAFT → READY move.
+  const validatePollFields = (): string | null => {
+    if (!pollData.organizationId) {
+      return t('errors.orgRequired');
+    }
+
+    if (!pollData.title.trim()) {
+      return t('errors.titleRequired');
+    }
+
+    if (!pollData.description.trim()) {
+      return t('errors.descriptionRequired');
+    }
+
+    return null;
+  };
+
+  const handleSaveDraftForAttachment = async () => {
+    setSavingDraft(true);
+    setDraftError(null);
+
+    const invalid = validatePollFields();
+
+    if (invalid) {
+      // Keep the modal open so the author can see which field is missing.
+      setDraftError(invalid);
+      setSavingDraft(false);
+
+      return;
+    }
+
+    const persisted = await persistPoll();
+
+    setSavingDraft(false);
+
+    if (!persisted.success) {
+      setDraftError(persisted.error);
+
+      return;
+    }
+
+    draftPollIdRef.current = persisted.pollId;
+    setDraftPollId(persisted.pollId);
+    setModalOpen(false);
+
+    const file = pendingFileRef.current;
+    const resolve = pendingResolveRef.current;
+    pendingFileRef.current = null;
+    pendingResolveRef.current = null;
+
+    if (file && resolve) {
+      resolve(await uploadAttachment(persisted.pollId, file));
+    }
+  };
+
+  const handleCancelDraft = () => {
+    setModalOpen(false);
+
+    const resolve = pendingResolveRef.current;
+    pendingFileRef.current = null;
+    pendingResolveRef.current = null;
+
+    // Resolving with an error means the editor inserts no ref, so the pasted
+    // file simply does not appear.
+    resolve?.({ error: '' });
+  };
+
   const handleSave = async () => {
     try {
       setIsSaving(true);
       setError(null);
-      setFieldErrors(undefined);
+      applyFieldErrors(undefined);
       setQuestionFieldErrors(null);
 
       // Validate
@@ -402,34 +721,19 @@ export function CreatePollForm() {
         }
       }
 
-      // Create poll
-      const pollFormData = new FormData();
-      pollFormData.append('title', pollData.title);
-      pollFormData.append('description', pollData.description);
-      pollFormData.append('organizationId', pollData.organizationId);
+      // If a draft was already saved to host an attachment, update that poll
+      // rather than creating a second one.
+      const persisted = draftPollId
+        ? await updateExistingDraft(draftPollId)
+        : await persistPoll();
 
-      if (pollData.boardId) {
-        pollFormData.append('boardId', pollData.boardId);
-      }
-
-      pollFormData.append('startDate', pollData.startDate);
-      pollFormData.append('endDate', pollData.endDate);
-      pollFormData.append('pollType', pollType);
-      pollFormData.append('anonymous', String(anonymous));
-      pollFormData.append('distributionType', distributionType);
-      pollFormData.append('propertyAggregation', propertyAggregation);
-      pollFormData.append('propertyIds', JSON.stringify(propertyIds));
-
-      const pollResult = await createPollAction(pollFormData);
-
-      if (!pollResult.success) {
-        setError(pollResult.error);
-        setFieldErrors(pollResult.fieldErrors);
+      if (!persisted.success) {
+        setError(persisted.error);
 
         return;
       }
 
-      const pollId = pollResult.data.pollId;
+      const pollId = persisted.pollId;
 
       // Create questions with answers
       for (const question of questions) {
@@ -592,11 +896,18 @@ export function CreatePollForm() {
 
       {/* Poll Basic Info */}
       <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-4">
+        {draftSaved && (
+          <p className="rounded-md bg-zinc-50 p-3 text-sm text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+            {t('saveDraftModal.lockedAfterDraft')}
+          </p>
+        )}
+
         <Field>
           <Label>{t('type.label')}</Label>
           <Select
             name="pollType"
             value={pollType}
+            disabled={draftSaved}
             onChange={(e) => {
               const next = e.target.value as 'ORGANIZATION' | 'OPEN';
               setPollType(next);
@@ -628,6 +939,7 @@ export function CreatePollForm() {
             name="anonymous"
             checked={anonymous}
             onChange={setAnonymous}
+            disabled={draftSaved}
           />
         </SwitchField>
 
@@ -643,7 +955,7 @@ export function CreatePollForm() {
                 boardId: '',
               })
             }
-            disabled={isLoading || allOrganizations.length === 0}
+            disabled={isLoading || allOrganizations.length === 0 || draftSaved}
             required
           >
             {isLoading ? (
@@ -672,7 +984,7 @@ export function CreatePollForm() {
               onChange={(e) =>
                 setPollData({ ...pollData, boardId: e.target.value })
               }
-              disabled={isLoading || !pollData.organizationId}
+              disabled={isLoading || !pollData.organizationId || draftSaved}
             >
               <option value="">{t('orgWidePoll')}</option>
               {filteredBoards.map((board) => (
@@ -703,20 +1015,35 @@ export function CreatePollForm() {
 
         <Field>
           <Label>{t('pollDescription')}</Label>
-          <Textarea
+          <MarkdownEditor
             value={pollData.description}
-            invalid={!!fieldErrors?.description}
-            onChange={(e) => {
-              setPollData({ ...pollData, description: e.target.value });
+            onChange={(next) => {
+              setPollData({ ...pollData, description: next });
               setFieldErrors(undefined);
             }}
-            placeholder={t('pollDescription')}
-            required
-            rows={3}
+            apiPrefix={POLL_ATTACHMENT_API_PREFIX}
+            maxLength={POLL_DESCRIPTION_MAX_LENGTH}
+            onUploadAttachment={handleUploadAttachment}
           />
           {fieldErrors?.description && (
             <p className="text-sm text-red-600">{fieldErrors.description[0]}</p>
           )}
+          {descriptionLengthAtError !== null && (
+            <p className="text-sm text-red-600">
+              {t('descriptionCharacterCount', {
+                current: descriptionLengthAtError.toLocaleString(locale),
+                max: POLL_DESCRIPTION_MAX_LENGTH.toLocaleString(locale),
+              })}
+            </p>
+          )}
+          <PollAttachmentUploader
+            attachments={attachments}
+            uploading={uploadingAttachment}
+            removingId={removingAttachmentId}
+            error={attachmentError}
+            onPickFile={handlePickAttachment}
+            onRemove={handleRemoveAttachment}
+          />
         </Field>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -881,6 +1208,14 @@ export function CreatePollForm() {
           {isSaving ? tCommon('saving') : t('save')}
         </Button>
       </div>
+
+      <SaveDraftBeforeAttachModal
+        open={modalOpen}
+        saving={savingDraft}
+        error={draftError}
+        onSave={handleSaveDraftForAttachment}
+        onCancel={handleCancelDraft}
+      />
     </div>
   );
 }

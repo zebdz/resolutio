@@ -65,6 +65,9 @@ describe('GetOpenPollPreviewUseCase', () => {
     expect(result.value).toEqual({
       title: 'Should we repave the yard?',
       description: 'Full description here',
+      // Ids only — the anonymous preview renders the description, so it needs
+      // the allowlist, but never the file contents.
+      attachmentIds: [],
       state: PollState.ACTIVE,
       organizationName: 'ТСЖ "Орион"',
     });

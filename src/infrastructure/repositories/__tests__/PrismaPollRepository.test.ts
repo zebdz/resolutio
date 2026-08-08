@@ -104,6 +104,55 @@ describe('PrismaPollRepository', () => {
   // -------------------------------------------------------------------
   // toDomainPoll reconstitution (tested through public methods)
   // -------------------------------------------------------------------
+  describe('attachment id reconstitution', () => {
+    it('should map attachment rows to attachmentIds', async () => {
+      mockPrisma.poll.findUnique.mockResolvedValue(
+        buildPrismaPoll({
+          attachments: [{ id: 'att-1' }, { id: 'att-2' }],
+        })
+      );
+
+      const result = await repo.getPollById('poll-1');
+
+      expect(result.success).toBe(true);
+
+      if (!result.success) {
+        return;
+      }
+
+      expect(result.value!.attachmentIds).toEqual(['att-1', 'att-2']);
+    });
+
+    it('should default to an empty array when the relation is absent', async () => {
+      mockPrisma.poll.findUnique.mockResolvedValue(buildPrismaPoll());
+
+      const result = await repo.getPollById('poll-1');
+
+      expect(result.success).toBe(true);
+
+      if (!result.success) {
+        return;
+      }
+
+      expect(result.value!.attachmentIds).toEqual([]);
+    });
+
+    // Guards the failure mode that would break the description renderer:
+    // if the query stops selecting attachments, the allowlist goes empty and
+    // every inline image silently renders as a blocked placeholder.
+    it('should request attachment ids without their bytes', async () => {
+      mockPrisma.poll.findUnique.mockResolvedValue(buildPrismaPoll());
+
+      await repo.getPollById('poll-1');
+
+      const include = mockPrisma.poll.findUnique.mock.calls[0][0].include;
+
+      expect(include.attachments).toBeDefined();
+      expect(include.attachments.select).toEqual({ id: true });
+      expect(JSON.stringify(include.attachments)).not.toContain('bytes');
+    });
+  });
+
   describe('reconstitution via getPollById', () => {
     it('should reconstitute a Poll with nested questions and answers', async () => {
       const prismaData = buildPrismaPoll();
@@ -353,6 +402,7 @@ describe('PrismaPollRepository', () => {
         },
         include: {
           properties: true,
+          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
           questions: {
             include: {
               answers: {
@@ -403,6 +453,7 @@ describe('PrismaPollRepository', () => {
         where: { id: 'poll-1' },
         include: {
           properties: true,
+          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
           questions: {
             where: { archivedAt: null },
             include: {
@@ -462,6 +513,7 @@ describe('PrismaPollRepository', () => {
         },
         include: {
           properties: true,
+          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
           questions: {
             where: { archivedAt: null },
             include: {
@@ -551,6 +603,7 @@ describe('PrismaPollRepository', () => {
         },
         include: {
           properties: true,
+          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
           questions: {
             where: { archivedAt: null },
             include: {
@@ -633,6 +686,7 @@ describe('PrismaPollRepository', () => {
         },
         include: {
           properties: true,
+          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
           questions: {
             where: { archivedAt: null },
             include: {

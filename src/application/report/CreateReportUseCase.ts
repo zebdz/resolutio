@@ -5,7 +5,7 @@ import { ReportVisibility } from '../../domain/report/ReportVisibility';
 import { ReportDomainCodes } from '../../domain/report/ReportDomainCodes';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 import { ReportErrors } from './ReportErrors';
-import { stripMarkdownToPlainText } from './StripMarkdownToPlainText';
+import { stripMarkdownToPlainText } from '../shared/StripMarkdownToPlainText';
 
 export interface OrgRepoForCreateReport {
   isUserExactMember(userId: string, orgId: string): Promise<boolean>;

@@ -3,6 +3,7 @@ import { Poll } from '../Poll';
 import { Question } from '../Question';
 import { Answer } from '../Answer';
 import { PollDomainCodes } from '../PollDomainCodes';
+import { POLL_ATTACHMENT_COUNT_LIMIT } from '../PollAttachment';
 import { PollState } from '../PollState';
 import { ProfanityChecker } from '../../shared/profanity/ProfanityChecker';
 import { SharedDomainCodes } from '../../shared/SharedDomainCodes';
@@ -1590,6 +1591,203 @@ describe('Poll type', () => {
       const poll = create().value;
 
       expect((poll as any).setAnonymous).toBeUndefined();
+    });
+  });
+
+  describe('description attachments', () => {
+    function draftPoll(): Poll {
+      const r = Poll.create(
+        'Fence dispute',
+        'The fence was moved.',
+        'org-1',
+        null,
+        'user-1',
+        new Date('2030-01-01'),
+        new Date('2030-02-01')
+      );
+
+      if (!r.success) {
+        throw new Error('fixture poll failed to build: ' + r.error);
+      }
+
+      return r.value;
+    }
+
+    it('should start with no attachments', () => {
+      expect(draftPoll().attachmentIds).toEqual([]);
+    });
+
+    it('should add an attachment id', () => {
+      const poll = draftPoll();
+      const result = poll.addAttachment('att1');
+
+      expect(result.success).toBe(true);
+      expect(poll.attachmentIds).toEqual(['att1']);
+    });
+
+    it('should reject adding past the count limit', () => {
+      const poll = draftPoll();
+
+      for (let i = 0; i < POLL_ATTACHMENT_COUNT_LIMIT; i++) {
+        expect(poll.addAttachment(`att${i}`).success).toBe(true);
+      }
+
+      const result = poll.addAttachment('one-too-many');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollDomainCodes.POLL_ATTACHMENT_LIMIT_REACHED);
+    });
+
+    it('should remove an attachment id', () => {
+      const poll = draftPoll();
+      poll.addAttachment('att1');
+
+      const result = poll.removeAttachment('att1');
+
+      expect(result.success).toBe(true);
+      expect(poll.attachmentIds).toEqual([]);
+    });
+
+    it('should fail to remove an attachment that is not attached', () => {
+      const poll = draftPoll();
+      const result = poll.removeAttachment('nope');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(PollDomainCodes.POLL_ATTACHMENT_NOT_FOUND);
+    });
+
+    // attachmentIds lives outside `props`, so the spread in toJSON would
+    // silently drop it without an explicit key. Serialized poll payloads feed
+    // the description renderer's allowlist; an empty list there makes every
+    // inline image render as a blocked placeholder.
+    it('should include attachmentIds in toJSON', () => {
+      const poll = draftPoll();
+      poll.addAttachment('att1');
+      poll.addAttachment('att2');
+
+      expect(poll.toJSON().attachmentIds).toEqual(['att1', 'att2']);
+    });
+
+    it('should serialize an empty attachment list rather than undefined', () => {
+      expect(draftPoll().toJSON().attachmentIds).toEqual([]);
+    });
+
+    it('should not leak internal state through the getter', () => {
+      const poll = draftPoll();
+      poll.addAttachment('att1');
+
+      poll.attachmentIds.push('injected');
+
+      expect(poll.attachmentIds).toEqual(['att1']);
+    });
+
+    it('should fail to add an attachment once the poll is active', () => {
+      const poll = draftPoll();
+      poll.addQuestion(createQuestionWithAnswer(poll.id));
+      poll.takeSnapshot();
+      poll.activate();
+
+      const result = poll.addAttachment('att1');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(
+        PollDomainCodes.POLL_CANNOT_CHANGE_ATTACHMENTS_ACTIVE
+      );
+    });
+
+    it('should fail to remove an attachment once the poll is active', () => {
+      const poll = draftPoll();
+      poll.addAttachment('att1');
+      poll.addQuestion(createQuestionWithAnswer(poll.id));
+      poll.takeSnapshot();
+      poll.activate();
+
+      const result = poll.removeAttachment('att1');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(
+        PollDomainCodes.POLL_CANNOT_CHANGE_ATTACHMENTS_ACTIVE
+      );
+    });
+  });
+
+  describe('updateDescription attachment refs', () => {
+    function draftPollWithAttachment(): Poll {
+      const r = Poll.create(
+        'Fence dispute',
+        'Initial text.',
+        'org-1',
+        null,
+        'user-1',
+        new Date('2030-01-01'),
+        new Date('2030-02-01')
+      );
+
+      if (!r.success) {
+        throw new Error('fixture poll failed to build: ' + r.error);
+      }
+
+      r.value.addAttachment('own1');
+
+      return r.value;
+    }
+
+    it('should accept a description referencing its own attachment', () => {
+      const poll = draftPollWithAttachment();
+      const result = poll.updateDescription(
+        'See ![photo](/api/poll-attachments/own1)'
+      );
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should reject a description referencing a foreign attachment', () => {
+      const poll = draftPollWithAttachment();
+      const result = poll.updateDescription(
+        'See ![photo](/api/poll-attachments/foreign9)'
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe(
+        PollDomainCodes.POLL_DESCRIPTION_INVALID_ATTACHMENT_REF
+      );
+    });
+
+    it('should accept a PDF link ref to its own attachment', () => {
+      const poll = draftPollWithAttachment();
+      const result = poll.updateDescription(
+        'See [survey.pdf](/api/poll-attachments/own1)'
+      );
+
+      expect(result.success).toBe(true);
+    });
+
+    it('should ignore a report-attachment URL, which is not a poll ref', () => {
+      const poll = draftPollWithAttachment();
+      const result = poll.updateDescription(
+        'See ![x](/api/report-attachments/other1)'
+      );
+
+      expect(result.success).toBe(true);
+    });
+
+    // A brand-new poll owns no attachments, so any ref in its initial
+    // description necessarily points at another poll's file.
+    it('should reject creating a poll whose description already has a ref', () => {
+      const result = Poll.create(
+        'Fence dispute',
+        'See ![photo](/api/poll-attachments/someone-elses-file)',
+        'org-1',
+        null,
+        'user-1',
+        new Date('2030-01-01'),
+        new Date('2030-02-01')
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.success === false && result.error).toBe(
+        PollDomainCodes.POLL_DESCRIPTION_INVALID_ATTACHMENT_REF
+      );
     });
   });
 });

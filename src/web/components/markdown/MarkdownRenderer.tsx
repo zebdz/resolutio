@@ -2,6 +2,7 @@
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import { useTranslations } from 'next-intl';
 import { detectVideoEmbed } from './detectVideoEmbed';
@@ -19,31 +20,46 @@ const SANITIZE_SCHEMA = {
 interface Props {
   source: string;
   /**
-   * Optional allowlist of attachment ids that belong to *this* report.
+   * Attachment API path prefix for the owning aggregate, e.g.
+   * `/api/poll-attachments` or `/api/report-attachments`. Only images served
+   * from this prefix may render.
+   */
+  apiPrefix: string;
+  /**
+   * Optional allowlist of attachment ids that belong to *this* entity.
    * When provided, inline images whose src points to an attachment id not in
    * this set are treated like external images (placeholder instead of <img>).
-   * Defense-in-depth: the save-time guard in Report.updateBody already
-   * prevents new cross-report refs, but pre-existing bodies might still
-   * carry stale URLs.
+   * Defense-in-depth: the save-time guard in the domain already prevents new
+   * cross-entity refs, but pre-existing bodies might still carry stale URLs.
    */
   allowedAttachmentIds?: string[];
 }
 
-const ATTACHMENT_ID_FROM_SRC = /\/api\/report-attachments\/([A-Za-z0-9_-]+)/;
+function escapeForRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
-export function ReportMarkdownRenderer({
+export function MarkdownRenderer({
   source,
+  apiPrefix,
   allowedAttachmentIds,
 }: Props) {
-  const t = useTranslations('report.markdown');
+  const t = useTranslations('markdown');
   const allowedSet = allowedAttachmentIds
     ? new Set(allowedAttachmentIds)
     : null;
+  const attachmentIdFromSrc = new RegExp(
+    `${escapeForRegex(apiPrefix)}/([A-Za-z0-9_-]+)`
+  );
 
   return (
     <div className="prose prose-zinc max-w-none dark:prose-invert">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        // remarkBreaks turns a single newline into a line break. Without it,
+        // markdown joins consecutive lines into one paragraph, which surprises
+        // authors who paste text with per-line clauses and do not know
+        // markdown's blank-line rule.
+        remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[[rehypeSanitize, SANITIZE_SCHEMA]]}
         skipHtml
         components={{
@@ -80,7 +96,7 @@ export function ReportMarkdownRenderer({
             if (
               !src ||
               typeof src !== 'string' ||
-              !isAllowedAttachmentSrc(src)
+              !isAllowedAttachmentSrc(src, apiPrefix)
             ) {
               return (
                 <span className="block rounded-md border border-dashed border-zinc-300 bg-zinc-50 p-3 text-xs italic text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
@@ -90,9 +106,9 @@ export function ReportMarkdownRenderer({
             }
 
             // If the parent passed an allowlist, only render attachments that
-            // belong to *this* report. Other ids → placeholder.
+            // belong to *this* entity. Other ids → placeholder.
             if (allowedSet) {
-              const m = src.match(ATTACHMENT_ID_FROM_SRC);
+              const m = src.match(attachmentIdFromSrc);
               const id = m?.[1];
 
               if (!id || !allowedSet.has(id)) {

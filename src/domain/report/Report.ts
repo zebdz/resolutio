@@ -3,10 +3,14 @@ import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
 import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 import { ReportDomainCodes } from './ReportDomainCodes';
 import { ReportVisibility, isPublicVisibility } from './ReportVisibility';
-import { extractReportAttachmentIdsFromBody } from './extractReportAttachmentIdsFromBody';
+import { validateAttachmentRefs } from '../shared/attachments/validateAttachmentRefs';
 
 export const REPORT_TITLE_MAX_LENGTH = 200;
 export const REPORT_BODY_MAX_LENGTH = 50_000;
+
+// Path prefix for inline attachment refs in report bodies and the download
+// route that serves them.
+export const REPORT_ATTACHMENT_API_PREFIX = '/api/report-attachments';
 
 export type ReportState = 'DRAFT' | 'PUBLISHED';
 
@@ -62,7 +66,12 @@ export class Report {
 
     // No attachments exist for a brand-new report, so any inline image ref
     // is automatically foreign.
-    const refCheck = validateBodyAttachmentRefs(input.body, []);
+    const refCheck = validateAttachmentRefs(
+      input.body,
+      REPORT_ATTACHMENT_API_PREFIX,
+      [],
+      ReportDomainCodes.REPORT_BODY_INVALID_ATTACHMENT_REF
+    );
 
     if (!refCheck.success) {
       return failure(refCheck.error);
@@ -200,9 +209,11 @@ export class Report {
       return failure(v.error);
     }
 
-    const refCheck = validateBodyAttachmentRefs(
+    const refCheck = validateAttachmentRefs(
       newBody,
-      this.props.attachmentIds
+      REPORT_ATTACHMENT_API_PREFIX,
+      this.props.attachmentIds,
+      ReportDomainCodes.REPORT_BODY_INVALID_ATTACHMENT_REF
     );
 
     if (!refCheck.success) {
@@ -396,30 +407,6 @@ function validateBody(
       return failure(
         profanityErrorCode(profanityChecker.findProfaneWords(text))
       );
-    }
-  }
-
-  return success(undefined);
-}
-
-// Body may only reference attachments that belong to this report. This
-// prevents leaks where pasting a URL from another (private) report would
-// render fine for the author but 404 for everyone else.
-function validateBodyAttachmentRefs(
-  body: string,
-  ownAttachmentIds: string[]
-): Result<void, string> {
-  const refIds = extractReportAttachmentIdsFromBody(body);
-
-  if (refIds.length === 0) {
-    return success(undefined);
-  }
-
-  const ownSet = new Set(ownAttachmentIds);
-
-  for (const id of refIds) {
-    if (!ownSet.has(id)) {
-      return failure(ReportDomainCodes.REPORT_BODY_INVALID_ATTACHMENT_REF);
     }
   }
 

@@ -9,6 +9,11 @@ import {
   POLL_DESCRIPTION_MAX_LENGTH,
 } from '@/domain/poll/Poll';
 import {
+  POLL_ATTACHMENT_IMAGE_MAX_BYTES,
+  POLL_ATTACHMENT_PDF_MAX_BYTES,
+  POLL_ATTACHMENT_COUNT_LIMIT,
+} from '@/domain/poll/PollAttachment';
+import {
   QUESTION_TEXT_MAX_LENGTH,
   QUESTION_DETAILS_MAX_LENGTH,
 } from '@/domain/poll/Question';
@@ -62,6 +67,13 @@ export const ERROR_CODE_PARAMS: Record<
   'domain.board.boardNameTooLong': { maxLength: BOARD_NAME_MAX_LENGTH },
   'domain.poll.titleTooLong': { maxLength: POLL_TITLE_MAX_LENGTH },
   'domain.poll.descriptionTooLong': { maxLength: POLL_DESCRIPTION_MAX_LENGTH },
+  'domain.poll.attachmentTooLarge': {
+    maxImageMb: POLL_ATTACHMENT_IMAGE_MAX_BYTES / (1024 * 1024),
+    maxPdfMb: POLL_ATTACHMENT_PDF_MAX_BYTES / (1024 * 1024),
+  },
+  'domain.poll.attachmentLimitReached': {
+    limit: POLL_ATTACHMENT_COUNT_LIMIT,
+  },
   'domain.poll.questionTextTooLong': { maxLength: QUESTION_TEXT_MAX_LENGTH },
   'domain.poll.questionDetailsTooLong': {
     maxLength: QUESTION_DETAILS_MAX_LENGTH,

@@ -2,12 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Field, Label } from '@/src/web/components/catalyst/fieldset';
 import { Input } from '@/src/web/components/catalyst/input';
-import { Textarea } from '@/src/web/components/catalyst/textarea';
 import {
   getPollByIdAction,
   updatePollAction,
@@ -40,6 +39,17 @@ import { LegalCheckControls } from '@/src/web/components/polls/legal/LegalCheckC
 import { LegalAnnotation } from '@/src/web/components/polls/legal/LegalAnnotation';
 import { LegalAnalysisSummary } from '@/src/web/components/polls/legal/LegalAnalysisSummary';
 import { PlusIcon } from '@heroicons/react/20/solid';
+import { MarkdownEditor } from '@/web/components/markdown/MarkdownEditor';
+import { POLL_ATTACHMENT_API_PREFIX } from '@/domain/poll/PollAttachment';
+import { POLL_DESCRIPTION_MAX_LENGTH } from '@/domain/poll/Poll';
+import { PollAttachmentUploader } from '@/web/components/polls/PollAttachmentUploader';
+import {
+  listPollAttachmentsAction,
+  removePollAttachmentAction,
+  type PollAttachmentSummary,
+} from '@/web/actions/poll/pollAttachments';
+import { buildAttachmentRef } from '@/web/components/markdown/buildAttachmentRef';
+import { removeAttachmentRefs } from '@/web/components/markdown/removeAttachmentRefs';
 import { validateHeaderName } from 'http';
 
 interface Answer {
@@ -73,6 +83,7 @@ export function EditPollForm() {
   const pollId = params.pollId as string;
   const t = useTranslations('poll');
   const tCommon = useTranslations('common');
+  const locale = useLocale();
   const tLegal = useTranslations('legalCheck');
 
   const [pollData, setPollData] = useState<PollData>({
@@ -113,6 +124,132 @@ export function EditPollForm() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [legalCheckError, setLegalCheckError] = useState<string | null>(null);
   const [isLegalCheckStale, setIsLegalCheckStale] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  // Captured once, when a save is rejected for length — not recomputed as the
+  // author types. Cleared on the next save attempt.
+  const [descriptionLengthAtError, setDescriptionLengthAtError] = useState<
+    number | null
+  >(null);
+
+  // Single place where field errors land, so the length snapshot cannot be
+  // forgotten on one of the save paths.
+  const applyFieldErrors = (errors?: Record<string, string[]>) => {
+    setFieldErrors(errors);
+    setDescriptionLengthAtError(
+      errors?.description ? pollData.description.length : null
+    );
+  };
+
+  // Uploads go through a route handler rather than a server action so they
+  // are not bound by the 12 MB serverActions body limit. The route returns an
+  // already-localized message on failure.
+  const handleUploadAttachment = useCallback(
+    async (file: File): Promise<{ id: string } | { error: string }> => {
+      setAttachmentError(null);
+
+      const formData = new FormData();
+      formData.append('pollId', pollId);
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/poll-attachments', {
+          method: 'POST',
+          body: formData,
+        });
+        const json = await res.json();
+
+        if (!res.ok) {
+          setAttachmentError(json.error ?? tCommon('generic'));
+
+          return { error: json.error ?? tCommon('generic') };
+        }
+
+        return { id: json.id as string };
+      } catch {
+        setAttachmentError(tCommon('generic'));
+
+        return { error: tCommon('generic') };
+      }
+    },
+    [pollId, tCommon]
+  );
+
+  const [attachments, setAttachments] = useState<PollAttachmentSummary[]>([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [removingAttachmentId, setRemovingAttachmentId] = useState<
+    string | null
+  >(null);
+
+  const refreshAttachments = useCallback(async () => {
+    const result = await listPollAttachmentsAction(pollId);
+
+    if (result.success) {
+      setAttachments(result.data);
+    }
+  }, [pollId]);
+
+  useEffect(() => {
+    refreshAttachments();
+  }, [refreshAttachments]);
+
+  // Picking a file from the uploader does the same thing as pasting one into
+  // the editor: upload, then append the ref so the author never writes markdown
+  // by hand.
+  const handlePickAttachment = useCallback(
+    async (file: File) => {
+      setUploadingAttachment(true);
+
+      const result = await handleUploadAttachment(file);
+
+      setUploadingAttachment(false);
+
+      if ('id' in result) {
+        setPollData((prev) => ({
+          ...prev,
+          description:
+            prev.description +
+            buildAttachmentRef({
+              fileName: file.name,
+              mimeType: file.type,
+              apiPrefix: POLL_ATTACHMENT_API_PREFIX,
+              id: result.id,
+            }),
+        }));
+        await refreshAttachments();
+      }
+    },
+    [handleUploadAttachment, refreshAttachments]
+  );
+
+  const handleRemoveAttachment = useCallback(
+    async (id: string) => {
+      setRemovingAttachmentId(id);
+      setAttachmentError(null);
+
+      const result = await removePollAttachmentAction(id);
+
+      setRemovingAttachmentId(null);
+
+      if (!result.success) {
+        setAttachmentError(result.error);
+
+        return;
+      }
+
+      // The description may still reference the removed file; strip those refs
+      // so saving does not fail validation on a ref that no longer resolves.
+      setPollData((prev) => ({
+        ...prev,
+        description: removeAttachmentRefs(
+          prev.description,
+          POLL_ATTACHMENT_API_PREFIX,
+          id
+        ),
+      }));
+      await refreshAttachments();
+    },
+    [refreshAttachments]
+  );
 
   const handleCheckLegality = useCallback(
     async (model: string) => {
@@ -359,7 +496,7 @@ export function EditPollForm() {
     try {
       setIsSaving(true);
       setError(null);
-      setFieldErrors(undefined);
+      applyFieldErrors(undefined);
       setQuestionFieldErrors(null);
 
       // Validate
@@ -416,7 +553,7 @@ export function EditPollForm() {
 
       if (!pollResult.success) {
         setError(pollResult.error);
-        setFieldErrors(pollResult.fieldErrors);
+        applyFieldErrors(pollResult.fieldErrors);
 
         return;
       }
@@ -797,6 +934,19 @@ export function EditPollForm() {
           hasQuestions={questions.length > 0}
           isOpenPoll={pollData.pollType === 'OPEN'}
           onStateChange={loadPoll}
+          // Activating or finishing freezes the poll, so staying here would
+          // just replace the form with "this poll cannot be edited" — an error
+          // for doing exactly what was intended.
+          //
+          // Finishing goes to the results, which is what the author wants to
+          // see next and is readable to them: canViewResults only restricts
+          // non-admins on an anonymous poll while it is still active.
+          // Activating goes to the list, matching where the create flow lands.
+          onNoLongerEditable={(transition) =>
+            router.push(
+              transition === 'finished' ? `/polls/${pollId}/results` : '/polls'
+            )
+          }
         />
       )}
 
@@ -871,20 +1021,35 @@ export function EditPollForm() {
 
         <Field>
           <Label>{t('pollDescription')}</Label>
-          <Textarea
+          <MarkdownEditor
             value={pollData.description}
-            invalid={!!fieldErrors?.description}
-            onChange={(e) => {
-              setPollData({ ...pollData, description: e.target.value });
+            onChange={(next) => {
+              setPollData({ ...pollData, description: next });
               setFieldErrors(undefined);
             }}
-            placeholder={t('pollDescription')}
-            required
-            rows={3}
+            apiPrefix={POLL_ATTACHMENT_API_PREFIX}
+            maxLength={POLL_DESCRIPTION_MAX_LENGTH}
+            onUploadAttachment={handleUploadAttachment}
           />
           {fieldErrors?.description && (
             <p className="text-sm text-red-600">{fieldErrors.description[0]}</p>
           )}
+          {descriptionLengthAtError !== null && (
+            <p className="text-sm text-red-600">
+              {t('descriptionCharacterCount', {
+                current: descriptionLengthAtError.toLocaleString(locale),
+                max: POLL_DESCRIPTION_MAX_LENGTH.toLocaleString(locale),
+              })}
+            </p>
+          )}
+          <PollAttachmentUploader
+            attachments={attachments}
+            uploading={uploadingAttachment}
+            removingId={removingAttachmentId}
+            error={attachmentError}
+            onPickFile={handlePickAttachment}
+            onRemove={handleRemoveAttachment}
+          />
         </Field>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

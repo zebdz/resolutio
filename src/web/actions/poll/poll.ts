@@ -48,6 +48,7 @@ import { getCurrentUser } from '../../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
+import { normalizeFormText } from '@/web/actions/utils/normalizeFormText';
 import { QuestionType } from '@/domain/poll/QuestionType';
 import { PollState } from '@/domain/poll/PollState';
 import { PollSearchFilters } from '@/domain/poll/PollRepository';
@@ -238,7 +239,7 @@ export async function createPollAction(
     const anonymousRaw = formData.get('anonymous') as string | null;
     const input = {
       title: formData.get('title') as string,
-      description: formData.get('description') as string,
+      description: normalizeFormText(formData.get('description')),
       organizationId: formData.get('organizationId') as string,
       boardId: boardIdRaw && boardIdRaw.trim() ? boardIdRaw : null,
       startDate: new Date(formData.get('startDate') as string),
@@ -707,7 +708,7 @@ export async function updatePollAction(
     const input = {
       pollId: formData.get('pollId') as string,
       title: formData.get('title') as string,
-      description: formData.get('description') as string,
+      description: normalizeFormText(formData.get('description')),
       startDate: new Date(formData.get('startDate') as string),
       endDate: new Date(formData.get('endDate') as string),
     };

@@ -22,7 +22,11 @@ import {
   detachPollAction,
   removeReportAttachmentAction,
 } from '@/web/actions/report/report';
-import { ReportMarkdownEditor } from './ReportMarkdownEditor';
+import { MarkdownEditor } from '../markdown/MarkdownEditor';
+import {
+  REPORT_ATTACHMENT_API_PREFIX,
+  REPORT_BODY_MAX_LENGTH,
+} from '@/domain/report/Report';
 import { VisibilityPicker } from './VisibilityPicker';
 import { PollPicker } from './PollPicker';
 import { AttachmentUploader } from './AttachmentUploader';
@@ -260,10 +264,11 @@ export function ReportForm({
         <Field>
           <Label>{t('bodyLabel')}</Label>
           <div className="mt-3">
-            <ReportMarkdownEditor
+            <MarkdownEditor
               value={body}
               onChange={setBody}
-              maxLength={50000}
+              apiPrefix={REPORT_ATTACHMENT_API_PREFIX}
+              maxLength={REPORT_BODY_MAX_LENGTH}
               onUploadAttachment={
                 mode === 'edit' ? handleUploadAttachment : undefined
               }

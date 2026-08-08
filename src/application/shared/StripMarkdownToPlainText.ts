@@ -1,5 +1,11 @@
-// Lightweight md → plaintext stripper for profanity checking only.
-// NOT a full markdown parser; trades fidelity for zero deps + speed.
+// Lightweight md → plaintext stripper, shared by reports and polls.
+//
+// Used wherever markdown source must be shown or examined as prose rather
+// than rendered: profanity checking, list-card previews, PDF exports, and
+// social-preview descriptions.
+//
+// NOT a full markdown parser; trades fidelity for zero deps + speed. It runs
+// on every card in a list, so keep it cheap.
 export function stripMarkdownToPlainText(md: string): string {
   let s = md;
   // Code fences (keep inner content but drop fences and language tag)
