@@ -5,7 +5,7 @@ import { Link } from '@/src/i18n/routing';
 import { Heading } from '@/web/components/catalyst/heading';
 import { ReportStateBadge } from './ReportStateBadge';
 import { User } from '@/domain/user/User';
-import { stripMarkdownToPlainText } from '@/application/report/StripMarkdownToPlainText';
+import { stripMarkdownToPlainText } from '@/application/shared/StripMarkdownToPlainText';
 
 interface ReportCardData {
   id: string;

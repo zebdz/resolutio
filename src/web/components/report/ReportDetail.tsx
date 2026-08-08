@@ -4,7 +4,8 @@ import { Heading } from '@/web/components/catalyst/heading';
 import { User } from '@/domain/user/User';
 import type { SerializedReport } from '@/web/actions/report/serializeReport';
 import { ReportStateBadge } from './ReportStateBadge';
-import { ReportMarkdownRenderer } from './ReportMarkdownRenderer';
+import { MarkdownRenderer } from '../markdown/MarkdownRenderer';
+import { REPORT_ATTACHMENT_API_PREFIX } from '@/domain/report/Report';
 import { ReportAdminActions } from './ReportAdminActions';
 
 interface ReportDetailProps {
@@ -129,8 +130,9 @@ export async function ReportDetail({
 
       {/* Body */}
       <div className="prose prose-zinc max-w-none dark:prose-invert">
-        <ReportMarkdownRenderer
+        <MarkdownRenderer
           source={report.body}
+          apiPrefix={REPORT_ATTACHMENT_API_PREFIX}
           allowedAttachmentIds={attachments.map((a) => a.id)}
         />
       </div>

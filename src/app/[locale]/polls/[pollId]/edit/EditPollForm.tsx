@@ -7,7 +7,6 @@ import { Heading } from '@/src/web/components/catalyst/heading';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Field, Label } from '@/src/web/components/catalyst/fieldset';
 import { Input } from '@/src/web/components/catalyst/input';
-import { Textarea } from '@/src/web/components/catalyst/textarea';
 import {
   getPollByIdAction,
   updatePollAction,
@@ -40,6 +39,9 @@ import { LegalCheckControls } from '@/src/web/components/polls/legal/LegalCheckC
 import { LegalAnnotation } from '@/src/web/components/polls/legal/LegalAnnotation';
 import { LegalAnalysisSummary } from '@/src/web/components/polls/legal/LegalAnalysisSummary';
 import { PlusIcon } from '@heroicons/react/20/solid';
+import { MarkdownEditor } from '@/web/components/markdown/MarkdownEditor';
+import { POLL_ATTACHMENT_API_PREFIX } from '@/domain/poll/PollAttachment';
+import { POLL_DESCRIPTION_MAX_LENGTH } from '@/domain/poll/Poll';
 import { validateHeaderName } from 'http';
 
 interface Answer {
@@ -113,6 +115,41 @@ export function EditPollForm() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [legalCheckError, setLegalCheckError] = useState<string | null>(null);
   const [isLegalCheckStale, setIsLegalCheckStale] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+
+  // Uploads go through a route handler rather than a server action so they
+  // are not bound by the 12 MB serverActions body limit. The route returns an
+  // already-localized message on failure.
+  const handleUploadAttachment = useCallback(
+    async (file: File): Promise<{ id: string } | { error: string }> => {
+      setAttachmentError(null);
+
+      const formData = new FormData();
+      formData.append('pollId', pollId);
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/poll-attachments', {
+          method: 'POST',
+          body: formData,
+        });
+        const json = await res.json();
+
+        if (!res.ok) {
+          setAttachmentError(json.error ?? tCommon('generic'));
+
+          return { error: json.error ?? tCommon('generic') };
+        }
+
+        return { id: json.id as string };
+      } catch {
+        setAttachmentError(tCommon('generic'));
+
+        return { error: tCommon('generic') };
+      }
+    },
+    [pollId, tCommon]
+  );
 
   const handleCheckLegality = useCallback(
     async (model: string) => {
@@ -871,19 +908,21 @@ export function EditPollForm() {
 
         <Field>
           <Label>{t('pollDescription')}</Label>
-          <Textarea
+          <MarkdownEditor
             value={pollData.description}
-            invalid={!!fieldErrors?.description}
-            onChange={(e) => {
-              setPollData({ ...pollData, description: e.target.value });
+            onChange={(next) => {
+              setPollData({ ...pollData, description: next });
               setFieldErrors(undefined);
             }}
-            placeholder={t('pollDescription')}
-            required
-            rows={3}
+            apiPrefix={POLL_ATTACHMENT_API_PREFIX}
+            maxLength={POLL_DESCRIPTION_MAX_LENGTH}
+            onUploadAttachment={handleUploadAttachment}
           />
           {fieldErrors?.description && (
             <p className="text-sm text-red-600">{fieldErrors.description[0]}</p>
+          )}
+          {attachmentError && (
+            <p className="text-sm text-red-600">{attachmentError}</p>
           )}
         </Field>
 

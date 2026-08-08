@@ -556,9 +556,9 @@
   },
   "common": {
     "back": "Назад",
-    "backToOrganization": "\u2190 Назад к организации",
-    "backToManagement": "\u2190 Назад к управлению",
-    "backToHome": "\u2190 На главную",
+    "backToOrganization": "← Назад к организации",
+    "backToManagement": "← Назад к управлению",
+    "backToHome": "← На главную",
     "loading": "Загрузка...",
     "creating": "Создание...",
     "error": "Произошла ошибка",
@@ -1339,7 +1339,15 @@
       "pollResultsAdminOnly": "Результаты доступны только администраторам организации",
       "pollResultsNotOrgMember": "Вы не являетесь участником этой организации",
       "pollProtocolNotAvailable": "Протокол для этого голосования пока недоступен",
-      "pollIsAnonymous": "Это анонимное голосование — поимённый протокол не формируется"
+      "pollIsAnonymous": "Это анонимное голосование — поимённый протокол не формируется",
+      "attachmentFileNameEmpty": "Имя файла не может быть пустым",
+      "attachmentTypeNotAllowed": "Прикреплять можно только изображения PNG, JPEG, WebP и файлы PDF",
+      "attachmentTooLarge": "Файл слишком большой. Изображения — до {maxImageMb} МБ, PDF — до {maxPdfMb} МБ",
+      "attachmentMagicMismatch": "Содержимое файла не соответствует его типу",
+      "attachmentLimitReached": "К голосованию можно прикрепить не более {limit} файлов",
+      "attachmentNotFound": "Файл не найден",
+      "descriptionInvalidAttachmentRef": "Описание ссылается на файл, не принадлежащий этому голосованию",
+      "cannotChangeAttachmentsActive": "Нельзя изменять вложения после начала голосования"
     },
     "user": {
       "userNotFound": "Пользователь не найден",
@@ -2166,9 +2174,6 @@
       "archivedSuffix": " (архивировано)",
       "noLongerAttachable": " (больше не доступно)"
     },
-    "markdown": {
-      "externalImageBlocked": "Внешние изображения не разрешены — загрузите файл через прикрепление."
-    },
     "attachments": {
       "uploadButton": "Выбрать файл",
       "uploading": "Загрузка…",
@@ -2234,5 +2239,8 @@
       "newButton": "Новый отчёт",
       "viewAll": "Все отчёты"
     }
+  },
+  "markdown": {
+    "externalImageBlocked": "Внешние изображения не разрешены — загрузите файл через прикрепление."
   }
 }

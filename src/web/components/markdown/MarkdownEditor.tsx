@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
+import { buildAttachmentRef } from './buildAttachmentRef';
 
 const MDEditor = dynamic(
   () => import('@uiw/react-md-editor').then((m) => m.default),
@@ -11,15 +12,22 @@ const MDEditor = dynamic(
 interface Props {
   value: string;
   onChange: (next: string) => void;
+  /**
+   * Attachment API path prefix for the owning aggregate, e.g.
+   * `/api/poll-attachments` or `/api/report-attachments`. Inserted refs point
+   * at this prefix.
+   */
+  apiPrefix: string;
   onUploadAttachment?: (
     file: File
   ) => Promise<{ id: string } | { error: string }>;
   maxLength?: number;
 }
 
-export function ReportMarkdownEditor({
+export function MarkdownEditor({
   value,
   onChange,
+  apiPrefix,
   onUploadAttachment,
   maxLength,
 }: Props) {
@@ -47,8 +55,15 @@ export function ReportMarkdownEditor({
     const r = await onUploadAttachment(file);
 
     if ('id' in r) {
-      const ref = `\n\n![${file.name}](/api/report-attachments/${r.id})\n`;
-      onChange(value + ref);
+      onChange(
+        value +
+          buildAttachmentRef({
+            fileName: file.name,
+            mimeType: file.type,
+            apiPrefix,
+            id: r.id,
+          })
+      );
     }
   };
 

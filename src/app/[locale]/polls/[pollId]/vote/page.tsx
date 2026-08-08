@@ -18,6 +18,8 @@ import { Link } from '@/src/i18n/routing';
 import { Button } from '@/src/web/components/catalyst/button';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
+import { MarkdownRenderer } from '@/web/components/markdown/MarkdownRenderer';
+import { POLL_ATTACHMENT_API_PREFIX } from '@/domain/poll/PollAttachment';
 
 interface VotePageProps {
   params: Promise<{
@@ -124,6 +126,9 @@ export default async function VotePage({ params }: VotePageProps) {
     id: poll.id,
     title: poll.title,
     description: poll.description,
+    // Ids only — the renderer needs them to refuse refs to other polls'
+    // files. Attachment bytes never cross to the client.
+    attachmentIds: poll.attachmentIds ?? [],
     pollType: poll.pollType,
     anonymous: !!poll.anonymous,
     // The notice has to warn about the property listing too, and only an
@@ -157,9 +162,13 @@ export default async function VotePage({ params }: VotePageProps) {
       <div className="mb-6">
         <Heading>{serializedPoll.title}</Heading>
         {serializedPoll.description && (
-          <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            {serializedPoll.description}
-          </p>
+          <div className="mt-2 text-zinc-600 dark:text-zinc-400">
+            <MarkdownRenderer
+              source={serializedPoll.description}
+              apiPrefix={POLL_ATTACHMENT_API_PREFIX}
+              allowedAttachmentIds={serializedPoll.attachmentIds}
+            />
+          </div>
         )}
       </div>
 

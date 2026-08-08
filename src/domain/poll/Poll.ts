@@ -1,4 +1,9 @@
 import { Result, success, failure } from '../shared/Result';
+import { validateAttachmentRefs } from '../shared/attachments/validateAttachmentRefs';
+import {
+  POLL_ATTACHMENT_API_PREFIX,
+  POLL_ATTACHMENT_COUNT_LIMIT,
+} from './PollAttachment';
 import { Question, QuestionProps } from './Question';
 import { Answer } from './Answer';
 import { PollDomainCodes } from './PollDomainCodes';
@@ -10,7 +15,7 @@ import { DistributionType } from './DistributionType';
 import { PropertyAggregation } from './PropertyAggregation';
 
 export const POLL_TITLE_MAX_LENGTH = 500;
-export const POLL_DESCRIPTION_MAX_LENGTH = 1000;
+export const POLL_DESCRIPTION_MAX_LENGTH = 10000;
 
 export interface PollProps {
   id: string;
@@ -31,10 +36,20 @@ export interface PollProps {
   createdAt: Date;
   archivedAt: Date | null;
   questions: Question[];
+  // Ids of files attached to the description. Optional on input so that
+  // existing reconstitute callers keep working; always an array once
+  // constructed.
+  attachmentIds?: string[];
 }
 
 export class Poll {
-  private constructor(private props: PollProps) {}
+  // Held outside `props` so it is definitely an array internally while
+  // remaining optional for callers of `reconstitute`.
+  private attachmentIdList: string[];
+
+  private constructor(private props: PollProps) {
+    this.attachmentIdList = props.attachmentIds ?? [];
+  }
 
   public static create(
     title: string,
@@ -64,6 +79,19 @@ export class Poll {
 
     if (description.length > POLL_DESCRIPTION_MAX_LENGTH) {
       return failure(PollDomainCodes.POLL_DESCRIPTION_TOO_LONG);
+    }
+
+    // No attachments exist for a brand-new poll, so any inline ref is
+    // automatically foreign. Mirrors Report.create.
+    const refCheck = validateAttachmentRefs(
+      description,
+      POLL_ATTACHMENT_API_PREFIX,
+      [],
+      PollDomainCodes.POLL_DESCRIPTION_INVALID_ATTACHMENT_REF
+    );
+
+    if (!refCheck.success) {
+      return failure(refCheck.error);
     }
 
     // Validate dates
@@ -293,11 +321,60 @@ export class Poll {
       return failure(PollDomainCodes.POLL_DESCRIPTION_TOO_LONG);
     }
 
+    const refCheck = validateAttachmentRefs(
+      newDescription,
+      POLL_ATTACHMENT_API_PREFIX,
+      this.attachmentIdList,
+      PollDomainCodes.POLL_DESCRIPTION_INVALID_ATTACHMENT_REF
+    );
+
+    if (!refCheck.success) {
+      return refCheck;
+    }
+
     if (profanityChecker?.containsProfanity(newDescription.trim())) {
       return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
     this.props.description = newDescription.trim();
+
+    return success(undefined);
+  }
+
+  public get attachmentIds(): string[] {
+    return [...this.attachmentIdList];
+  }
+
+  // Attachments are part of the description's evidence, so they follow the
+  // same freeze rule as the description itself: mutable while DRAFT or
+  // READY, fixed once voting opens. Otherwise voters would see different
+  // evidence at different times.
+  public addAttachment(attachmentId: string): Result<void, string> {
+    if (this.isFinished() || this.isActive()) {
+      return failure(PollDomainCodes.POLL_CANNOT_CHANGE_ATTACHMENTS_ACTIVE);
+    }
+
+    if (this.attachmentIdList.length >= POLL_ATTACHMENT_COUNT_LIMIT) {
+      return failure(PollDomainCodes.POLL_ATTACHMENT_LIMIT_REACHED);
+    }
+
+    this.attachmentIdList.push(attachmentId);
+
+    return success(undefined);
+  }
+
+  public removeAttachment(attachmentId: string): Result<void, string> {
+    if (this.isFinished() || this.isActive()) {
+      return failure(PollDomainCodes.POLL_CANNOT_CHANGE_ATTACHMENTS_ACTIVE);
+    }
+
+    if (!this.attachmentIdList.includes(attachmentId)) {
+      return failure(PollDomainCodes.POLL_ATTACHMENT_NOT_FOUND);
+    }
+
+    this.attachmentIdList = this.attachmentIdList.filter(
+      (id) => id !== attachmentId
+    );
 
     return success(undefined);
   }
@@ -503,6 +580,8 @@ export class Poll {
     return {
       ...this.props,
       questions: this.props.questions.map((q) => q.toJSON()),
+      // Held outside `props`, so the spread above would otherwise drop it.
+      attachmentIds: [...this.attachmentIdList],
     };
   }
 

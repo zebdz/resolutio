@@ -556,9 +556,9 @@
   },
   "common": {
     "back": "Back",
-    "backToOrganization": "\u2190 Back to organization",
-    "backToManagement": "\u2190 Back to management",
-    "backToHome": "\u2190 Back to home",
+    "backToOrganization": "← Back to organization",
+    "backToManagement": "← Back to management",
+    "backToHome": "← Back to home",
     "loading": "Loading...",
     "creating": "Creating...",
     "error": "An error occurred",
@@ -1339,7 +1339,15 @@
       "pollResultsAdminOnly": "Only organization administrators can view these results",
       "pollResultsNotOrgMember": "You are not a member of this organization",
       "pollProtocolNotAvailable": "The protocol is not available for this poll yet",
-      "pollIsAnonymous": "This poll is anonymous — there is no named protocol"
+      "pollIsAnonymous": "This poll is anonymous — there is no named protocol",
+      "attachmentFileNameEmpty": "File name cannot be empty",
+      "attachmentTypeNotAllowed": "Only PNG, JPEG, WebP images and PDF files can be attached",
+      "attachmentTooLarge": "File is too large. Images may be up to {maxImageMb} MB, PDFs up to {maxPdfMb} MB",
+      "attachmentMagicMismatch": "File contents do not match its type",
+      "attachmentLimitReached": "A poll may have at most {limit} attachments",
+      "attachmentNotFound": "Attachment not found",
+      "descriptionInvalidAttachmentRef": "The description references a file that does not belong to this poll",
+      "cannotChangeAttachmentsActive": "Attachments cannot be changed once voting has started"
     },
     "user": {
       "userNotFound": "User not found",
@@ -2166,9 +2174,6 @@
       "archivedSuffix": " (archived)",
       "noLongerAttachable": " (no longer attachable)"
     },
-    "markdown": {
-      "externalImageBlocked": "External image not allowed — upload it via the attachment uploader instead."
-    },
     "attachments": {
       "uploadButton": "Choose file",
       "uploading": "Uploading…",
@@ -2234,5 +2239,8 @@
       "newButton": "New report",
       "viewAll": "View all"
     }
+  },
+  "markdown": {
+    "externalImageBlocked": "External image not allowed — upload it via the attachment uploader instead."
   }
 }
