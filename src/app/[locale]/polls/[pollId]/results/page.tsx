@@ -25,6 +25,8 @@ import {
 import { PollWeightCalculator } from '@/application/poll/PollWeightCalculator';
 import { DistributionType } from '@/domain/poll/DistributionType';
 import { PropertyAggregation } from '@/domain/poll/PropertyAggregation';
+import { MarkdownRenderer } from '@/web/components/markdown/MarkdownRenderer';
+import { POLL_ATTACHMENT_API_PREFIX } from '@/domain/poll/PollAttachment';
 
 const userRepository = new PrismaUserRepository(prisma);
 
@@ -219,9 +221,13 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
         <Heading>{t('title')}</Heading>
         <p className="mt-2 text-zinc-600 dark:text-zinc-400">{poll.title}</p>
         {poll.description && (
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-500">
-            {poll.description}
-          </p>
+          <div className="mt-1 text-sm text-zinc-500 dark:text-zinc-500">
+            <MarkdownRenderer
+              source={poll.description}
+              apiPrefix={POLL_ATTACHMENT_API_PREFIX}
+              allowedAttachmentIds={poll.attachmentIds ?? []}
+            />
+          </div>
         )}
       </div>
 

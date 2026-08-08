@@ -6,6 +6,9 @@ import { PollState } from '../../domain/poll/PollState';
 export interface OpenPollPreview {
   title: string;
   description: string;
+  // Ids only, so the description renderer can resolve inline refs to this
+  // poll's own files and refuse anything else. Bytes stay server-side.
+  attachmentIds: string[];
   state: PollState;
   organizationName: string;
 }
@@ -51,6 +54,7 @@ export class GetOpenPollPreviewUseCase {
     return success({
       title: poll.title,
       description: poll.description,
+      attachmentIds: poll.attachmentIds,
       state: poll.state,
       organizationName: organization.name,
     });

@@ -31,6 +31,13 @@ interface PollControlsProps {
   hasQuestions: boolean;
   isOpenPoll: boolean;
   onStateChange: () => void;
+  /**
+   * Called after a transition that leaves the poll uneditable — activating or
+   * finishing it. Reloading the edit form in place would strand the author on
+   * a page that can only tell them the poll is no longer editable, which reads
+   * as an error rather than the expected result of what they just did.
+   */
+  onNoLongerEditable?: (transition: 'activated' | 'finished') => void;
 }
 
 export default function PollControls({
@@ -39,6 +46,7 @@ export default function PollControls({
   hasQuestions,
   isOpenPoll,
   onStateChange,
+  onNoLongerEditable,
 }: PollControlsProps) {
   const t = useTranslations('poll');
   const labelKeys = getPollControlLabelKeys(isOpenPoll);
@@ -48,6 +56,26 @@ export default function PollControls({
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
   const [showFinishDialog, setShowFinishDialog] = useState(false);
+
+  /**
+   * After a transition that freezes the poll, navigate instead of reloading.
+   *
+   * Doing both would flash the error: `onStateChange` re-runs the parent's
+   * load, which resolves faster than the route change and paints "this poll
+   * cannot be edited" before the redirect lands. The reload is pointless
+   * anyway when the page is being left.
+   */
+  const leaveOrReload = (transition: 'activated' | 'finished'): boolean => {
+    if (onNoLongerEditable) {
+      onNoLongerEditable(transition);
+
+      return true;
+    }
+
+    onStateChange();
+
+    return false;
+  };
 
   const handleTakeSnapshot = async () => {
     if (!hasQuestions) {
@@ -95,20 +123,25 @@ export default function PollControls({
 
   const handleActivate = async () => {
     setIsActivating(true);
+    // Stay disabled while the route change is in flight, so the button does
+    // not flick back to "activate" and invite a second click.
+    let leaving = false;
 
     try {
       const result = await activatePollAction(pollId);
 
       if (result.success) {
         toast.success(t('pollActivated'));
-        onStateChange();
+        leaving = leaveOrReload('activated');
       } else {
         toast.error(result.error);
       }
     } catch {
       toast.error(t('errors.generic'));
     } finally {
-      setIsActivating(false);
+      if (!leaving) {
+        setIsActivating(false);
+      }
     }
   };
 
@@ -133,6 +166,7 @@ export default function PollControls({
 
   const handleFinish = async () => {
     setIsFinishing(true);
+    let leaving = false;
 
     try {
       const result = await finishPollAction(pollId);
@@ -140,14 +174,16 @@ export default function PollControls({
       if (result.success) {
         toast.success(t('pollFinished'));
         setShowFinishDialog(false);
-        onStateChange();
+        leaving = leaveOrReload('finished');
       } else {
         toast.error(result.error);
       }
     } catch {
       toast.error(t('errors.generic'));
     } finally {
-      setIsFinishing(false);
+      if (!leaving) {
+        setIsFinishing(false);
+      }
     }
   };
 

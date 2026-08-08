@@ -87,6 +87,18 @@ export const PollDomainCodes = {
   POLL_RESULTS_NOT_ORG_MEMBER: 'domain.poll.pollResultsNotOrgMember',
   POLL_PROTOCOL_NOT_AVAILABLE: 'domain.poll.pollProtocolNotAvailable',
   POLL_IS_ANONYMOUS: 'domain.poll.pollIsAnonymous',
+
+  // Poll description attachments
+  POLL_ATTACHMENT_FILENAME_EMPTY: 'domain.poll.attachmentFileNameEmpty',
+  POLL_ATTACHMENT_TYPE_NOT_ALLOWED: 'domain.poll.attachmentTypeNotAllowed',
+  POLL_ATTACHMENT_TOO_LARGE: 'domain.poll.attachmentTooLarge',
+  POLL_ATTACHMENT_MAGIC_MISMATCH: 'domain.poll.attachmentMagicMismatch',
+  POLL_ATTACHMENT_LIMIT_REACHED: 'domain.poll.attachmentLimitReached',
+  POLL_ATTACHMENT_NOT_FOUND: 'domain.poll.attachmentNotFound',
+  POLL_DESCRIPTION_INVALID_ATTACHMENT_REF:
+    'domain.poll.descriptionInvalidAttachmentRef',
+  POLL_CANNOT_CHANGE_ATTACHMENTS_ACTIVE:
+    'domain.poll.cannotChangeAttachmentsActive',
 } as const;
 
 export type PollDomainCode =

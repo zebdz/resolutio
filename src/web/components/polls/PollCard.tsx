@@ -6,6 +6,7 @@ import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import { PencilIcon } from '@heroicons/react/24/outline';
 import { PollStateBadge } from '@/src/web/components/polls/PollStateBadge';
+import { stripMarkdownToPlainText } from '@/application/shared/StripMarkdownToPlainText';
 import {
   takeSnapshotAction,
   discardSnapshotAction,
@@ -248,9 +249,11 @@ export function PollCard({
         </div>
 
         {/* Description */}
+        {/* Stripped, not rendered: the card shows two clamped lines, so raw
+            markdown would surface as literal `![photo](/api/…)` text. */}
         {poll.description && (
           <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
-            {poll.description}
+            {stripMarkdownToPlainText(poll.description)}
           </p>
         )}
 

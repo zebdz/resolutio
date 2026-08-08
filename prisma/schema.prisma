@@ -342,12 +342,32 @@ model Poll {
   properties      PollProperty[]
   eligibleMembers PollEligibleMember[]
   reportPolls     ReportPoll[]
+  attachments     PollAttachment[]
 
   @@index([organizationId])
   @@index([boardId])
   @@index([state])
   @@index([createdBy])
   @@map("polls")
+}
+
+model PollAttachment {
+  id        String   @id @default(cuid())
+  pollId    String   @map("poll_id")
+  fileName  String   @map("file_name")
+  mimeType  String   @map("mime_type")
+  sizeBytes Int      @map("size_bytes")
+  // bytea — kept inline for atomicity with the poll row and so the file is
+  // covered by the same backup as the poll it evidences. Capped at 10 MB by
+  // domain validation; Postgres TOAST stores values >2 KB out of line, so
+  // this does not slow row scans on Poll.
+  bytes     Bytes
+  createdAt DateTime @default(now()) @map("created_at")
+
+  poll Poll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  @@index([pollId])
+  @@map("poll_attachments")
 }
 
 model Question {

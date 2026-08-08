@@ -56,6 +56,10 @@ export class PrismaPollRepository implements PollRepository {
             orderBy: [{ page: 'asc' }, { order: 'asc' }],
           },
           properties: true,
+          // Ids only — never `bytes`. The description renderer needs the id
+          // allowlist so it can refuse refs to other polls' files; file
+          // content is served solely by the download route.
+          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
         },
       });
 
@@ -83,6 +87,10 @@ export class PrismaPollRepository implements PollRepository {
             orderBy: [{ page: 'asc' }, { order: 'asc' }],
           },
           properties: true,
+          // Ids only — never `bytes`. The description renderer needs the id
+          // allowlist so it can refuse refs to other polls' files; file
+          // content is served solely by the download route.
+          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
         },
       });
 
@@ -117,6 +125,10 @@ export class PrismaPollRepository implements PollRepository {
             orderBy: [{ page: 'asc' }, { order: 'asc' }],
           },
           properties: true,
+          // Ids only — never `bytes`. The description renderer needs the id
+          // allowlist so it can refuse refs to other polls' files; file
+          // content is served solely by the download route.
+          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -150,6 +162,10 @@ export class PrismaPollRepository implements PollRepository {
             orderBy: [{ page: 'asc' }, { order: 'asc' }],
           },
           properties: true,
+          // Ids only — never `bytes`. The description renderer needs the id
+          // allowlist so it can refuse refs to other polls' files; file
+          // content is served solely by the download route.
+          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -209,6 +225,10 @@ export class PrismaPollRepository implements PollRepository {
             orderBy: [{ page: 'asc' }, { order: 'asc' }],
           },
           properties: true,
+          // Ids only — never `bytes`. The description renderer needs the id
+          // allowlist so it can refuse refs to other polls' files; file
+          // content is served solely by the download route.
+          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -325,6 +345,10 @@ export class PrismaPollRepository implements PollRepository {
             orderBy: [{ page: 'asc' }, { order: 'asc' }],
           },
           properties: true,
+          // Ids only — never `bytes`. The description renderer needs the id
+          // allowlist so it can refuse refs to other polls' files; file
+          // content is served solely by the download route.
+          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
         },
         orderBy: { createdAt: 'desc' },
       };
@@ -420,6 +444,9 @@ export class PrismaPollRepository implements PollRepository {
       createdAt: prismaData.createdAt,
       archivedAt: prismaData.archivedAt,
       questions,
+      attachmentIds: (prismaData.attachments ?? []).map(
+        (a: { id: string }) => a.id
+      ),
     });
   }
 

@@ -18,7 +18,7 @@ import { serializeReport } from '@/web/actions/report/serializeReport';
 import { GetReportForViewerUseCase } from '@/application/report/GetReportForViewerUseCase';
 import { ResolveReportVisibilityService } from '@/application/report/ResolveReportVisibilityService';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
-import { stripMarkdownToPlainText } from '@/application/report/StripMarkdownToPlainText';
+import { stripMarkdownToPlainText } from '@/application/shared/StripMarkdownToPlainText';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 
 const SITE_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? 'https://resolutio.site';

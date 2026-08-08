@@ -1,3 +1,4 @@
+import { stripMarkdownToPlainText } from '@/application/shared/StripMarkdownToPlainText';
 import fs from 'fs';
 import path from 'path';
 import { NextRequest, NextResponse } from 'next/server';
@@ -141,7 +142,7 @@ export async function GET(
       organizationName: org?.name ?? '',
       boardName,
       pollTitle: poll.title ?? '',
-      pollDescription: poll.description ?? '',
+      pollDescription: stripMarkdownToPlainText(poll.description ?? ''),
       startDate: poll.startDate
         ? poll.startDate.toISOString().split('T')[0]
         : '',

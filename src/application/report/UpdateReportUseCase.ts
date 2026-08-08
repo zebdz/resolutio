@@ -2,7 +2,7 @@ import { Result, failure } from '../../domain/shared/Result';
 import { ReportRepository } from '../../domain/report/ReportRepository';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 import { ReportErrors } from './ReportErrors';
-import { stripMarkdownToPlainText } from './StripMarkdownToPlainText';
+import { stripMarkdownToPlainText } from '../shared/StripMarkdownToPlainText';
 
 export interface OrgRepoForUpdate {
   isUserAdmin(userId: string, orgId: string): Promise<boolean>;
