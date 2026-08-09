@@ -1,5 +1,5 @@
-import { getTranslations } from 'next-intl/server';
-import { redirect } from 'next/navigation';
+import { getLocale, getTranslations } from 'next-intl/server';
+
 import { Link } from '@/src/i18n/routing';
 import { Text } from '@/web/components/catalyst/text';
 import {
@@ -20,6 +20,7 @@ import { ResolveReportVisibilityService } from '@/application/report/ResolveRepo
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 import { stripMarkdownToPlainText } from '@/application/shared/StripMarkdownToPlainText';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
+import { redirectLocalized } from '@/web/lib/redirectLocalized';
 
 const SITE_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? 'https://resolutio.site';
 
@@ -100,7 +101,7 @@ export default async function ReportDetailPage({
     // (existence not leaked: REPORT_NOT_FOUND covers both "doesn't exist"
     // and "not visible to you").
     if (!currentUser) {
-      redirect('/login');
+      redirectLocalized(await getLocale(), '/login');
     }
 
     const errorMessage = await translateErrorCode(result.error);

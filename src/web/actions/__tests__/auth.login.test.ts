@@ -65,8 +65,11 @@ vi.mock('next/headers', () => ({
   cookies: vi.fn().mockResolvedValue({ get: vi.fn(), set: vi.fn() }),
 }));
 
+// permanentRedirect is unused here, but next-intl's createNavigation wraps both
+// at import time and throws if either is missing.
 vi.mock('next/navigation', () => ({
   redirect: vi.fn(),
+  permanentRedirect: vi.fn(),
 }));
 
 const { loginAction } = await import('../auth/auth');

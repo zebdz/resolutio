@@ -1,10 +1,10 @@
-import { redirect } from 'next/navigation';
 import { AuthLayout } from '@/src/web/components/catalyst/auth-layout';
 import { RegisterForm } from '@/web/components/auth/RegisterForm';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { readReturnToCookieServer } from '@/web/lib/returnTo.server';
 import { Locale } from '@/src/i18n/locales';
+import { redirectLocalized } from '@/web/lib/redirectLocalized';
 
 export async function generateMetadata() {
   const t = await getTranslations('auth.register');
@@ -24,7 +24,7 @@ export default async function RegisterPage({ params }: Props) {
 
   if (user) {
     const returnTo = await readReturnToCookieServer();
-    redirect(returnTo || '/home');
+    redirectLocalized(await getLocale(), returnTo || '/home');
   }
 
   const { locale } = await params;

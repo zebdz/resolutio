@@ -1,9 +1,9 @@
-import { redirect } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { AuthLayout } from '@/src/web/components/catalyst/auth-layout';
 import { ConfirmPhoneForm } from '@/web/components/auth/ConfirmPhoneForm';
 import { getCurrentUser } from '@/web/lib/session';
 import { readReturnToCookieServer } from '@/web/lib/returnTo.server';
+import { redirectLocalized } from '@/web/lib/redirectLocalized';
 
 export async function generateMetadata() {
   const t = await getTranslations('auth.confirmPhone');
@@ -15,17 +15,17 @@ export default async function ConfirmPhonePage() {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect('/login');
+    redirectLocalized(await getLocale(), '/login');
   }
 
   // Already confirmed — go to privacy setup, or wherever the visitor was headed
   if (user.isConfirmed()) {
     if (!user.privacySetupCompleted) {
-      redirect('/privacy-setup');
+      redirectLocalized(await getLocale(), '/privacy-setup');
     }
 
     const returnTo = await readReturnToCookieServer();
-    redirect(returnTo || '/home');
+    redirectLocalized(await getLocale(), returnTo || '/home');
   }
 
   // Mask phone for display: +7916***4567

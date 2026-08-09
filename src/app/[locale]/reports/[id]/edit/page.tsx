@@ -1,5 +1,5 @@
-import { getTranslations } from 'next-intl/server';
-import { redirect } from 'next/navigation';
+import { getLocale, getTranslations } from 'next-intl/server';
+
 import { Link } from '@/src/i18n/routing';
 import { Heading } from '@/web/components/catalyst/heading';
 import { Text } from '@/web/components/catalyst/text';
@@ -16,6 +16,7 @@ import { ReportForm } from '@/web/components/report/ReportForm';
 import { getReportAction } from '@/web/actions/report/report';
 import { ReportVisibility } from '@/domain/report/ReportVisibility';
 import { ArrowLeftIcon } from '@heroicons/react/20/solid';
+import { redirectLocalized } from '@/web/lib/redirectLocalized';
 
 const orgRepo = new PrismaOrganizationRepository(prisma);
 const boardRepo = new PrismaBoardRepository(prisma);
@@ -30,7 +31,7 @@ export default async function EditReportPage({ params }: EditReportPageProps) {
   const currentUser = await getCurrentUser();
 
   if (!currentUser) {
-    redirect('/login');
+    redirectLocalized(await getLocale(), '/login');
   }
 
   const user = currentUser;
