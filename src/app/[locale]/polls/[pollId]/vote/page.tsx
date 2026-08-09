@@ -1,5 +1,5 @@
-import { getTranslations } from 'next-intl/server';
-import { redirect } from 'next/navigation';
+import { getLocale, getTranslations } from 'next-intl/server';
+
 import {
   getUserVotingProgressAction,
   canUserVoteAction,
@@ -20,6 +20,7 @@ import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { MarkdownRenderer } from '@/web/components/markdown/MarkdownRenderer';
 import { POLL_ATTACHMENT_API_PREFIX } from '@/domain/poll/PollAttachment';
+import { redirectLocalized } from '@/web/lib/redirectLocalized';
 
 interface VotePageProps {
   params: Promise<{
@@ -47,7 +48,7 @@ export default async function VotePage({ params }: VotePageProps) {
     const preview = previewResult.success ? previewResult.value : null;
 
     if (!preview) {
-      redirect('/login');
+      redirectLocalized(await getLocale(), '/login');
     }
 
     return <PublicOpenPollPreview pollId={pollId} preview={preview} />;

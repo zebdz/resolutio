@@ -1,4 +1,8 @@
 {
+  "app": {
+    "title": "NOMOS",
+    "description": "Unite in organizations, vote, and formalize legally binding decisions"
+  },
   "auth": {
     "login": {
       "title": "Sign In",

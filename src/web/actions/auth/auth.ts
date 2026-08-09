@@ -1,8 +1,7 @@
 'use server';
 
-import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { RegisterUserUseCase } from '@/application/auth/RegisterUserUseCase';
 import { LoginUserUseCase } from '@/application/auth/LoginUserUseCase';
 import { LogoutUserUseCase } from '@/application/auth/LogoutUserUseCase';
@@ -43,6 +42,7 @@ import {
 import { getClientIp } from '@/web/lib/clientIp';
 import { registerSuperadminAccess } from '@/infrastructure/rateLimit/superadminWhitelist';
 import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChecker';
+import { redirectLocalized } from '@/web/lib/redirectLocalized';
 
 // Helper function to check if error is a Prisma connection error
 function isDatabaseConnectionError(error: unknown): boolean {
@@ -406,5 +406,5 @@ export async function logoutAction(): Promise<void> {
   }
 
   // Redirect to home page
-  redirect('/');
+  redirectLocalized(await getLocale(), '/');
 }

@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
-import { getMessages } from 'next-intl/server';
+import { getMessages, getTranslations } from 'next-intl/server';
 import { Nunito } from 'next/font/google';
 import { Toaster } from 'sonner';
 import { ToastClickDismiss } from '@/src/web/components/layout/ToastClickDismiss';
 import { routing } from '@/src/i18n/routing';
+import { buildSiteMetadata } from '@/web/metadata/siteMetadata';
 import '../globals.css';
 
 const nunito = Nunito({
@@ -12,13 +13,19 @@ const nunito = Nunito({
   subsets: ['latin', 'cyrillic'],
 });
 
-export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:8080'
-  ),
-  title: 'НОМОС',
-  description: 'Unite in organizations, vote, and create legal decisions',
-};
+// Built per request rather than declared as a static `export const metadata`,
+// which cannot read the [locale] segment and so served English link previews
+// on Russian URLs.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: 'app' });
+
+  return buildSiteMetadata({ locale, t });
+}
 
 // Generate static params for [locale] dynamic segment
 export function generateStaticParams() {

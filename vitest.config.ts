@@ -29,6 +29,11 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     setupFiles: [],
+    server: {
+      // Let Vite resolve next-intl's imports instead of Node's ESM resolver,
+      // which chokes on its extensionless `next/navigation` specifier.
+      deps: { inline: ['next-intl'] },
+    },
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
@@ -40,6 +45,9 @@ export default defineConfig({
   },
   resolve: {
     alias: [
+      // next-intl's ESM build imports `next/navigation` without an extension,
+      // and Next ships no `exports` map, so Node's ESM resolver can't find it.
+      { find: /^next\/navigation$/, replacement: 'next/navigation.js' },
       { find: '@/src', replacement: path.resolve(__dirname, './src') },
       {
         find: '@/domain',

@@ -1,9 +1,10 @@
-import { redirect } from 'next/navigation';
 import { getCurrentUser, getSessionCookie } from '@/web/lib/session';
 import { prisma, PrismaUserRepository } from '@/infrastructure/index';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { registerSuperadminAccess } from '@/infrastructure/rateLimit/superadminWhitelist';
 import { getClientIp } from '@/web/lib/clientIp';
+import { redirectLocalized } from '@/web/lib/redirectLocalized';
+import { getLocale } from 'next-intl/server';
 
 const userRepository = new PrismaUserRepository(prisma);
 
@@ -15,13 +16,13 @@ export default async function SuperadminLayout({
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect('/login');
+    redirectLocalized(await getLocale(), '/login');
   }
 
   const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
 
   if (!isSuperAdmin) {
-    redirect('/home');
+    redirectLocalized(await getLocale(), '/home');
   }
 
   // Refresh rate-limit whitelist on every superadmin page visit

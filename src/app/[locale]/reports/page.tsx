@@ -1,5 +1,5 @@
-import { getTranslations } from 'next-intl/server';
-import { redirect } from 'next/navigation';
+import { getLocale, getTranslations } from 'next-intl/server';
+
 import { Link } from '@/src/i18n/routing';
 import { Heading } from '@/web/components/catalyst/heading';
 import { Text } from '@/web/components/catalyst/text';
@@ -9,6 +9,7 @@ import { getCurrentUser } from '@/web/lib/session';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import ReportCard from '@/web/components/report/ReportCard';
 import { listReportsAction } from '@/web/actions/report/report';
+import { redirectLocalized } from '@/web/lib/redirectLocalized';
 
 const userRepo = new PrismaUserRepository(prisma);
 
@@ -25,7 +26,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const currentUser = await getCurrentUser();
 
   if (!currentUser) {
-    redirect('/login');
+    redirectLocalized(await getLocale(), '/login');
   }
 
   const t = await getTranslations('report.pages');
