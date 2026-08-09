@@ -1,5 +1,4 @@
-import { redirect } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { Text } from '@/src/web/components/catalyst/text';
@@ -8,6 +7,7 @@ import { Divider } from '@/src/web/components/catalyst/divider';
 import { PrivacySetupForm } from '@/web/components/privacy/PrivacySetupForm';
 import { logoutAction } from '@/src/web/actions/auth/auth';
 import { readReturnToCookieServer } from '@/web/lib/returnTo.server';
+import { redirectLocalized } from '@/web/lib/redirectLocalized';
 
 export async function generateMetadata() {
   const t = await getTranslations('privacySetup');
@@ -19,18 +19,18 @@ export default async function PrivacySetupPage() {
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect('/login');
+    redirectLocalized(await getLocale(), '/login');
   }
 
   // Unconfirmed users must confirm phone first
   if (!user.isConfirmed()) {
-    redirect('/confirm-phone');
+    redirectLocalized(await getLocale(), '/confirm-phone');
   }
 
   // Already completed — go home
   if (user.privacySetupCompleted) {
     const returnTo = await readReturnToCookieServer();
-    redirect(returnTo || '/home');
+    redirectLocalized(await getLocale(), returnTo || '/home');
   }
 
   const t = await getTranslations('privacySetup');

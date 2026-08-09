@@ -1,5 +1,4 @@
-import { redirect } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { getPollResultsAction } from '@/src/web/actions/poll/vote';
 import { getPollByIdAction } from '@/src/web/actions/poll/poll';
@@ -27,6 +26,7 @@ import { DistributionType } from '@/domain/poll/DistributionType';
 import { PropertyAggregation } from '@/domain/poll/PropertyAggregation';
 import { MarkdownRenderer } from '@/web/components/markdown/MarkdownRenderer';
 import { POLL_ATTACHMENT_API_PREFIX } from '@/domain/poll/PollAttachment';
+import { redirectLocalized } from '@/web/lib/redirectLocalized';
 
 const userRepository = new PrismaUserRepository(prisma);
 
@@ -56,7 +56,7 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
   const pollResult = await getPollByIdAction(pollId);
 
   if (!pollResult.success) {
-    redirect('/polls');
+    redirectLocalized(await getLocale(), '/polls');
   }
 
   const poll = pollResult.data;

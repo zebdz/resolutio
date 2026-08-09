@@ -1,5 +1,4 @@
-import { redirect } from 'next/navigation';
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { getPollByIdAction } from '@/src/web/actions/poll/poll';
 import { getParticipantsAction } from '@/src/web/actions/organization/participant';
@@ -20,6 +19,7 @@ import {
 import { PollWeightCalculator } from '@/application/poll/PollWeightCalculator';
 import { DistributionType } from '@/domain/poll/DistributionType';
 import { PropertyAggregation } from '@/domain/poll/PropertyAggregation';
+import { redirectLocalized } from '@/web/lib/redirectLocalized';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
@@ -46,14 +46,14 @@ export default async function ParticipantsPage({
   const { pollId } = await params;
 
   if (!user) {
-    redirect('/login');
+    redirectLocalized(await getLocale(), '/login');
   }
 
   // Get poll details
   const pollResult = await getPollByIdAction(pollId);
 
   if (!pollResult.success) {
-    redirect('/polls');
+    redirectLocalized(await getLocale(), '/polls');
   }
 
   const poll = pollResult.data;
@@ -68,7 +68,7 @@ export default async function ParticipantsPage({
 
   // Check if user is the poll creator
   if (!canManage) {
-    redirect(`/polls/${pollId}`);
+    redirectLocalized(await getLocale(), `/polls/${pollId}`);
   }
 
   // Fetch weight-config related data in parallel with participants.

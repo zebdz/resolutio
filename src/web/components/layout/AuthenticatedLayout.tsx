@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation';
+import { redirectLocalized } from '@/web/lib/redirectLocalized';
 import { getCurrentUser } from '@/web/lib/session';
 import {
   prisma,
@@ -8,6 +8,7 @@ import {
 import { StackedLayout } from '@/src/web/components/catalyst/stacked-layout';
 import { AppNavbar } from './AppNavbar';
 import { MobileSidebar } from './MobileSidebar';
+import { getLocale } from 'next-intl/server';
 
 interface AuthenticatedLayoutProps {
   children: React.ReactNode;
@@ -19,17 +20,17 @@ export async function AuthenticatedLayout({
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect('/login');
+    redirectLocalized(await getLocale(), '/login');
   }
 
   // Force confirmation gate for unconfirmed users
   if (!user.isConfirmed()) {
-    redirect('/confirm-phone');
+    redirectLocalized(await getLocale(), '/confirm-phone');
   }
 
   // Force privacy gate for users who haven't completed setup
   if (!user.privacySetupCompleted) {
-    redirect('/privacy-setup');
+    redirectLocalized(await getLocale(), '/privacy-setup');
   }
 
   const userRepository = new PrismaUserRepository(prisma);
@@ -42,7 +43,7 @@ export async function AuthenticatedLayout({
   ]);
 
   if (isBlocked) {
-    redirect('/blocked');
+    redirectLocalized(await getLocale(), '/blocked');
   }
 
   return (

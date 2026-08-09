@@ -1,11 +1,12 @@
-import { getTranslations } from 'next-intl/server';
+import { getLocale, getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
-import { redirect } from 'next/navigation';
+
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { Text } from '@/src/web/components/catalyst/text';
 import { Link } from '@/src/i18n/routing';
 import { SuperadminOrganizationsList } from './SuperadminOrganizationsList';
 import { searchAllOrganizationsAction } from '@/src/web/actions/organization/organization';
+import { redirectLocalized } from '@/web/lib/redirectLocalized';
 
 const PAGE_SIZE = 30;
 
@@ -22,7 +23,7 @@ export default async function SuperadminOrganizationsPage({
   const user = await getCurrentUser();
 
   if (!user) {
-    redirect('/login');
+    redirectLocalized(await getLocale(), '/login');
   }
 
   const result = await searchAllOrganizationsAction({
