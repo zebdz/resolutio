@@ -1,6 +1,6 @@
 {
   "name": "resolutio",
-  "version": "1.8.1",
+  "version": "1.9.1",
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
@@ -26,7 +26,7 @@
     "db:seed:legal-check": "npx tsx prisma/seed-legal-check.ts",
     "db:seed:named-protocol": "npx tsx prisma/seed-named-protocol.ts",
     "db:status": "npx prisma migrate status",
-    "db:migrate": "npx prisma migrate deploy",
+    "db:migrate": "npx prisma igrate deploy",
     "db:clear": "npx tsx prisma/db-clear.ts",
     "db:superadmin:add": "npx tsx prisma/superadmin-add.ts",
     "db:superadmin:remove": "npx tsx prisma/superadmin-remove.ts",
