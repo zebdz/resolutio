@@ -74,3 +74,34 @@ export function shouldShowManageParticipants(
 
   return state === PollState.ACTIVE || state === PollState.FINISHED;
 }
+
+export type PollOpenMode = 'edit' | 'read' | 'none';
+
+/**
+ * How — if at all — a card offers to open the poll page.
+ *
+ * Editing belongs to the author and mirrors the server rule: anything but
+ * ACTIVE or FINISHED, and not under an archived org or board. Reading belongs
+ * to admins, in every state, because the poll page is the only place the AI
+ * legality check is exposed and that check is an admin capability. Without
+ * the read branch an admin who did not write the poll had no way in at all.
+ */
+export function getPollOpenMode(input: {
+  isCreator: boolean;
+  canManage: boolean;
+  state: string;
+  isParentArchived: boolean;
+}): PollOpenMode {
+  const isEditableState =
+    input.state !== PollState.ACTIVE && input.state !== PollState.FINISHED;
+
+  if (!input.isParentArchived && input.isCreator && isEditableState) {
+    return 'edit';
+  }
+
+  if (input.canManage) {
+    return 'read';
+  }
+
+  return 'none';
+}

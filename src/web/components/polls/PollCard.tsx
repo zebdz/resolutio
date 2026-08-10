@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
-import { PencilIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { PollStateBadge } from '@/src/web/components/polls/PollStateBadge';
 import { stripMarkdownToPlainText } from '@/application/shared/StripMarkdownToPlainText';
 import {
@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import {
   getPollControlLabelKeys,
+  getPollOpenMode,
   shouldShowManageParticipants,
 } from '@/src/web/components/polls/pollControlLabels';
 
@@ -55,7 +56,14 @@ export function PollCard({
   const isParentArchived = isOrgArchived || isBoardArchived;
   const labelKeys = getPollControlLabelKeys(isOpenPoll);
 
-  const canEditPoll = isCreator;
+  // The page decides for itself whether it opens editable or read-only; the
+  // icon only says which one to expect.
+  const openMode = getPollOpenMode({
+    isCreator,
+    canManage,
+    state: poll.state,
+    isParentArchived,
+  });
   const canManageParticipants = canManage;
   const canActivateAndDeactivatePoll = canManage;
   // A named poll is readable by every member while it runs — the card must
@@ -192,14 +200,18 @@ export function PollCard({
           : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
       }`}
     >
-      {/* Edit button for creator if poll can be edited */}
-      {!isParentArchived && canEditPoll && !isActive && !isFinished && (
+      {/* Edit for the author, read-only for any other admin */}
+      {openMode !== 'none' && (
         <Link
           href={`/polls/${poll.id}/edit`}
           className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
-          title={t('editPoll')}
+          title={openMode === 'edit' ? t('editPoll') : t('viewPoll')}
         >
-          <PencilIcon className="w-5 h-5" />
+          {openMode === 'edit' ? (
+            <PencilIcon className="w-5 h-5" />
+          ) : (
+            <EyeIcon className="w-5 h-5" />
+          )}
         </Link>
       )}
 

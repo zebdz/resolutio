@@ -706,6 +706,7 @@
     "delete": "Delete",
     "edit": "Edit",
     "editPoll": "Edit Poll",
+    "viewPoll": "View Poll",
     "view": "View",
     "vote": "Vote",
     "viewResults": "View Results",
@@ -1022,6 +1023,7 @@
   "legalCheck": {
     "checkLegality": "Check Legality",
     "saveFirst": "Save to check legality",
+    "readyOnly": "A new check can only be run while the poll is in the Ready state.",
     "analyzing": "Analyzing...",
     "selectModel": "AI Model",
     "severity": {
