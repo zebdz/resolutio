@@ -21,6 +21,7 @@ import {
   OtpCodeHasherImpl,
   createSmsDeliveryChannelFromEnv,
   TurnstileCaptchaVerifier,
+  isCaptchaEnforced,
 } from '@/infrastructure/index';
 import {
   setSessionCookie,
@@ -286,6 +287,13 @@ export async function loginAction(
     // Verify CAPTCHA
     const clientIp = await getClientIp();
     const captchaToken = formData.get('captchaToken') as string;
+
+    // A missing token is a failed CAPTCHA, not a reason to skip it: treating
+    // absence as "nothing to check" let any client opt out by omitting the
+    // field.
+    if (isCaptchaEnforced() && !captchaToken) {
+      return { success: false, error: t('captchaFailed') };
+    }
 
     if (captchaToken) {
       const captchaValid = await captchaVerifier.verify(captchaToken, clientIp);

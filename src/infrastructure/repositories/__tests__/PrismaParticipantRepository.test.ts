@@ -57,6 +57,7 @@ function createActivePoll(id: string): Poll {
   const answerResult = Answer.create('A1', 1, question.id);
   question.addAnswer(answerResult.value as Answer);
   poll.addQuestion(question);
+  poll.submitToAdmin();
   poll.takeSnapshot();
   poll.activate();
 

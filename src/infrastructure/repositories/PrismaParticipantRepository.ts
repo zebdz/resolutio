@@ -489,6 +489,7 @@ export class PrismaParticipantRepository implements ParticipantRepository {
   private toPrismaState(domainState: PollState): PrismaPollState {
     const stateMap: Record<PollState, PrismaPollState> = {
       [PollState.DRAFT]: PrismaPollState.DRAFT,
+      [PollState.SUBMITTED]: PrismaPollState.SUBMITTED,
       [PollState.READY]: PrismaPollState.READY,
       [PollState.ACTIVE]: PrismaPollState.ACTIVE,
       [PollState.FINISHED]: PrismaPollState.FINISHED,

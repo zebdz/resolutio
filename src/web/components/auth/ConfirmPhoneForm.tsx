@@ -8,6 +8,7 @@ import { Text } from '@/src/web/components/catalyst/text';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { OtpInput } from './OtpInput';
 import { TurnstileWidget } from './TurnstileWidget';
+import { isCaptchaRequired } from './captchaRequired';
 import {
   confirmPhoneAction,
   requestConfirmationOtpAction,
@@ -198,7 +199,11 @@ export function ConfirmPhoneForm({ maskedPhone }: Props) {
             type="button"
             plain
             onClick={() => handleResend()}
-            disabled={isPending || resendCountdown > 0 || !captchaToken}
+            disabled={
+              isPending ||
+              resendCountdown > 0 ||
+              (isCaptchaRequired() && !captchaToken)
+            }
           >
             {resendCountdown > 0
               ? tOtp('resendIn', { seconds: resendCountdown })

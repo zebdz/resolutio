@@ -24,6 +24,11 @@ import { LocaleSwitcher } from './LocaleSwitcher';
 interface AppNavbarProps {
   isSuperAdmin: boolean;
   unreadNotificationCount: number;
+  /**
+   * Labels the account link. Falls back to the generic word when blank, so a
+   * user without a usable name still gets a link that says what it is.
+   */
+  firstName?: string;
 }
 
 function isItemCurrent(itemHref: string, pathname: string): boolean {
@@ -40,6 +45,7 @@ function isItemCurrent(itemHref: string, pathname: string): boolean {
 export function AppNavbar({
   isSuperAdmin,
   unreadNotificationCount,
+  firstName,
 }: AppNavbarProps) {
   const t = useTranslations('navbar');
   const pathname = usePathname();
@@ -113,7 +119,9 @@ export function AppNavbar({
           current={isItemCurrent('/account', pathname)}
         >
           <UserCircleIcon data-slot="icon" />
-          <NavbarLabel className="max-lg:hidden">{t('account')}</NavbarLabel>
+          <NavbarLabel className="max-lg:hidden">
+            {firstName?.trim() || t('account')}
+          </NavbarLabel>
         </NavbarItem>
         <div className="rounded-lg bg-white/15 px-1 py-px">
           <LocaleSwitcher />

@@ -444,6 +444,7 @@ describe('AddQuestionUseCase', () => {
     poll.addQuestion(question);
 
     // Transition to FINISHED state
+    poll.submitToAdmin();
     poll.takeSnapshot();
     poll.activate();
     poll.finish();

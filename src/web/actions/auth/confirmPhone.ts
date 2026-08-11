@@ -12,6 +12,7 @@ import {
   OtpCodeHasherImpl,
   createSmsDeliveryChannelFromEnv,
   TurnstileCaptchaVerifier,
+  isCaptchaEnforced,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '@/web/lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
@@ -136,7 +137,14 @@ export async function requestConfirmationOtpAction(
 
     const clientIp = await getClientIp();
 
-    // Verify CAPTCHA
+    // Verify CAPTCHA. A missing token is a failure, not a reason to skip the
+    // check — otherwise omitting the field opts a client out of it.
+    if (isCaptchaEnforced() && !captchaToken) {
+      const tOtp = await getTranslations('otp.errors');
+
+      return { success: false, error: tOtp('captchaFailed') };
+    }
+
     if (captchaToken) {
       const captchaValid = await captchaVerifier.verify(captchaToken, clientIp);
 

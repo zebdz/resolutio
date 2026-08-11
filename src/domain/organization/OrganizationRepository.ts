@@ -94,6 +94,12 @@ export interface OrganizationRepository {
   isUserAdmin(userId: string, organizationId: string): Promise<boolean>;
 
   /**
+   * Ids of every admin of an organization, for notifying the people who can
+   * act on something addressed to "the admins".
+   */
+  getAdminUserIds(organizationId: string): Promise<string[]>;
+
+  /**
    * Gets all organizations where user is an accepted member
    */
   findMembershipsByUserId(userId: string): Promise<Organization[]>;

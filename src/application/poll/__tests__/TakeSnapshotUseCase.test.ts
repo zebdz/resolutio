@@ -56,6 +56,7 @@ describe('TakeSnapshotUseCase', () => {
     const answerResult = Answer.create('Answer 1', 1, question.id);
     question.addAnswer(answerResult.value);
     poll.addQuestion(question);
+    poll.submitToAdmin();
 
     pollRepository = {
       getPollById: vi.fn().mockResolvedValue(success(poll)),
@@ -225,6 +226,7 @@ describe('TakeSnapshotUseCase', () => {
     (q as any).props.id = 'q-org-1';
     q.addAnswer(Answer.create('A', 1, q.id).value);
     orgPoll.addQuestion(q);
+    orgPoll.submitToAdmin();
 
     pollRepository.getPollById = vi.fn().mockResolvedValue(success(orgPoll));
 
@@ -284,6 +286,7 @@ describe('TakeSnapshotUseCase', () => {
     (q as any).props.id = 'q-own-1';
     q.addAnswer(Answer.create('A', 1, q.id).value);
     orgPoll.addQuestion(q);
+    orgPoll.submitToAdmin();
 
     pollRepository.getPollById = vi.fn().mockResolvedValue(success(orgPoll));
 
@@ -347,6 +350,7 @@ describe('TakeSnapshotUseCase', () => {
     (q as any).props.id = 'q-scope-1';
     q.addAnswer(Answer.create('A', 1, q.id).value);
     orgPoll.addQuestion(q);
+    orgPoll.submitToAdmin();
 
     pollRepository.getPollById = vi.fn().mockResolvedValue(success(orgPoll));
 
@@ -420,6 +424,12 @@ describe('TakeSnapshotUseCase', () => {
       (question as any).props.id = 'question-open-1';
       question.addAnswer(Answer.create('Answer 1', 1, question.id).value);
       openPoll.addQuestion(question);
+      openPoll.submitToAdmin();
+    } else {
+      // A question-less poll cannot be submitted the normal way, so the state
+      // is forced: the point of the case is that takeSnapshot still checks for
+      // questions itself rather than trusting submit to have done it.
+      (openPoll as any).props.state = PollState.SUBMITTED;
     }
 
     return openPoll;

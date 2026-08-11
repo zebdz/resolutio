@@ -52,12 +52,14 @@ export async function AuthenticatedLayout({
         <AppNavbar
           isSuperAdmin={isSuperAdmin}
           unreadNotificationCount={unreadNotificationCount}
+          firstName={user.firstName}
         />
       }
       sidebar={
         <MobileSidebar
           isSuperAdmin={isSuperAdmin}
           unreadNotificationCount={unreadNotificationCount}
+          firstName={user.firstName}
         />
       }
     >
