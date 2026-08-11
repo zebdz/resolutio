@@ -35,3 +35,4 @@ export { StubSmsOtpDeliveryChannel } from './auth/StubSmsOtpDeliveryChannel';
 export { SmsRuOtpDeliveryChannel } from './auth/SmsRuOtpDeliveryChannel';
 export { createSmsDeliveryChannelFromEnv } from './auth/smsDeliveryChannelFactory';
 export { TurnstileCaptchaVerifier } from './auth/TurnstileCaptchaVerifier';
+export { isCaptchaEnforced } from './auth/captchaPolicy';
