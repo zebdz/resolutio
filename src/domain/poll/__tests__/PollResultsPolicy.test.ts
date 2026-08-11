@@ -30,6 +30,7 @@ function makePoll(
   poll.addQuestion(question);
 
   if (state !== PollState.DRAFT) {
+    poll.submitToAdmin();
     poll.takeSnapshot();
   }
 

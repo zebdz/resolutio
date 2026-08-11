@@ -65,6 +65,7 @@ describe('FinishPollUseCase', () => {
     poll.addQuestion(question);
 
     // Take snapshot and activate the poll
+    poll.submitToAdmin();
     poll.takeSnapshot();
     poll.activate();
 

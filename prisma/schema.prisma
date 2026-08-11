@@ -15,6 +15,7 @@ datasource db {
 // Enums
 enum PollState {
   DRAFT
+  SUBMITTED
   READY
   ACTIVE
   FINISHED

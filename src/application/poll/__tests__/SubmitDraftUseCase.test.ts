@@ -74,6 +74,7 @@ describe('SubmitDraftUseCase', () => {
 
     // Add questions to poll and activate
     (poll as any).props.questions = [question];
+    poll.submitToAdmin();
     poll.takeSnapshot();
     poll.activate();
 
@@ -381,6 +382,7 @@ describe('SubmitDraftUseCase', () => {
       ).value;
       (openPoll as any).props.id = 'poll-1';
       (openPoll as any).props.questions = [question];
+      openPoll.submitToAdmin();
       openPoll.takeSnapshot();
       openPoll.activate();
 

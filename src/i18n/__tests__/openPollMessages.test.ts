@@ -20,10 +20,10 @@ const OPEN_POLL_CONTROL_KEYS = [
   'markingReady',
   'markedReady',
   'confirmMarkReady',
-  'backToDraft',
-  'returningToDraft',
-  'returnedToDraft',
-  'confirmBackToDraft',
+  'backToReview',
+  'returningToReview',
+  'returnedToReview',
+  'confirmBackToReview',
   'readyHint',
 ];
 

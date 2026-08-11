@@ -62,6 +62,12 @@ export class DeleteQuestionUseCase {
     }
 
     // Check poll state
+    // A submitted poll is the author's handover to an admin; it must not
+    // change underneath them until it is recalled to DRAFT.
+    if (poll.isSubmitted()) {
+      return failure(PollErrors.CANNOT_MODIFY_SUBMITTED);
+    }
+
     if (poll.isActive()) {
       return failure(PollErrors.CANNOT_MODIFY_ACTIVE);
     }

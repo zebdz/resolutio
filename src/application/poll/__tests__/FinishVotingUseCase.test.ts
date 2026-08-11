@@ -423,6 +423,7 @@ describe('FinishVotingUseCase', () => {
       (q: any) => q.pollId === poll.id
     );
     (poll as any).props.questions = questions;
+    poll.submitToAdmin();
     poll.takeSnapshot();
     poll.activate();
     await pollRepository.updatePoll(poll);

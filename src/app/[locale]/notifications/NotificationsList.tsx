@@ -22,6 +22,8 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ChevronRightIcon,
+  InboxArrowDownIcon,
+  ArrowUturnLeftIcon,
 } from '@heroicons/react/20/solid';
 import {
   markNotificationReadAction,
@@ -62,6 +64,10 @@ function getNotificationIcon(type: string) {
       return <XCircleIcon className="h-5 w-5 text-red-500" />;
     case 'poll_activated':
       return <MegaphoneIcon className="h-5 w-5 text-green-500" />;
+    case 'poll_submitted':
+      return <InboxArrowDownIcon className="h-5 w-5 text-amber-500" />;
+    case 'poll_returned_to_draft':
+      return <ArrowUturnLeftIcon className="h-5 w-5 text-amber-500" />;
     case 'poll_finished':
       return <CheckCircleIcon className="h-5 w-5 text-purple-500" />;
     case 'admin_invite_received':

@@ -699,10 +699,11 @@ async function main() {
 
   // ── 6. Polls (0-2 per board) — batched ──────────────────────
   const stateWeights = [
-    [PollState.DRAFT, 0.15],
-    [PollState.READY, 0.15],
-    [PollState.ACTIVE, 0.35],
-    [PollState.FINISHED, 0.35],
+    [PollState.DRAFT, 0.12],
+    [PollState.SUBMITTED, 0.12],
+    [PollState.READY, 0.12],
+    [PollState.ACTIVE, 0.32],
+    [PollState.FINISHED, 0.32],
   ] as const;
 
   function pickState(): PollState {
@@ -723,6 +724,7 @@ async function main() {
   function datePair(state: PollState): [Date, Date] {
     switch (state) {
       case PollState.DRAFT:
+      case PollState.SUBMITTED:
         return [daysFromNow(randInt(5, 30)), daysFromNow(randInt(31, 60))];
       case PollState.READY:
         return [daysFromNow(randInt(1, 10)), daysFromNow(randInt(11, 25))];
@@ -835,8 +837,14 @@ async function main() {
         });
       }
 
-      // Participants + votes for non-DRAFT
-      if (state !== PollState.DRAFT && mems.length >= 2) {
+      // Participants + votes from READY on. A submitted poll is still waiting
+      // for an admin to freeze the electorate, so it has no participants yet —
+      // same as a draft.
+      if (
+        state !== PollState.DRAFT &&
+        state !== PollState.SUBMITTED &&
+        mems.length >= 2
+      ) {
         const pCount = Math.min(
           mems.length,
           randInt(3, Math.min(15, mems.length))

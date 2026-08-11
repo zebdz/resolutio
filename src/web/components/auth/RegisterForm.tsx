@@ -19,6 +19,7 @@ import { Text, TextLink } from '@/src/web/components/catalyst/text';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { PasswordStrengthMeter } from './PasswordStrengthMeter';
 import { TurnstileWidget } from './TurnstileWidget';
+import { isCaptchaRequired } from './captchaRequired';
 import { registerAction } from '@/src/web/actions/auth/auth';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/16/solid';
 import { Locale } from '@/src/i18n/locales';
@@ -472,7 +473,9 @@ export function RegisterForm({ locale }: Props) {
         type="submit"
         color="brand-green"
         className="w-full"
-        disabled={isPending || !captchaToken || !isFormValid}
+        disabled={
+          isPending || (isCaptchaRequired() && !captchaToken) || !isFormValid
+        }
       >
         {isPending ? t('register.registering') : t('register.submit')}
       </Button>

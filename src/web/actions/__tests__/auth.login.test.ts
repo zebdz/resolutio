@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockIsSuperAdmin = vi.fn();
 const mockLoginExecute = vi.fn();
 const mockRegisterSuperadminAccess = vi.fn();
+const mockIsCaptchaEnforced = vi.fn();
+const mockCaptchaVerify = vi.fn();
 
 vi.mock('@/infrastructure/index', () => ({
   prisma: {},
@@ -16,8 +18,9 @@ vi.mock('@/infrastructure/index', () => ({
   OtpCodeHasherImpl: class {},
   createSmsDeliveryChannelFromEnv: () => ({}),
   TurnstileCaptchaVerifier: class {
-    verify = vi.fn().mockResolvedValue(true);
+    verify = mockCaptchaVerify;
   },
+  isCaptchaEnforced: mockIsCaptchaEnforced,
 }));
 
 vi.mock('@/application/auth/LoginUserUseCase', () => ({
@@ -74,10 +77,18 @@ vi.mock('next/navigation', () => ({
 
 const { loginAction } = await import('../auth/auth');
 
-function makeFormData(phone: string, password: string): FormData {
+function makeFormData(
+  phone: string,
+  password: string,
+  captchaToken?: string
+): FormData {
   const fd = new FormData();
   fd.set('phoneNumber', phone);
   fd.set('password', password);
+
+  if (captchaToken !== undefined) {
+    fd.set('captchaToken', captchaToken);
+  }
 
   return fd;
 }
@@ -95,6 +106,9 @@ const successResult = {
 describe('loginAction — superadmin whitelist', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Matches a local checkout with no Turnstile secret configured.
+    mockIsCaptchaEnforced.mockReturnValue(false);
+    mockCaptchaVerify.mockResolvedValue(true);
   });
 
   it('registers superadmin in whitelist after login', async () => {
@@ -123,5 +137,64 @@ describe('loginAction — superadmin whitelist', () => {
 
     expect(result.success).toBe(true);
     expect(mockRegisterSuperadminAccess).not.toHaveBeenCalled();
+  });
+});
+
+describe('loginAction — CAPTCHA enforcement', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockLoginExecute.mockResolvedValue(successResult);
+    mockIsSuperAdmin.mockResolvedValue(false);
+    mockCaptchaVerify.mockResolvedValue(true);
+  });
+
+  // The bypass this guards: the call site used to verify only when a token was
+  // present, so omitting the field skipped the check entirely.
+  it('rejects a login carrying no token while enforcement is on', async () => {
+    mockIsCaptchaEnforced.mockReturnValue(true);
+
+    const result = await loginAction(
+      makeFormData('+71234567890', 'password123')
+    );
+
+    expect(result.success).toBe(false);
+    expect(mockLoginExecute).not.toHaveBeenCalled();
+    expect(mockCaptchaVerify).not.toHaveBeenCalled();
+  });
+
+  it('rejects a login whose token fails verification', async () => {
+    mockIsCaptchaEnforced.mockReturnValue(true);
+    mockCaptchaVerify.mockResolvedValue(false);
+
+    const result = await loginAction(
+      makeFormData('+71234567890', 'password123', 'bad-token')
+    );
+
+    expect(result.success).toBe(false);
+    expect(mockLoginExecute).not.toHaveBeenCalled();
+  });
+
+  it('accepts a login whose token verifies', async () => {
+    mockIsCaptchaEnforced.mockReturnValue(true);
+
+    const result = await loginAction(
+      makeFormData('+71234567890', 'password123', 'good-token')
+    );
+
+    expect(result.success).toBe(true);
+    expect(mockCaptchaVerify).toHaveBeenCalledWith('good-token', '1.2.3.4');
+  });
+
+  // Local dev with no secret: a tokenless login still has to work, or the
+  // forms become unusable.
+  it('allows a tokenless login while enforcement is off', async () => {
+    mockIsCaptchaEnforced.mockReturnValue(false);
+
+    const result = await loginAction(
+      makeFormData('+71234567890', 'password123')
+    );
+
+    expect(result.success).toBe(true);
+    expect(mockCaptchaVerify).not.toHaveBeenCalled();
   });
 });

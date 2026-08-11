@@ -454,6 +454,8 @@ export class PrismaPollRepository implements PollRepository {
     switch (prismaState) {
       case 'DRAFT':
         return PollState.DRAFT;
+      case 'SUBMITTED':
+        return PollState.SUBMITTED;
       case 'READY':
         return PollState.READY;
       case 'ACTIVE':
@@ -467,6 +469,8 @@ export class PrismaPollRepository implements PollRepository {
     switch (domainState) {
       case PollState.DRAFT:
         return 'DRAFT';
+      case PollState.SUBMITTED:
+        return 'SUBMITTED';
       case PollState.READY:
         return 'READY';
       case PollState.ACTIVE:

@@ -6,6 +6,7 @@ export const PollErrors = {
   CANNOT_MODIFY_FINISHED: 'poll.errors.cannotModifyFinished',
   CANNOT_MODIFY_ACTIVE: 'poll.errors.cannotModifyActive',
   CANNOT_MODIFY_HAS_VOTES: 'poll.errors.cannotModifyHasVotes',
+  CANNOT_MODIFY_SUBMITTED: 'poll.errors.cannotModifySubmitted',
   NOT_POLL_CREATOR: 'poll.errors.notPollCreator',
   NOT_BOARD_MEMBER: 'poll.errors.notBoardMember',
   NOT_ORG_MEMBER: 'poll.errors.notOrgMember',

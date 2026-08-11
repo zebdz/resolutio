@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
-import { PencilIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, EyeIcon } from '@heroicons/react/24/outline';
 import { PollStateBadge } from '@/src/web/components/polls/PollStateBadge';
 import { stripMarkdownToPlainText } from '@/application/shared/StripMarkdownToPlainText';
 import {
@@ -13,10 +13,16 @@ import {
   activatePollAction,
   deactivatePollAction,
   finishPollAction,
+  submitPollToAdminAction,
+  returnPollToDraftAction,
 } from '@/src/web/actions/poll/poll';
 import { toast } from 'sonner';
 import {
+  canSeeResultsBeforePollEnds,
   getPollControlLabelKeys,
+  getPollLifecycleActions,
+  getPollOpenMode,
+  getReturnToDraftLabelKeys,
   shouldShowManageParticipants,
 } from '@/src/web/components/polls/pollControlLabels';
 
@@ -39,13 +45,13 @@ export function PollCard({
   const [isDeactivating, setIsDeactivating] = useState(false);
   const [isActivating, setIsActivating] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isReturning, setIsReturning] = useState(false);
 
   const now = new Date();
   const startDate = new Date(poll.startDate);
   const endDate = new Date(poll.endDate);
   const isActive = poll.state === 'ACTIVE';
-  const isDraft = poll.state === 'DRAFT';
-  const isReady = poll.state === 'READY';
   const isFinished = poll.state === 'FINISHED';
   const isCreator = poll.createdBy === userId;
   const isOpenPoll = poll.pollType === 'OPEN';
@@ -55,12 +61,76 @@ export function PollCard({
   const isParentArchived = isOrgArchived || isBoardArchived;
   const labelKeys = getPollControlLabelKeys(isOpenPoll);
 
-  const canEditPoll = isCreator;
+  // The page decides for itself whether it opens editable or read-only; the
+  // icon only says which one to expect.
+  const openMode = getPollOpenMode({
+    isCreator,
+    canManage,
+    state: poll.state,
+    isParentArchived,
+  });
   const canManageParticipants = canManage;
-  const canActivateAndDeactivatePoll = canManage;
+  // Which lifecycle buttons this viewer gets, decided in one place shared with
+  // PollControls so the list and the poll page cannot disagree.
+  const actions = getPollLifecycleActions({
+    state: poll.state,
+    isCreator,
+    canManage,
+    isParentArchived,
+  });
+  const returnLabelKeys = getReturnToDraftLabelKeys(isCreator);
   // A named poll is readable by every member while it runs — the card must
   // offer the link. The results page enforces the rule server-side regardless.
-  const canViewResultsBeforePollEnds = canManage || !isAnonymousPoll;
+  const canViewResultsBeforePollEnds = canSeeResultsBeforePollEnds({
+    canManage,
+    isAnonymous: isAnonymousPoll,
+  });
+
+  const handleSubmit = async () => {
+    if (!confirm(t('submit.confirmSend'))) {
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const result = await submitPollToAdminAction(poll.id);
+
+      if (result.success) {
+        toast.success(t('submit.sent'));
+        onPollStateChange();
+      } else {
+        toast.error(result.error);
+      }
+    } catch {
+      toast.error(t('errors.generic'));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReturnToDraft = async () => {
+    if (!confirm(t(returnLabelKeys.confirm))) {
+      return;
+    }
+
+    setIsReturning(true);
+
+    try {
+      const result = await returnPollToDraftAction(poll.id);
+
+      if (result.success) {
+        toast.success(t(returnLabelKeys.done));
+        onPollStateChange();
+      } else {
+        toast.error(result.error);
+      }
+    } catch {
+      toast.error(t('errors.generic'));
+    } finally {
+      setIsReturning(false);
+    }
+  };
 
   const handleTakeSnapshot = async () => {
     if (!confirm(t(labelKeys.confirmPrepare))) {
@@ -192,14 +262,21 @@ export function PollCard({
           : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700'
       }`}
     >
-      {/* Edit button for creator if poll can be edited */}
-      {!isParentArchived && canEditPoll && !isActive && !isFinished && (
+      {/* Edit for the author, read-only for any other admin — and each goes to
+          the route that actually does that. */}
+      {openMode !== 'none' && (
         <Link
-          href={`/polls/${poll.id}/edit`}
+          href={
+            openMode === 'edit' ? `/polls/${poll.id}/edit` : `/polls/${poll.id}`
+          }
           className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
-          title={t('editPoll')}
+          title={openMode === 'edit' ? t('editPoll') : t('viewPoll')}
         >
-          <PencilIcon className="w-5 h-5" />
+          {openMode === 'edit' ? (
+            <PencilIcon className="w-5 h-5" />
+          ) : (
+            <EyeIcon className="w-5 h-5" />
+          )}
         </Link>
       )}
 
@@ -315,8 +392,35 @@ export function PollCard({
               )}
           </div>
 
-          {/* Take Snapshot button for DRAFT polls */}
-          {!isParentArchived && canActivateAndDeactivatePoll && isDraft && (
+          {/* The author hands a finished draft over; nothing an admin can do
+              exists before that. */}
+          {actions.submit && (
+            <Button
+              color="brand-green"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="w-full"
+            >
+              {isSubmitting ? t('submit.sending') : t('submit.send')}
+            </Button>
+          )}
+
+          {actions.returnToDraft && (
+            <Button
+              color="zinc"
+              onClick={handleReturnToDraft}
+              disabled={isReturning}
+              className="w-full"
+            >
+              {isReturning
+                ? t(returnLabelKeys.pending)
+                : t(returnLabelKeys.action)}
+            </Button>
+          )}
+
+          {/* Freezes the electorate for an organization poll; an open poll has
+              none, so the same step just marks it ready. */}
+          {actions.prepare && (
             <Button
               color="brand-green"
               onClick={handleTakeSnapshot}
@@ -327,32 +431,32 @@ export function PollCard({
             </Button>
           )}
 
-          {/* Activate and Discard Snapshot buttons for READY polls */}
-          {!isParentArchived && canActivateAndDeactivatePoll && isReady && (
-            <>
-              <Button
-                color="green"
-                onClick={handleActivate}
-                disabled={isActivating}
-                className="w-full"
-              >
-                {isActivating ? t('activating') : t('activatePoll')}
-              </Button>
-              <Button
-                color="zinc"
-                onClick={handleDiscardSnapshot}
-                disabled={isDiscardingSnapshot}
-                className="w-full"
-              >
-                {isDiscardingSnapshot
-                  ? t(labelKeys.reverting)
-                  : t(labelKeys.revert)}
-              </Button>
-            </>
+          {actions.activate && (
+            <Button
+              color="green"
+              onClick={handleActivate}
+              disabled={isActivating}
+              className="w-full"
+            >
+              {isActivating ? t('activating') : t('activatePoll')}
+            </Button>
+          )}
+
+          {actions.revert && (
+            <Button
+              color="zinc"
+              onClick={handleDiscardSnapshot}
+              disabled={isDiscardingSnapshot}
+              className="w-full"
+            >
+              {isDiscardingSnapshot
+                ? t(labelKeys.reverting)
+                : t(labelKeys.revert)}
+            </Button>
           )}
 
           {/* Deactivate and Finish buttons for ACTIVE polls */}
-          {!isParentArchived && canActivateAndDeactivatePoll && isActive && (
+          {actions.deactivate && actions.finish && (
             <>
               <Button
                 color="yellow"

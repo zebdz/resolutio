@@ -50,7 +50,8 @@ import {
 } from '@/web/actions/poll/pollAttachments';
 import { buildAttachmentRef } from '@/web/components/markdown/buildAttachmentRef';
 import { removeAttachmentRefs } from '@/web/components/markdown/removeAttachmentRefs';
-import { validateHeaderName } from 'http';
+import { PollReadOnlyView } from '@/web/components/polls/PollReadOnlyView';
+import { canViewPollPage } from '@/web/components/polls/pollControlLabels';
 
 interface Answer {
   id: string;
@@ -75,9 +76,24 @@ interface PollData {
   endDate: string;
   state: PollState;
   pollType: string;
+  // Needed by the read-only renderer, which refuses inline images that point
+  // at another poll's files.
+  attachmentIds: string[];
+  // Gates the results link: an anonymous poll's results stay admin-only while
+  // it runs.
+  anonymous: boolean;
 }
 
-export function EditPollForm() {
+interface EditPollFormProps {
+  /**
+   * Render the poll as a read-only review even when the viewer could edit it.
+   * Set by the /polls/[pollId] route, whose whole point is that it is not the
+   * editor; the edit route leaves it unset and lets permissions decide.
+   */
+  readOnly?: boolean;
+}
+
+export function EditPollForm({ readOnly = false }: EditPollFormProps = {}) {
   const router = useRouter();
   const params = useParams();
   const pollId = params.pollId as string;
@@ -93,6 +109,8 @@ export function EditPollForm() {
     endDate: '',
     state: PollState.DRAFT,
     pollType: 'ORGANIZATION',
+    attachmentIds: [],
+    anonymous: false,
   });
 
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -112,6 +130,12 @@ export function EditPollForm() {
   } | null>(null);
   const [canEdit, setCanEdit] = useState(false);
   const [canManage, setCanManage] = useState(false);
+  // An admin who may not edit still gets the poll, read-only: this page is the
+  // only place the legality check is exposed, and it is an admin feature.
+  const [isReadOnly, setIsReadOnly] = useState(false);
+  // The author, who may submit and recall even when the poll is locked.
+  const [isCreator, setIsCreator] = useState(false);
+  const [readOnlyReason, setReadOnlyReason] = useState<string | null>(null);
 
   // Legal check state
   const [legalAnnotations, setLegalAnnotations] = useState<
@@ -292,8 +316,12 @@ export function EditPollForm() {
       setIsLoading(true);
       setError(null);
 
-      // Check if poll can be edited
-      const canEditResult = await canEditPollAction(pollId);
+      // Whether the poll may be edited, and — since an admin who may not edit
+      // still gets to read it — who is asking.
+      const [canEditResult, manageResult] = await Promise.all([
+        canEditPollAction(pollId),
+        canManagePollAction(pollId),
+      ]);
 
       if (!canEditResult.success) {
         setError(canEditResult.error);
@@ -302,31 +330,52 @@ export function EditPollForm() {
         return;
       }
 
-      if (!canEditResult.data.canEdit) {
-        let errorMessage = t('errors.cannotModifyFinished');
+      const isManager = manageResult.success ? manageResult.data : false;
 
-        if (canEditResult.data.reason === 'active') {
-          errorMessage = t('errors.cannotModifyActive');
+      setCanManage(isManager);
+
+      const editable = canEditResult.data.canEdit;
+      const isAuthor = canEditResult.data.isCreator;
+      // Who may see the poll at all, as opposed to change it. An author whose
+      // poll is submitted is locked out of editing but still owns it — this is
+      // where they recall it.
+      const canView = canViewPollPage({
+        isCreator: isAuthor,
+        canManage: isManager,
+      });
+
+      setCanEdit(editable);
+      setIsCreator(isAuthor);
+      // `readOnly` additionally lets the view route show a poll its viewer
+      // could otherwise edit.
+      setIsReadOnly((readOnly || !editable) && canView);
+
+      if (!editable) {
+        let reasonMessage = t('errors.cannotModifyFinished');
+
+        if (canEditResult.data.reason === 'submitted') {
+          reasonMessage = t('submit.awaitingAdminHint');
+        } else if (canEditResult.data.reason === 'active') {
+          reasonMessage = t('errors.cannotModifyActive');
         } else if (canEditResult.data.reason === 'hasVotes') {
-          errorMessage = t('errors.cannotModifyHasVotes');
+          reasonMessage = t('errors.cannotModifyHasVotes');
         } else if (canEditResult.data.reason === 'notCreator') {
-          errorMessage = t('errors.notPollCreator');
+          reasonMessage = t('errors.notPollCreator');
         }
 
-        setError(errorMessage);
-        setCanEdit(false);
-        setIsLoading(false);
+        // For anyone who may still see the poll the reason is context, not a
+        // failure — the page goes on to render it — so it must not go through
+        // `error`, which the editor paints red. Only someone who may not see
+        // it at all stops here; bailing out for the author too left them on a
+        // page built entirely from empty defaults.
+        if (canView) {
+          setReadOnlyReason(reasonMessage);
+        } else {
+          setError(reasonMessage);
+          setIsLoading(false);
 
-        return;
-      }
-
-      setCanEdit(true);
-
-      // Check if user can manage poll
-      const manageResult = await canManagePollAction(pollId);
-
-      if (manageResult.success) {
-        setCanManage(manageResult.data);
+          return;
+        }
       }
 
       // Load poll data
@@ -342,6 +391,8 @@ export function EditPollForm() {
           endDate: new Date(poll.endDate).toISOString().split('T')[0],
           state: poll.state,
           pollType: poll.pollType,
+          attachmentIds: poll.attachmentIds ?? [],
+          anonymous: !!poll.anonymous,
         });
         setOriginalTitle(poll.title);
         setOriginalDescription(poll.description);
@@ -387,7 +438,7 @@ export function EditPollForm() {
     } finally {
       setIsLoading(false);
     }
-  }, [pollId, t]);
+  }, [pollId, t, readOnly]);
 
   // Load poll data
   useEffect(() => {
@@ -884,7 +935,7 @@ export function EditPollForm() {
     );
   }
 
-  if (!canEdit) {
+  if (!canEdit && !isReadOnly) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -896,6 +947,125 @@ export function EditPollForm() {
         <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-200">
           {error || t('errors.cannotModifyFinished')}
         </div>
+      </div>
+    );
+  }
+
+  // A new analysis is READY-only server-side; a stored one is worth reading in
+  // any state, so the panel renders throughout and explains itself.
+  const canRunLegalCheck = pollData.state === PollState.READY;
+
+  const legalCheckPanel = canManage && (
+    <div className="space-y-2">
+      <LegalCheckControls
+        isAnalyzing={isAnalyzing}
+        hasUnsavedChanges={hasLegalRelevantChanges(
+          {
+            title: originalTitle,
+            description: originalDescription,
+            questions: originalQuestions.map((q) => ({
+              id: q.id,
+              text: q.text,
+              answers: (q.answers ?? []).map((a) => ({
+                id: a.id,
+                text: a.text,
+              })),
+            })),
+          },
+          {
+            title: pollData.title,
+            description: pollData.description,
+            questions: questions.map((q) => ({
+              id: q.id,
+              text: q.text,
+              answers: (q.answers ?? []).map((a) => ({
+                id: a.id,
+                text: a.text,
+              })),
+            })),
+          }
+        )}
+        canRun={canRunLegalCheck}
+        onCheckLegality={handleCheckLegality}
+      />
+      {!canRunLegalCheck && (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          {tLegal('readyOnly')}
+        </p>
+      )}
+      {legalCheckError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200">
+          {legalCheckError}
+        </div>
+      )}
+    </div>
+  );
+
+  const legalSummaryPanel = canManage && legalSummary && (
+    <>
+      {isLegalCheckStale && (
+        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200">
+          {tLegal('summary.stale')}
+        </div>
+      )}
+      <LegalAnalysisSummary
+        summary={legalSummary}
+        annotations={legalAnnotations}
+        model={legalCheckModel}
+        checkedAt={legalCheckDate}
+      />
+    </>
+  );
+
+  if (isReadOnly) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <Heading className="text-3xl font-bold">{t('viewPoll')}</Heading>
+          <Link href="/polls">
+            <Button color="zinc">{tCommon('back')}</Button>
+          </Link>
+        </div>
+
+        {/* Without this a failed load renders as a poll with no title, no
+            dates and no questions — indistinguishable from an empty one. */}
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200">
+            {error}
+          </div>
+        )}
+
+        {readOnlyReason && (
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-400">
+            {readOnlyReason}
+          </div>
+        )}
+
+        <PollControls
+          pollId={pollId}
+          state={pollData.state}
+          hasQuestions={questions.length > 0}
+          isOpenPoll={pollData.pollType === 'OPEN'}
+          isCreator={isCreator}
+          canManage={canManage}
+          isAnonymous={pollData.anonymous}
+          onStateChange={loadPoll}
+        />
+
+        {legalCheckPanel}
+
+        <PollReadOnlyView
+          title={pollData.title}
+          description={pollData.description}
+          startDate={pollData.startDate}
+          endDate={pollData.endDate}
+          pollType={pollData.pollType}
+          attachmentIds={pollData.attachmentIds}
+          questions={questions}
+          annotations={legalAnnotations}
+        />
+
+        {legalSummaryPanel}
       </div>
     );
   }
@@ -926,13 +1096,17 @@ export function EditPollForm() {
         </div>
       )}
 
-      {/* Poll Controls */}
-      {canManage && (
+      {/* Poll Controls. The author needs these too now — "send to admin" is
+          theirs, and it is the only way a draft ever leaves them. */}
+      {(canManage || isCreator) && (
         <PollControls
           pollId={pollId}
           state={pollData.state}
           hasQuestions={questions.length > 0}
           isOpenPoll={pollData.pollType === 'OPEN'}
+          isCreator={isCreator}
+          canManage={canManage}
+          isAnonymous={pollData.anonymous}
           onStateChange={loadPoll}
           // Activating or finishing freezes the poll, so staying here would
           // just replace the form with "this poll cannot be edited" — an error
@@ -950,46 +1124,8 @@ export function EditPollForm() {
         />
       )}
 
-      {/* Legal check controls (admin only, non-draft polls) */}
-      {canManage && pollData.state !== PollState.DRAFT && (
-        <div className="space-y-2">
-          <LegalCheckControls
-            isAnalyzing={isAnalyzing}
-            hasUnsavedChanges={hasLegalRelevantChanges(
-              {
-                title: originalTitle,
-                description: originalDescription,
-                questions: originalQuestions.map((q) => ({
-                  id: q.id,
-                  text: q.text,
-                  answers: (q.answers ?? []).map((a) => ({
-                    id: a.id,
-                    text: a.text,
-                  })),
-                })),
-              },
-              {
-                title: pollData.title,
-                description: pollData.description,
-                questions: questions.map((q) => ({
-                  id: q.id,
-                  text: q.text,
-                  answers: (q.answers ?? []).map((a) => ({
-                    id: a.id,
-                    text: a.text,
-                  })),
-                })),
-              }
-            )}
-            onCheckLegality={handleCheckLegality}
-          />
-          {legalCheckError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200">
-              {legalCheckError}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Legal check controls (admin only) */}
+      {legalCheckPanel}
 
       {/* Poll Basic Info */}
       <div className="p-6 bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-4">
@@ -1172,21 +1308,7 @@ export function EditPollForm() {
       </div>
 
       {/* Legal analysis summary */}
-      {canManage && pollData.state !== PollState.DRAFT && legalSummary && (
-        <>
-          {isLegalCheckStale && (
-            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200">
-              {tLegal('summary.stale')}
-            </div>
-          )}
-          <LegalAnalysisSummary
-            summary={legalSummary}
-            annotations={legalAnnotations}
-            model={legalCheckModel}
-            checkedAt={legalCheckDate}
-          />
-        </>
-      )}
+      {legalSummaryPanel}
     </div>
   );
 }

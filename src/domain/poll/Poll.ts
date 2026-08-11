@@ -245,6 +245,10 @@ export class Poll {
     return this.props.state === PollState.DRAFT;
   }
 
+  public isSubmitted(): boolean {
+    return this.props.state === PollState.SUBMITTED;
+  }
+
   public isReady(): boolean {
     return this.props.state === PollState.READY;
   }
@@ -258,18 +262,23 @@ export class Poll {
   }
 
   /**
+   * Content is frozen from the moment the author submits the poll. An admin
+   * deciding whether to freeze participants has to be looking at what they
+   * will actually be freezing, so a submitted poll must not move under them;
+   * the author recalls it to DRAFT if they want to change something.
+   */
+  public isContentLocked(): boolean {
+    return this.isSubmitted() || this.isActive() || this.isFinished();
+  }
+
+  /**
    * Check if this poll can be edited
    * A poll can only be edited if:
-   * - It is not active
-   * - It is not finished
+   * - It is not submitted, active or finished
    * - It has no votes
    */
   public canEdit(hasVotes: boolean): Result<boolean, string> {
-    if (this.isActive()) {
-      return success(false);
-    }
-
-    if (this.isFinished()) {
+    if (this.isContentLocked()) {
       return success(false);
     }
 
@@ -284,6 +293,10 @@ export class Poll {
     newTitle: string,
     profanityChecker?: ProfanityChecker
   ): Result<void, string> {
+    if (this.isSubmitted()) {
+      return failure(PollDomainCodes.POLL_CANNOT_UPDATE_SUBMITTED);
+    }
+
     if (this.isFinished() || this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED);
     }
@@ -309,6 +322,10 @@ export class Poll {
     newDescription: string,
     profanityChecker?: ProfanityChecker
   ): Result<void, string> {
+    if (this.isSubmitted()) {
+      return failure(PollDomainCodes.POLL_CANNOT_UPDATE_SUBMITTED);
+    }
+
     if (this.isFinished() || this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED);
     }
@@ -350,6 +367,10 @@ export class Poll {
   // READY, fixed once voting opens. Otherwise voters would see different
   // evidence at different times.
   public addAttachment(attachmentId: string): Result<void, string> {
+    if (this.isSubmitted()) {
+      return failure(PollDomainCodes.POLL_CANNOT_UPDATE_SUBMITTED);
+    }
+
     if (this.isFinished() || this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_CHANGE_ATTACHMENTS_ACTIVE);
     }
@@ -364,6 +385,10 @@ export class Poll {
   }
 
   public removeAttachment(attachmentId: string): Result<void, string> {
+    if (this.isSubmitted()) {
+      return failure(PollDomainCodes.POLL_CANNOT_UPDATE_SUBMITTED);
+    }
+
     if (this.isFinished() || this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_CHANGE_ATTACHMENTS_ACTIVE);
     }
@@ -380,6 +405,10 @@ export class Poll {
   }
 
   public updateDates(startDate: Date, endDate: Date): Result<void, string> {
+    if (this.isSubmitted()) {
+      return failure(PollDomainCodes.POLL_CANNOT_UPDATE_SUBMITTED);
+    }
+
     if (this.isFinished() || this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED);
     }
@@ -395,28 +424,82 @@ export class Poll {
   }
 
   /**
-   * Take snapshot: DRAFT → READY
-   * Validates poll has questions with answers before transitioning
+   * A poll is only fit to leave the author's hands once every live question
+   * can actually be answered. Checked when it is submitted, so the author sees
+   * the problem while they can still fix it, and again on snapshot, which is a
+   * separate entry point into the same requirement.
    */
-  public takeSnapshot(): Result<void, string> {
-    if (!this.isDraft()) {
-      return failure(PollDomainCodes.POLL_MUST_BE_DRAFT);
-    }
-
-    // Check poll has at least one non-archived question
+  private validateAnswerable(): Result<void, string> {
     const activeQuestions = this.props.questions.filter((q) => !q.isArchived());
 
     if (activeQuestions.length === 0) {
       return failure(PollDomainCodes.POLL_NO_QUESTIONS);
     }
 
-    // Check each active question has at least one non-archived answer
     for (const question of activeQuestions) {
       const activeAnswers = question.answers.filter((a) => !a.isArchived());
 
       if (activeAnswers.length === 0) {
         return failure(PollDomainCodes.POLL_QUESTION_NO_ANSWERS);
       }
+    }
+
+    return success(undefined);
+  }
+
+  /**
+   * Submit to admin: DRAFT → SUBMITTED
+   *
+   * The author declaring the poll finished. Nothing an admin does to a poll's
+   * lifecycle is possible before this point.
+   */
+  public submitToAdmin(): Result<void, string> {
+    if (!this.isDraft()) {
+      return failure(PollDomainCodes.POLL_MUST_BE_DRAFT);
+    }
+
+    const answerable = this.validateAnswerable();
+
+    if (!answerable.success) {
+      return failure(answerable.error);
+    }
+
+    this.props.state = PollState.SUBMITTED;
+
+    return success(undefined);
+  }
+
+  /**
+   * Return to draft: SUBMITTED → DRAFT
+   *
+   * One transition, two callers: the author recalling a poll they submitted
+   * too early, and an admin handing it back for changes. Only from SUBMITTED —
+   * once an admin has frozen participants the way back is discardSnapshot,
+   * which has to reckon with votes.
+   */
+  public returnToDraft(): Result<void, string> {
+    if (!this.isSubmitted()) {
+      return failure(PollDomainCodes.POLL_MUST_BE_SUBMITTED);
+    }
+
+    this.props.state = PollState.DRAFT;
+
+    return success(undefined);
+  }
+
+  /**
+   * Take snapshot: SUBMITTED → READY
+   * Validates poll has questions with answers before transitioning
+   */
+  public takeSnapshot(): Result<void, string> {
+    if (!this.isSubmitted()) {
+      return failure(PollDomainCodes.POLL_MUST_BE_SUBMITTED);
+    }
+
+    const answerable = this.validateAnswerable();
+
+    if (!answerable.success) {
+      return failure(answerable.error);
     }
 
     this.props.state = PollState.READY;
@@ -437,7 +520,12 @@ export class Poll {
       return failure(PollDomainCodes.POLL_CANNOT_DISCARD_SNAPSHOT_HAS_VOTES);
     }
 
-    this.props.state = PollState.DRAFT;
+    // Back to SUBMITTED, not DRAFT: this undoes the admin's freeze, not the
+    // author's handover. Dropping to DRAFT would silently revoke a decision
+    // that was never the admin's to revoke, and leave the author waiting on a
+    // poll they had already sent. An admin who does want the author to change
+    // something uses returnToDraft, which tells them so.
+    this.props.state = PollState.SUBMITTED;
 
     return success(undefined);
   }
@@ -482,6 +570,10 @@ export class Poll {
   }
 
   public addQuestion(question: Question): Result<void, string> {
+    if (this.isSubmitted()) {
+      return failure(PollDomainCodes.POLL_CANNOT_UPDATE_SUBMITTED);
+    }
+
     if (this.isFinished() || this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_ADD_QUESTION_FINISHED);
     }
@@ -496,6 +588,10 @@ export class Poll {
   }
 
   public removeQuestion(questionId: string): Result<void, string> {
+    if (this.isSubmitted()) {
+      return failure(PollDomainCodes.POLL_CANNOT_UPDATE_SUBMITTED);
+    }
+
     if (this.isFinished() || this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_REMOVE_QUESTION_FINISHED);
     }
@@ -540,6 +636,10 @@ export class Poll {
     order: number,
     profanityChecker?: ProfanityChecker
   ): Result<Answer, string> {
+    if (this.isSubmitted()) {
+      return failure(PollDomainCodes.POLL_CANNOT_UPDATE_SUBMITTED);
+    }
+
     if (this.isActive()) {
       return failure(PollDomainCodes.POLL_CANNOT_ADD_ANSWER_ACTIVE);
     }

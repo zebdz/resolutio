@@ -63,6 +63,19 @@ const TYPE_CONFIG: Record<string, TypeConfigEntry> = {
     url: (id) => `/polls/${id}/results`,
     actionKey: 'viewResults',
   },
+  // An admin reviewing a submitted poll cannot edit it, so they get the
+  // read-only page; the author whose poll came back is going to change
+  // something, so they get the editor.
+  poll_submitted: {
+    dataKey: 'pollId',
+    url: (id) => `/polls/${id}`,
+    actionKey: 'reviewPoll',
+  },
+  poll_returned_to_draft: {
+    dataKey: 'pollId',
+    url: (id) => `/polls/${id}/edit`,
+    actionKey: 'editPoll',
+  },
   auto_join_failed: {
     dataKey: 'organizationId',
     url: (id) => `/organizations/${id}`,

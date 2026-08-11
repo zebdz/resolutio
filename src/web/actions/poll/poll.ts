@@ -15,6 +15,8 @@ import { UpdateQuestionOrderUseCase } from '@/application/poll/UpdateQuestionOrd
 import { TakeSnapshotUseCase } from '@/application/poll/TakeSnapshotUseCase';
 import { PollWeightCalculator } from '@/application/poll/PollWeightCalculator';
 import { ActivatePollUseCase } from '@/application/poll/ActivatePollUseCase';
+import { SubmitPollToAdminUseCase } from '@/application/poll/SubmitPollToAdminUseCase';
+import { ReturnPollToDraftUseCase } from '@/application/poll/ReturnPollToDraftUseCase';
 import { DeactivatePollUseCase } from '@/application/poll/DeactivatePollUseCase';
 import { DiscardSnapshotUseCase } from '@/application/poll/DiscardSnapshotUseCase';
 import { FinishPollUseCase } from '@/application/poll/FinishPollUseCase';
@@ -160,6 +162,18 @@ const activatePollUseCase = new ActivatePollUseCase(
   notificationRepository,
   participantRepository,
   boardRepository
+);
+const submitPollToAdminUseCase = new SubmitPollToAdminUseCase(
+  pollRepository,
+  organizationRepository,
+  userRepository,
+  notificationRepository
+);
+const returnPollToDraftUseCase = new ReturnPollToDraftUseCase(
+  pollRepository,
+  organizationRepository,
+  userRepository,
+  notificationRepository
 );
 const deactivatePollUseCase = new DeactivatePollUseCase(
   pollRepository,
@@ -757,7 +771,9 @@ export async function updatePollAction(
 
 export async function canEditPollAction(
   pollId: string
-): Promise<ActionResult<{ canEdit: boolean; reason?: string }>> {
+): Promise<
+  ActionResult<{ canEdit: boolean; reason?: string; isCreator: boolean }>
+> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -798,13 +814,19 @@ export async function canEditPollAction(
 
     // Check if user is creator or superadmin
     const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
+    // Reported separately from canEdit: a submitted poll is uneditable by
+    // everyone, but only its author may recall it, so the UI still has to tell
+    // the two apart. A superadmin edits on the author's behalf and counts as
+    // one here, matching SubmitPollToAdminUseCase.
+    const isCreator = isSuperAdmin || poll.createdBy === user.id;
 
-    if (!isSuperAdmin && poll.createdBy !== user.id) {
+    if (!isCreator) {
       return {
         success: true,
         data: {
           canEdit: false,
           reason: 'notCreator',
+          isCreator: false,
         },
       };
     }
@@ -834,7 +856,9 @@ export async function canEditPollAction(
     if (!canEditResult.value) {
       let reason = 'unknown';
 
-      if (poll.isActive()) {
+      if (poll.isSubmitted()) {
+        reason = 'submitted';
+      } else if (poll.isActive()) {
         reason = 'active';
       } else if (poll.isFinished()) {
         reason = 'finished';
@@ -847,6 +871,7 @@ export async function canEditPollAction(
         data: {
           canEdit: false,
           reason,
+          isCreator,
         },
       };
     }
@@ -855,6 +880,7 @@ export async function canEditPollAction(
       success: true,
       data: {
         canEdit: true,
+        isCreator,
       },
     };
   } catch (error) {
@@ -1185,6 +1211,102 @@ export async function activatePollAction(
     return { success: true, data: undefined };
   } catch (error) {
     console.error('Error activating poll:', error);
+
+    return {
+      success: false,
+      error: t('unexpected'),
+    };
+  }
+}
+
+/**
+ * Hand a draft to the organization's admins (DRAFT → SUBMITTED).
+ * The author's call, so this is the one lifecycle action an admin cannot take.
+ */
+export async function submitPollToAdminAction(
+  pollId: string
+): Promise<ActionResult<void>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    const result = await submitPollToAdminUseCase.execute({
+      pollId,
+      userId: user.id,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: await translateErrorCode(result.error),
+      };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error submitting poll to admin:', error);
+
+    return {
+      success: false,
+      error: t('unexpected'),
+    };
+  }
+}
+
+/**
+ * Send a submitted poll back for editing (SUBMITTED → DRAFT): the author
+ * recalling it, or an admin returning it for changes.
+ */
+export async function returnPollToDraftAction(
+  pollId: string
+): Promise<ActionResult<void>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const t = await getTranslations('common.errors');
+
+  try {
+    const user = await getCurrentUser();
+
+    if (!user) {
+      return {
+        success: false,
+        error: t('unauthorized'),
+      };
+    }
+
+    const result = await returnPollToDraftUseCase.execute({
+      pollId,
+      userId: user.id,
+    });
+
+    if (!result.success) {
+      return {
+        success: false,
+        error: await translateErrorCode(result.error),
+      };
+    }
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error('Error returning poll to draft:', error);
 
     return {
       success: false,
