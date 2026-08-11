@@ -27,6 +27,11 @@ import { getVersion } from '@/src/web/lib/version';
 interface MobileSidebarProps {
   isSuperAdmin: boolean;
   unreadNotificationCount: number;
+  /**
+   * Labels the account link. Falls back to the generic word when blank, so a
+   * user without a usable name still gets a link that says what it is.
+   */
+  firstName?: string;
 }
 
 function isItemCurrent(itemHref: string, pathname: string): boolean {
@@ -43,6 +48,7 @@ function isItemCurrent(itemHref: string, pathname: string): boolean {
 export function MobileSidebar({
   isSuperAdmin,
   unreadNotificationCount,
+  firstName,
 }: MobileSidebarProps) {
   const t = useTranslations('navbar');
   const pathname = usePathname();
@@ -133,7 +139,7 @@ export function MobileSidebar({
             current={isItemCurrent('/account', pathname)}
           >
             <UserCircleIcon data-slot="icon" />
-            <SidebarLabel>{t('account')}</SidebarLabel>
+            <SidebarLabel>{firstName?.trim() || t('account')}</SidebarLabel>
           </SidebarItem>
         </SidebarSection>
 
