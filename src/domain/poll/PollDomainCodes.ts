@@ -21,8 +21,10 @@ export const PollDomainCodes = {
 
   // State machine transitions
   POLL_MUST_BE_DRAFT: 'domain.poll.mustBeDraft',
+  POLL_MUST_BE_SUBMITTED: 'domain.poll.mustBeSubmitted',
   POLL_MUST_BE_READY: 'domain.poll.mustBeReady',
   POLL_MUST_BE_ACTIVE: 'domain.poll.mustBeActive',
+  POLL_CANNOT_UPDATE_SUBMITTED: 'domain.poll.cannotUpdateSubmitted',
   POLL_CANNOT_DISCARD_SNAPSHOT_HAS_VOTES:
     'domain.poll.cannotDiscardSnapshotHasVotes',
   POLL_CANNOT_UPDATE_FINISHED: 'domain.poll.cannotUpdateFinished',

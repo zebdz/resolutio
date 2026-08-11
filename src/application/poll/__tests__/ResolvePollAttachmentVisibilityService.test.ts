@@ -56,6 +56,7 @@ function buildPoll(
   // deliberately restricted to the creator and admins.
   if ((overrides.state ?? 'ACTIVE') === 'ACTIVE') {
     poll.addQuestion(questionWithAnswer(poll.id));
+    poll.submitToAdmin();
     poll.takeSnapshot();
     poll.activate();
   }

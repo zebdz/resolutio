@@ -40,6 +40,12 @@ export class UpdateQuestionOrderUseCase {
     }
 
     // 3. Check if poll is finished
+    // A submitted poll is the author's handover to an admin; it must not
+    // change underneath them until it is recalled to DRAFT.
+    if (poll.isSubmitted()) {
+      return failure(PollErrors.CANNOT_MODIFY_SUBMITTED);
+    }
+
     if (poll.isFinished()) {
       return failure(PollErrors.CANNOT_MODIFY_FINISHED);
     }

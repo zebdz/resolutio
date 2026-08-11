@@ -51,6 +51,7 @@ describe('GetParticipantsUseCase', () => {
     const answerResult = Answer.create('Test A', 1, questionResult.value.id);
     questionResult.value.addAnswer(answerResult.value);
     poll.addQuestion(questionResult.value);
+    poll.submitToAdmin();
     poll.takeSnapshot();
     // Poll is now in READY state (canModify should be true if no votes)
 

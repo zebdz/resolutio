@@ -27,6 +27,7 @@ function makeDraftPoll(pollType: 'ORGANIZATION' | 'OPEN'): Poll {
 
 function makeActivePoll(pollType: 'ORGANIZATION' | 'OPEN'): Poll {
   const poll = makeDraftPoll(pollType);
+  poll.submitToAdmin();
   poll.takeSnapshot();
   poll.activate();
 
@@ -116,6 +117,7 @@ describe('PollVotingPolicy.canVote', () => {
 
     it('rejects a READY poll with POLL_NOT_ACTIVE', () => {
       const poll = makeDraftPoll('OPEN');
+      poll.submitToAdmin();
       poll.takeSnapshot();
 
       const result = PollVotingPolicy.canVote(poll, {

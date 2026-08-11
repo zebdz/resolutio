@@ -116,6 +116,7 @@ describe('UpdateQuestionOrderUseCase', () => {
     );
     questionResult.value.addAnswer(answerResult.value);
     poll.addQuestion(questionResult.value);
+    poll.submitToAdmin();
     poll.takeSnapshot();
     poll.activate();
     poll.finish();

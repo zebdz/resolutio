@@ -136,6 +136,7 @@ export function PollsListView({
           >
             <option value="">{t('allStatuses')}</option>
             <option value={PollState.DRAFT}>{t('draft')}</option>
+            <option value={PollState.SUBMITTED}>{t('submitted')}</option>
             <option value={PollState.READY}>{t('ready')}</option>
             <option value={PollState.ACTIVE}>{t('active')}</option>
             <option value={PollState.FINISHED}>{t('finished')}</option>

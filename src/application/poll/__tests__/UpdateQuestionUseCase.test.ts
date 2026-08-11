@@ -124,6 +124,7 @@ describe('UpdateQuestionUseCase', () => {
       );
       questionForActivation.value.addAnswer(tempAnswer.value);
       poll.addQuestion(questionForActivation.value);
+      poll.submitToAdmin();
       poll.takeSnapshot();
       poll.activate();
 

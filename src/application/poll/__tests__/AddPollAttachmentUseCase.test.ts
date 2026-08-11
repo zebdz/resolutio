@@ -50,6 +50,7 @@ function draftPoll(): Poll {
 function activePoll(): Poll {
   const poll = draftPoll();
   poll.addQuestion(questionWithAnswer(poll.id));
+  poll.submitToAdmin();
   poll.takeSnapshot();
   poll.activate();
 

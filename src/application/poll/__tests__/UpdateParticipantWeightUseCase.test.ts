@@ -43,6 +43,7 @@ describe('UpdateParticipantWeightUseCase', () => {
     if (pollResult.success) {
       poll = pollResult.value;
       (poll as any).props.id = 'poll-1';
+      poll.submitToAdmin();
       poll.takeSnapshot();
       poll.activate();
     }

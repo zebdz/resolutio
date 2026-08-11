@@ -113,6 +113,7 @@ describe('UpdatePollUseCase', () => {
       );
       questionResult.value.addAnswer(answerResult.value);
       poll.addQuestion(questionResult.value);
+      poll.submitToAdmin();
       poll.takeSnapshot();
       poll.activate();
 
@@ -145,6 +146,7 @@ describe('UpdatePollUseCase', () => {
       );
       questionResult.value.addAnswer(answerResult.value);
       poll.addQuestion(questionResult.value);
+      poll.submitToAdmin();
       poll.takeSnapshot();
       poll.activate();
       poll.finish();

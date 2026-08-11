@@ -67,6 +67,7 @@ describe('Poll Domain', () => {
       poll.addQuestion(createQuestionWithAnswer(poll.id));
 
       // Activate poll (must go through READY state first)
+      poll.submitToAdmin();
       poll.takeSnapshot();
       const activateResult = poll.activate();
       expect(activateResult.success).toBe(true);
@@ -92,6 +93,7 @@ describe('Poll Domain', () => {
 
       // Finish poll (must go through READY → ACTIVE first)
       poll.addQuestion(createQuestionWithAnswer(poll.id));
+      poll.submitToAdmin();
       poll.takeSnapshot();
       poll.activate();
       poll.finish();
@@ -137,6 +139,7 @@ describe('Poll Domain', () => {
       // Add a question with answer so we can activate the poll
       poll.addQuestion(createQuestionWithAnswer(poll.id));
 
+      poll.submitToAdmin();
       poll.takeSnapshot();
       const activateResult = poll.activate();
       expect(activateResult.success).toBe(true);
@@ -164,6 +167,7 @@ describe('Poll Domain', () => {
       // Add a question with answer so we can activate the poll
       poll.addQuestion(createQuestionWithAnswer(poll.id));
 
+      poll.submitToAdmin();
       poll.takeSnapshot();
       const activateResult = poll.activate();
       expect(activateResult.success).toBe(true);
@@ -191,6 +195,7 @@ describe('Poll Domain', () => {
       // Add a question with answer so we can activate the poll
       poll.addQuestion(createQuestionWithAnswer(poll.id));
 
+      poll.submitToAdmin();
       poll.takeSnapshot();
       const activateResult = poll.activate();
       expect(activateResult.success).toBe(true);
@@ -218,6 +223,7 @@ describe('Poll Domain', () => {
       // Add a question with answer so we can activate the poll
       poll.addQuestion(createQuestionWithAnswer(poll.id));
 
+      poll.submitToAdmin();
       poll.takeSnapshot();
       const activateResult = poll.activate();
       expect(activateResult.success).toBe(true);
@@ -268,6 +274,7 @@ describe('Poll Domain', () => {
       if (pollResult.success) {
         const poll = pollResult.value;
         poll.addQuestion(createQuestionWithAnswer(poll.id));
+        poll.submitToAdmin();
         poll.takeSnapshot();
         expect(poll.isReady()).toBe(true);
       }
@@ -289,6 +296,7 @@ describe('Poll Domain', () => {
       if (pollResult.success) {
         const poll = pollResult.value;
         poll.addQuestion(createQuestionWithAnswer(poll.id));
+        poll.submitToAdmin();
         poll.takeSnapshot();
         expect(poll.canModifyParticipants(false)).toBe(true);
       }
@@ -310,6 +318,7 @@ describe('Poll Domain', () => {
       if (pollResult.success) {
         const poll = pollResult.value;
         poll.addQuestion(createQuestionWithAnswer(poll.id));
+        poll.submitToAdmin();
         poll.takeSnapshot();
         expect(poll.canModifyParticipants(true)).toBe(false);
       }
@@ -459,6 +468,7 @@ describe('Poll Domain', () => {
       poll.addQuestion(question);
 
       // Activate through state machine
+      poll.submitToAdmin();
       poll.takeSnapshot();
       poll.activate();
 
@@ -494,6 +504,7 @@ describe('Poll Domain', () => {
       poll.addQuestion(question);
 
       // Finish through state machine
+      poll.submitToAdmin();
       poll.takeSnapshot();
       poll.activate();
       poll.finish();
@@ -602,18 +613,97 @@ describe('Poll Domain', () => {
       });
     });
 
-    describe('takeSnapshot (DRAFT → READY)', () => {
-      it('should transition from DRAFT to READY', () => {
-        const pollResult = Poll.create(
+    function draftWithQuestion() {
+      const poll = Poll.create(
+        'Test Poll',
+        'Test Description',
+        'board-1',
+        'user-1',
+        new Date('2026-01-15'),
+        new Date('2026-02-15')
+      ).value;
+      poll.addQuestion(createQuestionWithAnswer(poll.id));
+
+      return poll;
+    }
+
+    describe('submitToAdmin (DRAFT → SUBMITTED)', () => {
+      it('should transition from DRAFT to SUBMITTED', () => {
+        const poll = draftWithQuestion();
+
+        const result = poll.submitToAdmin();
+
+        expect(result.success).toBe(true);
+        expect(poll.state).toBe(PollState.SUBMITTED);
+      });
+
+      // Caught here rather than at snapshot so the author sees it while the
+      // poll is still theirs to fix.
+      it('should fail if poll has no questions', () => {
+        const poll = Poll.create(
           'Test Poll',
           'Test Description',
           'board-1',
           'user-1',
           new Date('2026-01-15'),
           new Date('2026-02-15')
-        );
-        const poll = pollResult.value;
-        poll.addQuestion(createQuestionWithAnswer(poll.id));
+        ).value;
+
+        const result = poll.submitToAdmin();
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(PollDomainCodes.POLL_NO_QUESTIONS);
+      });
+
+      it('should fail if the poll was already submitted', () => {
+        const poll = draftWithQuestion();
+        poll.submitToAdmin();
+
+        const result = poll.submitToAdmin();
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_DRAFT);
+      });
+    });
+
+    describe('returnToDraft (SUBMITTED → DRAFT)', () => {
+      it('should transition from SUBMITTED back to DRAFT', () => {
+        const poll = draftWithQuestion();
+        poll.submitToAdmin();
+
+        const result = poll.returnToDraft();
+
+        expect(result.success).toBe(true);
+        expect(poll.state).toBe(PollState.DRAFT);
+      });
+
+      // The author's recall window closes once an admin has frozen
+      // participants; from READY the way back is discardSnapshot.
+      it('should fail once the poll is READY', () => {
+        const poll = draftWithQuestion();
+        poll.submitToAdmin();
+        poll.takeSnapshot();
+
+        const result = poll.returnToDraft();
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_SUBMITTED);
+      });
+
+      it('should fail on a poll that was never submitted', () => {
+        const poll = draftWithQuestion();
+
+        const result = poll.returnToDraft();
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_SUBMITTED);
+      });
+    });
+
+    describe('takeSnapshot (SUBMITTED → READY)', () => {
+      it('should transition from SUBMITTED to READY', () => {
+        const poll = draftWithQuestion();
+        poll.submitToAdmin();
 
         const result = poll.takeSnapshot();
 
@@ -621,45 +711,57 @@ describe('Poll Domain', () => {
         expect(poll.state).toBe(PollState.READY);
       });
 
-      it('should fail if poll has no questions', () => {
-        const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
-        );
-        const poll = pollResult.value;
+      // The regression this state exists to prevent: an admin freezing a poll
+      // whose author has not handed it over.
+      it('should refuse a draft the author has not submitted', () => {
+        const poll = draftWithQuestion();
 
         const result = poll.takeSnapshot();
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(PollDomainCodes.POLL_NO_QUESTIONS);
+        expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_SUBMITTED);
+        expect(poll.state).toBe(PollState.DRAFT);
       });
 
-      it('should fail if poll is not in DRAFT state', () => {
-        const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
-        );
-        const poll = pollResult.value;
-        poll.addQuestion(createQuestionWithAnswer(poll.id));
+      it('should fail if poll is already READY', () => {
+        const poll = draftWithQuestion();
+        poll.submitToAdmin();
         poll.takeSnapshot();
 
         const result = poll.takeSnapshot();
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_DRAFT);
+        expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_SUBMITTED);
       });
     });
 
-    describe('discardSnapshot (READY → DRAFT)', () => {
-      it('should transition from READY to DRAFT when no votes', () => {
+    describe('content lock while submitted', () => {
+      it('refuses edits until the poll is recalled', () => {
+        const poll = draftWithQuestion();
+        poll.submitToAdmin();
+
+        const result = poll.updateTitle('Changed behind the admin');
+
+        expect(result.success).toBe(false);
+        expect(result.error).toBe(PollDomainCodes.POLL_CANNOT_UPDATE_SUBMITTED);
+        expect(poll.canEdit(false).value).toBe(false);
+      });
+
+      it('allows edits again after a recall', () => {
+        const poll = draftWithQuestion();
+        poll.submitToAdmin();
+        poll.returnToDraft();
+
+        expect(poll.updateTitle('Changed after recall').success).toBe(true);
+        expect(poll.canEdit(false).value).toBe(true);
+      });
+    });
+
+    describe('discardSnapshot (READY → SUBMITTED)', () => {
+      // Undoing the freeze is the admin's to undo; the handover is not. A poll
+      // dropped to DRAFT here would revoke the author's submission behind
+      // their back and leave them waiting on a poll they had already sent.
+      it('should return to SUBMITTED when no votes, not to DRAFT', () => {
         const pollResult = Poll.create(
           'Test Poll',
           'Test Description',
@@ -670,12 +772,34 @@ describe('Poll Domain', () => {
         );
         const poll = pollResult.value;
         poll.addQuestion(createQuestionWithAnswer(poll.id));
+        poll.submitToAdmin();
         poll.takeSnapshot();
 
         const result = poll.discardSnapshot(false);
 
         expect(result.success).toBe(true);
-        expect(poll.state).toBe(PollState.DRAFT);
+        expect(poll.state).toBe(PollState.SUBMITTED);
+      });
+
+      // And the poll is immediately re-freezable, without the author having to
+      // submit it a second time.
+      it('leaves the poll ready to be frozen again', () => {
+        const pollResult = Poll.create(
+          'Test Poll',
+          'Test Description',
+          'board-1',
+          'user-1',
+          new Date('2026-01-15'),
+          new Date('2026-02-15')
+        );
+        const poll = pollResult.value;
+        poll.addQuestion(createQuestionWithAnswer(poll.id));
+        poll.submitToAdmin();
+        poll.takeSnapshot();
+        poll.discardSnapshot(false);
+
+        expect(poll.takeSnapshot().success).toBe(true);
+        expect(poll.state).toBe(PollState.READY);
       });
 
       it('should fail if poll has votes', () => {
@@ -689,6 +813,7 @@ describe('Poll Domain', () => {
         );
         const poll = pollResult.value;
         poll.addQuestion(createQuestionWithAnswer(poll.id));
+        poll.submitToAdmin();
         poll.takeSnapshot();
 
         const result = poll.discardSnapshot(true);
@@ -729,6 +854,7 @@ describe('Poll Domain', () => {
         );
         const poll = pollResult.value;
         poll.addQuestion(createQuestionWithAnswer(poll.id));
+        poll.submitToAdmin();
         poll.takeSnapshot();
 
         const result = poll.activate();
@@ -767,6 +893,7 @@ describe('Poll Domain', () => {
         );
         const poll = pollResult.value;
         poll.addQuestion(createQuestionWithAnswer(poll.id));
+        poll.submitToAdmin();
         poll.takeSnapshot();
         poll.activate();
 
@@ -806,6 +933,7 @@ describe('Poll Domain', () => {
         );
         const poll = pollResult.value;
         poll.addQuestion(createQuestionWithAnswer(poll.id));
+        poll.submitToAdmin();
         poll.takeSnapshot();
         poll.activate();
 
@@ -845,6 +973,7 @@ describe('Poll Domain', () => {
         );
         const poll = pollResult.value;
         poll.addQuestion(createQuestionWithAnswer(poll.id));
+        poll.submitToAdmin();
         poll.takeSnapshot();
 
         expect(poll.canModifyParticipants(false)).toBe(true);
@@ -861,6 +990,7 @@ describe('Poll Domain', () => {
         );
         const poll = pollResult.value;
         poll.addQuestion(createQuestionWithAnswer(poll.id));
+        poll.submitToAdmin();
         poll.takeSnapshot();
 
         expect(poll.canModifyParticipants(true)).toBe(false);
@@ -891,6 +1021,7 @@ describe('Poll Domain', () => {
         );
         const poll = pollResult.value;
         poll.addQuestion(createQuestionWithAnswer(poll.id));
+        poll.submitToAdmin();
         poll.takeSnapshot();
         poll.activate();
 
@@ -908,6 +1039,7 @@ describe('Poll Domain', () => {
         );
         const poll = pollResult.value;
         poll.addQuestion(createQuestionWithAnswer(poll.id));
+        poll.submitToAdmin();
         poll.takeSnapshot();
         poll.activate();
         poll.finish();
@@ -931,6 +1063,7 @@ describe('Poll Domain', () => {
 
         expect(poll.isActive()).toBe(false);
 
+        poll.submitToAdmin();
         poll.takeSnapshot();
         expect(poll.isActive()).toBe(false);
 
@@ -955,6 +1088,7 @@ describe('Poll Domain', () => {
 
         expect(poll.isFinished()).toBe(false);
 
+        poll.submitToAdmin();
         poll.takeSnapshot();
         expect(poll.isFinished()).toBe(false);
 
@@ -979,6 +1113,7 @@ describe('Poll Domain', () => {
 
         expect(poll.isReady()).toBe(false);
 
+        poll.submitToAdmin();
         poll.takeSnapshot();
         expect(poll.isReady()).toBe(true);
 
@@ -1000,6 +1135,7 @@ describe('Poll Domain', () => {
 
         expect(poll.isDraft()).toBe(true);
 
+        poll.submitToAdmin();
         poll.takeSnapshot();
         expect(poll.isDraft()).toBe(false);
       });
@@ -1684,6 +1820,7 @@ describe('Poll type', () => {
     it('should fail to add an attachment once the poll is active', () => {
       const poll = draftPoll();
       poll.addQuestion(createQuestionWithAnswer(poll.id));
+      poll.submitToAdmin();
       poll.takeSnapshot();
       poll.activate();
 
@@ -1699,6 +1836,7 @@ describe('Poll type', () => {
       const poll = draftPoll();
       poll.addAttachment('att1');
       poll.addQuestion(createQuestionWithAnswer(poll.id));
+      poll.submitToAdmin();
       poll.takeSnapshot();
       poll.activate();
 

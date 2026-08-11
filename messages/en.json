@@ -625,6 +625,25 @@
     "pollsPerPage": "Polls per page",
     "draft": "Draft",
     "ready": "Ready",
+    "submitted": "Awaiting admin",
+    "submit": {
+      "send": "Send to admin",
+      "sending": "Sending…",
+      "sent": "Sent to admin",
+      "confirmSend": "Send this poll to the administrators? You will not be able to edit it until you recall it.",
+      "recall": "Recall",
+      "recalling": "Recalling…",
+      "recalled": "Recalled — the poll is a draft again",
+      "confirmRecall": "Recall this poll from the administrators and reopen it for editing?",
+      "returnToAuthor": "Return to author",
+      "returning": "Returning…",
+      "returned": "Returned to the author",
+      "confirmReturn": "Send this poll back to its author for changes?",
+      "awaitingAdminHint": "Sent to the administrators. Recall it to make changes.",
+      "draftHint": "Only you can see this as a draft. Send it to an admin when it is ready.",
+      "copyLink": "Copy link for admin",
+      "linkCopied": "Link copied — send it to an administrator"
+    },
     "noPollsYet": "No polls created yet",
     "noBoardMembership": "You must be a member of a board to create polls. Join an organization and become a board member first.",
     "noOrgMembership": "You must be a member of an organization to create polls. Join an organization first.",
@@ -659,10 +678,10 @@
       "markingReady": "Marking as ready...",
       "markedReady": "Poll marked as ready",
       "confirmMarkReady": "Mark this poll ready to activate?",
-      "backToDraft": "Back to draft",
-      "returningToDraft": "Returning to draft...",
-      "returnedToDraft": "Poll returned to draft",
-      "confirmBackToDraft": "Return this poll to draft?",
+      "backToReview": "Back to review",
+      "returningToReview": "Returning...",
+      "returnedToReview": "Poll returned to the administrators",
+      "confirmBackToReview": "Undo the ready state and send this poll back for review?",
       "readyHint": "Anyone verified can vote — no participant list."
     },
     "publicPreview": {
@@ -742,6 +761,7 @@
       "cannotModifyFinished": "Cannot modify a finished poll",
       "cannotModifyActive": "Cannot modify an active poll",
       "cannotModifyHasVotes": "Cannot modify a poll that has votes",
+      "cannotModifySubmitted": "Recall the poll from the administrators before editing it",
       "notPollCreator": "Only the poll creator can edit it",
       "notBoardMember": "You must be a board member to create polls",
       "notOrgMember": "You must be an organization member to create polls",
@@ -1107,6 +1127,14 @@
         "title": "Poll is now active",
         "body": "Voting has started for \"{pollTitle}\""
       },
+      "pollSubmitted": {
+        "title": "A poll is waiting for review",
+        "body": "\"{pollTitle}\" has been sent to the administrators"
+      },
+      "pollReturnedToDraft": {
+        "title": "A poll was sent back for changes",
+        "body": "\"{pollTitle}\" was returned to you by an administrator"
+      },
       "pollFinished": {
         "title": "Poll has ended",
         "body": "Voting has ended for \"{pollTitle}\""
@@ -1215,6 +1243,8 @@
         "viewParentRequests": "View parent requests",
         "voteNow": "Vote now",
         "viewResults": "View results",
+        "reviewPoll": "Review poll",
+        "editPoll": "Edit poll",
         "respondToInvite": "Respond to invitation",
         "viewBoard": "View board",
         "viewPropertyClaims": "View property claims",
@@ -1334,6 +1364,8 @@
       "singleChoiceMultipleAnswers": "Single-choice questions can only have one answer",
       "mustBeDraft": "Poll must be in draft state",
       "mustBeReady": "Poll must be in ready state",
+      "mustBeSubmitted": "Poll must be submitted to an administrator first",
+      "cannotUpdateSubmitted": "Recall the poll from the administrators before editing it",
       "mustBeActive": "Poll must be in active state",
       "cannotDiscardSnapshotHasVotes": "Cannot discard participants - poll already has votes",
       "pollFinished": "Poll has already finished",

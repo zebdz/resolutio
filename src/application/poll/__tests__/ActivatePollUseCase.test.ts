@@ -496,6 +496,7 @@ function createReadyPoll(id: string, boardId: string, createdBy: string): Poll {
   poll.addQuestion(question);
 
   // Take snapshot to move to READY state
+  poll.submitToAdmin();
   poll.takeSnapshot();
 
   return poll;
@@ -777,6 +778,7 @@ describe('ActivatePollUseCase', () => {
       (question as any).props.id = 'question-open-1';
       question.addAnswer(Answer.create('Answer 1', 1, question.id).value);
       poll.addQuestion(question);
+      poll.submitToAdmin();
       poll.takeSnapshot();
 
       return poll;

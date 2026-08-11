@@ -50,6 +50,7 @@ describe('DiscardSnapshotUseCase', () => {
     const answerResult = Answer.create('Answer 1', 1, question.id);
     question.addAnswer(answerResult.value);
     poll.addQuestion(question);
+    poll.submitToAdmin();
     poll.takeSnapshot();
 
     pollRepository = {
