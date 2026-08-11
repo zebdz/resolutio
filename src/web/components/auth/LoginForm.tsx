@@ -18,6 +18,7 @@ import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { loginAction } from '@/src/web/actions/auth/auth';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/16/solid';
 import { TurnstileWidget } from '@/web/components/auth/TurnstileWidget';
+import { isCaptchaRequired } from '@/web/components/auth/captchaRequired';
 
 export function LoginForm() {
   const t = useTranslations('auth');
@@ -189,7 +190,7 @@ export function LoginForm() {
         type="submit"
         color="brand-green"
         className="w-full"
-        disabled={isPending || !captchaToken}
+        disabled={isPending || (isCaptchaRequired() && !captchaToken)}
       >
         {isPending ? t('login.signingIn') : t('login.submit')}
       </Button>
