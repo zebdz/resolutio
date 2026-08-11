@@ -28,6 +28,7 @@ import {
 import { BlockUserDialog } from './BlockUserDialog';
 import { BlockHistoryDialog } from './BlockHistoryDialog';
 import { UserPollsDialog } from './UserPollsDialog';
+import { ResetPasswordDialog } from './ResetPasswordDialog';
 import { User } from '@/domain/user/User';
 import { Link } from '@/src/i18n/routing';
 
@@ -84,6 +85,8 @@ export function UserManagementPanel({
     totalCount: number;
   }>({ polls: [], totalCount: 0 });
   const [pollsLoading, setPollsLoading] = useState(false);
+  const [passwordTarget, setPasswordTarget] =
+    useState<SerializedAdminUserResult | null>(null);
 
   // Org combobox state
   const [orgOptions, setOrgOptions] = useState<{ id: string; name: string }[]>(
@@ -454,6 +457,15 @@ export function UserManagementPanel({
                     {t('history')}
                   </Button>
 
+                  {/* Password reset button */}
+                  <Button
+                    plain
+                    onClick={() => setPasswordTarget(user)}
+                    className="text-xs"
+                  >
+                    {t('changePassword')}
+                  </Button>
+
                   {/* Block status + action */}
                   {user.blockStatus?.blocked ? (
                     <>
@@ -653,6 +665,17 @@ export function UserManagementPanel({
             </Button>
           </DialogActions>
         </Dialog>
+      )}
+
+      {/* Password reset dialog */}
+      {passwordTarget && (
+        <ResetPasswordDialog
+          isOpen={true}
+          onClose={() => setPasswordTarget(null)}
+          userId={passwordTarget.id}
+          userName={getUserName(passwordTarget)}
+          nickname={passwordTarget.nickname}
+        />
       )}
 
       {/* Polls dialog */}

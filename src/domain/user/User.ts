@@ -352,6 +352,22 @@ export class User {
     });
   }
 
+  /**
+   * Replace the stored credential. Takes an already-hashed password —
+   * hashing belongs to infrastructure, so the domain never sees the
+   * plaintext.
+   */
+  changePassword(hashedPassword: string): User {
+    if (!hashedPassword?.trim()) {
+      throw new Error(UserDomainCodes.PASSWORD_REQUIRED);
+    }
+
+    return new User({
+      ...this.props,
+      password: hashedPassword,
+    });
+  }
+
   updateNickname(nickname: Nickname): User {
     return new User({
       ...this.props,

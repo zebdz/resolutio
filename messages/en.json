@@ -1706,7 +1706,19 @@
       "privacyEnabled": "Yes",
       "privacyDisabled": "No",
       "loadMore": "Load more",
-      "clearFilters": "Clear all filters"
+      "clearFilters": "Clear all filters",
+      "changePassword": "Change Password",
+      "changePasswordTitle": "Change Password",
+      "changePasswordDescription": "Generate a new password for {name}. This signs them out on every device — they will have to sign in again with the new password.",
+      "changePasswordDone": "{name} now has a new password and has been signed out everywhere.",
+      "generatePassword": "Generate new password",
+      "generatingPassword": "Generating...",
+      "passwordShownOnce": "Copy this password now — it is shown only once and cannot be retrieved later.",
+      "passwordResetFailed": "Could not change the password",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFailed": "Could not copy automatically — select the password and copy it manually",
+      "close": "Close"
     },
     "blockedIps": {
       "title": "Blocked IPs",

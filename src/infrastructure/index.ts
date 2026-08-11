@@ -30,6 +30,7 @@ export { PrismaReportAttachmentRepository } from './repositories/PrismaReportAtt
 // Auth
 export { Argon2PasswordHasher } from './auth/Argon2PasswordHasher';
 export { Argon2PasswordVerifier } from './auth/Argon2PasswordVerifier';
+export { CryptoPasswordGenerator } from './auth/CryptoPasswordGenerator';
 export { OtpCodeHasherImpl } from './auth/OtpCodeHasherImpl';
 export { StubSmsOtpDeliveryChannel } from './auth/StubSmsOtpDeliveryChannel';
 export { SmsRuOtpDeliveryChannel } from './auth/SmsRuOtpDeliveryChannel';
