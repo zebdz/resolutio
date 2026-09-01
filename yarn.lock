@@ -1789,6 +1789,13 @@
   dependencies:
     undici-types "~6.21.0"
 
+"@types/nodemailer@^8.0.1":
+  version "8.0.1"
+  resolved "https://registry.yarnpkg.com/@types/nodemailer/-/nodemailer-8.0.1.tgz#4ef2b4e62c819225a0b8a6384bf750c0c664d465"
+  integrity sha512-PxpaInm8V1JQDd4j0ds5HfvWQk8JupS1C0Picb96QJsrrRDjBH+DlK7L4ZdNSqNULhiZRQHc40nLVShaGxXAMw==
+  dependencies:
+    "@types/node" "*"
+
 "@types/pdfkit@*":
   version "0.17.5"
   resolved "https://registry.yarnpkg.com/@types/pdfkit/-/pdfkit-0.17.5.tgz#4de2ae5fb460c8fbd91f01cba8731b70c72f84dd"
@@ -5315,6 +5322,11 @@ node-releases@^2.0.27:
   version "2.0.27"
   resolved "https://registry.npmjs.org/node-releases/-/node-releases-2.0.27.tgz"
   integrity sha512-nmh3lCkYZ3grZvqcCH+fjmQ7X+H0OeZgP40OierEaAptX4XofMh5kwNbWh7lBduUzCcV/8kZ+NDLCwm2iorIlA==
+
+nodemailer@^9.1.0:
+  version "9.1.0"
+  resolved "https://registry.yarnpkg.com/nodemailer/-/nodemailer-9.1.0.tgz#a83be0fcbe356c359f7a15f4fdebea72b0edc7a5"
+  integrity sha512-xj1Ri5Sau3qpPffHJwi2bY0oWVVWYq62Ph17l+2v1xXpxjqTls3YPc3L8dub9mcJpxj+1ucNnuYVqLlgh4pmDA==
 
 normalize-path@^3.0.0:
   version "3.0.0"

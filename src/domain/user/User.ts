@@ -1,6 +1,7 @@
 import { PhoneNumber } from './PhoneNumber';
 import { Nickname } from './Nickname';
 import { Address } from './Address';
+import { EmailAddress } from './EmailAddress';
 import { UserDomainCodes } from './UserDomainCodes';
 import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
@@ -35,6 +36,8 @@ export interface UserProps {
   address?: Address;
   privacySetupCompleted: boolean;
   confirmedAt?: Date;
+  email?: EmailAddress;
+  emailConfirmedAt?: Date;
 }
 
 export interface PersonalInfoForPasswordCheck {
@@ -42,6 +45,7 @@ export interface PersonalInfoForPasswordCheck {
   lastName?: string;
   middleName?: string;
   phoneNumber?: string;
+  email?: string;
 }
 
 export function passwordMatchesPersonalInfo(
@@ -59,6 +63,24 @@ export function passwordMatchesPersonalInfo(
 
   for (const name of names) {
     if (lower === name.toLowerCase()) {
+      return true;
+    }
+  }
+
+  // The address and its local part, by equality — the same rule the names use.
+  // The local part is the identity half: "ivan.petrov" is as bad a password as
+  // the first name it is built from. The domain is deliberately NOT checked:
+  // it is shared by millions and is nobody's personal information.
+  if (info.email && info.email.trim().length > 0) {
+    const email = info.email.trim().toLowerCase();
+
+    if (lower === email) {
+      return true;
+    }
+
+    const at = email.indexOf('@');
+
+    if (at > 0 && lower === email.slice(0, at)) {
       return true;
     }
   }
@@ -103,10 +125,13 @@ export class User {
       | 'allowFindByAddress'
       | 'address'
       | 'privacySetupCompleted'
+      | 'email'
+      | 'emailConfirmedAt'
     > & {
       language?: Language;
       consentGivenAt?: Date;
       nickname?: Nickname;
+      email?: EmailAddress;
     },
     profanityChecker?: ProfanityChecker
   ): User {
@@ -179,6 +204,8 @@ export class User {
       allowFindByPhone: false,
       allowFindByAddress: false,
       privacySetupCompleted: false,
+      email: props.email,
+      emailConfirmedAt: undefined,
     });
   }
 
@@ -287,6 +314,47 @@ export class User {
     return new User({
       ...this.props,
       confirmedAt: new Date(),
+    });
+  }
+
+  get email(): EmailAddress | undefined {
+    return this.props.email;
+  }
+
+  get emailConfirmedAt(): Date | undefined {
+    return this.props.emailConfirmedAt;
+  }
+
+  hasConfirmedEmail(): boolean {
+    return !!this.props.email && this.props.emailConfirmedAt !== undefined;
+  }
+
+  /**
+   * Set the address, always unconfirmed. Re-setting the same address also
+   * clears confirmation: a new address must never inherit the previous one's
+   * confirmed status, or changing to an attacker-controlled address would
+   * yield an immediately reset-capable email.
+   */
+  changeEmail(email: EmailAddress): User {
+    return new User({
+      ...this.props,
+      email,
+      emailConfirmedAt: undefined,
+    });
+  }
+
+  confirmEmail(): User {
+    return new User({
+      ...this.props,
+      emailConfirmedAt: new Date(),
+    });
+  }
+
+  removeEmail(): User {
+    return new User({
+      ...this.props,
+      email: undefined,
+      emailConfirmedAt: undefined,
     });
   }
 

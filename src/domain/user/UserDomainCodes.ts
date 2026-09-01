@@ -15,6 +15,11 @@ export const UserDomainCodes = {
   CONSENT_REQUIRED: 'domain.user.consentRequired',
   PASSWORDS_MISMATCH: 'domain.user.passwordsMismatch',
   PASSWORD_MATCHES_PERSONAL_INFO: 'domain.user.passwordMatchesPersonalInfo',
+  EMAIL_INVALID: 'domain.user.emailInvalid',
+  EMAIL_TAKEN: 'domain.user.emailTaken',
+  EMAIL_NOT_SET: 'domain.user.emailNotSet',
+  EMAIL_NOT_CONFIRMED: 'domain.user.emailNotConfirmed',
+  EMAIL_ALREADY_CONFIRMED: 'domain.user.emailAlreadyConfirmed',
 } as const;
 
 export type UserDomainCode =

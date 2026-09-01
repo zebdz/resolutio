@@ -1,9 +1,23 @@
 export type OtpChannel = 'sms' | 'email';
 
+/**
+ * What a code was minted for. Without this, two codes issued to the same
+ * address on the same channel are indistinguishable rows, and a code sent to
+ * confirm an email address could be redeemed at the password-reset endpoint.
+ */
+export const OtpPurposes = {
+  PHONE_CONFIRMATION: 'phone_confirmation',
+  EMAIL_CONFIRMATION: 'email_confirmation',
+  PASSWORD_RESET: 'password_reset',
+} as const;
+
+export type OtpPurpose = (typeof OtpPurposes)[keyof typeof OtpPurposes];
+
 export interface OtpVerificationProps {
   id: string;
   identifier: string;
   channel: OtpChannel;
+  purpose: OtpPurpose;
   code: string; // hashed
   clientIp: string;
   attempts: number;
@@ -20,6 +34,7 @@ export class OtpVerification {
   static create(input: {
     identifier: string;
     channel: OtpChannel;
+    purpose: OtpPurpose;
     code: string;
     clientIp: string;
     expiresAt: Date;
@@ -30,6 +45,7 @@ export class OtpVerification {
       id: '',
       identifier: input.identifier,
       channel: input.channel,
+      purpose: input.purpose,
       code: input.code,
       clientIp: input.clientIp,
       attempts: 0,
@@ -53,6 +69,9 @@ export class OtpVerification {
   }
   get channel(): OtpChannel {
     return this.props.channel;
+  }
+  get purpose(): OtpPurpose {
+    return this.props.purpose;
   }
   get code(): string {
     return this.props.code;

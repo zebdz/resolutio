@@ -8,7 +8,12 @@ import { User } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
 import { Nickname } from '@/domain/user/Nickname';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
-import { OtpVerification, OtpChannel } from '@/domain/otp/OtpVerification';
+import {
+  OtpVerification,
+  OtpChannel,
+  OtpPurposes,
+} from '@/domain/otp/OtpVerification';
+import { EmailAddress } from '@/domain/user/EmailAddress';
 import { PasswordHasher } from '../RegisterUserUseCase';
 import { SessionRepository, Session } from '@/domain/user/SessionRepository';
 import { OtpCodeHasher } from '../OtpCodeHasher';
@@ -32,6 +37,14 @@ class MockUserRepository implements UserRepository {
 
   async findByIds(): Promise<User[]> {
     return [];
+  }
+
+  async findByEmail(email: EmailAddress): Promise<User | null> {
+    return (
+      Array.from(this.users.values()).find(
+        (u) => u.email?.getValue() === email.getValue()
+      ) || null
+    );
   }
 
   async findByPhoneNumber(phoneNumber: PhoneNumber): Promise<User | null> {
@@ -106,6 +119,10 @@ class MockUserRepository implements UserRepository {
 class MockOtpRepository implements OtpRepository {
   private otps: Map<string, OtpVerification> = new Map();
   private nextId = 1;
+
+  get saved(): OtpVerification[] {
+    return Array.from(this.otps.values());
+  }
 
   async save(otp: OtpVerification): Promise<OtpVerification> {
     const id = `otp-${this.nextId++}`;
@@ -509,6 +526,210 @@ describe('RegisterUserSchema', () => {
 
   it('should accept valid password not matching personal info', () => {
     const result = RegisterUserSchema.safeParse(validSchemaInput);
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('RegisterUserUseCase with an email address', () => {
+  let useCase: RegisterUserUseCase;
+  let userRepository: MockUserRepository;
+  let otpRepository: MockOtpRepository;
+  let sessionRepository: MockSessionRepository;
+  let passwordHasher: MockPasswordHasher;
+  let otpCodeHasher: MockOtpCodeHasher;
+  let smsChannel: MockOtpDeliveryChannel;
+  let emailChannel: MockOtpDeliveryChannel;
+
+  const validInput = {
+    firstName: 'John',
+    lastName: 'Doe',
+    phoneNumber: '+79161234567',
+    password: 'securepass',
+    language: 'ru' as const,
+    consentGiven: true,
+    clientIp: '127.0.0.1',
+  };
+
+  beforeEach(() => {
+    userRepository = new MockUserRepository();
+    otpRepository = new MockOtpRepository();
+    sessionRepository = new MockSessionRepository();
+    passwordHasher = new MockPasswordHasher();
+    otpCodeHasher = new MockOtpCodeHasher();
+    smsChannel = new MockOtpDeliveryChannel();
+    emailChannel = new MockOtpDeliveryChannel();
+    emailChannel.channel = 'email';
+
+    useCase = new RegisterUserUseCase({
+      userRepository,
+      passwordHasher,
+      otpRepository,
+      sessionRepository,
+      otpCodeHasher,
+      deliveryChannel: smsChannel,
+      emailDeliveryChannel: emailChannel,
+    });
+  });
+
+  it('stores the address unconfirmed and normalized', async () => {
+    const result = await useCase.execute({
+      ...validInput,
+      email: 'John@Mail.RU',
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.user.email?.getValue()).toBe('john@mail.ru');
+      expect(result.value.user.hasConfirmedEmail()).toBe(false);
+    }
+  });
+
+  it('issues an email_confirmation code alongside the phone code', async () => {
+    await useCase.execute({ ...validInput, email: 'john@mail.ru' });
+
+    const purposes = otpRepository.saved.map((o) => o.purpose);
+
+    expect(purposes).toContain(OtpPurposes.PHONE_CONFIRMATION);
+    expect(purposes).toContain(OtpPurposes.EMAIL_CONFIRMATION);
+  });
+
+  it('sends the email code to the address, not the phone', async () => {
+    await useCase.execute({ ...validInput, email: 'john@mail.ru' });
+
+    const emailOtp = otpRepository.saved.find(
+      (o) => o.purpose === OtpPurposes.EMAIL_CONFIRMATION
+    );
+
+    expect(emailOtp?.identifier).toBe('john@mail.ru');
+    expect(emailOtp?.channel).toBe('email');
+  });
+
+  it('registers normally when no email is given', async () => {
+    const result = await useCase.execute(validInput);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.user.email).toBeUndefined();
+    }
+
+    const purposes = otpRepository.saved.map((o) => o.purpose);
+    expect(purposes).not.toContain(OtpPurposes.EMAIL_CONFIRMATION);
+  });
+
+  it('treats an empty email string as no email', async () => {
+    const result = await useCase.execute({ ...validInput, email: '' });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.user.email).toBeUndefined();
+    }
+  });
+
+  it('rejects an invalid address', async () => {
+    const result = await useCase.execute({
+      ...validInput,
+      email: 'not-an-email',
+    });
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error).toBe(UserDomainCodes.EMAIL_INVALID);
+    }
+  });
+
+  it('rejects an address already used by another account', async () => {
+    const existing = User.reconstitute({
+      id: 'user-99',
+      firstName: 'Petr',
+      lastName: 'Petrov',
+      phoneNumber: PhoneNumber.create('+79997654321'),
+      password: 'hash',
+      language: 'ru',
+      createdAt: new Date('2026-01-01'),
+      nickname: Nickname.create('petr_petrov'),
+    }).changeEmail(EmailAddress.create('john@mail.ru'));
+    userRepository.addUser(existing);
+
+    const result = await useCase.execute({
+      ...validInput,
+      email: 'john@mail.ru',
+    });
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error).toBe(UserDomainCodes.EMAIL_TAKEN);
+    }
+  });
+
+  // Registration must not die because a mail server is down; the phone flow is
+  // what actually gates the account.
+  it('still registers when the confirmation email cannot be sent', async () => {
+    emailChannel.shouldSucceed = false;
+
+    const result = await useCase.execute({
+      ...validInput,
+      email: 'john@mail.ru',
+    });
+
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('RegisterUserSchema — password vs. the supplied email', () => {
+  const base = {
+    firstName: 'John',
+    lastName: 'Doe',
+    phoneNumber: '+79161234567',
+    language: 'ru' as const,
+    consentGiven: true as const,
+  };
+
+  it.each([
+    ['the full address', 'ivan.petrov@mail.ru'],
+    ['the local part', 'ivan.petrov'],
+  ])('rejects a password equal to %s', (_label, password) => {
+    const result = RegisterUserSchema.safeParse({
+      ...base,
+      email: 'ivan.petrov@mail.ru',
+      password,
+      confirmPassword: password,
+    });
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(
+        result.error.issues.some(
+          (i) => i.message === UserDomainCodes.PASSWORD_MATCHES_PERSONAL_INFO
+        )
+      ).toBe(true);
+    }
+  });
+
+  it('accepts an unrelated password alongside an email', () => {
+    const result = RegisterUserSchema.safeParse({
+      ...base,
+      email: 'ivan.petrov@mail.ru',
+      password: 'Korova-Zabor-71',
+      confirmPassword: 'Korova-Zabor-71',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('still accepts a password that merely contains the local part', () => {
+    const result = RegisterUserSchema.safeParse({
+      ...base,
+      email: 'ivan@mail.ru',
+      password: 'ivan-Korova-Zabor-71',
+      confirmPassword: 'ivan-Korova-Zabor-71',
+    });
+
     expect(result.success).toBe(true);
   });
 });

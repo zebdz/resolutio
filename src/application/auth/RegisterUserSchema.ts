@@ -6,6 +6,7 @@ import {
   PASSWORD_MIN_LENGTH,
   passwordMatchesPersonalInfo,
 } from '../../domain/user/User';
+import { EMAIL_MAX_LENGTH, EMAIL_REGEX } from '../../domain/user/EmailAddress';
 import { UserDomainCodes } from '../../domain/user/UserDomainCodes';
 import { SharedDomainCodes } from '../../domain/shared/SharedDomainCodes';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
@@ -44,6 +45,16 @@ export const registerUserSchema = (profanityChecker: ProfanityChecker) =>
       phoneNumber: z
         .string()
         .regex(PHONE_NUMBER_REGEX, UserDomainCodes.PHONE_NUMBER_INVALID),
+      // Optional. An empty string means "not provided" — the field is always
+      // present in the form payload even when the user leaves it blank.
+      email: z
+        .string()
+        .trim()
+        .toLowerCase()
+        .max(EMAIL_MAX_LENGTH, UserDomainCodes.EMAIL_INVALID)
+        .regex(EMAIL_REGEX, UserDomainCodes.EMAIL_INVALID)
+        .optional()
+        .or(z.literal('')),
       password: z
         .string()
         .min(PASSWORD_MIN_LENGTH, UserDomainCodes.PASSWORD_TOO_SHORT),
@@ -60,6 +71,7 @@ export const registerUserSchema = (profanityChecker: ProfanityChecker) =>
           lastName: data.lastName,
           middleName: data.middleName || undefined,
           phoneNumber: data.phoneNumber,
+          email: data.email || undefined,
         }),
       {
         message: UserDomainCodes.PASSWORD_MATCHES_PERSONAL_INFO,

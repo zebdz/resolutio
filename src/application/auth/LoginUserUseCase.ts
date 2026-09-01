@@ -3,7 +3,7 @@ import { PhoneNumber } from '@/domain/user/PhoneNumber';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { SessionRepository, Session } from '@/domain/user/SessionRepository';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
-import { OtpVerification } from '@/domain/otp/OtpVerification';
+import { OtpPurposes, OtpVerification } from '@/domain/otp/OtpVerification';
 import { OtpCode } from '@/domain/otp/OtpCode';
 import { Result, success, failure } from '@/domain/shared/Result';
 import { OtpCodeHasher } from './OtpCodeHasher';
@@ -112,6 +112,7 @@ export class LoginUserUseCase {
       const otpVerification = OtpVerification.create({
         identifier: phoneNumber.getValue(),
         channel: this.deliveryChannel.channel,
+        purpose: OtpPurposes.PHONE_CONFIRMATION,
         code: hashedCode,
         clientIp: input.ipAddress,
         expiresAt: otpExpiresAt,
@@ -124,7 +125,8 @@ export class LoginUserUseCase {
         phoneNumber.getValue(),
         code.getValue(),
         user.language,
-        input.ipAddress
+        input.ipAddress,
+        OtpPurposes.PHONE_CONFIRMATION
       );
 
       if (!deliveryResult.success) {

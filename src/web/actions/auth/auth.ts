@@ -20,6 +20,7 @@ import {
   Argon2PasswordVerifier,
   OtpCodeHasherImpl,
   createSmsDeliveryChannelFromEnv,
+  createEmailDeliveryChannelFromEnv,
   TurnstileCaptchaVerifier,
   isCaptchaEnforced,
 } from '@/infrastructure/index';
@@ -108,6 +109,7 @@ const registerUserUseCase = new RegisterUserUseCase({
   sessionRepository,
   otpCodeHasher,
   deliveryChannel,
+  emailDeliveryChannel: createEmailDeliveryChannelFromEnv(),
   profanityChecker,
   expiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '10', 10),
 });
@@ -155,6 +157,7 @@ export async function registerAction(
       lastName: formData.get('lastName') as string,
       middleName: (formData.get('middleName') as string) || undefined,
       phoneNumber: formData.get('phoneNumber') as string,
+      email: (formData.get('email') as string) || undefined,
       password: formData.get('password') as string,
       confirmPassword: formData.get('confirmPassword') as string,
       language: (formData.get('language') as Locale) || defaultLocale,
