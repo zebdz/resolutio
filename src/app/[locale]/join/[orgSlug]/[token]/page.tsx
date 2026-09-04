@@ -15,6 +15,7 @@ import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { buildJoinUrl } from '@/web/lib/buildJoinUrl';
 import { JoinConfirmButton } from './JoinConfirmButton';
 import { SetReturnTo } from '@/web/components/shared/SetReturnTo';
+import { Linkify } from '@/web/components/linkify/Linkify';
 
 export async function generateMetadata({
   params,
@@ -149,7 +150,7 @@ export default async function JoinTokenPage({
           <div className="space-y-4">
             {data.organizationDescription && (
               <Text className="text-zinc-700 dark:text-zinc-300">
-                {data.organizationDescription}
+                <Linkify text={data.organizationDescription} />
               </Text>
             )}
             <Text className="text-sm text-zinc-500 dark:text-zinc-400">

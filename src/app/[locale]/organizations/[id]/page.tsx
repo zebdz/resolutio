@@ -22,6 +22,7 @@ import { getOrgMembersAction } from '@/src/web/actions/invitation/invitation';
 import { listOrgPropertiesForMemberAction } from '@/src/web/actions/organization/propertyClaim';
 import { PropertiesSection } from './PropertiesSection';
 import { ReportsSection } from '@/src/web/components/report/ReportsSection';
+import { Linkify } from '@/src/web/components/linkify/Linkify';
 import { User } from '@/domain/user/User';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);
@@ -148,7 +149,7 @@ export default async function OrganizationDetailPage({
             {t('description')}
           </Heading>
           <Text className="text-zinc-700 dark:text-zinc-300">
-            {organization.description}
+            <Linkify text={organization.description} />
           </Text>
         </div>
 
