@@ -5,7 +5,11 @@ import { OrganizationDomainCodes } from './OrganizationDomainCodes';
 
 export const ORGANIZATION_NAME_MIN_LENGTH = 1;
 export const ORGANIZATION_NAME_MAX_LENGTH = 255;
-export const ORGANIZATION_NAME_PATTERN = /^[\p{L}\p{N}\s\-"]+$/u;
+// Letters, digits, whitespace, hyphens, quotes and parentheses. The quote set
+// covers guillemets («») and typographic quotes as well as the ASCII one —
+// Russian names are written with guillemets, and Russian is the default
+// language. Parentheses carry qualifiers such as "(филиал №2)".
+export const ORGANIZATION_NAME_PATTERN = /^[\p{L}\p{N}\s\-"«»„“”‘’()]+$/u;
 export const ORGANIZATION_DESCRIPTION_MAX_LENGTH = 2000;
 
 export interface OrganizationProps {

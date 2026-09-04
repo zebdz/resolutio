@@ -1305,7 +1305,7 @@
       "organizationAlreadyArchived": "Organization is already archived",
       "organizationNotArchived": "Organization is not archived",
       "organizationNameTooShort": "Organization name must be at least {minLength, plural, =1 {1 character} other {# characters}}",
-      "organizationNameInvalidChars": "Organization name can only contain letters, numbers, spaces, hyphens, and double quotes",
+      "organizationNameInvalidChars": "Organization name can only contain letters, numbers, spaces, hyphens, quotes, and parentheses",
       "propertyNameEmpty": "Property name cannot be empty",
       "propertyAssetNameEmpty": "Asset name cannot be empty",
       "propertyAssetSizeNonPositive": "Asset size must be greater than zero",

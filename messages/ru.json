@@ -1305,7 +1305,7 @@
       "organizationAlreadyArchived": "Организация уже архивирована",
       "organizationNotArchived": "Организация не архивирована",
       "organizationNameTooShort": "Название организации должно содержать не менее {minLength, plural, =1 {1 символа} other {# символов}}",
-      "organizationNameInvalidChars": "Название организации может содержать только буквы, цифры, пробелы, дефисы и кавычки",
+      "organizationNameInvalidChars": "Название организации может содержать только буквы, цифры, пробелы, дефисы, кавычки и скобки",
       "propertyNameEmpty": "Название имущества не может быть пустым",
       "propertyAssetNameEmpty": "Название объекта не может быть пустым",
       "propertyAssetSizeNonPositive": "Размер объекта должен быть больше нуля",

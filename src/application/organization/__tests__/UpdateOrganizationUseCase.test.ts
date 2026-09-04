@@ -431,6 +431,48 @@ describe('UpdateOrganizationUseCase', () => {
     expect(result.success).toBe(true);
   });
 
+  it('should let an org keep a stored name the current rules would reject', async () => {
+    // Names predating ORGANIZATION_NAME_PATTERN can contain characters the
+    // pattern no longer allows. Re-validating an unchanged name would make
+    // those organizations impossible to edit at all.
+    const legacyName = 'Org <legacy> name';
+    organizationRepository.addOrganization(makeOrg('org-1', legacyName));
+    organizationRepository.setAdmin('org-1', 'admin-1');
+
+    const result = await useCase.execute({
+      organizationId: 'org-1',
+      userId: 'admin-1',
+      name: legacyName,
+      description: 'New Desc',
+    });
+
+    expect(result.success).toBe(true);
+
+    const updated = await organizationRepository.findById('org-1');
+    expect(updated!.name).toBe(legacyName);
+    expect(updated!.description).toBe('New Desc');
+  });
+
+  it('should still validate the name when it changes', async () => {
+    organizationRepository.addOrganization(makeOrg('org-1', 'Old Name'));
+    organizationRepository.setAdmin('org-1', 'admin-1');
+
+    const result = await useCase.execute({
+      organizationId: 'org-1',
+      userId: 'admin-1',
+      name: 'Renamed <bad>',
+      description: 'Desc',
+    });
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error).toBe(
+        'domain.organization.organizationNameInvalidChars'
+      );
+    }
+  });
+
   describe('allowMultiTreeMembership toggle', () => {
     it('should allow root org to enable multi-membership', async () => {
       organizationRepository.addOrganization(makeOrg('org-1'));

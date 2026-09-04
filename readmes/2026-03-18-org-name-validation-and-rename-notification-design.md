@@ -2,6 +2,10 @@
 
 ## 1. Org Name Validation
 
+> **Partly superseded** — the allowed character set and the re-validation
+> behaviour changed on 2026-09-04. See [Amendment](#amendment-2026-09-04) at the
+> end of this document.
+
 ### Rules
 
 - Min 1 character (after trim)
@@ -88,3 +92,53 @@
 - `src/web/utils/__tests__/notificationActionUrl.test.ts` — test new mapping
 - `messages/en.json` — new messages
 - `messages/ru.json` — new messages
+
+## Amendment 2026-09-04
+
+Two defects in the validation above surfaced when an admin tried to edit the
+description of an organization named
+`ТСЖ «Гвардейский 13» (демо поимённого протокола)` and got
+`organizationNameInvalidChars` — an error about a field they had not touched.
+
+### The character set was too narrow
+
+`/^[\p{L}\p{N}\s\-"]+$/u` allows only the ASCII `"`. It rejects `«` (U+00AB)
+and `»` (U+00BB) — the standard Russian quotation marks — while the RU message
+said only "кавычки", promising quotes without qualification in an app whose
+default language is Russian. Parentheses were rejected too, though they
+routinely carry qualifiers such as `(филиал №2)`.
+
+**Now:** `/^[\p{L}\p{N}\s\-"«»„“”‘’()]+$/u` — guillemets, typographic quotes and
+parentheses added. Still rejects `<>{}/\` and the rest.
+
+Both messages were reworded to match what the code accepts:
+
+- EN: "Organization name can only contain letters, numbers, spaces, hyphens,
+  quotes, and parentheses"
+- RU: "Название организации может содержать только буквы, цифры, пробелы,
+  дефисы, кавычки и скобки"
+
+### Unchanged names were re-validated
+
+`UpdateOrganizationUseCase` called `organization.updateName(input.name)`
+unconditionally, so every edit re-checked the stored name against the current
+rules. Organizations created before 2026-03-18 could hold names that were legal
+then and are not now — and those became **impossible to edit at all**: the admin
+could not fix the description, and could not fix the name without also renaming
+it to satisfy the pattern.
+
+**Now:** `updateName()` runs only when `input.name.trim() !== organization.name`,
+reusing the flag the uniqueness check already needed. A rename to an invalid
+name still fails; leaving the name alone no longer can. `UpdateOrganizationUseCase`
+is the only caller of `updateName()`.
+
+Rule of thumb this establishes: **validate what the user submitted as a change,
+not what was already stored.** Tightening a rule must not strand existing rows.
+
+### Files modified
+
+- `src/domain/organization/Organization.ts` — widened `ORGANIZATION_NAME_PATTERN`
+- `src/domain/organization/__tests__/Organization.test.ts` — guillemets/parentheses accepted
+- `src/application/organization/UpdateOrganizationUseCase.ts` — validate name only when changed
+- `src/application/organization/__tests__/UpdateOrganizationUseCase.test.ts` — legacy name editable; rename still validated
+- `messages/en.json`, `messages/ru.json` — `organizationNameInvalidChars` reworded
