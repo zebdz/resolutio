@@ -8,7 +8,7 @@ import type {
   OtpDeliveryChannel,
   OtpDeliveryResult,
 } from '@/application/auth/OtpDeliveryChannel';
-import type { OtpChannel } from '@/domain/otp/OtpVerification';
+import type { OtpChannel, OtpPurpose } from '@/domain/otp/OtpVerification';
 import {
   SmsRuApiError,
   SmsRuNetworkError,
@@ -94,7 +94,10 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
     recipient: string,
     code: string,
     locale: string,
-    clientIp: string
+    clientIp: string,
+    // SMS copy does not vary by purpose yet — accepted to satisfy the
+    // interface, and available if that changes.
+    _purpose: OtpPurpose
   ): Promise<OtpDeliveryResult> {
     if (!clientIp) {
       this.logger.logError({

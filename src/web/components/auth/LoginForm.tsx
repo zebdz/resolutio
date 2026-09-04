@@ -179,6 +179,15 @@ export function LoginForm() {
         </Field>
       </FieldGroup>
 
+      <Text className="text-right text-sm">
+        <Link
+          href="/forgot-password"
+          className="font-semibold text-blue-600 hover:text-blue-500"
+        >
+          {t('login.forgotPassword')}
+        </Link>
+      </Text>
+
       <TurnstileWidget
         key={captchaResetKey}
         onSuccess={setCaptchaToken}

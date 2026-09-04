@@ -3,7 +3,11 @@ import { ConfirmPhoneUseCase } from '../ConfirmPhoneUseCase';
 import { OtpErrors } from '../OtpErrors';
 import { AuthErrors } from '../AuthErrors';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
-import { OtpVerification, OtpChannel } from '@/domain/otp/OtpVerification';
+import {
+  OtpVerification,
+  OtpPurpose,
+  OtpPurposes,
+} from '@/domain/otp/OtpVerification';
 import { OtpCodeHasher } from '../OtpCodeHasher';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { User } from '@/domain/user/User';
@@ -85,6 +89,10 @@ class MockUserRepository implements UserRepository {
     return null;
   }
 
+  async findByEmail(): Promise<User | null> {
+    return null;
+  }
+
   async findByNickname(): Promise<User | null> {
     return null;
   }
@@ -150,6 +158,7 @@ function makeOtp(
     id?: string;
     code?: string;
     userId?: string;
+    purpose?: OtpPurpose;
     expiresAt?: Date;
     verifiedAt?: Date | null;
     attempts?: number;
@@ -160,6 +169,7 @@ function makeOtp(
     id: overrides.id ?? 'otp-1',
     identifier: '+79161234567',
     channel: 'sms',
+    purpose: overrides.purpose ?? OtpPurposes.PHONE_CONFIRMATION,
     code: overrides.code ?? 'hashed-123456',
     clientIp: '127.0.0.1',
     attempts: overrides.attempts ?? 0,
@@ -167,7 +177,10 @@ function makeOtp(
     expiresAt: overrides.expiresAt ?? new Date(Date.now() + 10 * 60 * 1000),
     verifiedAt: overrides.verifiedAt ?? null,
     createdAt: new Date(),
-    userId: overrides.userId,
+    // Defaults to the user makeUser() builds. The column is non-nullable in
+    // the database, so leaving it undefined here modelled a row that cannot
+    // exist — and hid the missing ownership check.
+    userId: overrides.userId ?? 'user-1',
   });
 }
 
@@ -329,5 +342,63 @@ describe('ConfirmPhoneUseCase', () => {
 
     const otp = await otpRepository.findById('otp-1');
     expect(otp!.isVerified()).toBe(true);
+  });
+});
+
+describe('ConfirmPhoneUseCase OTP binding', () => {
+  let useCase: ConfirmPhoneUseCase;
+  let otpRepository: MockOtpRepository;
+  let otpCodeHasher: MockOtpCodeHasher;
+  let userRepository: MockUserRepository;
+
+  beforeEach(() => {
+    otpRepository = new MockOtpRepository();
+    otpCodeHasher = new MockOtpCodeHasher();
+    userRepository = new MockUserRepository();
+    userRepository.addUser(makeUser());
+
+    useCase = new ConfirmPhoneUseCase({
+      otpRepository,
+      otpCodeHasher,
+      userRepository,
+    });
+  });
+
+  it('rejects an OTP that belongs to a different user', async () => {
+    otpRepository.addOtp(makeOtp({ userId: 'someone-else' }));
+
+    const result = await useCase.execute({
+      userId: 'user-1',
+      otpId: 'otp-1',
+      code: '123456',
+    });
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error).toBe(OtpErrors.NOT_FOUND);
+    }
+
+    expect(userRepository.confirmedUserIds).not.toContain('user-1');
+  });
+
+  // The cross-purpose replay guard: a password-reset code must not be
+  // spendable on confirming a phone number.
+  it('rejects an OTP minted for a different purpose', async () => {
+    otpRepository.addOtp(makeOtp({ purpose: OtpPurposes.PASSWORD_RESET }));
+
+    const result = await useCase.execute({
+      userId: 'user-1',
+      otpId: 'otp-1',
+      code: '123456',
+    });
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error).toBe(OtpErrors.NOT_FOUND);
+    }
+
+    expect(userRepository.confirmedUserIds).not.toContain('user-1');
   });
 });

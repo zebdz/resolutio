@@ -1,5 +1,5 @@
 import { OtpRepository } from '@/domain/otp/OtpRepository';
-import { OtpVerification } from '@/domain/otp/OtpVerification';
+import { OtpPurposes, OtpVerification } from '@/domain/otp/OtpVerification';
 import { OtpCode } from '@/domain/otp/OtpCode';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { Result, success, failure } from '@/domain/shared/Result';
@@ -65,12 +65,14 @@ export class RequestConfirmationOtpUseCase {
       const recentCount = await this.otpRepository.countRecentByIdentifier(
         phone,
         this.deliveryChannel.channel,
+        OtpPurposes.PHONE_CONFIRMATION,
         THROTTLE_WINDOW_HOURS
       );
 
       const lastOtp = await this.otpRepository.findLatestByIdentifier(
         phone,
-        this.deliveryChannel.channel
+        this.deliveryChannel.channel,
+        OtpPurposes.PHONE_CONFIRMATION
       );
 
       const retryAfter = getRetryAfter(recentCount, lastOtp?.createdAt ?? null);
@@ -89,6 +91,7 @@ export class RequestConfirmationOtpUseCase {
       const otpVerification = OtpVerification.create({
         identifier: phone,
         channel: this.deliveryChannel.channel,
+        purpose: OtpPurposes.PHONE_CONFIRMATION,
         code: hashedCode,
         clientIp: input.clientIp,
         expiresAt,
@@ -102,7 +105,8 @@ export class RequestConfirmationOtpUseCase {
         phone,
         code.getValue(),
         user.language,
-        input.clientIp
+        input.clientIp,
+        OtpPurposes.PHONE_CONFIRMATION
       );
 
       if (!deliveryResult.success) {

@@ -8,6 +8,7 @@ import { Input } from '@/src/web/components/catalyst/input';
 import {
   Field,
   Label,
+  Description,
   FieldGroup,
 } from '@/src/web/components/catalyst/fieldset';
 import {
@@ -52,6 +53,7 @@ export function RegisterForm({ locale }: Props) {
     lastName: '',
     middleName: '',
     phoneNumber: '',
+    email: '',
     password: '',
     confirmPassword: '',
     consentGiven: false,
@@ -71,9 +73,11 @@ export function RegisterForm({ locale }: Props) {
       });
     }
 
-    // Re-validate password against personal info when name/phone changes
+    // Re-validate password against personal info when name/phone/email changes
     if (
-      ['firstName', 'lastName', 'middleName', 'phoneNumber'].includes(name) &&
+      ['firstName', 'lastName', 'middleName', 'phoneNumber', 'email'].includes(
+        name
+      ) &&
       formValues.password
     ) {
       const updatedInfo = {
@@ -81,6 +85,7 @@ export function RegisterForm({ locale }: Props) {
         lastName: name === 'lastName' ? value : formValues.lastName,
         middleName: name === 'middleName' ? value : formValues.middleName,
         phoneNumber: name === 'phoneNumber' ? value : formValues.phoneNumber,
+        email: name === 'email' ? value : formValues.email,
       };
 
       if (passwordMatchesPersonalInfo(formValues.password, updatedInfo)) {
@@ -170,6 +175,7 @@ export function RegisterForm({ locale }: Props) {
         lastName: formValues.lastName,
         middleName: formValues.middleName || undefined,
         phoneNumber: formValues.phoneNumber,
+        email: formValues.email || undefined,
       })
     ) {
       setFieldErrors((prev) => ({
@@ -206,6 +212,7 @@ export function RegisterForm({ locale }: Props) {
       lastName: formValues.lastName,
       middleName: formValues.middleName || undefined,
       phoneNumber: formValues.phoneNumber,
+      email: formValues.email || undefined,
     }) &&
     formValues.password === formValues.confirmPassword &&
     formValues.consentGiven;
@@ -220,6 +227,7 @@ export function RegisterForm({ locale }: Props) {
       formData.set('lastName', formValues.lastName);
       formData.set('middleName', formValues.middleName);
       formData.set('phoneNumber', formValues.phoneNumber);
+      formData.set('email', formValues.email);
       formData.set('password', formValues.password);
       formData.set('confirmPassword', formValues.confirmPassword);
       formData.set('language', locale);
@@ -363,6 +371,24 @@ export function RegisterForm({ locale }: Props) {
             <Text className="text-sm text-red-600">
               {fieldErrors.phoneNumber[0]}
             </Text>
+          )}
+        </Field>
+
+        <Field>
+          <Label>{t('register.email')}</Label>
+          <Input
+            name="email"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            value={formValues.email}
+            onChange={handleInputChange}
+            disabled={isPending}
+            invalid={!!fieldErrors.email}
+          />
+          <Description>{t('register.emailOptional')}</Description>
+          {fieldErrors.email && (
+            <Text className="text-sm text-red-600">{fieldErrors.email[0]}</Text>
           )}
         </Field>
 

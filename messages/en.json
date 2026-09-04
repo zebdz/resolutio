@@ -13,7 +13,8 @@
       "signingIn": "Signing in...",
       "noAccount": "Don't have an account?",
       "signUp": "Sign up",
-      "error": "Invalid phone number or password"
+      "error": "Invalid phone number or password",
+      "forgotPassword": "Forgot your password?"
     },
     "register": {
       "title": "Create Account",
@@ -50,7 +51,9 @@
         "fair": "Fair",
         "strong": "Strong",
         "veryStrong": "Very strong"
-      }
+      },
+      "email": "Email",
+      "emailOptional": "Optional. Lets you reset your password yourself if you forget it."
     },
     "logout": "Logout",
     "confirmPhone": {
@@ -68,6 +71,22 @@
       "invalidCredentials": "Invalid phone number or password",
       "phoneExists": "Phone number already registered",
       "missingIp": "Unable to determine your IP address"
+    },
+    "forgotPassword": {
+      "title": "Reset your password",
+      "subtitle": "We will email a one-time code to the confirmed address on your account.",
+      "identifierLabel": "Phone number or email",
+      "identifierHint": "Whichever you remember. The code goes to the confirmed email address on the account.",
+      "sendCode": "Send code",
+      "sending": "Sending...",
+      "codeSentNotice": "If an account matches, we have sent a code to its email address.",
+      "codeLabel": "Code from the email",
+      "newPasswordLabel": "New password",
+      "confirmPasswordLabel": "Repeat new password",
+      "resetPassword": "Set new password",
+      "resetting": "Saving...",
+      "back": "Use a different phone or email",
+      "backToLogin": "Back to sign in"
     }
   },
   "otp": {
@@ -216,7 +235,21 @@
     "privacySave": "Save Privacy Settings",
     "privacySaving": "Saving...",
     "privacySuccess": "Privacy settings updated successfully",
-    "logout": "Logout"
+    "logout": "Logout",
+    "email": {
+      "title": "Email address",
+      "description": "Optional. Once confirmed, it lets you reset your password yourself if you forget it.",
+      "label": "Email",
+      "none": "No email address on file",
+      "confirmedBadge": "Confirmed",
+      "unconfirmedBadge": "Not confirmed",
+      "codeLabel": "Confirmation code",
+      "codeHint": "Enter the code we emailed to that address.",
+      "confirm": "Confirm",
+      "resend": "Send again",
+      "codeSent": "We sent a confirmation code to that address",
+      "confirmed": "Email address confirmed"
+    }
   },
   "organization": {
     "title": "Organization",
@@ -1272,7 +1305,7 @@
       "organizationAlreadyArchived": "Organization is already archived",
       "organizationNotArchived": "Organization is not archived",
       "organizationNameTooShort": "Organization name must be at least {minLength, plural, =1 {1 character} other {# characters}}",
-      "organizationNameInvalidChars": "Organization name can only contain letters, numbers, spaces, hyphens, and double quotes",
+      "organizationNameInvalidChars": "Organization name can only contain letters, numbers, spaces, hyphens, quotes, and parentheses",
       "propertyNameEmpty": "Property name cannot be empty",
       "propertyAssetNameEmpty": "Asset name cannot be empty",
       "propertyAssetSizeNonPositive": "Asset size must be greater than zero",
@@ -1421,6 +1454,11 @@
       "consentRequired": "Consent is required",
       "passwordsMismatch": "Passwords don't match",
       "passwordMatchesPersonalInfo": "Password must not match your name or phone number",
+      "emailInvalid": "Enter a valid email address",
+      "emailTaken": "That email address is already in use",
+      "emailNotSet": "No email address on file",
+      "emailNotConfirmed": "That email address is not confirmed yet",
+      "emailAlreadyConfirmed": "That email address is already confirmed",
       "address": {
         "countryRequired": "Country is required",
         "cityRequired": "City is required",
@@ -2310,5 +2348,27 @@
   },
   "markdown": {
     "externalImageBlocked": "External image not allowed — upload it via the attachment uploader instead."
+  },
+  "email": {
+    "otp": {
+      "phoneConfirmation": {
+        "subject": "Your Resolutio confirmation code",
+        "body": "Your confirmation code is {code}. It expires in {minutes} minutes.\n\nIf you did not request it, ignore this message."
+      },
+      "emailConfirmation": {
+        "subject": "Confirm your Resolutio email address",
+        "body": "Your confirmation code is {code}. It expires in {minutes} minutes.\n\nIf you did not add this address to a Resolutio account, ignore this message."
+      },
+      "passwordReset": {
+        "subject": "Reset your Resolutio password",
+        "body": "Your password reset code is {code}. It expires in {minutes} minutes.\n\nIf you did not ask to reset your password, ignore this message — your password has not changed."
+      }
+    },
+    "notifications": {
+      "emailChanged": {
+        "subject": "The email address on your Resolutio account changed",
+        "body": "The email address on your account was changed to {newEmail}.\n\nIf this was not you, contact an administrator immediately — whoever made the change can now request password resets."
+      }
+    }
   }
 }

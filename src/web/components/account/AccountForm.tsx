@@ -15,6 +15,12 @@ import { Select } from '@/src/web/components/catalyst/select';
 import { Switch, SwitchField } from '@/src/web/components/catalyst/switch';
 import { AlertBanner } from '@/src/web/components/catalyst/alert-banner';
 import { updateProfileAction } from '@/src/web/actions/user/user';
+import {
+  updateEmailAction,
+  requestEmailConfirmationAction,
+  confirmEmailAction,
+} from '@/src/web/actions/user/email';
+import { Badge } from '@/src/web/components/catalyst/badge';
 import { Locale } from '@/src/i18n/locales';
 type Props = {
   user: {
@@ -29,6 +35,8 @@ type Props = {
     allowFindByName: boolean;
     allowFindByPhone: boolean;
     allowFindByAddress: boolean;
+    email: string | null;
+    emailConfirmed: boolean;
   };
 };
 
@@ -55,6 +63,17 @@ export function AccountForm({ user }: Props) {
     allowFindByPhone: user.allowFindByPhone,
     allowFindByAddress: user.allowFindByAddress,
   });
+
+  // --- Email form state ---
+  const [isEmailPending, startEmailTransition] = useTransition();
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
+  const [emailValue, setEmailValue] = useState(user.email ?? '');
+  const [pendingOtpId, setPendingOtpId] = useState<string | null>(null);
+  const [confirmCode, setConfirmCode] = useState('');
+
+  const emailChanged =
+    emailValue.trim().toLowerCase() !== (user.email ?? '').toLowerCase();
 
   const prefsChanged =
     prefValues.language !== user.language ||
@@ -138,6 +157,70 @@ export function AccountForm({ user }: Props) {
     });
   }
 
+  function handleEmailSave() {
+    setEmailError(null);
+    setEmailSuccess(null);
+
+    startEmailTransition(async () => {
+      const form = new FormData();
+      form.set('email', emailValue);
+
+      const result = await updateEmailAction(form);
+
+      if (!result.success) {
+        setEmailError(result.error);
+
+        return;
+      }
+
+      setPendingOtpId(result.data?.otpId ?? null);
+      setEmailSuccess(t('email.codeSent'));
+      router.refresh();
+    });
+  }
+
+  function handleResendCode() {
+    setEmailError(null);
+    setEmailSuccess(null);
+
+    startEmailTransition(async () => {
+      const result = await requestEmailConfirmationAction();
+
+      if (!result.success) {
+        setEmailError(result.error);
+
+        return;
+      }
+
+      setPendingOtpId(result.data.otpId);
+      setEmailSuccess(t('email.codeSent'));
+    });
+  }
+
+  function handleConfirmCode() {
+    setEmailError(null);
+    setEmailSuccess(null);
+
+    startEmailTransition(async () => {
+      const form = new FormData();
+      form.set('otpId', pendingOtpId ?? '');
+      form.set('code', confirmCode);
+
+      const result = await confirmEmailAction(form);
+
+      if (!result.success) {
+        setEmailError(result.error);
+
+        return;
+      }
+
+      setPendingOtpId(null);
+      setConfirmCode('');
+      setEmailSuccess(t('email.confirmed'));
+      router.refresh();
+    });
+  }
+
   return (
     <div className="space-y-8">
       {/* Preferences: language + nickname */}
@@ -185,6 +268,94 @@ export function AccountForm({ user }: Props) {
           </Button>
         </div>
       </form>
+
+      {/* Email: optional, confirmable — gates self-service password reset */}
+      <div className="border-t border-zinc-200 pt-8 dark:border-zinc-700">
+        <h3 className="mb-1 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+          {t('email.title')}
+        </h3>
+        <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
+          {t('email.description')}
+        </p>
+
+        {emailError && <AlertBanner color="red">{emailError}</AlertBanner>}
+        {emailSuccess && (
+          <AlertBanner color="green">{emailSuccess}</AlertBanner>
+        )}
+
+        <FieldGroup>
+          <Field>
+            <Label>{t('email.label')}</Label>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+              <Input
+                type="email"
+                name="email"
+                autoComplete="email"
+                inputMode="email"
+                value={emailValue}
+                onChange={(e) => setEmailValue(e.target.value)}
+                disabled={isEmailPending}
+                className="sm:flex-1"
+              />
+              <Button
+                type="button"
+                onClick={handleEmailSave}
+                disabled={isEmailPending || !emailChanged || !emailValue.trim()}
+                className="cursor-pointer disabled:cursor-not-allowed"
+              >
+                {isEmailPending ? t('saving') : t('save')}
+              </Button>
+            </div>
+            <Description>
+              {user.email ? (
+                user.emailConfirmed ? (
+                  <Badge color="green">{t('email.confirmedBadge')}</Badge>
+                ) : (
+                  <Badge color="amber">{t('email.unconfirmedBadge')}</Badge>
+                )
+              ) : (
+                t('email.none')
+              )}
+            </Description>
+          </Field>
+
+          {user.email && !user.emailConfirmed && (
+            <Field>
+              <Label>{t('email.codeLabel')}</Label>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                <Input
+                  name="code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={confirmCode}
+                  onChange={(e) => setConfirmCode(e.target.value)}
+                  disabled={isEmailPending}
+                  className="sm:flex-1"
+                />
+                <Button
+                  type="button"
+                  onClick={handleConfirmCode}
+                  disabled={isEmailPending || confirmCode.length !== 6}
+                  className="cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {t('email.confirm')}
+                </Button>
+                <Button
+                  type="button"
+                  plain
+                  onClick={handleResendCode}
+                  disabled={isEmailPending}
+                  className="cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {t('email.resend')}
+                </Button>
+              </div>
+              <Description>{t('email.codeHint')}</Description>
+            </Field>
+          )}
+        </FieldGroup>
+      </div>
 
       {/* Privacy settings: separate form */}
       <div className="border-t border-zinc-200 pt-8 dark:border-zinc-700">

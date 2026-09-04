@@ -3,6 +3,7 @@ import { User, type Language } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
 import { Nickname } from '@/domain/user/Nickname';
 import { Address } from '@/domain/user/Address';
+import { EmailAddress } from '@/domain/user/EmailAddress';
 import type { PrismaClient } from '@/generated/prisma/client';
 import { AddressIntegrityLogger } from '@/infrastructure/address/AddressIntegrityLogger';
 
@@ -22,6 +23,8 @@ const USER_SELECT = {
   allowFindByAddress: true,
   privacySetupCompleted: true,
   confirmedAt: true,
+  email: true,
+  emailConfirmedAt: true,
   address: {
     select: {
       id: true,
@@ -58,6 +61,8 @@ type UserRow = {
   allowFindByAddress: boolean;
   privacySetupCompleted: boolean;
   confirmedAt: Date | null;
+  email: string | null;
+  emailConfirmedAt: Date | null;
   address: {
     id: string;
     country: string;
@@ -117,6 +122,19 @@ export class PrismaUserRepository implements UserRepository {
     return this.toDomain(user);
   }
 
+  async findByEmail(email: EmailAddress): Promise<User | null> {
+    const user = await this.prisma.user.findFirst({
+      where: { email: email.getValue() },
+      select: USER_SELECT,
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    return this.toDomain(user);
+  }
+
   async findByNickname(nickname: string): Promise<User | null> {
     const user = await this.prisma.user.findUnique({
       where: { nickname },
@@ -156,6 +174,11 @@ export class PrismaUserRepository implements UserRepository {
         allowFindByPhone: user.allowFindByPhone,
         privacySetupCompleted: user.privacySetupCompleted,
         confirmedAt: user.confirmedAt,
+        // `?? null` for the same reason as the address fields below: Prisma
+        // skips `undefined`, so removing an email would otherwise leave the
+        // old address in place.
+        email: user.email?.getValue() ?? null,
+        emailConfirmedAt: user.emailConfirmedAt ?? null,
         ...(user.address
           ? {
               // Prisma treats `undefined` in a create/update payload as "skip
@@ -197,6 +220,8 @@ export class PrismaUserRepository implements UserRepository {
         password: user.password,
         language: user.language,
         nickname: user.nickname.getValue(),
+        email: user.email?.getValue() ?? null,
+        emailConfirmedAt: user.emailConfirmedAt ?? null,
         ...(user.address
           ? {
               address: {
@@ -457,6 +482,8 @@ export class PrismaUserRepository implements UserRepository {
       allowFindByAddress: user.allowFindByAddress,
       privacySetupCompleted: user.privacySetupCompleted,
       confirmedAt: user.confirmedAt ?? undefined,
+      email: user.email ? EmailAddress.create(user.email) : undefined,
+      emailConfirmedAt: user.emailConfirmedAt ?? undefined,
       address: user.address
         ? Address.create({
             country: user.address.country,

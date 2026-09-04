@@ -1,4 +1,5 @@
 import { OtpRepository } from '@/domain/otp/OtpRepository';
+import { OtpPurposes } from '@/domain/otp/OtpVerification';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { Result, success, failure } from '@/domain/shared/Result';
 import { OtpCodeHasher } from './OtpCodeHasher';
@@ -47,6 +48,21 @@ export class ConfirmPhoneUseCase {
     const otp = await this.otpRepository.findById(input.otpId);
 
     if (!otp) {
+      return failure(OtpErrors.NOT_FOUND);
+    }
+
+    // The OTP must belong to the user being confirmed. Today `userId` comes
+    // from the session so this cannot be crossed, but nothing in the use case
+    // itself enforced it — and the password-reset flow runs unauthenticated.
+    // NOT_FOUND rather than a distinct code: a caller probing ids learns
+    // nothing from the difference.
+    if (otp.userId !== user.id) {
+      return failure(OtpErrors.NOT_FOUND);
+    }
+
+    // A code minted to confirm an email address or reset a password must not
+    // be spendable here.
+    if (otp.purpose !== OtpPurposes.PHONE_CONFIRMATION) {
       return failure(OtpErrors.NOT_FOUND);
     }
 

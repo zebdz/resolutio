@@ -3,7 +3,11 @@ import { RequestConfirmationOtpUseCase } from '../RequestConfirmationOtpUseCase'
 import { OtpErrors } from '../OtpErrors';
 import { AuthErrors } from '../AuthErrors';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
-import { OtpVerification, OtpChannel } from '@/domain/otp/OtpVerification';
+import {
+  OtpVerification,
+  OtpChannel,
+  OtpPurpose,
+} from '@/domain/otp/OtpVerification';
 import { OtpCodeHasher } from '../OtpCodeHasher';
 import { OtpDeliveryChannel, OtpDeliveryResult } from '../OtpDeliveryChannel';
 import { UserRepository } from '@/domain/user/UserRepository';
@@ -30,10 +34,14 @@ class MockOtpRepository implements OtpRepository {
 
   async findLatestByIdentifier(
     identifier: string,
-    channel: OtpChannel
+    channel: OtpChannel,
+    purpose: OtpPurpose
   ): Promise<OtpVerification | null> {
     const all = Array.from(this.otps.values()).filter(
-      (o) => o.identifier === identifier && o.channel === channel
+      (o) =>
+        o.identifier === identifier &&
+        o.channel === channel &&
+        o.purpose === purpose
     );
 
     if (all.length === 0) {
@@ -56,6 +64,7 @@ class MockOtpRepository implements OtpRepository {
   async countRecentByIdentifier(
     identifier: string,
     channel: OtpChannel,
+    purpose: OtpPurpose,
     sinceHours: number
   ): Promise<number> {
     const since = new Date(Date.now() - sinceHours * 3600 * 1000);
@@ -64,6 +73,7 @@ class MockOtpRepository implements OtpRepository {
       (o) =>
         o.identifier === identifier &&
         o.channel === channel &&
+        o.purpose === purpose &&
         o.createdAt >= since
     ).length;
   }
@@ -125,6 +135,9 @@ class MockUserRepository implements UserRepository {
     return [];
   }
   async findByPhoneNumber(): Promise<User | null> {
+    return null;
+  }
+  async findByEmail(): Promise<User | null> {
     return null;
   }
   async findByNickname(): Promise<User | null> {

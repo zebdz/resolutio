@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { OtpVerification, OtpChannel } from '../OtpVerification';
+import { OtpVerification, OtpChannel, OtpPurposes } from '../OtpVerification';
 
 describe('OtpVerification', () => {
   const baseProps = {
     id: 'otp-1',
     identifier: '+79161234567',
     channel: 'sms' as OtpChannel,
+    purpose: OtpPurposes.PHONE_CONFIRMATION,
     code: 'hashed-code',
     clientIp: '127.0.0.1',
     attempts: 0,
@@ -21,6 +22,7 @@ describe('OtpVerification', () => {
       const otp = OtpVerification.create({
         identifier: '+79161234567',
         channel: 'sms',
+        purpose: OtpPurposes.PHONE_CONFIRMATION,
         code: 'hashed-code',
         clientIp: '127.0.0.1',
         expiresAt: new Date(Date.now() + 10 * 60 * 1000),
@@ -128,5 +130,44 @@ describe('OtpVerification', () => {
       // Original unchanged
       expect(otp.isVerified()).toBe(false);
     });
+  });
+});
+
+describe('OtpVerification purpose', () => {
+  it('carries the purpose it was created for', () => {
+    const otp = OtpVerification.create({
+      identifier: 'ivan@mail.ru',
+      channel: 'email',
+      purpose: OtpPurposes.PASSWORD_RESET,
+      code: 'hashed',
+      clientIp: '127.0.0.1',
+      expiresAt: new Date(Date.now() + 600_000),
+      userId: 'user-1',
+    });
+
+    expect(otp.purpose).toBe('password_reset');
+  });
+
+  it('keeps the purpose across incrementAttempts and markVerified', () => {
+    const otp = OtpVerification.create({
+      identifier: 'ivan@mail.ru',
+      channel: 'email',
+      purpose: OtpPurposes.EMAIL_CONFIRMATION,
+      code: 'hashed',
+      clientIp: '127.0.0.1',
+      expiresAt: new Date(Date.now() + 600_000),
+      userId: 'user-1',
+    });
+
+    expect(otp.incrementAttempts().purpose).toBe('email_confirmation');
+    expect(otp.markVerified().purpose).toBe('email_confirmation');
+  });
+
+  it('exposes exactly the three known purposes', () => {
+    expect(Object.values(OtpPurposes)).toEqual([
+      'phone_confirmation',
+      'email_confirmation',
+      'password_reset',
+    ]);
   });
 });

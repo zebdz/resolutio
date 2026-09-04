@@ -17,6 +17,7 @@ vi.mock('@/infrastructure/index', () => ({
   Argon2PasswordVerifier: class {},
   OtpCodeHasherImpl: class {},
   createSmsDeliveryChannelFromEnv: () => ({}),
+  createEmailDeliveryChannelFromEnv: () => ({}),
   TurnstileCaptchaVerifier: class {
     verify = mockCaptchaVerify;
   },

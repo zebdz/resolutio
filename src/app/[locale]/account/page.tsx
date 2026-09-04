@@ -122,6 +122,9 @@ export default async function AccountPage() {
                 allowFindByName: user.allowFindByName,
                 allowFindByPhone: user.allowFindByPhone,
                 allowFindByAddress: user.allowFindByAddress,
+                // Plain values only — no domain object crosses the boundary.
+                email: user.email?.getValue() ?? null,
+                emailConfirmed: user.hasConfirmedEmail(),
               }}
             />
           </div>

@@ -4,8 +4,10 @@ import { Nickname } from '@/domain/user/Nickname';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { SessionRepository, Session } from '@/domain/user/SessionRepository';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
-import { OtpVerification } from '@/domain/otp/OtpVerification';
+import { OtpPurposes, OtpVerification } from '@/domain/otp/OtpVerification';
 import { OtpCode } from '@/domain/otp/OtpCode';
+import { EmailAddress } from '@/domain/user/EmailAddress';
+import { UserDomainCodes } from '@/domain/user/UserDomainCodes';
 import { Result, success, failure } from '@/domain/shared/Result';
 import { ProfanityChecker } from '@/domain/shared/profanity/ProfanityChecker';
 import { OtpCodeHasher } from './OtpCodeHasher';
@@ -25,6 +27,7 @@ export interface RegisterUserInput {
   middleName?: string;
   phoneNumber: string;
   password: string;
+  email?: string;
   language?: Language;
   consentGiven: boolean;
   clientIp: string;
@@ -39,6 +42,7 @@ export interface RegisterResult {
   expiresAt: Date;
   backdoorCode?: string;
   expiresInSeconds: number;
+  emailOtpId?: string;
 }
 
 interface Dependencies {
@@ -48,6 +52,9 @@ interface Dependencies {
   sessionRepository: SessionRepository;
   otpCodeHasher: OtpCodeHasher;
   deliveryChannel: OtpDeliveryChannel;
+  /** Optional: when absent, an email supplied at registration is stored but no
+   * confirmation code goes out. The user can request one from the account page. */
+  emailDeliveryChannel?: OtpDeliveryChannel;
   profanityChecker?: ProfanityChecker;
   expiryMinutes?: number;
 }
@@ -59,6 +66,7 @@ export class RegisterUserUseCase {
   private readonly sessionRepository: SessionRepository;
   private readonly otpCodeHasher: OtpCodeHasher;
   private readonly deliveryChannel: OtpDeliveryChannel;
+  private readonly emailDeliveryChannel?: OtpDeliveryChannel;
   private readonly profanityChecker?: ProfanityChecker;
   private readonly expiryMinutes: number;
 
@@ -69,6 +77,7 @@ export class RegisterUserUseCase {
     this.sessionRepository = deps.sessionRepository;
     this.otpCodeHasher = deps.otpCodeHasher;
     this.deliveryChannel = deps.deliveryChannel;
+    this.emailDeliveryChannel = deps.emailDeliveryChannel;
     this.profanityChecker = deps.profanityChecker;
     this.expiryMinutes = deps.expiryMinutes ?? 10;
   }
@@ -96,6 +105,24 @@ export class RegisterUserUseCase {
     const existingUser =
       await this.userRepository.findByPhoneNumber(phoneNumber);
 
+    // 4a. Resolve the optional email. An empty string is "not provided" — the
+    // form always submits the field, blank or not.
+    let email: EmailAddress | undefined;
+
+    if (input.email && input.email.trim().length > 0) {
+      try {
+        email = EmailAddress.create(input.email);
+      } catch {
+        return failure(UserDomainCodes.EMAIL_INVALID);
+      }
+
+      const emailOwner = await this.userRepository.findByEmail(email);
+
+      if (emailOwner && emailOwner.id !== existingUser?.id) {
+        return failure(UserDomainCodes.EMAIL_TAKEN);
+      }
+    }
+
     let savedUser: User;
 
     if (existingUser) {
@@ -122,6 +149,10 @@ export class RegisterUserUseCase {
         allowFindByPhone: existingUser.allowFindByPhone,
         privacySetupCompleted: existingUser.privacySetupCompleted,
         // no confirmedAt — stays unconfirmed
+        // A re-registration may supply a new address; it starts unconfirmed
+        // either way. Omitting it keeps whatever was there before.
+        email: email ?? existingUser.email,
+        emailConfirmedAt: undefined,
       });
 
       savedUser = await this.userRepository.save(updatedUser);
@@ -152,6 +183,7 @@ export class RegisterUserUseCase {
           language: input.language || 'ru',
           consentGivenAt: new Date(),
           nickname,
+          email,
         },
         this.profanityChecker
       );
@@ -177,6 +209,7 @@ export class RegisterUserUseCase {
     const otpVerification = OtpVerification.create({
       identifier: phoneNumber.getValue(),
       channel: this.deliveryChannel.channel,
+      purpose: OtpPurposes.PHONE_CONFIRMATION,
       code: hashedCode,
       clientIp: input.clientIp,
       expiresAt: otpExpiresAt,
@@ -189,12 +222,23 @@ export class RegisterUserUseCase {
       phoneNumber.getValue(),
       code.getValue(),
       savedUser.language,
-      input.clientIp
+      input.clientIp,
+      OtpPurposes.PHONE_CONFIRMATION
     );
 
     if (!deliveryResult.success) {
       return failure(OtpErrors.SEND_FAILED);
     }
+
+    // 7. If an address was supplied, send its confirmation code too. The user
+    // enters it later from the account page rather than here — registration
+    // already asks for one code, and stacking a second would be heavy.
+    const emailOtpId = await this.issueEmailConfirmation(
+      email,
+      savedUser,
+      input.clientIp,
+      otpExpiresAt
+    );
 
     return success({
       user: savedUser,
@@ -203,6 +247,56 @@ export class RegisterUserUseCase {
       expiresAt: otpExpiresAt,
       backdoorCode: deliveryResult.backdoorCode,
       expiresInSeconds: this.expiryMinutes * 60,
+      emailOtpId,
     });
+  }
+
+  /**
+   * Best effort by design: the phone flow is what gates the account, so a mail
+   * server being down must not fail a registration. The user can request a
+   * fresh code from the account page whenever they like.
+   */
+  private async issueEmailConfirmation(
+    email: EmailAddress | undefined,
+    savedUser: User,
+    clientIp: string,
+    expiresAt: Date
+  ): Promise<string | undefined> {
+    if (!email || !this.emailDeliveryChannel) {
+      return undefined;
+    }
+
+    try {
+      const emailCode = OtpCode.generate();
+
+      const savedEmailOtp = await this.otpRepository.save(
+        OtpVerification.create({
+          identifier: email.getValue(),
+          channel: this.emailDeliveryChannel.channel,
+          purpose: OtpPurposes.EMAIL_CONFIRMATION,
+          code: this.otpCodeHasher.hash(emailCode.getValue()),
+          clientIp,
+          expiresAt,
+          userId: savedUser.id,
+        })
+      );
+
+      await this.emailDeliveryChannel.send(
+        email.getValue(),
+        emailCode.getValue(),
+        savedUser.language,
+        clientIp,
+        OtpPurposes.EMAIL_CONFIRMATION
+      );
+
+      return savedEmailOtp.id;
+    } catch (error) {
+      console.error(
+        'Failed to issue the registration email confirmation code:',
+        error instanceof Error ? error.message : error
+      );
+
+      return undefined;
+    }
   }
 }
