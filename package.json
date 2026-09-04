@@ -1,6 +1,6 @@
 {
   "name": "resolutio",
-  "version": "1.9.2",
+  "version": "1.9.3",
   "private": true,
   "license": "AGPL-3.0-only",
   "scripts": {
@@ -65,6 +65,7 @@
     "motion": "^12.23.26",
     "next": "16.0.7",
     "next-intl": "^4.5.8",
+    "nodemailer": "^9.1.0",
     "pdfmake": "^0.3.5",
     "pg": "^8.16.3",
     "react": "19.2.0",
@@ -87,6 +88,7 @@
     "@types/d3-selection": "^3.0.11",
     "@types/d3-shape": "^3.1.8",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.15.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",

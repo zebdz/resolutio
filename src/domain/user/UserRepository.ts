@@ -1,10 +1,12 @@
 import { User } from './User';
 import { PhoneNumber } from './PhoneNumber';
+import { EmailAddress } from './EmailAddress';
 
 export interface UserRepository {
   findById(id: string): Promise<User | null>;
   findByIds(ids: string[]): Promise<User[]>;
   findByPhoneNumber(phoneNumber: PhoneNumber): Promise<User | null>;
+  findByEmail(email: EmailAddress): Promise<User | null>;
   findByNickname(nickname: string): Promise<User | null>;
   isNicknameAvailable(nickname: string): Promise<boolean>;
   save(user: User): Promise<User>;

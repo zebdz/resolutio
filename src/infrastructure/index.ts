@@ -37,3 +37,11 @@ export { SmsRuOtpDeliveryChannel } from './auth/SmsRuOtpDeliveryChannel';
 export { createSmsDeliveryChannelFromEnv } from './auth/smsDeliveryChannelFactory';
 export { TurnstileCaptchaVerifier } from './auth/TurnstileCaptchaVerifier';
 export { isCaptchaEnforced } from './auth/captchaPolicy';
+
+// Email
+export { StubEmailSender } from './email/StubEmailSender';
+export { NodemailerEmailSender } from './email/NodemailerEmailSender';
+export { createEmailSenderFromEnv } from './email/emailSenderFactory';
+export { NextIntlEmailTemplateRenderer } from './email/NextIntlEmailTemplateRenderer';
+export { EmailOtpDeliveryChannel } from './auth/EmailOtpDeliveryChannel';
+export { createEmailDeliveryChannelFromEnv } from './auth/emailDeliveryChannelFactory';

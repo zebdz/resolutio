@@ -1,5 +1,9 @@
 import type { OtpRepository } from '@/domain/otp/OtpRepository';
-import { OtpVerification, type OtpChannel } from '@/domain/otp/OtpVerification';
+import {
+  OtpVerification,
+  type OtpChannel,
+  type OtpPurpose,
+} from '@/domain/otp/OtpVerification';
 import type { PrismaClient } from '@/generated/prisma/client';
 
 export class PrismaOtpRepository implements OtpRepository {
@@ -10,6 +14,7 @@ export class PrismaOtpRepository implements OtpRepository {
       data: {
         identifier: otp.identifier,
         channel: otp.channel,
+        purpose: otp.purpose,
         code: otp.code,
         clientIp: otp.clientIp,
         userId: otp.userId,
@@ -38,10 +43,11 @@ export class PrismaOtpRepository implements OtpRepository {
 
   async findLatestByIdentifier(
     identifier: string,
-    channel: OtpChannel
+    channel: OtpChannel,
+    purpose: OtpPurpose
   ): Promise<OtpVerification | null> {
     const record = await this.prisma.otpVerification.findFirst({
-      where: { identifier, channel },
+      where: { identifier, channel, purpose },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -78,6 +84,7 @@ export class PrismaOtpRepository implements OtpRepository {
   async countRecentByIdentifier(
     identifier: string,
     channel: OtpChannel,
+    purpose: OtpPurpose,
     sinceHours: number
   ): Promise<number> {
     const since = new Date(Date.now() - sinceHours * 3600 * 1000);
@@ -86,6 +93,7 @@ export class PrismaOtpRepository implements OtpRepository {
       where: {
         identifier,
         channel,
+        purpose,
         createdAt: { gte: since },
       },
     });
@@ -103,6 +111,7 @@ export class PrismaOtpRepository implements OtpRepository {
     id: string;
     identifier: string;
     channel: string;
+    purpose: string;
     code: string;
     clientIp: string;
     userId: string;
@@ -116,6 +125,7 @@ export class PrismaOtpRepository implements OtpRepository {
       id: record.id,
       identifier: record.identifier,
       channel: record.channel as OtpChannel,
+      purpose: record.purpose as OtpPurpose,
       code: record.code,
       clientIp: record.clientIp,
       attempts: record.attempts,

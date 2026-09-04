@@ -7,6 +7,7 @@ import {
 } from '../User';
 import { PhoneNumber } from '../PhoneNumber';
 import { Nickname } from '../Nickname';
+import { EmailAddress } from '../EmailAddress';
 import { UserDomainCodes } from '../UserDomainCodes';
 import { SharedDomainCodes } from '../../shared/SharedDomainCodes';
 import { ProfanityChecker } from '../../shared/profanity/ProfanityChecker';
@@ -655,5 +656,175 @@ describe('User', () => {
         false
       );
     });
+  });
+});
+
+describe('User email', () => {
+  function buildUser(
+    overrides: Partial<Parameters<typeof User.reconstitute>[0]> = {}
+  ) {
+    return User.reconstitute({
+      id: 'user-1',
+      firstName: 'Ivan',
+      lastName: 'Ivanov',
+      phoneNumber: PhoneNumber.create('+79161234567'),
+      password: 'hash',
+      language: 'ru',
+      createdAt: new Date('2026-01-01'),
+      nickname: Nickname.create('ivan_ivanov'),
+      ...overrides,
+    });
+  }
+
+  it('has no email by default', () => {
+    const user = buildUser();
+
+    expect(user.email).toBeUndefined();
+    expect(user.emailConfirmedAt).toBeUndefined();
+    expect(user.hasConfirmedEmail()).toBe(false);
+  });
+
+  it('stores an email as unconfirmed', () => {
+    const user = buildUser().changeEmail(EmailAddress.create('ivan@mail.ru'));
+
+    expect(user.email?.getValue()).toBe('ivan@mail.ru');
+    expect(user.hasConfirmedEmail()).toBe(false);
+  });
+
+  it('marks an email confirmed', () => {
+    const user = buildUser()
+      .changeEmail(EmailAddress.create('ivan@mail.ru'))
+      .confirmEmail();
+
+    expect(user.hasConfirmedEmail()).toBe(true);
+    expect(user.emailConfirmedAt).toBeInstanceOf(Date);
+  });
+
+  // The load-bearing invariant. If a new address inherited the old one's
+  // confirmed flag, changing to an attacker-controlled address would yield an
+  // immediately reset-capable email.
+  it('clears confirmation when the address changes', () => {
+    const user = buildUser()
+      .changeEmail(EmailAddress.create('ivan@mail.ru'))
+      .confirmEmail()
+      .changeEmail(EmailAddress.create('petr@mail.ru'));
+
+    expect(user.email?.getValue()).toBe('petr@mail.ru');
+    expect(user.emailConfirmedAt).toBeUndefined();
+    expect(user.hasConfirmedEmail()).toBe(false);
+  });
+
+  it('clears confirmation even when re-setting the same address', () => {
+    const user = buildUser()
+      .changeEmail(EmailAddress.create('ivan@mail.ru'))
+      .confirmEmail()
+      .changeEmail(EmailAddress.create('ivan@mail.ru'));
+
+    expect(user.hasConfirmedEmail()).toBe(false);
+  });
+
+  it('removes the email and its confirmation together', () => {
+    const user = buildUser()
+      .changeEmail(EmailAddress.create('ivan@mail.ru'))
+      .confirmEmail()
+      .removeEmail();
+
+    expect(user.email).toBeUndefined();
+    expect(user.emailConfirmedAt).toBeUndefined();
+  });
+
+  it('leaves the rest of the user untouched when the email changes', () => {
+    const user = buildUser().changeEmail(EmailAddress.create('ivan@mail.ru'));
+
+    expect(user.id).toBe('user-1');
+    expect(user.firstName).toBe('Ivan');
+    expect(user.phoneNumber.getValue()).toBe('+79161234567');
+    expect(user.password).toBe('hash');
+  });
+
+  it('accepts an email at creation, always unconfirmed', () => {
+    const user = User.create({
+      firstName: 'Ivan',
+      lastName: 'Ivanov',
+      phoneNumber: PhoneNumber.create('+79161234567'),
+      password: 'hash',
+      email: EmailAddress.create('ivan@mail.ru'),
+    });
+
+    expect(user.email?.getValue()).toBe('ivan@mail.ru');
+    expect(user.hasConfirmedEmail()).toBe(false);
+  });
+});
+
+describe('passwordMatchesPersonalInfo — email', () => {
+  it('returns true when the password equals the full address', () => {
+    expect(
+      passwordMatchesPersonalInfo('ivan.petrov@mail.ru', {
+        email: 'ivan.petrov@mail.ru',
+      })
+    ).toBe(true);
+  });
+
+  it('matches the address case-insensitively in both directions', () => {
+    expect(
+      passwordMatchesPersonalInfo('IVAN@MAIL.RU', { email: 'ivan@mail.ru' })
+    ).toBe(true);
+    expect(
+      passwordMatchesPersonalInfo('ivan@mail.ru', { email: 'IVAN@MAIL.RU' })
+    ).toBe(true);
+  });
+
+  // The local part is the identity half — "ivan.petrov" is exactly as bad a
+  // password as the first name it is built from.
+  it('returns true when the password equals the local part', () => {
+    expect(
+      passwordMatchesPersonalInfo('ivan.petrov', {
+        email: 'ivan.petrov@mail.ru',
+      })
+    ).toBe(true);
+  });
+
+  // The domain is shared by millions of people; it is not personal info, and
+  // rejecting it here would be a rule this function has no business making.
+  it('returns false when the password equals only the domain', () => {
+    expect(
+      passwordMatchesPersonalInfo('mail.ru', { email: 'ivan@mail.ru' })
+    ).toBe(false);
+  });
+
+  it('returns false for an unrelated password', () => {
+    expect(
+      passwordMatchesPersonalInfo('Korova-Zabor-71', {
+        email: 'ivan@mail.ru',
+      })
+    ).toBe(false);
+  });
+
+  // Equality, not containment — the same rule the name checks use. A password
+  // that merely contains the local part stays allowed.
+  it('does not reject a password that merely contains the local part', () => {
+    expect(
+      passwordMatchesPersonalInfo('ivan-Korova-Zabor-71', {
+        email: 'ivan@mail.ru',
+      })
+    ).toBe(false);
+  });
+
+  it('ignores a malformed address without throwing', () => {
+    expect(
+      passwordMatchesPersonalInfo('not-an-email', { email: 'not-an-email' })
+    ).toBe(true);
+    expect(
+      passwordMatchesPersonalInfo('something-else', { email: 'not-an-email' })
+    ).toBe(false);
+  });
+
+  it('leaves behaviour unchanged when no email is supplied', () => {
+    expect(passwordMatchesPersonalInfo('John', { firstName: 'john' })).toBe(
+      true
+    );
+    expect(
+      passwordMatchesPersonalInfo('Korova-Zabor-71', { firstName: 'john' })
+    ).toBe(false);
   });
 });

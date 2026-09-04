@@ -70,6 +70,8 @@ model User {
   privacySetupCompleted Boolean   @default(false) @map("privacy_setup_completed")
   confirmedAt           DateTime? @map("confirmed_at")
   allowFindByAddress    Boolean   @default(false) @map("allow_find_by_address")
+  email                 String?   @unique
+  emailConfirmedAt      DateTime? @map("email_confirmed_at")
 
   // Relations
   sessions           Session[]
@@ -518,6 +520,7 @@ model OtpVerification {
   id          String    @id @default(cuid())
   identifier  String    // phone number (E.164 format)
   channel     String    @default("sms") // "sms" | "email"
+  purpose     String    @default("phone_confirmation") // "phone_confirmation" | "email_confirmation" | "password_reset"
   code        String    // hashed code
   clientIp    String    @map("client_ip")
   userId      String    @map("user_id")
@@ -529,7 +532,7 @@ model OtpVerification {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([identifier, channel])
+  @@index([identifier, channel, purpose])
   @@index([clientIp])
   @@index([expiresAt])
   @@index([userId])

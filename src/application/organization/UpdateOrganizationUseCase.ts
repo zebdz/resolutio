@@ -60,8 +60,11 @@ export class UpdateOrganizationUseCase {
       return failure(OrganizationErrors.NOT_ADMIN);
     }
 
+    const oldName = organization.name;
+    const nameChanged = input.name.trim() !== organization.name;
+
     // Check name uniqueness only if name changed
-    if (input.name.trim() !== organization.name) {
+    if (nameChanged) {
       const existingOrg = await this.organizationRepository.findByName(
         input.name.trim()
       );
@@ -71,15 +74,19 @@ export class UpdateOrganizationUseCase {
       }
     }
 
-    const oldName = organization.name;
+    // Validate only a name the admin actually typed. Names stored before the
+    // current rules existed may no longer satisfy them, and re-checking one
+    // that did not change would make those organizations uneditable — the
+    // admin could not even fix the description.
+    if (nameChanged) {
+      const nameResult = organization.updateName(
+        input.name,
+        this.profanityChecker
+      );
 
-    const nameResult = organization.updateName(
-      input.name,
-      this.profanityChecker
-    );
-
-    if (!nameResult.success) {
-      return failure(nameResult.error);
+      if (!nameResult.success) {
+        return failure(nameResult.error);
+      }
     }
 
     const descResult = organization.updateDescription(

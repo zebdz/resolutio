@@ -1,17 +1,11 @@
 import type { Metadata } from 'next';
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, getTranslations } from 'next-intl/server';
-import { Nunito } from 'next/font/google';
 import { Toaster } from 'sonner';
 import { ToastClickDismiss } from '@/src/web/components/layout/ToastClickDismiss';
 import { routing } from '@/src/i18n/routing';
 import { buildSiteMetadata } from '@/web/metadata/siteMetadata';
 import '../globals.css';
-
-const nunito = Nunito({
-  variable: '--font-nunito',
-  subsets: ['latin', 'cyrillic'],
-});
 
 // Built per request rather than declared as a static `export const metadata`,
 // which cannot read the [locale] segment and so served English link previews
@@ -47,7 +41,9 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale}>
-      <body className={`${nunito.variable} antialiased`}>
+      {/* --font-nunito is defined on :root in globals.css alongside the
+          vendored @font-face rules; no next/font class to apply here. */}
+      <body className="antialiased">
         <NextIntlClientProvider messages={messages}>
           {children}
           <Toaster />

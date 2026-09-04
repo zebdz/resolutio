@@ -278,6 +278,16 @@ describe('Organization.create name validation', () => {
 
     expect(result.success).toBe(true);
   });
+
+  it('should allow guillemets, typographic quotes and parentheses', () => {
+    const result = Organization.create(
+      'ТСЖ «Гвардейский 13» (демо поимённого протокола)',
+      'Valid desc',
+      'user-1'
+    );
+
+    expect(result.success).toBe(true);
+  });
 });
 
 const mockProfanityChecker: ProfanityChecker = {
