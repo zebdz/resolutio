@@ -8,7 +8,6 @@ import { OtpErrors } from './OtpErrors';
 
 export interface ConfirmEmailInput {
   userId: string;
-  otpId: string;
   code: string;
 }
 
@@ -42,19 +41,15 @@ export class ConfirmEmailUseCase {
       return failure(UserDomainCodes.EMAIL_NOT_SET);
     }
 
-    const otp = await this.otpRepository.findById(input.otpId);
+    // The pending code is the latest one issued to this user for this
+    // purpose. Ownership and purpose are scoped by the query; the browser
+    // never names an otp id, so a reload loses nothing.
+    const otp = await this.otpRepository.findLatestByUserId(
+      user.id,
+      OtpPurposes.EMAIL_CONFIRMATION
+    );
 
     if (!otp) {
-      return failure(OtpErrors.NOT_FOUND);
-    }
-
-    // Ownership and purpose both answer NOT_FOUND: a caller probing ids learns
-    // nothing from the difference between "not yours" and "wrong kind".
-    if (otp.userId !== user.id) {
-      return failure(OtpErrors.NOT_FOUND);
-    }
-
-    if (otp.purpose !== OtpPurposes.EMAIL_CONFIRMATION) {
       return failure(OtpErrors.NOT_FOUND);
     }
 

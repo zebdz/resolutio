@@ -87,7 +87,6 @@ function makeFormData(): FormData {
   return fd;
 }
 
-const OTP_WINDOW_SECONDS = 600;
 const SESSION_TTL_SECONDS = 86_400;
 
 const successResult = {
@@ -96,9 +95,6 @@ const successResult = {
     user: { id: 'user-1' },
     session: { id: 'sess-1' },
     sessionExpiresInSeconds: SESSION_TTL_SECONDS,
-    otpId: 'otp-1',
-    expiresAt: new Date('2026-09-09T12:10:00Z'),
-    expiresInSeconds: OTP_WINDOW_SECONDS,
   },
 };
 
@@ -118,13 +114,15 @@ describe('registerAction — session cookie lifetime', () => {
     );
   });
 
-  it('still hands the OTP window to the client', async () => {
+  // The confirm-phone page reads its state from the server, so the
+  // registration payload carries nothing about the code that was sent.
+  it('hands the client only the user id', async () => {
     const result = await registerAction(makeFormData());
 
     expect(result.success).toBe(true);
 
     if (result.success) {
-      expect(result.data.expiresInSeconds).toBe(OTP_WINDOW_SECONDS);
+      expect(result.data).toStrictEqual({ userId: 'user-1' });
     }
   });
 });

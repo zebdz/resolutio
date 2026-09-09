@@ -48,14 +48,15 @@ const confirmEmailUseCase = new ConfirmEmailUseCase({
 });
 
 export interface EmailOtpIssued {
-  otpId: string;
-  expiresInSeconds: number;
-  backdoorCode?: string;
+  // Seconds until the throttle allows the next code; the form counts down
+  // from this. Nothing about the code itself: the account page reads the
+  // pending state from the server, and confirming resolves the code by user.
+  retryAfterSeconds: number;
 }
 
 export async function updateEmailAction(
   formData: FormData
-): Promise<ActionResult<EmailOtpIssued | null>> {
+): Promise<ActionResult<EmailOtpIssued>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -93,11 +94,7 @@ export async function updateEmailAction(
 
     return {
       success: true,
-      data: {
-        otpId: issued.value.otpId,
-        expiresInSeconds: issued.value.expiresInSeconds,
-        backdoorCode: issued.value.backdoorCode,
-      },
+      data: { retryAfterSeconds: issued.value.retryAfterSeconds },
     };
   } catch (error) {
     console.error('Update email action error:', error);
@@ -135,11 +132,7 @@ export async function requestEmailConfirmationAction(): Promise<
 
     return {
       success: true,
-      data: {
-        otpId: issued.value.otpId,
-        expiresInSeconds: issued.value.expiresInSeconds,
-        backdoorCode: issued.value.backdoorCode,
-      },
+      data: { retryAfterSeconds: issued.value.retryAfterSeconds },
     };
   } catch (error) {
     console.error('Request email confirmation action error:', error);
@@ -169,7 +162,6 @@ export async function confirmEmailAction(
     const result = await confirmEmailUseCase.execute({
       // From the session, never the form — the form supplies only the code.
       userId: currentUser.id,
-      otpId: (formData.get('otpId') as string) ?? '',
       code: (formData.get('code') as string) ?? '',
     });
 

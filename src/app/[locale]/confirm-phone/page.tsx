@@ -1,9 +1,22 @@
 import { getLocale, getTranslations } from 'next-intl/server';
 import { AuthLayout } from '@/src/web/components/catalyst/auth-layout';
 import { ConfirmPhoneForm } from '@/web/components/auth/ConfirmPhoneForm';
+import { GetPhoneConfirmationStatusUseCase } from '@/application/auth/GetPhoneConfirmationStatusUseCase';
+import {
+  prisma,
+  PrismaUserRepository,
+  PrismaOtpRepository,
+  createSmsDeliveryChannelFromEnv,
+} from '@/infrastructure/index';
 import { getCurrentUser } from '@/web/lib/session';
 import { readReturnToCookieServer } from '@/web/lib/returnTo.server';
 import { redirectLocalized } from '@/web/lib/redirectLocalized';
+
+const statusUseCase = new GetPhoneConfirmationStatusUseCase({
+  otpRepository: new PrismaOtpRepository(prisma),
+  userRepository: new PrismaUserRepository(prisma),
+  deliveryChannel: createSmsDeliveryChannelFromEnv(),
+});
 
 export async function generateMetadata() {
   const t = await getTranslations('auth.confirmPhone');
@@ -35,9 +48,25 @@ export default async function ConfirmPhonePage() {
     (_, prefix, middle, last) => `${prefix}${'*'.repeat(middle.length)}${last}`
   );
 
+  // The form renders from server-known state: whether a code is waiting to be
+  // entered and when another may be requested. Nothing is carried over from
+  // the register/login step in browser storage any more, so a reload or a
+  // redirect here lands on the same screen as the first visit.
+  const status = await statusUseCase.execute({ userId: user.id });
+
+  // The user was loaded a moment ago, so the only failure is a vanished row;
+  // fall back to "request a code" rather than crash.
+  const { hasPendingCode, retryAfterSeconds } = status.success
+    ? status.value
+    : { hasPendingCode: false, retryAfterSeconds: 0 };
+
   return (
     <AuthLayout>
-      <ConfirmPhoneForm maskedPhone={maskedPhone} />
+      <ConfirmPhoneForm
+        maskedPhone={maskedPhone}
+        hasPendingCode={hasPendingCode}
+        retryAfterSeconds={retryAfterSeconds}
+      />
     </AuthLayout>
   );
 }

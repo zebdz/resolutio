@@ -13,6 +13,19 @@ import { AccountForm } from '@/web/components/account/AccountForm';
 import { AddressForm } from '@/web/components/account/AddressForm';
 import { logoutAction } from '@/src/web/actions/auth/auth';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
+import { GetEmailConfirmationStatusUseCase } from '@/application/auth/GetEmailConfirmationStatusUseCase';
+import {
+  prisma,
+  PrismaUserRepository,
+  PrismaOtpRepository,
+  createEmailDeliveryChannelFromEnv,
+} from '@/infrastructure/index';
+
+const emailStatusUseCase = new GetEmailConfirmationStatusUseCase({
+  otpRepository: new PrismaOtpRepository(prisma),
+  userRepository: new PrismaUserRepository(prisma),
+  deliveryChannel: createEmailDeliveryChannelFromEnv(),
+});
 
 export async function generateMetadata() {
   const t = await getTranslations('account');
@@ -30,6 +43,13 @@ export default async function AccountPage() {
   if (!user) {
     return <AuthenticatedLayout>{null}</AuthenticatedLayout>;
   }
+
+  // The email confirmation controls render from server-known state, so a
+  // reload keeps a pending code enterable instead of forcing a resend.
+  const emailStatus = await emailStatusUseCase.execute({ userId: user.id });
+  const emailCode = emailStatus.success
+    ? emailStatus.value
+    : { hasPendingCode: false, retryAfterSeconds: 0 };
 
   return (
     <AuthenticatedLayout>
@@ -126,6 +146,7 @@ export default async function AccountPage() {
                 email: user.email?.getValue() ?? null,
                 emailConfirmed: user.hasConfirmedEmail(),
               }}
+              emailCode={emailCode}
             />
           </div>
         </div>

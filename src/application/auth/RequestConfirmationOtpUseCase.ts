@@ -7,7 +7,7 @@ import { OtpCodeHasher } from './OtpCodeHasher';
 import { OtpDeliveryChannel } from './OtpDeliveryChannel';
 import { OtpErrors } from './OtpErrors';
 import { AuthErrors } from './AuthErrors';
-import { getRetryAfter, THROTTLE_WINDOW_HOURS } from './OtpThrottleCalculator';
+import { calculateThrottleDelay, readThrottle } from './OtpThrottleCalculator';
 
 export interface RequestConfirmationOtpInput {
   userId: string;
@@ -19,6 +19,9 @@ export interface RequestConfirmationOtpResult {
   expiresAt: Date;
   backdoorCode?: string;
   expiresInSeconds: number;
+  // Seconds until the throttle allows the next code. The client counts down
+  // from this rather than assuming a fixed minute, since the delay escalates.
+  retryAfterSeconds: number;
 }
 
 interface Dependencies {
@@ -62,22 +65,14 @@ export class RequestConfirmationOtpUseCase {
       const phone = user.phoneNumber.getValue();
 
       // 2. Per-phone throttle (not per-IP!)
-      const recentCount = await this.otpRepository.countRecentByIdentifier(
-        phone,
-        this.deliveryChannel.channel,
-        OtpPurposes.PHONE_CONFIRMATION,
-        THROTTLE_WINDOW_HOURS
-      );
-
-      const lastOtp = await this.otpRepository.findLatestByIdentifier(
+      const throttle = await readThrottle(
+        this.otpRepository,
         phone,
         this.deliveryChannel.channel,
         OtpPurposes.PHONE_CONFIRMATION
       );
 
-      const retryAfter = getRetryAfter(recentCount, lastOtp?.createdAt ?? null);
-
-      if (retryAfter > 0) {
+      if (throttle.retryAfterSeconds > 0) {
         return failure(OtpErrors.THROTTLED);
       }
 
@@ -118,6 +113,9 @@ export class RequestConfirmationOtpUseCase {
         expiresAt,
         backdoorCode: deliveryResult.backdoorCode,
         expiresInSeconds: this.expiryMinutes * 60,
+        // The code just sent joins the window, so the next request waits
+        // the following tier.
+        retryAfterSeconds: calculateThrottleDelay(throttle.recentCount + 1),
       });
     } catch (error) {
       return failure(

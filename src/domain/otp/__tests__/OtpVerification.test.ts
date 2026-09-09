@@ -171,3 +171,48 @@ describe('OtpVerification purpose', () => {
     ]);
   });
 });
+
+describe('OtpVerification isPending', () => {
+  const live = {
+    id: 'otp-1',
+    identifier: '+79161234567',
+    channel: 'sms' as OtpChannel,
+    purpose: OtpPurposes.PHONE_CONFIRMATION,
+    code: 'hashed-code',
+    clientIp: '127.0.0.1',
+    attempts: 0,
+    maxAttempts: 5,
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+    verifiedAt: null,
+    createdAt: new Date(),
+    userId: 'user-1',
+  };
+
+  it('is pending while unverified, unexpired and with attempts left', () => {
+    expect(OtpVerification.reconstitute(live).isPending()).toBe(true);
+  });
+
+  it('stops being pending once verified', () => {
+    const otp = OtpVerification.reconstitute({
+      ...live,
+      verifiedAt: new Date(),
+    });
+
+    expect(otp.isPending()).toBe(false);
+  });
+
+  it('stops being pending once expired', () => {
+    const otp = OtpVerification.reconstitute({
+      ...live,
+      expiresAt: new Date(Date.now() - 1000),
+    });
+
+    expect(otp.isPending()).toBe(false);
+  });
+
+  it('stops being pending once out of attempts', () => {
+    const otp = OtpVerification.reconstitute({ ...live, attempts: 5 });
+
+    expect(otp.isPending()).toBe(false);
+  });
+});

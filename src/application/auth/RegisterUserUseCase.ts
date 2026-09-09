@@ -14,6 +14,7 @@ import { OtpCodeHasher } from './OtpCodeHasher';
 import { OtpDeliveryChannel } from './OtpDeliveryChannel';
 import { OtpErrors } from './OtpErrors';
 import { AuthErrors } from './AuthErrors';
+import { readOtpStatus, shouldIssueCode } from './OtpStatus';
 import { SESSION_TTL_MS } from './LoginUserUseCase';
 import type { Language } from '@/domain/user/User';
 
@@ -38,14 +39,9 @@ export interface RegisterUserInput {
 export interface RegisterResult {
   user: User;
   session: Session;
-  // Lifetime for the session cookie. Distinct from the OTP window below:
-  // copying that into the cookie logged registrants out ten minutes in.
+  // Lifetime for the session cookie. Distinct from the OTP window: copying
+  // that into the cookie once logged registrants out ten minutes in.
   sessionExpiresInSeconds: number;
-  otpId: string;
-  expiresAt: Date;
-  backdoorCode?: string;
-  expiresInSeconds: number;
-  emailOtpId?: string;
 }
 
 interface Dependencies {
@@ -203,40 +199,51 @@ export class RegisterUserUseCase {
       input.userAgent
     );
 
-    // 6. Generate + send OTP
-    const code = OtpCode.generate();
-    const hashedCode = this.otpCodeHasher.hash(code.getValue());
-
+    // 6. Send a code, unless one is pending or the throttle says wait: the
+    // same rule as login, so re-registering an unconfirmed phone cannot pump
+    // SMS. A brand-new account has no code yet, so its first one always goes
+    // out. Either way the confirm-phone page shows what applies.
     const otpExpiresAt = new Date(Date.now() + this.expiryMinutes * 60 * 1000);
 
-    const otpVerification = OtpVerification.create({
+    const status = await readOtpStatus(this.otpRepository, {
+      userId: savedUser.id,
       identifier: phoneNumber.getValue(),
       channel: this.deliveryChannel.channel,
       purpose: OtpPurposes.PHONE_CONFIRMATION,
-      code: hashedCode,
-      clientIp: input.clientIp,
-      expiresAt: otpExpiresAt,
-      userId: savedUser.id,
     });
 
-    const savedOtp = await this.otpRepository.save(otpVerification);
+    if (shouldIssueCode(status)) {
+      const code = OtpCode.generate();
 
-    const deliveryResult = await this.deliveryChannel.send(
-      phoneNumber.getValue(),
-      code.getValue(),
-      savedUser.language,
-      input.clientIp,
-      OtpPurposes.PHONE_CONFIRMATION
-    );
+      await this.otpRepository.save(
+        OtpVerification.create({
+          identifier: phoneNumber.getValue(),
+          channel: this.deliveryChannel.channel,
+          purpose: OtpPurposes.PHONE_CONFIRMATION,
+          code: this.otpCodeHasher.hash(code.getValue()),
+          clientIp: input.clientIp,
+          expiresAt: otpExpiresAt,
+          userId: savedUser.id,
+        })
+      );
 
-    if (!deliveryResult.success) {
-      return failure(OtpErrors.SEND_FAILED);
+      const deliveryResult = await this.deliveryChannel.send(
+        phoneNumber.getValue(),
+        code.getValue(),
+        savedUser.language,
+        input.clientIp,
+        OtpPurposes.PHONE_CONFIRMATION
+      );
+
+      if (!deliveryResult.success) {
+        return failure(OtpErrors.SEND_FAILED);
+      }
     }
 
     // 7. If an address was supplied, send its confirmation code too. The user
     // enters it later from the account page rather than here — registration
     // already asks for one code, and stacking a second would be heavy.
-    const emailOtpId = await this.issueEmailConfirmation(
+    await this.issueEmailConfirmation(
       email,
       savedUser,
       input.clientIp,
@@ -247,11 +254,6 @@ export class RegisterUserUseCase {
       user: savedUser,
       session,
       sessionExpiresInSeconds: Math.floor(SESSION_TTL_MS / 1000),
-      otpId: savedOtp.id,
-      expiresAt: otpExpiresAt,
-      backdoorCode: deliveryResult.backdoorCode,
-      expiresInSeconds: this.expiryMinutes * 60,
-      emailOtpId,
     });
   }
 
@@ -265,15 +267,15 @@ export class RegisterUserUseCase {
     savedUser: User,
     clientIp: string,
     expiresAt: Date
-  ): Promise<string | undefined> {
+  ): Promise<void> {
     if (!email || !this.emailDeliveryChannel) {
-      return undefined;
+      return;
     }
 
     try {
       const emailCode = OtpCode.generate();
 
-      const savedEmailOtp = await this.otpRepository.save(
+      await this.otpRepository.save(
         OtpVerification.create({
           identifier: email.getValue(),
           channel: this.emailDeliveryChannel.channel,
@@ -292,15 +294,11 @@ export class RegisterUserUseCase {
         clientIp,
         OtpPurposes.EMAIL_CONFIRMATION
       );
-
-      return savedEmailOtp.id;
     } catch (error) {
       console.error(
         'Failed to issue the registration email confirmation code:',
         error instanceof Error ? error.message : error
       );
-
-      return undefined;
     }
   }
 }

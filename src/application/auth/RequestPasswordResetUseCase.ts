@@ -9,7 +9,7 @@ import { OtpCodeHasher } from './OtpCodeHasher';
 import { OtpDeliveryChannel } from './OtpDeliveryChannel';
 import { AuthErrors } from './AuthErrors';
 import { parseAccountIdentifier } from './parseAccountIdentifier';
-import { getRetryAfter, THROTTLE_WINDOW_HOURS } from './OtpThrottleCalculator';
+import { readThrottle } from './OtpThrottleCalculator';
 
 export interface RequestPasswordResetInput {
   identifier: string;
@@ -84,20 +84,14 @@ export class RequestPasswordResetUseCase {
 
     const address = user.email.getValue();
 
-    const recentCount = await this.otpRepository.countRecentByIdentifier(
-      address,
-      this.deliveryChannel.channel,
-      OtpPurposes.PASSWORD_RESET,
-      THROTTLE_WINDOW_HOURS
-    );
-
-    const lastOtp = await this.otpRepository.findLatestByIdentifier(
+    const throttle = await readThrottle(
+      this.otpRepository,
       address,
       this.deliveryChannel.channel,
       OtpPurposes.PASSWORD_RESET
     );
 
-    if (getRetryAfter(recentCount, lastOtp?.createdAt ?? null) > 0) {
+    if (throttle.retryAfterSeconds > 0) {
       return;
     }
 
