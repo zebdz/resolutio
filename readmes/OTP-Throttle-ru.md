@@ -24,11 +24,12 @@
 ## Как это работает
 
 1. Пользователь запрашивает OTP
-2. Система считает, сколько OTP было отправлено на этот номер за последние 24 часа (`recentCount`)
-3. Система находит время создания последнего OTP (`lastOtpCreatedAt`)
-4. `getRetryAfter(recentCount, lastOtpCreatedAt)` вычисляет оставшееся время ожидания в секундах
-5. Если `retryAfter > 0` — запрос отклоняется с ошибкой `otp.errors.throttled`
-6. Если `retryAfter === 0` — OTP генерируется и отправляется
+2. `readThrottle()` считает, сколько OTP было отправлено на этот идентификатор за последние 24 часа (`recentCount`), и находит время создания последнего (`lastOtpCreatedAt`)
+3. `getRetryAfter(recentCount, lastOtpCreatedAt)` вычисляет оставшееся время ожидания в секундах (`retryAfterSeconds`)
+4. Если `retryAfterSeconds > 0` — запрос отклоняется с ошибкой `otp.errors.throttled` (сброс пароля вместо этого молча не отправляет код)
+5. Если `retryAfterSeconds === 0` — OTP генерируется и отправляется
+
+Все три юзкейса запроса кода (подтверждение телефона, подтверждение email, сброс пароля) проходят через `readThrottle()`, так что правило записано один раз.
 
 ## Срок действия OTP
 
@@ -38,8 +39,28 @@
 
 Окно скользящее — старые OTP автоматически выпадают из подсчёта по мере того, как их возраст превышает 24 часа. Ручного сброса нет.
 
+## Страница подтверждения телефона
+
+Страница рендерится из состояния, известного серверу, через `GetPhoneConfirmationStatusUseCase`:
+
+- `hasPendingCode` — последний OTP подтверждения телефона для пользователя не проверен, не истёк и ещё имеет попытки. Без него поле ввода кода скрыто, а основное действие — «Отправить код».
+- `retryAfterSeconds` — `getRetryAfter(...)` для телефона пользователя, чтобы обратный отсчёт после перезагрузки совпадал с троттлингом. Форма показывает его как таймер (`formatCountdown`: `4:59`, `1:00:00`), поскольку ступени доходят до 24 часов.
+
+Каждый запрос кода (включая первый) явный и проходит через CAPTCHA; при открытии страницы ничего не запрашивается. `requestConfirmationOtpAction` возвращает `retryAfterSeconds` для _следующего_ запроса (`calculateThrottleDelay(recentCount + 1)`), от которого форма ведёт обратный отсчёт. Подтверждение отправляет только код: `ConfirmPhoneUseCase` находит OTP через `OtpRepository.findLatestByUserId`, так что браузер не хранит id OTP.
+
+Вход и регистрация отправляют первый код сами по тому же правилу, по которому страница подтверждения телефона включает свою кнопку (`shouldIssueCode()` поверх `readOtpStatus()`, из которого страница и рендерится): только если нет кода, который ещё можно ввести, и `readThrottle()` разрешает. Иначе они всё равно успешны, а страница показывает ожидающий код или таймер, так что повторные входы или повторная регистрация неподтверждённого номера не тратят SMS и не обесценивают код, уже пришедший в SMS. У нового аккаунта кода ещё нет, поэтому его первый код уходит всегда. Клиенту из этих действий о коде ничего не передаётся: страница читает состояние с сервера.
+
+## Страница аккаунта (подтверждение email)
+
+Та же схема через `GetEmailConfirmationStatusUseCase`: `hasPendingCode` истинно только для непроверенного, неистёкшего кода с оставшимися попытками, отправленного на адрес, который сейчас указан в профиле; `retryAfterSeconds` следует троттлингу для этого адреса. Оба статусных юзкейса используют общий `readOtpStatus()`. Форма не хранит id OTP: `updateEmailAction` и `requestEmailConfirmationAction` возвращают `retryAfterSeconds` для обратного отсчёта, а `confirmEmailAction` отправляет только код, который `ConfirmEmailUseCase` находит через `OtpRepository.findLatestByUserId`. CAPTCHA здесь нет: вызывающий авторизован, ограничен rate limit и троттлингом.
+
 ## Ключевые файлы
 
-- `src/application/auth/OtpThrottleCalculator.ts` — логика расчёта задержек
-- `src/application/auth/RequestConfirmationOtpUseCase.ts` — юзкейс, применяющий троттлинг
+- `src/application/auth/OtpThrottleCalculator.ts` — логика расчёта задержек; `readThrottle()` читает текущее состояние для одного идентификатора
+- `src/application/auth/RequestConfirmationOtpUseCase.ts`, `RequestEmailConfirmationOtpUseCase.ts`, `RequestPasswordResetUseCase.ts` — юзкейсы, применяющие троттлинг
+- `src/application/auth/OtpStatus.ts` — `readOtpStatus()`: статус «код ожидает ввода» + троттлинг, общий для двух статусных юзкейсов ниже; `shouldIssueCode()` — правило отправки, которое применяют вход и регистрация
+- `src/application/auth/GetPhoneConfirmationStatusUseCase.ts` — статус только для чтения для страницы подтверждения телефона
+- `src/application/auth/GetEmailConfirmationStatusUseCase.ts` — статус только для чтения для подтверждения email на странице аккаунта
+- `src/web/components/auth/otpControls.ts` — чистые правила кнопок, общие для обеих форм ввода кода
+- `src/web/hooks/useCountdown.ts`, `src/web/lib/formatCountdown.ts` — состояние обратного отсчёта и его подпись `m:ss` / `h:mm:ss`
 - `src/application/auth/OtpErrors.ts` — коды ошибок

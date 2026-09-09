@@ -106,6 +106,14 @@ export class OtpVerification {
     return this.props.verifiedAt !== null;
   }
 
+  /**
+   * Still awaiting a correct entry: not yet verified, not expired, and with
+   * attempts left. This is the code the confirm-phone page asks the user for.
+   */
+  isPending(): boolean {
+    return !this.isVerified() && !this.isExpired() && !this.hasMaxAttempts();
+  }
+
   hasMaxAttempts(): boolean {
     return this.props.attempts >= this.props.maxAttempts;
   }

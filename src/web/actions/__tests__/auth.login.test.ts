@@ -199,3 +199,39 @@ describe('loginAction — CAPTCHA enforcement', () => {
     expect(mockCaptchaVerify).not.toHaveBeenCalled();
   });
 });
+
+describe('loginAction — payload', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockIsCaptchaEnforced.mockReturnValue(false);
+    mockCaptchaVerify.mockResolvedValue(true);
+    mockIsSuperAdmin.mockResolvedValue(false);
+  });
+
+  // The confirm-phone page reads its state from the server; the form only
+  // needs to know where to go next.
+  it('flags an unconfirmed account with nothing about the code', async () => {
+    mockLoginExecute.mockResolvedValue({
+      success: true,
+      value: {
+        user: { id: 'user-1' },
+        session: { id: 'sess-1' },
+        expiresInSeconds: 3600,
+        needsConfirmation: true,
+      },
+    });
+
+    const result = await loginAction(
+      makeFormData('+71234567890', 'password123')
+    );
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.data).toStrictEqual({
+        userId: 'user-1',
+        needsConfirmation: true,
+      });
+    }
+  });
+});

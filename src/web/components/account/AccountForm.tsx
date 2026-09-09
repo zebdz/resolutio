@@ -22,6 +22,9 @@ import {
 } from '@/src/web/actions/user/email';
 import { Badge } from '@/src/web/components/catalyst/badge';
 import { Locale } from '@/src/i18n/locales';
+import { useCountdown } from '@/src/web/hooks/useCountdown';
+import { deriveOtpControls } from '@/src/web/components/auth/otpControls';
+import { formatCountdown } from '@/src/web/lib/formatCountdown';
 type Props = {
   user: {
     id: string;
@@ -38,10 +41,17 @@ type Props = {
     email: string | null;
     emailConfirmed: boolean;
   };
+  // Reported by the server: whether a code for the current address can still
+  // be entered, and seconds until another may be requested.
+  emailCode: {
+    hasPendingCode: boolean;
+    retryAfterSeconds: number;
+  };
 };
 
-export function AccountForm({ user }: Props) {
+export function AccountForm({ user, emailCode }: Props) {
   const t = useTranslations('account');
+  const tOtp = useTranslations('otp');
   const router = useRouter();
 
   // --- Preferences form state ---
@@ -69,11 +79,31 @@ export function AccountForm({ user }: Props) {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [emailSuccess, setEmailSuccess] = useState<string | null>(null);
   const [emailValue, setEmailValue] = useState(user.email ?? '');
-  const [pendingOtpId, setPendingOtpId] = useState<string | null>(null);
+  const [hasPendingCode, setHasPendingCode] = useState(
+    emailCode.hasPendingCode
+  );
+  const [resendCountdown, setResendCountdown] = useCountdown(
+    emailCode.retryAfterSeconds
+  );
   const [confirmCode, setConfirmCode] = useState('');
 
   const emailChanged =
     emailValue.trim().toLowerCase() !== (user.email ?? '').toLowerCase();
+
+  const codeControls = deriveOtpControls({
+    hasPendingCode,
+    otpCodeLength: confirmCode.length,
+    isPending: isEmailPending,
+    resendCountdown,
+    // Requests here are authenticated and throttled; no CAPTCHA.
+    captchaRequired: false,
+    hasCaptchaToken: false,
+  });
+
+  const requestCodeLabel =
+    codeControls.requestLabel === 'resendIn'
+      ? tOtp('resendIn', { time: formatCountdown(resendCountdown) })
+      : tOtp(codeControls.requestLabel);
 
   const prefsChanged =
     prefValues.language !== user.language ||
@@ -173,13 +203,19 @@ export function AccountForm({ user }: Props) {
         return;
       }
 
-      setPendingOtpId(result.data?.otpId ?? null);
+      setHasPendingCode(true);
+      setResendCountdown(result.data.retryAfterSeconds);
+      setConfirmCode('');
       setEmailSuccess(t('email.codeSent'));
       router.refresh();
     });
   }
 
-  function handleResendCode() {
+  function handleRequestCode() {
+    if (!codeControls.canRequestCode) {
+      return;
+    }
+
     setEmailError(null);
     setEmailSuccess(null);
 
@@ -192,7 +228,9 @@ export function AccountForm({ user }: Props) {
         return;
       }
 
-      setPendingOtpId(result.data.otpId);
+      setHasPendingCode(true);
+      setResendCountdown(result.data.retryAfterSeconds);
+      setConfirmCode('');
       setEmailSuccess(t('email.codeSent'));
     });
   }
@@ -203,7 +241,6 @@ export function AccountForm({ user }: Props) {
 
     startEmailTransition(async () => {
       const form = new FormData();
-      form.set('otpId', pendingOtpId ?? '');
       form.set('code', confirmCode);
 
       const result = await confirmEmailAction(form);
@@ -214,7 +251,7 @@ export function AccountForm({ user }: Props) {
         return;
       }
 
-      setPendingOtpId(null);
+      setHasPendingCode(false);
       setConfirmCode('');
       setEmailSuccess(t('email.confirmed'));
       router.refresh();
@@ -319,7 +356,9 @@ export function AccountForm({ user }: Props) {
             </Description>
           </Field>
 
-          {user.email && !user.emailConfirmed && (
+          {/* Rendered from server state: a reload keeps the code entry open
+              while a code is pending, and offers to send one otherwise */}
+          {user.email && !user.emailConfirmed && hasPendingCode && (
             <Field>
               <Label>{t('email.codeLabel')}</Label>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
@@ -336,7 +375,7 @@ export function AccountForm({ user }: Props) {
                 <Button
                   type="button"
                   onClick={handleConfirmCode}
-                  disabled={isEmailPending || confirmCode.length !== 6}
+                  disabled={!codeControls.canVerify}
                   className="cursor-pointer disabled:cursor-not-allowed"
                 >
                   {t('email.confirm')}
@@ -344,14 +383,28 @@ export function AccountForm({ user }: Props) {
                 <Button
                   type="button"
                   plain
-                  onClick={handleResendCode}
-                  disabled={isEmailPending}
+                  onClick={handleRequestCode}
+                  disabled={!codeControls.canRequestCode}
                   className="cursor-pointer disabled:cursor-not-allowed"
                 >
-                  {t('email.resend')}
+                  {requestCodeLabel}
                 </Button>
               </div>
               <Description>{t('email.codeHint')}</Description>
+            </Field>
+          )}
+
+          {user.email && !user.emailConfirmed && !hasPendingCode && (
+            <Field>
+              <Button
+                type="button"
+                onClick={handleRequestCode}
+                disabled={!codeControls.canRequestCode}
+                className="cursor-pointer disabled:cursor-not-allowed"
+              >
+                {requestCodeLabel}
+              </Button>
+              <Description>{t('email.noCodeHint')}</Description>
             </Field>
           )}
         </FieldGroup>

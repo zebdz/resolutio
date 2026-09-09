@@ -244,18 +244,8 @@ export function RegisterForm({ locale }: Props) {
 
         formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } else {
-        // Store OTP data for confirm-phone page
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem(
-            'confirmPhoneData',
-            JSON.stringify({
-              otpId: result.data.otpId,
-              backdoorCode: result.data.backdoorCode,
-              expiresInSeconds: result.data.expiresInSeconds,
-            })
-          );
-        }
-
+        // The confirm-phone page reads the pending code from the server; no
+        // handoff through browser storage.
         router.push('/confirm-phone');
       }
     });

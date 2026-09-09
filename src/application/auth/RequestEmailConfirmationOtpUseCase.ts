@@ -8,7 +8,7 @@ import { OtpCodeHasher } from './OtpCodeHasher';
 import { OtpDeliveryChannel } from './OtpDeliveryChannel';
 import { OtpErrors } from './OtpErrors';
 import { AuthErrors } from './AuthErrors';
-import { getRetryAfter, THROTTLE_WINDOW_HOURS } from './OtpThrottleCalculator';
+import { calculateThrottleDelay, readThrottle } from './OtpThrottleCalculator';
 
 export interface RequestEmailConfirmationOtpInput {
   userId: string;
@@ -16,10 +16,10 @@ export interface RequestEmailConfirmationOtpInput {
 }
 
 export interface RequestEmailConfirmationOtpResult {
-  otpId: string;
-  expiresAt: Date;
-  backdoorCode?: string;
-  expiresInSeconds: number;
+  // Seconds until the throttle allows the next code; the account page counts
+  // down from this. Nothing else is needed: confirming resolves the code
+  // server-side from the user.
+  retryAfterSeconds: number;
 }
 
 interface Dependencies {
@@ -74,27 +74,21 @@ export class RequestEmailConfirmationOtpUseCase {
 
       const address = user.email.getValue();
 
-      const recentCount = await this.otpRepository.countRecentByIdentifier(
-        address,
-        this.deliveryChannel.channel,
-        OtpPurposes.EMAIL_CONFIRMATION,
-        THROTTLE_WINDOW_HOURS
-      );
-
-      const lastOtp = await this.otpRepository.findLatestByIdentifier(
+      const throttle = await readThrottle(
+        this.otpRepository,
         address,
         this.deliveryChannel.channel,
         OtpPurposes.EMAIL_CONFIRMATION
       );
 
-      if (getRetryAfter(recentCount, lastOtp?.createdAt ?? null) > 0) {
+      if (throttle.retryAfterSeconds > 0) {
         return failure(OtpErrors.THROTTLED);
       }
 
       const code = OtpCode.generate();
       const expiresAt = new Date(Date.now() + this.expiryMinutes * 60 * 1000);
 
-      const saved = await this.otpRepository.save(
+      await this.otpRepository.save(
         OtpVerification.create({
           identifier: address,
           channel: this.deliveryChannel.channel,
@@ -119,10 +113,7 @@ export class RequestEmailConfirmationOtpUseCase {
       }
 
       return success({
-        otpId: saved.id,
-        expiresAt,
-        backdoorCode: deliveryResult.backdoorCode,
-        expiresInSeconds: this.expiryMinutes * 60,
+        retryAfterSeconds: calculateThrottleDelay(throttle.recentCount + 1),
       });
     } catch (error) {
       return failure(

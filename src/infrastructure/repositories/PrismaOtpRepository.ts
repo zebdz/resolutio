@@ -58,6 +58,22 @@ export class PrismaOtpRepository implements OtpRepository {
     return this.toDomain(record);
   }
 
+  async findLatestByUserId(
+    userId: string,
+    purpose: OtpPurpose
+  ): Promise<OtpVerification | null> {
+    const record = await this.prisma.otpVerification.findFirst({
+      where: { userId, purpose },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!record) {
+      return null;
+    }
+
+    return this.toDomain(record);
+  }
+
   async update(otp: OtpVerification): Promise<OtpVerification> {
     const updated = await this.prisma.otpVerification.update({
       where: { id: otp.id },
