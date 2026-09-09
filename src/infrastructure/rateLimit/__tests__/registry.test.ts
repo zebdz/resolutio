@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import en from '@/messages/en.json';
+import ru from '@/messages/ru.json';
 
 import {
   limiterRegistry,
@@ -40,6 +42,22 @@ describe('limiterRegistry', () => {
     // by array index, so inserting an entry anywhere but the end would
     // silently repoint every export after it.
     expect(addressSuggestLimiter).toBe(limiterRegistry[9].limiter);
+  });
+});
+
+describe('limiterRegistry labels', () => {
+  // The superadmin pages render tLabels(entry.label); a label without a
+  // translation shows up as the raw key path.
+  it.each([
+    ['en', en],
+    ['ru', ru],
+  ])('every registry label is translated in %s', (_lang, messages) => {
+    const labels: Record<string, string> =
+      messages.superadmin.rateLimits.labels;
+
+    for (const entry of limiterRegistry) {
+      expect(labels[entry.label], `label "${entry.label}"`).toBeDefined();
+    }
   });
 });
 

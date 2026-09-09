@@ -1679,7 +1679,9 @@
         "phoneSearch": "Phone Search (userId)",
         "login": "Login (IP+Phone)",
         "registrationIp": "Registration (IP)",
-        "registrationDevice": "Registration (Device)"
+        "registrationDevice": "Registration (Device)",
+        "reportCreate": "Report creation (userId)",
+        "addressSuggest": "Address suggestions (DaData daily quota)"
       }
     },
     "suspiciousActivity": {

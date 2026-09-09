@@ -1679,7 +1679,9 @@
         "phoneSearch": "Поиск по телефону (userId)",
         "login": "Вход (IP+Телефон)",
         "registrationIp": "Регистрация (IP)",
-        "registrationDevice": "Регистрация (Устройство)"
+        "registrationDevice": "Регистрация (Устройство)",
+        "reportCreate": "Создание отчёта (userId)",
+        "addressSuggest": "Подсказки адресов (дневная квота DaData)"
       }
     },
     "suspiciousActivity": {
