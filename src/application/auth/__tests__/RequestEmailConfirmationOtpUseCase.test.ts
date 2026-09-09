@@ -253,4 +253,18 @@ describe('RequestEmailConfirmationOtpUseCase', () => {
     expect(result.success).toBe(false);
     expect(otpRepository.save).not.toHaveBeenCalled();
   });
+
+  // The account page counts down from this; the delay escalates per address.
+  it('reports when the next code may be requested', async () => {
+    const result = await useCase.execute({
+      userId: 'user-1',
+      clientIp: '127.0.0.1',
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.retryAfterSeconds).toBe(60);
+    }
+  });
 });

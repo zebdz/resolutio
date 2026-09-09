@@ -36,6 +36,23 @@ class MockOtpRepository implements OtpRepository {
     return null;
   }
 
+  async findLatestByUserId(
+    userId: string,
+    purpose: OtpPurpose
+  ): Promise<OtpVerification | null> {
+    const matching = Array.from(this.otps.values()).filter(
+      (o) => o.userId === userId && o.purpose === purpose
+    );
+
+    if (matching.length === 0) {
+      return null;
+    }
+
+    return matching.sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+    )[0];
+  }
+
   async update(otp: OtpVerification): Promise<OtpVerification> {
     this.otps.set(otp.id, otp);
 
@@ -163,6 +180,7 @@ function makeOtp(
     verifiedAt?: Date | null;
     attempts?: number;
     maxAttempts?: number;
+    createdAt?: Date;
   } = {}
 ): OtpVerification {
   return OtpVerification.reconstitute({
@@ -176,7 +194,7 @@ function makeOtp(
     maxAttempts: overrides.maxAttempts ?? 5,
     expiresAt: overrides.expiresAt ?? new Date(Date.now() + 10 * 60 * 1000),
     verifiedAt: overrides.verifiedAt ?? null,
-    createdAt: new Date(),
+    createdAt: overrides.createdAt ?? new Date(),
     // Defaults to the user makeUser() builds. The column is non-nullable in
     // the database, so leaving it undefined here modelled a row that cannot
     // exist — and hid the missing ownership check.
@@ -207,7 +225,6 @@ describe('ConfirmPhoneUseCase', () => {
 
     const result = await useCase.execute({
       userId: 'nonexistent',
-      otpId: 'otp-1',
       code: '123456',
     });
 
@@ -225,7 +242,6 @@ describe('ConfirmPhoneUseCase', () => {
 
     const result = await useCase.execute({
       userId: 'user-1',
-      otpId: 'otp-1',
       code: '123456',
     });
 
@@ -242,7 +258,6 @@ describe('ConfirmPhoneUseCase', () => {
 
     const result = await useCase.execute({
       userId: 'user-1',
-      otpId: 'nonexistent',
       code: '123456',
     });
 
@@ -265,7 +280,6 @@ describe('ConfirmPhoneUseCase', () => {
 
     const result = await useCase.execute({
       userId: 'user-1',
-      otpId: 'otp-1',
       code: '123456',
     });
 
@@ -285,7 +299,6 @@ describe('ConfirmPhoneUseCase', () => {
 
     const result = await useCase.execute({
       userId: 'user-1',
-      otpId: 'otp-1',
       code: '123456',
     });
 
@@ -303,7 +316,6 @@ describe('ConfirmPhoneUseCase', () => {
 
     const result = await useCase.execute({
       userId: 'user-1',
-      otpId: 'otp-1',
       code: '123456',
     });
 
@@ -321,7 +333,6 @@ describe('ConfirmPhoneUseCase', () => {
 
     const result = await useCase.execute({
       userId: 'user-1',
-      otpId: 'otp-1',
       code: '123456',
     });
 
@@ -336,7 +347,6 @@ describe('ConfirmPhoneUseCase', () => {
 
     await useCase.execute({
       userId: 'user-1',
-      otpId: 'otp-1',
       code: '123456',
     });
 
@@ -369,7 +379,6 @@ describe('ConfirmPhoneUseCase OTP binding', () => {
 
     const result = await useCase.execute({
       userId: 'user-1',
-      otpId: 'otp-1',
       code: '123456',
     });
 
@@ -389,7 +398,6 @@ describe('ConfirmPhoneUseCase OTP binding', () => {
 
     const result = await useCase.execute({
       userId: 'user-1',
-      otpId: 'otp-1',
       code: '123456',
     });
 
@@ -400,5 +408,45 @@ describe('ConfirmPhoneUseCase OTP binding', () => {
     }
 
     expect(userRepository.confirmedUserIds).not.toContain('user-1');
+  });
+});
+
+// The client no longer holds an otp id: reloads and server-side redirects
+// lost it, which is why the form used to auto-request a fresh code. The use
+// case resolves the code itself, from the latest one issued to the user.
+describe('ConfirmPhoneUseCase code resolution', () => {
+  let useCase: ConfirmPhoneUseCase;
+  let otpRepository: MockOtpRepository;
+  let userRepository: MockUserRepository;
+
+  beforeEach(() => {
+    otpRepository = new MockOtpRepository();
+    userRepository = new MockUserRepository();
+    userRepository.addUser(makeUser());
+
+    useCase = new ConfirmPhoneUseCase({
+      otpRepository,
+      otpCodeHasher: new MockOtpCodeHasher(),
+      userRepository,
+    });
+  });
+
+  it('confirms with the latest code issued to the user, without an otp id', async () => {
+    otpRepository.addOtp(
+      makeOtp({
+        id: 'otp-old',
+        code: 'hashed-111111',
+        createdAt: new Date(Date.now() - 5 * 60 * 1000),
+      })
+    );
+    otpRepository.addOtp(makeOtp({ id: 'otp-new', code: 'hashed-123456' }));
+
+    const result = await useCase.execute({ userId: 'user-1', code: '123456' });
+
+    expect(result.success).toBe(true);
+    expect(userRepository.confirmedUserIds).toContain('user-1');
+
+    const verified = await otpRepository.findById('otp-new');
+    expect(verified!.isVerified()).toBe(true);
   });
 });

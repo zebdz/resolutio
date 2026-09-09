@@ -63,7 +63,7 @@ describe('ConfirmEmailUseCase', () => {
       save: vi.fn().mockImplementation(async (u: User) => u),
     };
     otpRepository = {
-      findById: vi.fn().mockResolvedValue(buildOtp()),
+      findLatestByUserId: vi.fn().mockResolvedValue(buildOtp()),
       update: vi.fn().mockImplementation(async (o: OtpVerification) => o),
     };
     otpCodeHasher = { hash: vi.fn(), verify: vi.fn().mockReturnValue(true) };
@@ -76,7 +76,7 @@ describe('ConfirmEmailUseCase', () => {
   });
 
   function run(code = '123456') {
-    return useCase.execute({ userId: 'user-1', otpId: 'otp-1', code });
+    return useCase.execute({ userId: 'user-1', code });
   }
 
   it('marks the email confirmed on a valid code', async () => {
@@ -100,9 +100,9 @@ describe('ConfirmEmailUseCase', () => {
   });
 
   it('rejects an already-verified code', async () => {
-    (otpRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      buildOtp({ verifiedAt: new Date() })
-    );
+    (
+      otpRepository.findLatestByUserId as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(buildOtp({ verifiedAt: new Date() }));
 
     const result = await run();
 
@@ -116,39 +116,23 @@ describe('ConfirmEmailUseCase', () => {
   });
 
   // The replay guard from spec §4: a reset code must not confirm an address.
-  it('rejects a code minted for a different purpose', async () => {
-    (otpRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      buildOtp({ purpose: OtpPurposes.PASSWORD_RESET })
+  // Ownership and purpose are scoped by the query itself: the browser never
+  // names an otp id, so there is nothing to probe.
+  it('resolves the latest email-confirmation code issued to the user', async () => {
+    await run();
+
+    expect(otpRepository.findLatestByUserId).toHaveBeenCalledWith(
+      'user-1',
+      OtpPurposes.EMAIL_CONFIRMATION
     );
-
-    const result = await run();
-
-    expect(result.success).toBe(false);
-
-    if (!result.success) {
-      expect(result.error).toBe(OtpErrors.NOT_FOUND);
-    }
-
-    expect(userRepository.save).not.toHaveBeenCalled();
-  });
-
-  it('rejects an OTP belonging to another user', async () => {
-    (otpRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      buildOtp({ userId: 'someone-else' })
-    );
-
-    const result = await run();
-
-    expect(result.success).toBe(false);
-    expect(userRepository.save).not.toHaveBeenCalled();
   });
 
   // The code proved ownership of the address it was sent to. If the user has
   // since changed their address, it proves nothing about the new one.
   it('rejects a code issued to a different address than the one on file', async () => {
-    (otpRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      buildOtp({ identifier: 'old@mail.ru' })
-    );
+    (
+      otpRepository.findLatestByUserId as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(buildOtp({ identifier: 'old@mail.ru' }));
 
     const result = await run();
 
@@ -157,9 +141,9 @@ describe('ConfirmEmailUseCase', () => {
   });
 
   it('rejects an expired code', async () => {
-    (otpRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      buildOtp({ expiresAt: new Date(Date.now() - 1000) })
-    );
+    (
+      otpRepository.findLatestByUserId as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(buildOtp({ expiresAt: new Date(Date.now() - 1000) }));
 
     const result = await run();
 
@@ -171,9 +155,9 @@ describe('ConfirmEmailUseCase', () => {
   });
 
   it('rejects once attempts are exhausted', async () => {
-    (otpRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      buildOtp({ attempts: 5 })
-    );
+    (
+      otpRepository.findLatestByUserId as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(buildOtp({ attempts: 5 }));
 
     const result = await run();
 
@@ -202,9 +186,9 @@ describe('ConfirmEmailUseCase', () => {
   });
 
   it('rejects when the OTP does not exist', async () => {
-    (otpRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(
-      null
-    );
+    (
+      otpRepository.findLatestByUserId as ReturnType<typeof vi.fn>
+    ).mockResolvedValue(null);
 
     const result = await run();
 

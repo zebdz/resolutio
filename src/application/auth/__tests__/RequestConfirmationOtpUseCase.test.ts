@@ -7,6 +7,7 @@ import {
   OtpVerification,
   OtpChannel,
   OtpPurpose,
+  OtpPurposes,
 } from '@/domain/otp/OtpVerification';
 import { OtpCodeHasher } from '../OtpCodeHasher';
 import { OtpDeliveryChannel, OtpDeliveryResult } from '../OtpDeliveryChannel';
@@ -42,6 +43,21 @@ class MockOtpRepository implements OtpRepository {
         o.identifier === identifier &&
         o.channel === channel &&
         o.purpose === purpose
+    );
+
+    if (all.length === 0) {
+      return null;
+    }
+
+    return all.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+  }
+
+  async findLatestByUserId(
+    userId: string,
+    purpose: OtpPurpose
+  ): Promise<OtpVerification | null> {
+    const all = Array.from(this.otps.values()).filter(
+      (o) => o.userId === userId && o.purpose === purpose
     );
 
     if (all.length === 0) {
@@ -339,6 +355,71 @@ describe('RequestConfirmationOtpUseCase', () => {
     if (result.success) {
       const savedOtp = await otpRepository.findById(result.value.otpId);
       expect(savedOtp!.code).toMatch(/^hashed-/);
+    }
+  });
+});
+
+// The client counts down to the next allowed request from this figure. It
+// used to assume 60 seconds every time, while the throttle escalates.
+describe('RequestConfirmationOtpUseCase retryAfterSeconds', () => {
+  let useCase: RequestConfirmationOtpUseCase;
+  let otpRepository: MockOtpRepository;
+
+  beforeEach(() => {
+    otpRepository = new MockOtpRepository();
+    const userRepository = new MockUserRepository();
+    userRepository.addUser(makeUser());
+
+    useCase = new RequestConfirmationOtpUseCase({
+      otpRepository,
+      otpCodeHasher: new MockOtpCodeHasher(),
+      deliveryChannel: new MockOtpDeliveryChannel(),
+      userRepository,
+    });
+  });
+
+  it('tells how long until the next code may be requested', async () => {
+    const result = await useCase.execute({
+      userId: 'user-1',
+      clientIp: '127.0.0.1',
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.retryAfterSeconds).toBe(60);
+    }
+  });
+
+  it('escalates the wait with the codes already sent in the window', async () => {
+    // One code went out two minutes ago: this request is allowed, and the
+    // one after it has to wait the third-tier delay.
+    await otpRepository.save(
+      OtpVerification.reconstitute({
+        id: '',
+        identifier: '+79161234567',
+        channel: 'sms',
+        purpose: OtpPurposes.PHONE_CONFIRMATION,
+        code: 'hashed-000000',
+        clientIp: '127.0.0.1',
+        attempts: 0,
+        maxAttempts: 5,
+        expiresAt: new Date(Date.now() + 8 * 60 * 1000),
+        verifiedAt: null,
+        createdAt: new Date(Date.now() - 2 * 60 * 1000),
+        userId: 'user-1',
+      })
+    );
+
+    const result = await useCase.execute({
+      userId: 'user-1',
+      clientIp: '127.0.0.1',
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.retryAfterSeconds).toBe(300);
     }
   });
 });

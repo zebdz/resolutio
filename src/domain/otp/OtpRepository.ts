@@ -8,6 +8,13 @@ export interface OtpRepository {
     channel: OtpChannel,
     purpose: OtpPurpose
   ): Promise<OtpVerification | null>;
+  // The latest code minted for a user for one purpose, whatever address or
+  // channel it went to. Phone confirmation resolves its code this way: the
+  // user is known from the session, and the client holds no otp id.
+  findLatestByUserId(
+    userId: string,
+    purpose: OtpPurpose
+  ): Promise<OtpVerification | null>;
   update(otp: OtpVerification): Promise<OtpVerification>;
   // Deliberately purpose-agnostic: this is the global per-IP ceiling and
   // should count every code an address caused, whatever it was for.

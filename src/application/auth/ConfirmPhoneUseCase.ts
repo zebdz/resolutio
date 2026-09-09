@@ -8,7 +8,6 @@ import { AuthErrors } from './AuthErrors';
 
 export interface ConfirmPhoneInput {
   userId: string;
-  otpId: string;
   code: string;
 }
 
@@ -44,25 +43,18 @@ export class ConfirmPhoneUseCase {
       return failure(AuthErrors.ACCOUNT_NOT_CONFIRMED);
     }
 
-    // 3. Find OTP
-    const otp = await this.otpRepository.findById(input.otpId);
+    // 3. Resolve the code server-side: the latest one minted for this user to
+    // confirm a phone. The client used to send an otp id, but that id only
+    // ever lived in browser state, so a reload or a server-side redirect lost
+    // it. Looking up by user and purpose also settles, at the query itself,
+    // that the OTP belongs to the user being confirmed and that a code minted
+    // to confirm an email address or reset a password is not spendable here.
+    const otp = await this.otpRepository.findLatestByUserId(
+      user.id,
+      OtpPurposes.PHONE_CONFIRMATION
+    );
 
     if (!otp) {
-      return failure(OtpErrors.NOT_FOUND);
-    }
-
-    // The OTP must belong to the user being confirmed. Today `userId` comes
-    // from the session so this cannot be crossed, but nothing in the use case
-    // itself enforced it — and the password-reset flow runs unauthenticated.
-    // NOT_FOUND rather than a distinct code: a caller probing ids learns
-    // nothing from the difference.
-    if (otp.userId !== user.id) {
-      return failure(OtpErrors.NOT_FOUND);
-    }
-
-    // A code minted to confirm an email address or reset a password must not
-    // be spendable here.
-    if (otp.purpose !== OtpPurposes.PHONE_CONFIRMATION) {
       return failure(OtpErrors.NOT_FOUND);
     }
 

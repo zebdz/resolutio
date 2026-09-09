@@ -126,10 +126,6 @@ const logoutUserUseCase = new LogoutUserUseCase(sessionRepository);
 
 export interface RegisterActionData {
   userId: string;
-  otpId: string;
-  expiresAt: string;
-  backdoorCode?: string;
-  expiresInSeconds: number;
 }
 
 export async function registerAction(
@@ -212,9 +208,8 @@ export async function registerAction(
       return { success: false, error: await translateErrorCode(result.error) };
     }
 
-    // Set session cookie. The session TTL, not the OTP window: the latter is
-    // what the client counts down, and using it here logged people out ten
-    // minutes after registering.
+    // Set session cookie. The session TTL, not the OTP window: using the
+    // latter here once logged people out ten minutes after registering.
     await setSessionCookie(
       result.value.session.id,
       result.value.sessionExpiresInSeconds
@@ -222,13 +217,9 @@ export async function registerAction(
 
     return {
       success: true,
-      data: {
-        userId: result.value.user.id,
-        otpId: result.value.otpId,
-        expiresAt: result.value.expiresAt.toISOString(),
-        backdoorCode: result.value.backdoorCode,
-        expiresInSeconds: result.value.expiresInSeconds,
-      },
+      // The confirm-phone page reads the code state from the server; the
+      // form only needs to know where to go next.
+      data: { userId: result.value.user.id },
     };
   } catch (error) {
     console.error('Register action error:', error);
@@ -251,9 +242,6 @@ export async function registerAction(
 export interface LoginActionData {
   userId: string;
   needsConfirmation?: true;
-  otpId?: string;
-  expiresAt?: string;
-  backdoorCode?: string;
 }
 
 export async function loginAction(
@@ -371,11 +359,10 @@ export async function loginAction(
       userId: result.value.user.id,
     };
 
+    // Nothing about the code goes to the client: the confirm-phone page
+    // reads its state from the server.
     if (result.value.needsConfirmation) {
       data.needsConfirmation = true;
-      data.otpId = result.value.otpId;
-      data.expiresAt = result.value.expiresAt?.toISOString();
-      data.backdoorCode = result.value.backdoorCode;
     }
 
     return {

@@ -79,7 +79,7 @@ beforeEach(() => {
     .mockResolvedValue({ success: true, value: { changed: true } });
   requestOtpExecute.mockReset().mockResolvedValue({
     success: true,
-    value: { otpId: 'otp-1', expiresInSeconds: 600 },
+    value: { retryAfterSeconds: 60 },
   });
   confirmEmailExecute
     .mockReset()
@@ -114,6 +114,10 @@ describe('updateEmailAction', () => {
       email: 'ivan@mail.ru',
     });
     expect(requestOtpExecute).toHaveBeenCalled();
+
+    if (result.success) {
+      expect(result.data).toStrictEqual({ retryAfterSeconds: 60 });
+    }
   });
 
   it('surfaces the domain error and sends nothing when the change is rejected', async () => {
@@ -164,13 +168,13 @@ describe('requestEmailConfirmationAction', () => {
     expect(requestOtpExecute).not.toHaveBeenCalled();
   });
 
-  it('returns the otp id so the form can submit the code against it', async () => {
+  it('returns when the next code may be requested, and nothing else', async () => {
     const result = await requestEmailConfirmationAction();
 
     expect(result.success).toBe(true);
 
     if (result.success) {
-      expect(result.data.otpId).toBe('otp-1');
+      expect(result.data).toStrictEqual({ retryAfterSeconds: 60 });
     }
   });
 });
@@ -178,7 +182,6 @@ describe('requestEmailConfirmationAction', () => {
 describe('confirmEmailAction', () => {
   function confirmForm() {
     const form = new FormData();
-    form.set('otpId', 'otp-1');
     form.set('code', '123456');
 
     return form;
@@ -193,13 +196,26 @@ describe('confirmEmailAction', () => {
     expect(confirmEmailExecute).not.toHaveBeenCalled();
   });
 
-  it('confirms with the session user, the otp id and the code', async () => {
+  it('confirms with the session user and the code, nothing else', async () => {
     const result = await confirmEmailAction(confirmForm());
 
     expect(result.success).toBe(true);
     expect(confirmEmailExecute).toHaveBeenCalledWith({
       userId: 'user-1',
-      otpId: 'otp-1',
+      code: '123456',
+    });
+  });
+
+  // The pending code is resolved server-side from the user; an id in the
+  // form must not steer it.
+  it('ignores an otp id smuggled in through the form', async () => {
+    const form = confirmForm();
+    form.set('otpId', 'otp-x');
+
+    await confirmEmailAction(form);
+
+    expect(confirmEmailExecute).toHaveBeenCalledWith({
+      userId: 'user-1',
       code: '123456',
     });
   });

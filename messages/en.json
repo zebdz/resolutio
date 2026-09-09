@@ -59,6 +59,7 @@
     "confirmPhone": {
       "title": "Confirm Your Phone",
       "subtitle": "We sent a verification code to {phone}",
+      "subtitleNoCode": "To confirm your phone, request a code for {phone}",
       "verify": "Confirm",
       "verifying": "Confirming...",
       "logout": "Log out",
@@ -95,8 +96,9 @@
     "codeLabel": "Verification Code",
     "verify": "Verify",
     "verifying": "Verifying...",
+    "sendCode": "Send code",
     "resend": "Resend Code",
-    "resendIn": "Resend in {seconds}s",
+    "resendIn": "Resend in {time}",
     "back": "Back",
     "backdoorHint": "Real SMS verification coming soon. Use this code: {code}",
     "errors": {
@@ -245,8 +247,8 @@
       "unconfirmedBadge": "Not confirmed",
       "codeLabel": "Confirmation code",
       "codeHint": "Enter the code we emailed to that address.",
+      "noCodeHint": "Request a code to confirm this address.",
       "confirm": "Confirm",
-      "resend": "Send again",
       "codeSent": "We sent a confirmation code to that address",
       "confirmed": "Email address confirmed"
     }

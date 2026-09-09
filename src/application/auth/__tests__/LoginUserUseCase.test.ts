@@ -8,7 +8,12 @@ import {
 import { UserRepository } from '@/domain/user/UserRepository';
 import { SessionRepository, Session } from '@/domain/user/SessionRepository';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
-import { OtpVerification, OtpChannel } from '@/domain/otp/OtpVerification';
+import {
+  OtpVerification,
+  OtpChannel,
+  OtpPurpose,
+  OtpPurposes,
+} from '@/domain/otp/OtpVerification';
 import { OtpCodeHasher } from '../OtpCodeHasher';
 import { OtpDeliveryChannel, OtpDeliveryResult } from '../OtpDeliveryChannel';
 import { User } from '@/domain/user/User';
@@ -114,8 +119,40 @@ class MockOtpRepository implements OtpRepository {
     return this.otps.get(id) || null;
   }
 
-  async findLatestByIdentifier(): Promise<OtpVerification | null> {
-    return null;
+  async findLatestByIdentifier(
+    identifier: string,
+    channel: OtpChannel,
+    purpose: OtpPurpose
+  ): Promise<OtpVerification | null> {
+    const matches = Array.from(this.otps.values())
+      .filter(
+        (otp) =>
+          otp.identifier === identifier &&
+          otp.channel === channel &&
+          otp.purpose === purpose
+      )
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    return matches[0] ?? null;
+  }
+
+  get saved(): OtpVerification[] {
+    return Array.from(this.otps.values());
+  }
+
+  seed(otp: OtpVerification): void {
+    this.otps.set(otp.id, otp);
+  }
+
+  async findLatestByUserId(
+    userId: string,
+    purpose: OtpPurpose
+  ): Promise<OtpVerification | null> {
+    const matches = Array.from(this.otps.values())
+      .filter((otp) => otp.userId === userId && otp.purpose === purpose)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    return matches[0] ?? null;
   }
 
   async update(otp: OtpVerification): Promise<OtpVerification> {
@@ -128,8 +165,21 @@ class MockOtpRepository implements OtpRepository {
     return 0;
   }
 
-  async countRecentByIdentifier(): Promise<number> {
-    return 0;
+  async countRecentByIdentifier(
+    identifier: string,
+    channel: OtpChannel,
+    purpose: OtpPurpose,
+    sinceHours: number
+  ): Promise<number> {
+    const since = Date.now() - sinceHours * 3600 * 1000;
+
+    return Array.from(this.otps.values()).filter(
+      (otp) =>
+        otp.identifier === identifier &&
+        otp.channel === channel &&
+        otp.purpose === purpose &&
+        otp.createdAt.getTime() >= since
+    ).length;
   }
 
   async deleteExpired(): Promise<void> {}
@@ -150,22 +200,16 @@ class MockOtpCodeHasher implements OtpCodeHasher {
 class MockOtpDeliveryChannel implements OtpDeliveryChannel {
   channel: OtpChannel = 'sms';
   shouldSucceed = true;
-  returnBackdoorCode = true;
+  sendCount = 0;
 
-  async send(
-    _recipient: string,
-    code: string,
-    _locale: string,
-    _clientIp: string
-  ): Promise<OtpDeliveryResult> {
+  async send(): Promise<OtpDeliveryResult> {
+    this.sendCount += 1;
+
     if (!this.shouldSucceed) {
       return { success: false };
     }
 
-    return {
-      success: true,
-      backdoorCode: this.returnBackdoorCode ? code : undefined,
-    };
+    return { success: true };
   }
 }
 
@@ -239,6 +283,32 @@ function createTestUser(
     consentGivenAt: new Date(),
     createdAt: new Date(),
     confirmedAt: overrides.confirmedAt,
+  });
+}
+
+// A phone-confirmation code issued to the user some minutes ago, valid for
+// ten minutes from issue.
+function phoneCodeFor(
+  user: User,
+  overrides: Partial<{ id: string; issuedMinutesAgo: number }> = {}
+): OtpVerification {
+  const createdAt = new Date(
+    Date.now() - (overrides.issuedMinutesAgo ?? 1) * 60 * 1000
+  );
+
+  return OtpVerification.reconstitute({
+    id: overrides.id ?? 'otp-seeded',
+    identifier: user.phoneNumber.getValue(),
+    channel: 'sms',
+    purpose: OtpPurposes.PHONE_CONFIRMATION,
+    code: 'hashed-123456',
+    clientIp: '127.0.0.1',
+    attempts: 0,
+    maxAttempts: 5,
+    expiresAt: new Date(createdAt.getTime() + 10 * 60 * 1000),
+    verifiedAt: null,
+    createdAt,
+    userId: user.id,
   });
 }
 
@@ -402,28 +472,11 @@ describe('LoginUserUseCase', () => {
     if (result.success) {
       expect(result.value.needsConfirmation).toBe(true);
       expect(result.value.session).toBeDefined();
-      expect(result.value.otpId).toBeTruthy();
-      expect(result.value.expiresAt).toBeInstanceOf(Date);
-      expect(result.value.backdoorCode).toBeTruthy();
     }
-  });
 
-  it('should not return backdoorCode when delivery channel omits it', async () => {
-    const user = createTestUser({});
-    userRepository.addUser(user);
-    deliveryChannel.returnBackdoorCode = false;
-
-    const result = await useCase.execute({
-      phoneNumber: '+79161234567',
-      password: 'securepass',
-      ipAddress: '127.0.0.1',
-    });
-
-    expect(result.success).toBe(true);
-
-    if (result.success && result.value.needsConfirmation) {
-      expect(result.value.backdoorCode).toBeUndefined();
-    }
+    expect(otpRepository.saved).toHaveLength(1);
+    expect(otpRepository.saved[0].userId).toBe('user-1');
+    expect(deliveryChannel.sendCount).toBe(1);
   });
 
   it('should not set needsConfirmation for confirmed user', async () => {
@@ -440,7 +493,81 @@ describe('LoginUserUseCase', () => {
 
     if (result.success) {
       expect(result.value.needsConfirmation).toBeUndefined();
-      expect(result.value.otpId).toBeUndefined();
     }
+
+    expect(deliveryChannel.sendCount).toBe(0);
+  });
+
+  // Re-sending on every login burned an SMS each time and, since the
+  // confirm-phone page checks the latest code, made the one already in the
+  // inbox useless.
+  it('does not send a new code while the user has a pending one', async () => {
+    const user = createTestUser();
+    userRepository.addUser(user);
+    otpRepository.seed(phoneCodeFor(user));
+
+    const result = await useCase.execute({
+      phoneNumber: '+79161234567',
+      password: 'securepass',
+      ipAddress: '127.0.0.1',
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.needsConfirmation).toBe(true);
+    }
+
+    expect(deliveryChannel.sendCount).toBe(0);
+    expect(otpRepository.saved).toHaveLength(1);
+  });
+
+  it('sends a new code once the last one has expired', async () => {
+    const user = createTestUser();
+    userRepository.addUser(user);
+    otpRepository.seed(phoneCodeFor(user, { issuedMinutesAgo: 11 }));
+
+    const result = await useCase.execute({
+      phoneNumber: '+79161234567',
+      password: 'securepass',
+      ipAddress: '127.0.0.1',
+    });
+
+    expect(result.success).toBe(true);
+    expect(deliveryChannel.sendCount).toBe(1);
+    expect(otpRepository.saved).toHaveLength(2);
+  });
+
+  // Same escalating throttle as an explicit request. Login still succeeds;
+  // the confirm-phone page shows the wait.
+  it('does not send while the throttle from earlier codes still runs', async () => {
+    const user = createTestUser();
+    userRepository.addUser(user);
+    // Three codes in the window put the next one 30 minutes out; the last
+    // expired a minute ago, so nothing is pending either.
+    otpRepository.seed(
+      phoneCodeFor(user, { id: 'otp-a', issuedMinutesAgo: 13 })
+    );
+    otpRepository.seed(
+      phoneCodeFor(user, { id: 'otp-b', issuedMinutesAgo: 12 })
+    );
+    otpRepository.seed(
+      phoneCodeFor(user, { id: 'otp-c', issuedMinutesAgo: 11 })
+    );
+
+    const result = await useCase.execute({
+      phoneNumber: '+79161234567',
+      password: 'securepass',
+      ipAddress: '127.0.0.1',
+    });
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.needsConfirmation).toBe(true);
+    }
+
+    expect(deliveryChannel.sendCount).toBe(0);
+    expect(otpRepository.saved).toHaveLength(3);
   });
 });

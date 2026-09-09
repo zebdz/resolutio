@@ -81,17 +81,9 @@ export function LoginForm() {
         setCaptchaToken(null);
         setCaptchaResetKey((prev) => prev + 1);
       } else if (result.data.needsConfirmation) {
-        // Store OTP data for confirm-phone page
-        if (typeof window !== 'undefined' && result.data.otpId) {
-          sessionStorage.setItem(
-            'confirmPhoneData',
-            JSON.stringify({
-              otpId: result.data.otpId,
-              backdoorCode: result.data.backdoorCode, // TODO: remove backdoorCord after real SMS-send implementation
-            })
-          );
-        }
-
+        // The confirm-phone page reads the pending code from the server; no
+        // handoff through browser storage, which a reload or an origin change
+        // (http -> https) used to lose.
         router.push('/confirm-phone');
       } else {
         const returnTo = consumeReturnToClient();

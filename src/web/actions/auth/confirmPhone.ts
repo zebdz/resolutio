@@ -76,12 +76,13 @@ export async function confirmPhoneAction(
       return { success: false, error: tCommon('unauthorized') };
     }
 
-    const otpId = formData.get('otpId') as string;
     const code = formData.get('code') as string;
 
+    // The pending code is resolved server-side from the session user. The
+    // form used to send an otp id it kept in sessionStorage, which a reload
+    // or a server-side redirect lost.
     const result = await confirmPhoneUseCase.execute({
       userId: user.id,
-      otpId,
       code,
     });
 
@@ -110,16 +111,16 @@ export async function confirmPhoneAction(
   }
 }
 
+export interface RequestConfirmationOtpData {
+  backdoorCode?: string;
+  // Seconds until the throttle allows the next code; the form counts down
+  // from this instead of assuming a fixed minute.
+  retryAfterSeconds: number;
+}
+
 export async function requestConfirmationOtpAction(
   captchaToken?: string
-): Promise<
-  ActionResult<{
-    otpId: string;
-    expiresAt: string;
-    backdoorCode?: string;
-    expiresInSeconds: number;
-  }>
-> {
+): Promise<ActionResult<RequestConfirmationOtpData>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -173,10 +174,8 @@ export async function requestConfirmationOtpAction(
     return {
       success: true,
       data: {
-        otpId: result.value.otpId,
-        expiresAt: result.value.expiresAt.toISOString(),
         backdoorCode: result.value.backdoorCode,
-        expiresInSeconds: result.value.expiresInSeconds,
+        retryAfterSeconds: result.value.retryAfterSeconds,
       },
     };
   } catch (error) {

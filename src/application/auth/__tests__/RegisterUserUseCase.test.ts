@@ -13,6 +13,7 @@ import {
   OtpVerification,
   OtpChannel,
   OtpPurposes,
+  OtpPurpose,
 } from '@/domain/otp/OtpVerification';
 import { EmailAddress } from '@/domain/user/EmailAddress';
 import { PasswordHasher } from '../RegisterUserUseCase';
@@ -137,8 +138,28 @@ class MockOtpRepository implements OtpRepository {
     return this.otps.get(id) || null;
   }
 
-  async findLatestByIdentifier(): Promise<OtpVerification | null> {
-    return null;
+  seed(otp: OtpVerification): void {
+    this.otps.set(otp.id, otp);
+  }
+
+  async findLatestByIdentifier(
+    identifier: string,
+    channel: OtpChannel,
+    purpose: OtpPurpose
+  ): Promise<OtpVerification | null> {
+    return this.latest(
+      (o) =>
+        o.identifier === identifier &&
+        o.channel === channel &&
+        o.purpose === purpose
+    );
+  }
+
+  async findLatestByUserId(
+    userId: string,
+    purpose: OtpPurpose
+  ): Promise<OtpVerification | null> {
+    return this.latest((o) => o.userId === userId && o.purpose === purpose);
   }
 
   async update(otp: OtpVerification): Promise<OtpVerification> {
@@ -151,11 +172,34 @@ class MockOtpRepository implements OtpRepository {
     return 0;
   }
 
-  async countRecentByIdentifier(): Promise<number> {
-    return 0;
+  async countRecentByIdentifier(
+    identifier: string,
+    channel: OtpChannel,
+    purpose: OtpPurpose,
+    sinceHours: number
+  ): Promise<number> {
+    const since = Date.now() - sinceHours * 3600 * 1000;
+
+    return Array.from(this.otps.values()).filter(
+      (o) =>
+        o.identifier === identifier &&
+        o.channel === channel &&
+        o.purpose === purpose &&
+        o.createdAt.getTime() >= since
+    ).length;
   }
 
   async deleteExpired(): Promise<void> {}
+
+  private latest(
+    match: (o: OtpVerification) => boolean
+  ): OtpVerification | null {
+    const matches = Array.from(this.otps.values())
+      .filter(match)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    return matches[0] ?? null;
+  }
 }
 
 // Mock SessionRepository
@@ -224,7 +268,7 @@ class MockOtpCodeHasher implements OtpCodeHasher {
 class MockOtpDeliveryChannel implements OtpDeliveryChannel {
   channel: OtpChannel = 'sms';
   shouldSucceed = true;
-  returnBackdoorCode = true;
+  sendCount = 0;
   lastSentCode: string | null = null;
 
   async send(
@@ -233,17 +277,56 @@ class MockOtpDeliveryChannel implements OtpDeliveryChannel {
     _locale: string,
     _clientIp: string
   ): Promise<OtpDeliveryResult> {
+    this.sendCount += 1;
     this.lastSentCode = code;
 
     if (!this.shouldSucceed) {
       return { success: false };
     }
 
-    return {
-      success: true,
-      backdoorCode: this.returnBackdoorCode ? code : undefined,
-    };
+    return { success: true };
   }
+}
+
+// An account that registered earlier with the same phone and never confirmed.
+function unconfirmedExisting(): User {
+  return User.reconstitute({
+    id: 'existing-user',
+    firstName: 'Jane',
+    lastName: 'Smith',
+    phoneNumber: PhoneNumber.create('+79161234567'),
+    password: 'hashed-oldpass',
+    language: 'ru',
+    createdAt: new Date('2024-01-01'),
+    nickname: Nickname.create('jane_smith'),
+    // no confirmedAt → unconfirmed
+  });
+}
+
+// A phone-confirmation code issued to that account some minutes ago, valid
+// for ten minutes from issue.
+function phoneCodeFor(
+  userId: string,
+  overrides: Partial<{ id: string; issuedMinutesAgo: number }> = {}
+): OtpVerification {
+  const createdAt = new Date(
+    Date.now() - (overrides.issuedMinutesAgo ?? 1) * 60 * 1000
+  );
+
+  return OtpVerification.reconstitute({
+    id: overrides.id ?? 'otp-seeded',
+    identifier: '+79161234567',
+    channel: 'sms',
+    purpose: OtpPurposes.PHONE_CONFIRMATION,
+    code: 'hashed-123456',
+    clientIp: '127.0.0.1',
+    attempts: 0,
+    maxAttempts: 5,
+    expiresAt: new Date(createdAt.getTime() + 10 * 60 * 1000),
+    verifiedAt: null,
+    createdAt,
+    userId,
+  });
 }
 
 describe('RegisterUserUseCase', () => {
@@ -325,11 +408,13 @@ describe('RegisterUserUseCase', () => {
       expect(result.value.user.consentGivenAt).toBeInstanceOf(Date);
       expect(result.value.session).toBeDefined();
       expect(result.value.session.userId).toBe(result.value.user.id);
-      expect(result.value.otpId).toBeTruthy();
-      expect(result.value.expiresAt).toBeInstanceOf(Date);
-      expect(result.value.backdoorCode).toBeTruthy();
-      expect(result.value.expiresInSeconds).toBeGreaterThan(0);
     }
+
+    const phoneCodes = otpRepository.saved.filter(
+      (o) => o.purpose === OtpPurposes.PHONE_CONFIRMATION
+    );
+    expect(phoneCodes).toHaveLength(1);
+    expect(deliveryChannel.sendCount).toBe(1);
   });
 
   it('gives the session cookie the session TTL, not the OTP expiry', async () => {
@@ -339,22 +424,6 @@ describe('RegisterUserUseCase', () => {
 
     if (result.success) {
       expect(result.value.sessionExpiresInSeconds).toBe(SESSION_TTL_MS / 1000);
-      // The OTP keeps its own, shorter, window
-      expect(result.value.expiresInSeconds).toBeLessThan(
-        result.value.sessionExpiresInSeconds
-      );
-    }
-  });
-
-  it('should not return backdoorCode when delivery channel omits it', async () => {
-    deliveryChannel.returnBackdoorCode = false;
-
-    const result = await useCase.execute(validInput);
-
-    expect(result.success).toBe(true);
-
-    if (result.success) {
-      expect(result.value.backdoorCode).toBeUndefined();
     }
   });
 
@@ -382,18 +451,7 @@ describe('RegisterUserUseCase', () => {
   });
 
   it('should re-register unconfirmed user: invalidate sessions + update data + send OTP', async () => {
-    const existing = User.reconstitute({
-      id: 'existing-user',
-      firstName: 'Jane',
-      lastName: 'Smith',
-      phoneNumber: PhoneNumber.create('+79161234567'),
-      password: 'hashed-oldpass',
-      language: 'ru',
-      createdAt: new Date('2024-01-01'),
-      nickname: Nickname.create('jane_smith'),
-      // no confirmedAt → unconfirmed
-    });
-    userRepository.addUser(existing);
+    userRepository.addUser(unconfirmedExisting());
 
     const result = await useCase.execute(validInput);
 
@@ -408,9 +466,43 @@ describe('RegisterUserUseCase', () => {
       expect(result.value.user.id).toBe('existing-user');
       // Session created
       expect(result.value.session.userId).toBe('existing-user');
-      // OTP sent
-      expect(result.value.otpId).toBeTruthy();
     }
+
+    // OTP sent
+    expect(deliveryChannel.sendCount).toBe(1);
+  });
+
+  // Same rule as login: re-registering an unconfirmed phone must not pump SMS.
+  it('does not send a new code when the re-registered phone still has a pending one', async () => {
+    userRepository.addUser(unconfirmedExisting());
+    otpRepository.seed(phoneCodeFor('existing-user'));
+
+    const result = await useCase.execute(validInput);
+
+    expect(result.success).toBe(true);
+    expect(deliveryChannel.sendCount).toBe(0);
+    expect(otpRepository.saved).toHaveLength(1);
+  });
+
+  it('does not send while the throttle from earlier codes still runs', async () => {
+    userRepository.addUser(unconfirmedExisting());
+    // Three codes in the window put the next one 30 minutes out; the last
+    // expired a minute ago, so nothing is pending either.
+    otpRepository.seed(
+      phoneCodeFor('existing-user', { id: 'otp-a', issuedMinutesAgo: 13 })
+    );
+    otpRepository.seed(
+      phoneCodeFor('existing-user', { id: 'otp-b', issuedMinutesAgo: 12 })
+    );
+    otpRepository.seed(
+      phoneCodeFor('existing-user', { id: 'otp-c', issuedMinutesAgo: 11 })
+    );
+
+    const result = await useCase.execute(validInput);
+
+    expect(result.success).toBe(true);
+    expect(deliveryChannel.sendCount).toBe(0);
+    expect(otpRepository.saved).toHaveLength(3);
   });
 
   it('should create user with a random nickname', async () => {
@@ -465,7 +557,9 @@ describe('RegisterUserUseCase', () => {
     expect(result.success).toBe(true);
 
     if (result.success) {
-      const savedOtp = await otpRepository.findById(result.value.otpId);
+      const savedOtp = otpRepository.saved.find(
+        (o) => o.purpose === OtpPurposes.PHONE_CONFIRMATION
+      );
       expect(savedOtp!.code).toMatch(/^hashed-/);
       expect(savedOtp!.userId).toBe(result.value.user.id);
     }
