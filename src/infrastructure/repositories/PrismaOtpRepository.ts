@@ -115,6 +115,14 @@ export class PrismaOtpRepository implements OtpRepository {
     });
   }
 
+  async deleteAllForUser(userId: string): Promise<number> {
+    const result = await this.prisma.otpVerification.deleteMany({
+      where: { userId },
+    });
+
+    return result.count;
+  }
+
   async deleteExpired(): Promise<void> {
     await this.prisma.otpVerification.deleteMany({
       where: {

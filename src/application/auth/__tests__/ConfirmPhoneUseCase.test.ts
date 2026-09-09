@@ -67,6 +67,10 @@ class MockOtpRepository implements OtpRepository {
     return 0;
   }
 
+  async deleteAllForUser(): Promise<number> {
+    return 0;
+  }
+
   async deleteExpired(): Promise<void> {}
 }
 

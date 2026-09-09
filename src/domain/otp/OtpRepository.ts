@@ -25,5 +25,9 @@ export interface OtpRepository {
     purpose: OtpPurpose,
     sinceHours: number
   ): Promise<number>;
+  // Superadmin reset: drops every code issued to the user, so the throttle
+  // for their phone and email (which counts those rows) restarts and a fresh
+  // code can go out at once. Returns how many rows went.
+  deleteAllForUser(userId: string): Promise<number>;
   deleteExpired(): Promise<void>;
 }

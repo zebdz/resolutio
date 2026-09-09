@@ -29,6 +29,7 @@ import { BlockUserDialog } from './BlockUserDialog';
 import { BlockHistoryDialog } from './BlockHistoryDialog';
 import { UserPollsDialog } from './UserPollsDialog';
 import { ResetPasswordDialog } from './ResetPasswordDialog';
+import { ResetOtpDialog } from './ResetOtpDialog';
 import { User } from '@/domain/user/User';
 import { Link } from '@/src/i18n/routing';
 
@@ -87,6 +88,9 @@ export function UserManagementPanel({
   const [pollsLoading, setPollsLoading] = useState(false);
   const [passwordTarget, setPasswordTarget] =
     useState<SerializedAdminUserResult | null>(null);
+  const [otpTarget, setOtpTarget] = useState<SerializedAdminUserResult | null>(
+    null
+  );
 
   // Org combobox state
   const [orgOptions, setOrgOptions] = useState<{ id: string; name: string }[]>(
@@ -466,6 +470,15 @@ export function UserManagementPanel({
                     {t('changePassword')}
                   </Button>
 
+                  {/* OTP reset button */}
+                  <Button
+                    plain
+                    onClick={() => setOtpTarget(user)}
+                    className="text-xs"
+                  >
+                    {t('resetOtp')}
+                  </Button>
+
                   {/* Block status + action */}
                   {user.blockStatus?.blocked ? (
                     <>
@@ -675,6 +688,17 @@ export function UserManagementPanel({
           userId={passwordTarget.id}
           userName={getUserName(passwordTarget)}
           nickname={passwordTarget.nickname}
+        />
+      )}
+
+      {/* OTP reset dialog */}
+      {otpTarget && (
+        <ResetOtpDialog
+          isOpen={true}
+          onClose={() => setOtpTarget(null)}
+          userId={otpTarget.id}
+          userName={getUserName(otpTarget)}
+          nickname={otpTarget.nickname}
         />
       )}
 
