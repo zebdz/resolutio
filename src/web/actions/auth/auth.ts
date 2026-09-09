@@ -212,10 +212,12 @@ export async function registerAction(
       return { success: false, error: await translateErrorCode(result.error) };
     }
 
-    // Set session cookie
+    // Set session cookie. The session TTL, not the OTP window: the latter is
+    // what the client counts down, and using it here logged people out ten
+    // minutes after registering.
     await setSessionCookie(
       result.value.session.id,
-      result.value.expiresInSeconds
+      result.value.sessionExpiresInSeconds
     );
 
     return {

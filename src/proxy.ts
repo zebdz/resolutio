@@ -30,6 +30,29 @@ function isBrowserRequest(request: NextRequest): boolean {
   return accept.includes('text/html');
 }
 
+// nginx terminates TLS and forwards the original scheme. In production the
+// session cookie is Secure, and a browser on a plain-http page drops it: the
+// login action succeeded, the next request carried no session, and the user
+// bounced back to /login. nginx redirects too; this keeps the app safe should
+// that config be lost.
+function redirectToHttps(request: NextRequest): NextResponse | null {
+  if (process.env.NODE_ENV !== 'production') {
+    return null;
+  }
+
+  // Chained proxies append: "http, https" — the first entry is the client's.
+  const proto = request.headers.get('x-forwarded-proto')?.split(',')[0].trim();
+
+  if (proto !== 'http') {
+    return null;
+  }
+
+  const url = request.nextUrl.clone();
+  url.protocol = 'https:';
+
+  return NextResponse.redirect(url, 308);
+}
+
 function extractLocale(request: NextRequest): string {
   // Try to get locale from URL path (e.g. /ru/some-page)
   const pathLocale = request.nextUrl.pathname.split('/')[1];
@@ -74,6 +97,12 @@ function captureReturnTo(
 }
 
 export default async function middleware(request: NextRequest) {
+  const httpsRedirect = redirectToHttps(request);
+
+  if (httpsRedirect) {
+    return httpsRedirect;
+  }
+
   // Don't rate-limit or IP-block the error pages themselves
   if (
     RATE_LIMITED_PATH.test(request.nextUrl.pathname) ||
