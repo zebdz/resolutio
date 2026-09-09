@@ -38,6 +38,9 @@ export interface RegisterUserInput {
 export interface RegisterResult {
   user: User;
   session: Session;
+  // Lifetime for the session cookie. Distinct from the OTP window below:
+  // copying that into the cookie logged registrants out ten minutes in.
+  sessionExpiresInSeconds: number;
   otpId: string;
   expiresAt: Date;
   backdoorCode?: string;
@@ -243,6 +246,7 @@ export class RegisterUserUseCase {
     return success({
       user: savedUser,
       session,
+      sessionExpiresInSeconds: Math.floor(SESSION_TTL_MS / 1000),
       otpId: savedOtp.id,
       expiresAt: otpExpiresAt,
       backdoorCode: deliveryResult.backdoorCode,

@@ -102,13 +102,23 @@ import middleware from '../proxy';
 
 function makeRequest(
   path: string,
-  options?: { sessionCookie?: string; accept?: string; ip?: string }
+  options?: {
+    sessionCookie?: string;
+    accept?: string;
+    ip?: string;
+    forwardedProto?: string;
+  }
 ) {
   const url = `http://localhost:3000${path}`;
   const headers: Record<string, string> = {
     accept: options?.accept ?? 'text/html',
     'x-forwarded-for': options?.ip ?? '1.2.3.4',
   };
+
+  if (options?.forwardedProto) {
+    headers['x-forwarded-proto'] = options.forwardedProto;
+  }
+
   const req = new NextRequest(url, { headers });
 
   if (options?.sessionCookie) {
@@ -228,5 +238,50 @@ describe('proxy middleware dual-key rate limiting', () => {
       })
     );
     expect(res.status).toBe(429);
+  });
+});
+
+// nginx terminates TLS and forwards the original scheme. A page served over
+// plain http cannot store the Secure session cookie, so a login there silently
+// bounced back to /login.
+describe('proxy middleware https enforcement', () => {
+  beforeEach(() => {
+    testSessionLimiter.clearAll();
+    testIpLimiter.clearAll();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('production: redirects a plain-http request to https, keeping path and query', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    const res = await middleware(
+      makeRequest('/en/login?next=1', { forwardedProto: 'http' })
+    );
+
+    expect(res.status).toBe(308);
+    expect(res.headers.get('location')).toBe(
+      'https://localhost:3000/en/login?next=1'
+    );
+  });
+
+  it('production: leaves https requests alone', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    const res = await middleware(
+      makeRequest('/en/login', { forwardedProto: 'https' })
+    );
+
+    expect(res.status).toBe(200);
+  });
+
+  it('outside production: never redirects — there is no TLS to send to', async () => {
+    const res = await middleware(
+      makeRequest('/en/login', { forwardedProto: 'http' })
+    );
+
+    expect(res.status).toBe(200);
   });
 });

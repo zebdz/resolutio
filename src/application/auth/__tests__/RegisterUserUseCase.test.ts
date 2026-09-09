@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { RegisterUserUseCase } from '../RegisterUserUseCase';
+import { SESSION_TTL_MS } from '../LoginUserUseCase';
 import { RegisterUserSchema } from '../RegisterUserSchema';
 import { AuthErrors } from '../AuthErrors';
 import { OtpErrors } from '../OtpErrors';
@@ -328,6 +329,20 @@ describe('RegisterUserUseCase', () => {
       expect(result.value.expiresAt).toBeInstanceOf(Date);
       expect(result.value.backdoorCode).toBeTruthy();
       expect(result.value.expiresInSeconds).toBeGreaterThan(0);
+    }
+  });
+
+  it('gives the session cookie the session TTL, not the OTP expiry', async () => {
+    const result = await useCase.execute(validInput);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.sessionExpiresInSeconds).toBe(SESSION_TTL_MS / 1000);
+      // The OTP keeps its own, shorter, window
+      expect(result.value.expiresInSeconds).toBeLessThan(
+        result.value.sessionExpiresInSeconds
+      );
     }
   });
 
