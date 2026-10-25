@@ -1,23 +1,25 @@
 ## Project description
-A service (web app) that would allow people to unite in organizations, vote, and based on those votes have a legal decision/document which they could use in a number of ways: 
+
+A service (web app) that would allow people to unite in organizations, vote, and based on those votes have a legal decision/document which they could use in a number of ways:
+
 - bring to court
 - bring to the governmental offices/officials
 - etc
 
-## CLAUDE plans
-- directory: plans/
+## Documentation
 
-## Specs / design docs
-- directory: readmes/
+- Start with [readmes/README.md](readmes/README.md), then read only the specs, active plan sections and reference docs relevant to the task. Do not load entire documentation directories.
+- Active plans live in `plans/`; historical plans live in `plans/archive/`. Exclude the archive from routine content searches. Consult it only for relevant historical reasoning or when requested.
+- Archived plans are historical proposals, not current requirements or proof of completed work. Check implementation claims against code and tests; surface conflicts with approved designs before changing behavior.
+- Keep the index, relevant design docs and active plan status updated as work progresses. On completion, record deviations and remaining limitations, then archive the plan and update its index entry.
 
 ## Git
+
 - git add is allowed
 - NEVER git commit
 
-## Permissions
-- Ask for confirmation before any file edits, writes, or bash commands that modify the filesystem (this is a learning project)
-
 ## Security
+
 - **Never send sensitive data to the client if the user shouldn't see it.** UI hiding is NOT security — anyone with browser DevTools can access client-side data.
 - Always check permissions on the SERVER and filter sensitive fields BEFORE serializing data for Client Components.
 - Domain objects (classes with methods) cannot cross the Server/Client boundary — always serialize to plain objects first.
@@ -39,10 +41,12 @@ A service (web app) that would allow people to unite in organizations, vote, and
   - Are Prisma Decimal types converted to numbers?
 
 ## Testing
+
 - use tdd skill
 - prefer unit tests over integration
 
 ## Database
+
 - DB: PostgreSQL
 - ORM: Prisma
 - Tables use `@@map` (e.g. `organizations`, not `"Organization"`) and columns use `@map` (e.g. `archived_at`, not `"archivedAt"`). Always check `prisma/schema.prisma` for actual DB names when writing raw SQL.
@@ -51,6 +55,7 @@ A service (web app) that would allow people to unite in organizations, vote, and
 - **No raw SQL in `web/actions/`** — use Prisma query builder (`findMany`, `findFirst`, etc.) or call repository methods. Raw SQL (`$queryRaw`) belongs in `infrastructure/` repositories only.
 
 ## UI
+
 - Tailwind Catalyst components: src/web/components/catalyst
 - Tailwind for styling
 - UI should be responsive: it should look good on widescreens, regular screens, tablets and especially on mobile phones
@@ -58,22 +63,26 @@ A service (web app) that would allow people to unite in organizations, vote, and
 - use design-an-interface skill when planning UI
 
 ## Tooling
+
 - package manager: yarn
 
 ## Coding
+
 - Use Domain Driven Development (DDD)
 - DDD structure:
-    /src
-     /domain
-     /application
-     /infrastructure
-     /web
+  /src
+  /domain
+  /application
+  /infrastructure
+  /web
 
 ## Coding style
+
 - look at eslint.config.js for rules
 - use Prettier for code formatting: .prettierrc
 
 ## Rate limiting
+
 - `<Link>` from `@/src/i18n/routing` defaults to `prefetch={false}` — do NOT override with `prefetch={true}` unless you have a specific reason. Each prefetch triggers a middleware request; navbar/sidebar links alone add ~16 MW hits per page load, quickly exhausting the 120/min MW session limit.
 - Every server action must include a rate limit check at the top:
   ```typescript
@@ -85,12 +94,13 @@ A service (web app) that would allow people to unite in organizations, vote, and
 - See `readmes/Rate-Limiting.md` for full architecture docs
 
 ## Rules
+
 - We never delete any entities, we only archive them. Because we need all info saved: who, when, and being a part of what organization voted and in what manner. The only rows on the database that we can delete - are the ones that have to do with linking a user to an organization, to an admin, to a board, to a superadmin (but not the user itself!).
 - vote drafts can also be deleted
 - notifications can also be deleted
 
-
 ## Error codes and localization
+
 - the app should support different languages, English and Russian for starters
 - Default language is chosen based on the language used when a user was registering
 - Once logged in, an app should respect user's default language setting
