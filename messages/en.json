@@ -1299,6 +1299,18 @@
     "notifications": "Notifications"
   },
   "domain": {
+    "seal": {
+      "pollNotFinished": "Only eligible finished polls can be sealed.",
+      "inconsistentRecord": "The poll record is inconsistent.",
+      "missingReceiptSecret": "A voter is missing a receipt secret.",
+      "anchorIllegalTransition": "This anchor transition is not allowed.",
+      "versionUnsupported": "This seal format version is not supported.",
+      "algorithmUnsupported": "This seal hashing algorithm is not supported.",
+      "leafNotFound": "The vote is not present in the supplied record.",
+      "invalidWeight": "The sealed weight has an invalid value or format.",
+      "invalidCanonical": "The supplied data is not in canonical form.",
+      "invalidProof": "The supplied anchor evidence is invalid."
+    },
     "organization": {
       "organizationNameEmpty": "Organization name cannot be empty",
       "organizationNameTooLong": "Organization name cannot exceed {maxLength} characters",

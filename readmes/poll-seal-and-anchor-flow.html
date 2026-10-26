@@ -1,0 +1,1704 @@
+<!doctype html>
+<!-- Standalone architecture walkthrough of the approved poll seal/anchor design.
+     Keep lifecycle, disclosure rules and phase status aligned with the linked design and plan. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="How a vote becomes an immutable poll record and a verifiable Bitcoin timestamp: lifecycle, receipts, privacy, recovery and implementation status."
+    />
+    <title>Poll seal &amp; anchor — feature flow · Resolutio</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #f6f7f1;
+        --card: #fff;
+        --ink: #203330;
+        --muted: #566660;
+        --line: #d7dfd5;
+        --green: #155b4e;
+        --wash: #e7f0e7;
+        --orange: #984620;
+        --sand: #fbefdf;
+        --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 5rem;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font:
+          16px/1.6 system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+      }
+      a,
+      button,
+      summary {
+        cursor: pointer;
+      }
+      a {
+        color: var(--green);
+        text-decoration-thickness: 1px;
+        text-underline-offset: 4px;
+      }
+      a:hover {
+        text-decoration-thickness: 2px;
+      }
+      :focus-visible {
+        outline: 3px solid var(--orange);
+        outline-offset: 5px;
+        border-radius: 2px;
+      }
+      .skip {
+        position: absolute;
+        top: -6rem;
+        left: 1rem;
+        padding: 0.7rem 1rem;
+        background: white;
+        z-index: 10;
+      }
+      .skip:focus {
+        top: 0.5rem;
+      }
+      .wrap {
+        width: min(1180px, calc(100% - 64px));
+        margin: auto;
+      }
+      .masthead {
+        border-bottom: 1px solid var(--line);
+      }
+      .masthead .wrap {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 20px 0;
+      }
+      .brand {
+        font-weight: 760;
+        letter-spacing: 0.14em;
+        font-size: 13px;
+      }
+      .meta,
+      .eyebrow {
+        font: 11px/1.5 var(--mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .hero {
+        padding: 64px 0 36px;
+      }
+      .hero-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .badge {
+        display: inline-block;
+        border: 1px solid #b7cdbc;
+        border-radius: 4px;
+        padding: 4px 9px;
+        color: var(--green);
+        background: var(--wash);
+        font: 11px/1.5 var(--mono);
+      }
+      h1 {
+        max-width: 850px;
+        font:
+          normal clamp(2.7rem, 5.5vw, 4.8rem)/1.04 Georgia,
+          'Times New Roman',
+          serif;
+        letter-spacing: -0.04em;
+        margin: 22px 0;
+      }
+      h1 em {
+        color: var(--green);
+        font-style: normal;
+      }
+      .lede {
+        max-width: 740px;
+        font-size: 19px;
+        color: var(--muted);
+        margin-bottom: 26px;
+      }
+      .status {
+        display: flex;
+        gap: 14px;
+        align-items: baseline;
+        border-left: 3px solid var(--green);
+        padding: 12px 18px;
+        background: var(--wash);
+        font-size: 14px;
+      }
+      .status strong {
+        flex-shrink: 0;
+      }
+      .toc {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        background: var(--paper);
+        border-bottom: 1px solid var(--line);
+      }
+      .toc .wrap {
+        display: flex;
+        gap: 24px;
+        overflow-x: auto;
+        padding: 14px 0;
+      }
+      .toc a {
+        flex-shrink: 0;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 650;
+      }
+      main {
+        padding-bottom: 60px;
+      }
+      section {
+        padding: 46px 0 12px;
+      }
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        gap: 18px;
+        border-top: 1px solid var(--line);
+        padding-top: 24px;
+        margin-bottom: 24px;
+      }
+      .section-head .number {
+        font: 12px var(--mono);
+        color: var(--green);
+      }
+      h2 {
+        font-size: 28px;
+        line-height: 1.25;
+        letter-spacing: -0.03em;
+        margin: 0;
+      }
+      h3 {
+        font-size: 18px;
+        line-height: 1.4;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0 0 14px;
+      }
+      .section-intro {
+        max-width: 780px;
+        color: var(--muted);
+      }
+      .overview {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        list-style: none;
+        padding: 0;
+        margin: 24px 0 16px;
+        border: 1px solid var(--line);
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .overview li {
+        position: relative;
+        border-right: 1px solid var(--line);
+      }
+      .overview li:last-child {
+        border: 0;
+      }
+      .overview a {
+        display: block;
+        padding: 18px 16px;
+        text-decoration: none;
+        min-height: 120px;
+      }
+      .overview a:hover {
+        background: var(--wash);
+      }
+      .overview .n {
+        font: 11px var(--mono);
+        display: block;
+        margin-bottom: 8px;
+        color: var(--muted);
+      }
+      .overview strong {
+        display: block;
+        font-size: 16px;
+      }
+      .overview small {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .overview .arrow {
+        float: right;
+        color: var(--green);
+      }
+      .caption {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .lifecycle {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 285px;
+        gap: 38px;
+        align-items: start;
+        margin-top: 28px;
+      }
+      .timeline {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+      }
+      .timeline > li {
+        position: relative;
+        padding: 0 0 32px 56px;
+      }
+      .timeline > li:not(:last-child)::before {
+        content: '';
+        position: absolute;
+        left: 17px;
+        top: 37px;
+        bottom: 0;
+        width: 1px;
+        background: #aebfb0;
+      }
+      .step-number {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 35px;
+        height: 35px;
+        display: grid;
+        place-items: center;
+        border: 1px solid #b7cdbc;
+        background: var(--wash);
+        color: var(--green);
+        border-radius: 50%;
+        font: 12px var(--mono);
+      }
+      .timeline h3 {
+        font-size: 21px;
+        margin: 4px 0 8px;
+      }
+      .step-meta {
+        font: 11px var(--mono);
+        color: var(--muted);
+        letter-spacing: 0.04em;
+        margin-bottom: 7px;
+      }
+      .artifact {
+        padding: 10px 13px;
+        margin: 12px 0;
+        border-left: 2px solid var(--green);
+        background: var(--wash);
+        font-size: 14px;
+      }
+      details {
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        background: #fff;
+        margin-top: 12px;
+      }
+      summary {
+        padding: 11px 14px;
+        font-weight: 650;
+        font-size: 13px;
+      }
+      details[open] summary {
+        border-bottom: 1px solid var(--line);
+      }
+      .detail-body {
+        padding: 14px;
+        font-size: 14px;
+      }
+      .detail-body p:last-child {
+        margin-bottom: 0;
+      }
+      code {
+        font: 0.86em var(--mono);
+        overflow-wrap: anywhere;
+      }
+      .detail-body code {
+        color: var(--green);
+      }
+      .card {
+        padding: 22px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+      }
+      .artifact-list {
+        display: grid;
+        gap: 14px;
+        position: sticky;
+        top: 80px;
+      }
+      .artifact-list .card p {
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .artifact-list .card p:last-child {
+        margin-bottom: 0;
+      }
+      .tag {
+        display: inline-block;
+        font: 10px/1.5 var(--mono);
+        padding: 3px 6px;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        margin: 0 0 12px;
+        text-transform: uppercase;
+      }
+      .note {
+        padding: 18px 22px;
+        background: var(--sand);
+        border-left: 3px solid var(--orange);
+        margin: 20px 0;
+        font-size: 14px;
+      }
+      .note p:last-child {
+        margin-bottom: 0;
+      }
+      .two-col {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+      .mini-flow {
+        list-style: none;
+        padding: 0;
+        margin: 10px 0 0;
+      }
+      .mini-flow li {
+        border-top: 1px solid var(--line);
+        padding: 9px 0;
+        font-size: 14px;
+      }
+      .mini-flow li::before {
+        content: '→';
+        color: var(--green);
+        margin-right: 9px;
+      }
+      .commitment {
+        margin: 26px 0 22px;
+        border: 1px solid var(--line);
+        background: white;
+        border-radius: 8px;
+        padding: 24px;
+      }
+      .commitment .section-grid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .section-box {
+        padding: 16px 12px;
+        border: 1px solid var(--line);
+        border-top: 3px solid var(--green);
+        background: var(--paper);
+      }
+      .section-box p {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 0;
+      }
+      .section-box strong {
+        font: 600 14px var(--mono);
+        display: block;
+        margin-bottom: 9px;
+      }
+      .section-box.private {
+        border-top-color: var(--orange);
+      }
+      .section-box .hash {
+        display: block;
+        margin-top: 12px;
+        font: 11px var(--mono);
+        color: var(--green);
+      }
+      .merge {
+        text-align: center;
+        font: 12px/1.7 var(--mono);
+        color: var(--muted);
+        padding: 15px 0;
+      }
+      .digest-flow {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr auto 1fr;
+        gap: 14px;
+        align-items: center;
+      }
+      .digest-flow .block {
+        padding: 17px;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        text-align: center;
+      }
+      .digest-flow .block strong {
+        display: block;
+      }
+      .digest-flow .block small {
+        font-size: 12px;
+        color: var(--muted);
+        display: block;
+      }
+      .digest-flow .block.dark {
+        background: var(--green);
+        color: white;
+        border-color: var(--green);
+      }
+      .digest-flow .block.dark small {
+        color: #d6e6de;
+      }
+      .formula {
+        background: #203b34;
+        color: #f2f6ef;
+        padding: 18px;
+        border-radius: 5px;
+        overflow-x: auto;
+        font: 12px/1.9 var(--mono);
+        white-space: pre;
+        margin: 12px 0;
+      }
+      .table-scroll {
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        background: white;
+        font-size: 14px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        background: var(--wash);
+        color: var(--green);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      td:first-child {
+        font-weight: 650;
+      }
+      td small {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-weight: 400;
+      }
+      .state-layout {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-top: 22px;
+      }
+      .state-card {
+        border: 1px solid var(--line);
+        background: white;
+        padding: 22px;
+        border-radius: 7px;
+      }
+      .state-card h3 {
+        font: 600 14px var(--mono);
+        color: var(--green);
+      }
+      .state-card.failure h3 {
+        color: var(--orange);
+      }
+      .state-card .transition {
+        border-top: 1px solid var(--line);
+        padding-top: 12px;
+        font-size: 13px;
+        margin-top: 14px;
+        margin-bottom: 0;
+      }
+      .schedule {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 14px 0;
+      }
+      .schedule span {
+        padding: 4px 9px;
+        background: var(--sand);
+        font: 12px var(--mono);
+        border-radius: 3px;
+      }
+      .recovery {
+        counter-reset: recover;
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+        margin: 24px 0;
+      }
+      .recovery .card {
+        padding: 18px;
+      }
+      .recovery .card::before {
+        counter-increment: recover;
+        content: '0' counter(recover);
+        display: block;
+        color: var(--muted);
+        font: 11px var(--mono);
+        margin-bottom: 12px;
+      }
+      .recovery h3 {
+        font-size: 16px;
+      }
+      .recovery p {
+        font-size: 13px;
+        margin: 0;
+      }
+      .checks {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        margin: 24px 0;
+      }
+      .checks .card {
+        border-top: 3px solid var(--green);
+      }
+      .checks .card p {
+        font-size: 14px;
+      }
+      .checks ol {
+        padding-left: 20px;
+        font-size: 13px;
+        margin-bottom: 0;
+      }
+      .checks li {
+        padding: 4px 0;
+      }
+      .check-label {
+        font: 10px var(--mono);
+        color: var(--green);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 12px;
+      }
+      .evidence-route {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        font: 12px var(--mono);
+        padding: 17px;
+        background: var(--wash);
+        border-radius: 5px;
+        margin: 22px 0;
+      }
+      .phase-grid {
+        list-style: none;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        padding: 0;
+      }
+      .phase-grid li {
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 16px;
+        font-size: 13px;
+      }
+      .phase-grid li.done {
+        background: var(--wash);
+        border-color: #aec7b3;
+      }
+      .phase-grid li.next {
+        border-color: var(--orange);
+      }
+      .phase-grid small {
+        display: block;
+        color: var(--muted);
+        font: 10px var(--mono);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+      }
+      footer {
+        border-top: 1px solid var(--line);
+        padding: 28px 0 40px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .sources {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin: 12px 0 20px;
+      }
+      .footer-meta {
+        font: 11px var(--mono);
+      }
+      @media (max-width: 960px) {
+        .overview {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        .overview li:nth-child(3) {
+          border-right: 0;
+        }
+        .overview li:nth-child(-n + 3) {
+          border-bottom: 1px solid var(--line);
+        }
+        .lifecycle {
+          grid-template-columns: minmax(0, 1fr) 245px;
+          gap: 24px;
+        }
+        .commitment .section-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+        .recovery {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .checks {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 680px) {
+        .wrap {
+          width: calc(100% - 32px);
+        }
+        .masthead .wrap {
+          align-items: flex-start;
+        }
+        .masthead .meta {
+          max-width: 150px;
+          text-align: right;
+          font-size: 10px;
+        }
+        .hero {
+          padding-top: 36px;
+        }
+        .lede {
+          font-size: 17px;
+        }
+        .status {
+          display: block;
+        }
+        .status strong {
+          display: block;
+          margin-bottom: 5px;
+        }
+        .toc .wrap {
+          gap: 20px;
+        }
+        .overview a {
+          padding: 14px 10px;
+          min-height: 108px;
+        }
+        .overview small {
+          font-size: 11px;
+        }
+        .lifecycle {
+          grid-template-columns: 1fr;
+        }
+        .artifact-list {
+          position: static;
+          grid-template-columns: 1fr;
+        }
+        .timeline > li {
+          padding-left: 47px;
+        }
+        .two-col,
+        .state-layout {
+          grid-template-columns: 1fr;
+        }
+        .commitment {
+          padding: 16px;
+        }
+        .commitment .section-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .section-box:last-child {
+          grid-column: 1/-1;
+        }
+        .digest-flow {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        .digest-flow > .connector {
+          text-align: center;
+          transform: rotate(90deg);
+        }
+        .phase-grid {
+          grid-template-columns: 1fr;
+        }
+        h2 {
+          font-size: 25px;
+        }
+        th,
+        td {
+          padding: 12px;
+          min-width: 140px;
+        }
+        .recovery {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+      @media print {
+        body {
+          font-size: 11px;
+          background: white;
+        }
+        .wrap {
+          width: 100%;
+        }
+        .hero {
+          padding: 10px 0;
+        }
+        h1 {
+          font-size: 34px;
+        }
+        .toc,
+        .skip {
+          display: none;
+        }
+        section {
+          padding: 20px 0 0;
+        }
+        .artifact-list {
+          position: static;
+        }
+        .card,
+        .state-card,
+        details,
+        .timeline > li {
+          break-inside: avoid;
+        }
+        .lifecycle {
+          grid-template-columns: 1fr 220px;
+        }
+        .overview {
+          grid-template-columns: repeat(6, 1fr);
+        }
+        .phase-grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        a {
+          color: inherit;
+        }
+        details::details-content {
+          content-visibility: visible;
+          display: block;
+        }
+        .formula {
+          white-space: pre-wrap;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to feature flow</a>
+    <header class="masthead">
+      <div class="wrap">
+        <div class="brand">RESOLUTIO</div>
+        <div class="meta">Architecture field guide<br />26 October 2026</div>
+      </div>
+    </header>
+    <div class="hero wrap">
+      <div class="hero-top">
+        <span class="eyebrow">Poll seal &amp; anchor</span
+        ><span class="badge">Approved design walkthrough</span>
+      </div>
+      <h1>From a vote to a<br /><em>verifiable record.</em></h1>
+      <p class="lede">
+        A voter keeps an original receipt. A finished poll becomes an immutable
+        record. A Bitcoin timestamp gives that record independently checkable
+        evidence of when it existed.
+      </p>
+      <div class="status">
+        <strong>Implementation checkpoint</strong
+        ><span
+          >Phase 1’s pure domain is complete, awaiting review. The end-to-end
+          flow below is the intended design; transactions, live anchoring,
+          delivery and verification interfaces remain to be implemented.</span
+        >
+      </div>
+    </div>
+    <nav class="toc" aria-label="Document sections">
+      <div class="wrap">
+        <a href="#lifecycle">01 / Lifecycle</a
+        ><a href="#record">02 / The record</a><a href="#anchors">03 / Anchors</a
+        ><a href="#recovery">04 / Recovery</a
+        ><a href="#verify">05 / Verification</a
+        ><a href="#delivery-plan">06 / Delivery plan</a>
+      </div>
+    </nav>
+    <main class="wrap" id="main">
+      <section id="lifecycle" aria-labelledby="lifecycle-title">
+        <div class="section-head">
+          <span class="number">01</span>
+          <h2 id="lifecycle-title">Follow the lifecycle</h2>
+        </div>
+        <p class="section-intro">
+          Finishing a poll, sealing its data, and confirming a timestamp are
+          separate milestones. A failure in the later work must not undo a
+          committed vote or the poll’s finish.
+        </p>
+        <ol class="overview" aria-label="Lifecycle overview">
+          <li>
+            <a href="#cast"
+              ><span class="n"
+                >01 <span class="arrow" aria-hidden="true">→</span></span
+              ><strong>Cast</strong><small>Keep the original receipt</small></a
+            >
+          </li>
+          <li>
+            <a href="#finish"
+              ><span class="n"
+                >02 <span class="arrow" aria-hidden="true">→</span></span
+              ><strong>Finish</strong><small>Close voting atomically</small></a
+            >
+          </li>
+          <li>
+            <a href="#seal"
+              ><span class="n"
+                >03 <span class="arrow" aria-hidden="true">→</span></span
+              ><strong>Seal</strong><small>Freeze five sections</small></a
+            >
+          </li>
+          <li>
+            <a href="#submit"
+              ><span class="n"
+                >04 <span class="arrow" aria-hidden="true">→</span></span
+              ><strong>Submit</strong><small>Receive a pending proof</small></a
+            >
+          </li>
+          <li>
+            <a href="#confirm"
+              ><span class="n"
+                >05 <span class="arrow" aria-hidden="true">→</span></span
+              ><strong>Confirm</strong><small>Verify Bitcoin evidence</small></a
+            >
+          </li>
+          <li>
+            <a href="#verify"
+              ><span class="n">06</span><strong>Verify</strong
+              ><small>Check the evidence</small></a
+            >
+          </li>
+        </ol>
+        <p class="caption">
+          Record and receipt checks can start once a seal is available. Bitcoin
+          timestamp verification needs a confirmed proof. Initial bundle
+          delivery starts with the first usable proof, even while it is pending.
+        </p>
+        <div class="lifecycle">
+          <ol class="timeline">
+            <li id="cast">
+              <span class="step-number" aria-hidden="true">01</span>
+              <div class="step-meta">VOTER → POLL TRANSACTION · PHASE 2</div>
+              <h3>Accept the whole ballot; return its receipt.</h3>
+              <p>
+                Lock the poll row, re-read its state, and accept votes only
+                while it is <code>ACTIVE</code>. Persist the complete ballot,
+                exact cast times, one participant receipt secret, signing
+                willingness, and the data needed to replay the same receipt.
+              </p>
+              <div class="artifact">
+                <strong>After commit → original receipt.</strong> The voter can
+                save it. A confirmed email address enables receipt email
+                delivery in Phase 6.
+              </div>
+              <details>
+                <summary>What must be atomic?</summary>
+                <div class="detail-body">
+                  <p>
+                    The secret is 32 random bytes per participant per poll.
+                    Multi-choice answers share that secret but derive different
+                    salts. Vote rows keep their original
+                    <code>createdAt</code> values.
+                  </p>
+                  <p>
+                    A repeated successful request returns the same receipt.
+                    Cleanup or email failure must not turn a committed ballot
+                    into a failed cast response. Signing willingness is stored
+                    independently from actual signatures.
+                  </p>
+                </div>
+              </details>
+            </li>
+            <li id="finish">
+              <span class="step-number" aria-hidden="true">02</span>
+              <div class="step-meta">
+                POLL TRANSACTION → POST-COMMIT HANDLERS · PHASES 2–3
+              </div>
+              <h3>Close voting at one definite cutoff.</h3>
+              <p>
+                Finishing takes the same poll-row lock. It commits
+                <code>FINISHED</code> and <code>finishedAt</code>, then
+                dispatches <code>PollFinished</code> to explicit sealing and
+                notification handlers.
+              </p>
+              <div class="artifact">
+                <strong>Two independent follow-ups →</strong> build the seal,
+                and notify participants that voting finished. Sealing failure
+                must not suppress the finish notification.
+              </div>
+              <details>
+                <summary>Why the shared lock matters</summary>
+                <div class="detail-body">
+                  <p>
+                    A pre-check outside the transaction can go stale. Every vote
+                    writer and competing poll-state writer must coordinate on
+                    the same row. A stale update must never reopen a finished
+                    poll.
+                  </p>
+                  <p>
+                    Polls already finished before rollout remain unsealed. A
+                    null <code>finishedAt</code> marks those legacy polls as
+                    ineligible.
+                  </p>
+                </div>
+              </details>
+            </li>
+            <li id="seal">
+              <span class="step-number" aria-hidden="true">03</span>
+              <div class="step-meta">
+                SEAL TRANSACTION · DOMAIN: PHASE 1 / INTEGRATION: PHASE 3
+              </div>
+              <h3>Capture a consistent snapshot and seal it.</h3>
+              <p>
+                Read the full poll, participants, votes, metadata and protocol
+                holdings. Build the five canonical sections, the vote Merkle
+                tree, the manifest and its root digest. Save them together in
+                one repeatable-read transaction.
+              </p>
+              <div class="artifact">
+                <strong>Output → immutable sealed record.</strong> External
+                names, labels and consented phones are captured by the
+                successful sealing attempt;
+                <code>metadataCapturedAt</code> records that time.
+              </div>
+              <details>
+                <summary>What changes between finishing and sealing?</summary>
+                <div class="detail-body">
+                  <p>
+                    Metadata may change after <code>finishedAt</code> and before
+                    a successful seal. A failed sealing transaction may retry
+                    with newer metadata. Once a seal is saved, covered
+                    renderings always reuse its frozen contents.
+                  </p>
+                  <p>
+                    The snapshot includes archived questions and answers,
+                    attachment metadata, and holdings resolved at each
+                    participant’s <code>snapshotAt</code>. No network calls
+                    occur in this transaction.
+                  </p>
+                </div>
+              </details>
+            </li>
+            <li id="submit">
+              <span class="step-number" aria-hidden="true">04</span>
+              <div class="step-meta">
+                ANCHOR WORKER → OPENTIMESTAMPS CALENDARS · PHASE 4
+              </div>
+              <h3>Submit the digest and store a pending proof.</h3>
+              <p>
+                The worker sends the root digest to OpenTimestamps outside the
+                database transaction. It validates that the returned proof
+                commits to that digest and contains a usable pending
+                attestation, then stores a <code>SUBMITTED</code> anchor.
+              </p>
+              <div class="artifact">
+                <strong>First usable proof → initial bundle delivery.</strong>
+                Phase 6 sends the manifest, the recipient’s own leaves and
+                paths, authorized labels, and available proof to confirmed-email
+                participants.
+              </div>
+              <details>
+                <summary>What does “pending” mean?</summary>
+                <div class="detail-body">
+                  <p>
+                    The calendars accepted the commitment, but verified Bitcoin
+                    evidence is not yet available. Pending must remain visibly
+                    different from confirmed.
+                  </p>
+                  <p>
+                    A submission failure becomes a durable
+                    <code>FAILED</code> attempt, even with no proof and no
+                    submission time. Recovery retries it later. Participant
+                    bundles never contain the signer list, even for an admin
+                    recipient.
+                  </p>
+                </div>
+              </details>
+            </li>
+            <li id="confirm">
+              <span class="step-number" aria-hidden="true">05</span>
+              <div class="step-meta">
+                RECOVERY WORKER → CALENDARS + BITCOIN VERIFICATION · PHASE 4
+              </div>
+              <h3>Upgrade the proof, then verify it.</h3>
+              <p>
+                Retrieve upgraded proof data and verify its Bitcoin attestation
+                through the configured verification adapter. Only then store
+                <code>CONFIRMED</code>, the confirmed proof, block height and
+                block time.
+              </p>
+              <div class="artifact">
+                <strong>Output → confirmed timestamp evidence.</strong> The
+                upgraded proof is downloadable later; successful initial bundle
+                emails are not automatically resent.
+              </div>
+              <details>
+                <summary>Which component establishes validity?</summary>
+                <div class="detail-body">
+                  <p>
+                    The real provider adapter must parse OTS proof bytes, check
+                    their committed digest, and verify Bitcoin evidence. The
+                    domain enforces consistency and legal transitions using that
+                    evidence.
+                  </p>
+                  <p>
+                    Nonempty bytes and a status label are insufficient.
+                    Development simulations remain labeled; a
+                    <code>stub</code> anchor cannot become a Bitcoin
+                    confirmation. Production requires an explicit real provider.
+                  </p>
+                </div>
+              </details>
+            </li>
+            <li>
+              <span class="step-number" aria-hidden="true">06</span>
+              <div class="step-meta">
+                VOTER / VIEWER → INDEPENDENT VERIFIER · PHASES 5, 7–8
+              </div>
+              <h3>Check the record; render covered results from it.</h3>
+              <p>
+                A standalone CLI checks local exported files first. Hosted
+                checks follow. An original receipt enables comparison with the
+                cast-time ballot; a code alone checks inclusion in the current
+                supplied record.
+              </p>
+              <div class="artifact">
+                <strong
+                  >Final results and all three protocols → sealed
+                  snapshot.</strong
+                >
+                The PDF footer points to record verification. Active polls
+                remain preliminary; legacy finished polls remain explicitly
+                unsealed.
+              </div>
+            </li>
+          </ol>
+          <aside
+            class="artifact-list"
+            aria-label="Three artifacts to distinguish"
+          >
+            <div class="card">
+              <span class="tag">Created at cast time</span>
+              <h3>Original receipt</h3>
+              <p>
+                Secret code, poll/user IDs, original vote preimages and hashes,
+                plus cast-time question, answer and poll labels.
+              </p>
+              <p>
+                <strong>Kept by the voter.</strong> Essential for detecting a
+                changed ballot before sealing.
+              </p>
+            </div>
+            <div class="card">
+              <span class="tag">Created after finish</span>
+              <h3>Sealed record</h3>
+              <p>
+                Five sections, canonical manifest and root digest. Contents are
+                frozen and disclosed according to policy.
+              </p>
+              <p>
+                <strong>Kept immutably.</strong> Final covered outputs read this
+                snapshot.
+              </p>
+            </div>
+            <div class="card">
+              <span class="tag">Upgraded over time</span>
+              <h3>Timestamp proof</h3>
+              <p>
+                An OpenTimestamps <code>.ots</code> proof linking the record’s
+                digest to timestamp evidence.
+              </p>
+              <p>
+                <strong>Pending → confirmed.</strong> Its proof bytes can evolve
+                while the sealed record stays the same.
+              </p>
+            </div>
+          </aside>
+        </div>
+        <div class="two-col" aria-label="Voting cutoff scenarios">
+          <details>
+            <summary>Race scenario A · vote gets the lock first</summary>
+            <div class="detail-body">
+              <ol class="mini-flow">
+                <li>Vote transaction sees <code>ACTIVE</code>.</li>
+                <li>Complete ballot and receipt data commit.</li>
+                <li>Finish transaction acquires the lock and closes voting.</li>
+                <li>The accepted vote is included in the later seal.</li>
+              </ol>
+            </div>
+          </details>
+          <details>
+            <summary>Race scenario B · finish gets the lock first</summary>
+            <div class="detail-body">
+              <ol class="mini-flow">
+                <li>Finish transaction commits <code>FINISHED</code>.</li>
+                <li>Vote transaction acquires the lock and re-reads state.</li>
+                <li>The late ballot is rejected before persistence.</li>
+                <li>
+                  No successful receipt is issued for that rejected ballot.
+                </li>
+              </ol>
+            </div>
+          </details>
+        </div>
+      </section>
+      <section id="record" aria-labelledby="record-title">
+        <div class="section-head">
+          <span class="number">02</span>
+          <h2 id="record-title">Five sections. One commitment.</h2>
+        </div>
+        <p class="section-intro">
+          Each section can be disclosed separately. The public manifest commits
+          to all five without exposing their contents. Anonymous, named and open
+          polls use the same record structure.
+        </p>
+        <figure
+          class="commitment"
+          aria-label="Five sections feed a manifest whose hash is submitted to OpenTimestamps"
+        >
+          <div class="section-grid">
+            <div class="section-box">
+              <strong>poll</strong>
+              <p>
+                Metadata, questions, answers, archived content and attachment
+                metadata.
+              </p>
+              <span class="hash">SHA-256 → hash</span>
+            </div>
+            <div class="section-box">
+              <strong>tallies</strong>
+              <p>
+                Answer totals, exact weights and participation with unique-voter
+                deduplication.
+              </p>
+              <span class="hash">SHA-256 → hash</span>
+            </div>
+            <div class="section-box">
+              <strong>register</strong>
+              <p>
+                Participants, frozen names, weights, holdings and whether they
+                voted.
+              </p>
+              <span class="hash">SHA-256 → hash</span>
+            </div>
+            <div class="section-box private">
+              <strong>signers</strong>
+              <p>
+                Voters’ recorded signing decisions and consented phones.
+                Admin-only.
+              </p>
+              <span class="hash">SHA-256 → hash</span>
+            </div>
+            <div class="section-box">
+              <strong>votes</strong>
+              <p>
+                Salted commitments to individual vote rows, ordered by leaf
+                hash.
+              </p>
+              <span class="hash">Merkle root + leaf count</span>
+            </div>
+          </div>
+          <div class="merge" aria-hidden="true">
+            ↓ &nbsp; all five commitments &nbsp; ↓
+          </div>
+          <div class="digest-flow">
+            <div class="block">
+              <strong>Canonical manifest</strong
+              ><small
+                >Version, algorithm, poll ID, seal time, section
+                commitments</small
+              >
+            </div>
+            <span class="connector" aria-hidden="true">→</span>
+            <div class="block dark">
+              <strong>Root digest</strong
+              ><small>SHA-256 of the canonical manifest</small>
+            </div>
+            <span class="connector" aria-hidden="true">→</span>
+            <div class="block">
+              <strong>OpenTimestamps</strong
+              ><small
+                >Only the digest is submitted; record contents stay
+                private</small
+              >
+            </div>
+          </div>
+          <figcaption class="caption" style="margin-top: 18px">
+            The vote Merkle root is one commitment inside the manifest. The root
+            digest of the entire manifest is the value anchored.
+          </figcaption>
+        </figure>
+        <details>
+          <summary>How a vote becomes a private, provable leaf</summary>
+          <div class="detail-body">
+            <p>
+              A multi-choice ballot produces several leaves. A leaf commits to
+              <code
+                >pollId, questionId, answerId, userId, weight, castAt,
+                salt</code
+              >.
+            </p>
+            <pre class="formula">
+salt = HMAC-SHA256(decoded receipt secret, questionId + ":" + answerId)
+leaf = SHA-256(0x00 || canonical vote preimage)
+node = SHA-256(0x01 || decoded left hash || decoded right hash)
+empty tree = SHA-256("")</pre
+            >
+            <p>
+              Leaves sort by hash, then pair left-to-right. An odd node carries
+              up unchanged. A path supplies sibling hashes and their sides,
+              allowing one leaf to be checked without exposing other voters’
+              preimages.
+            </p>
+            <p>
+              Producer text is prepared as NFC, then serialized using JCS.
+              Received evidence must already have exact canonical bytes;
+              verification does not repair it. Weights use integer millionths
+              internally and six-place decimal strings; holding shares preserve
+              eight decimal places.
+            </p>
+          </div>
+        </details>
+        <h3 style="margin-top: 28px">Who can see what?</h3>
+        <div class="table-scroll">
+          <table>
+            <caption
+              class="caption"
+              style="text-align: left; padding: 12px 18px"
+            >
+              Authorization is enforced before any record contents are
+              serialized to a client.
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Artifact</th>
+                <th scope="col">Authorized audience</th>
+                <th scope="col">Boundary</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Manifest, digest, status, proof</td>
+                <td>Anyone, without login</td>
+                <td>
+                  No poll title, names, answers or organization metadata on the
+                  public page.
+                </td>
+              </tr>
+              <tr>
+                <td>poll + tallies</td>
+                <td><code>canViewResults</code></td>
+                <td>
+                  Membership or voting rights alone do not bypass the existing
+                  results policy.
+                </td>
+              </tr>
+              <tr>
+                <td>register + all vote preimages</td>
+                <td><code>canViewVoterNames</code></td>
+                <td>
+                  Admin-only for anonymous polls. Receipt secrets are excluded.
+                </td>
+              </tr>
+              <tr>
+                <td>signers</td>
+                <td><code>canViewSignWillingness</code></td>
+                <td>
+                  Admin-only for every poll type; excluded from participant
+                  email bundles.
+                </td>
+              </tr>
+              <tr>
+                <td>Own leaves + inclusion paths</td>
+                <td>The authenticated voter</td>
+                <td>
+                  Only their sealed votes. Canonical answer labels require
+                  separate results access or a retained copy.
+                </td>
+              </tr>
+              <tr>
+                <td>Receipt secret</td>
+                <td>Its owner</td>
+                <td>
+                  Stored by the platform for current-record checks, but never
+                  included in admin serialization or sealed-record exports.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">
+          <strong>Signing willingness has its own section.</strong> Include only
+          voters with a non-null decision. A declining voter’s phone is null; a
+          willing voter’s phone is present only if available. An empty signer
+          list is still hashed. This records willingness, not actual signatures.
+        </div>
+      </section>
+      <section id="anchors" aria-labelledby="anchors-title">
+        <div class="section-head">
+          <span class="number">03</span>
+          <h2 id="anchors-title">The anchor has its own lifecycle</h2>
+        </div>
+        <p class="section-intro">
+          The seal stays immutable while anchor attempts evolve. A seal can
+          temporarily have no anchor; that is recoverable work. At most one
+          anchor is active: any anchor not marked <code>SUPERSEDED</code>.
+        </p>
+        <div class="state-layout">
+          <article class="state-card failure">
+            <h3>FAILED</h3>
+            <p>
+              A submission attempt failed. The first failure can have no proof
+              and no submission time.
+            </p>
+            <div class="schedule" aria-label="Retry backoff">
+              <span>5 min</span><span>15 min</span><span>1 hour</span
+              ><span>6 hours</span><span>24 hours…</span>
+            </div>
+            <p class="transition">
+              <strong>Due retry → submission attempt.</strong> Success becomes
+              <code>SUBMITTED</code>; another failure advances backoff.
+            </p>
+          </article>
+          <article class="state-card">
+            <h3>SUBMITTED</h3>
+            <p>
+              A validated pending proof commits to the requested digest. Bitcoin
+              confirmation has not yet been established.
+            </p>
+            <p class="transition">
+              <strong>Upgrade + Bitcoin verification → CONFIRMED.</strong>
+              Otherwise keep pending and poll again. Stale for more than three
+              days → supersede.
+            </p>
+          </article>
+          <article class="state-card">
+            <h3>CONFIRMED</h3>
+            <p>
+              The upgraded proof has verified Bitcoin evidence, with block
+              height and time recorded.
+            </p>
+            <p class="transition">
+              <strong>Confirmed proof remains downloadable.</strong> The
+              underlying record and digest do not change.
+            </p>
+          </article>
+          <article class="state-card failure">
+            <h3>SUPERSEDED</h3>
+            <p>
+              Retain the old pending attempt as history. Create a fresh attempt
+              for the same root digest.
+            </p>
+            <p class="transition">
+              <strong>Replace atomically.</strong> Save the old anchor’s
+              supersession and the replacement’s <code>SUBMITTED</code> or
+              <code>FAILED</code> state together.
+            </p>
+          </article>
+        </div>
+      </section>
+      <section id="recovery" aria-labelledby="recovery-title">
+        <div class="section-head">
+          <span class="number">04</span>
+          <h2 id="recovery-title">A crash leaves discoverable work</h2>
+        </div>
+        <p class="section-intro">
+          A reconciliation worker runs every 15 minutes. It examines persisted
+          state, so work can resume even if the process stopped before an event
+          handler or delivery ran.
+        </p>
+        <div class="recovery">
+          <article class="card">
+            <h3>Finished, no seal</h3>
+            <p>
+              Find eligible finished polls and run the complete
+              snapshot-and-save transaction.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Sealed, no active anchor</h3>
+            <p>
+              Submit the saved root digest. Never rebuild the record from
+              current data.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Anchor work is due</h3>
+            <p>
+              Retry a failure or upgrade a pending proof. Supersede a stale
+              pending attempt when required.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Initial bundle missing</h3>
+            <p>
+              Once a usable proof exists, create missing delivery records and
+              claim pending first sends.
+            </p>
+          </article>
+        </div>
+        <details>
+          <summary>How overlapping workers stay safe</summary>
+          <div class="detail-body">
+            <p>
+              Immediate dispatch, scheduled recovery and verify-page nudges
+              share a persistent per-poll claim with owner, expiry and an
+              increasing fencing token. Saving results checks the current token
+              inside the transaction; expired workers cannot overwrite newer
+              work.
+            </p>
+            <p>
+              Network I/O occurs outside transactions and batches are bounded. A
+              verify page nudges only its own stale pending anchor, no more
+              often than every 10 minutes.
+            </p>
+          </div>
+        </details>
+        <details>
+          <summary>
+            When an email delivery fails or its outcome is unknown
+          </summary>
+          <div class="detail-body">
+            <p>
+              Each recipient has a unique delivery record per seal:
+              <code>PENDING → SENDING → SENT / FAILED / UNKNOWN</code>. A
+              claimed first send can succeed, fail, or be left with an unknown
+              outcome after interruption.
+            </p>
+            <p>
+              Recovery handles missing or pending initial deliveries. It does
+              not automatically resend <code>SENT</code>, <code>FAILED</code> or
+              <code>UNKNOWN</code> deliveries. Exactly-once email delivery is
+              not claimed.
+            </p>
+          </div>
+        </details>
+      </section>
+      <section id="verify" aria-labelledby="verify-title">
+        <div class="section-head">
+          <span class="number">05</span>
+          <h2 id="verify-title">
+            Verification answers three different questions
+          </h2>
+        </div>
+        <p class="section-intro">
+          The CLI checks exported files without the running application.
+          OpenTimestamps tooling verifies timestamp evidence separately. Hosted
+          checks use the same pure core, but independent tools avoid relying on
+          the operator’s page.
+        </p>
+        <div class="checks">
+          <article class="card">
+            <div class="check-label">01 / Record consistency</div>
+            <h3>Do these contents match the commitment?</h3>
+            <p>
+              Available to anyone holding the relevant authorized sections and
+              manifest.
+            </p>
+            <ol>
+              <li>Reject unsupported formats and noncanonical bytes.</li>
+              <li>Recompute disclosed section hashes.</li>
+              <li>
+                Hash the manifest and compare its digest with the digest
+                committed in the proof.
+              </li>
+            </ol>
+          </article>
+          <article class="card">
+            <div class="check-label">02 / Original ballot comparison</div>
+            <h3>Is the ballot I retained included?</h3>
+            <p>
+              Requires the original downloaded or emailed cast-time receipt.
+            </p>
+            <ol>
+              <li>Recompute its original salted leaves locally.</li>
+              <li>
+                Compare the complete expected set with the supplied own leaves.
+                Changed, missing or extra own leaves fail.
+              </li>
+              <li>Verify every Merkle path to the manifest’s votes root.</li>
+            </ol>
+          </article>
+          <article class="card">
+            <div class="check-label">03 / Bitcoin timestamp</div>
+            <h3>What timestamp evidence anchors this digest?</h3>
+            <p>Requires a proof with verified Bitcoin evidence.</p>
+            <ol>
+              <li>
+                Check that the OTS proof commits to the manifest’s digest.
+              </li>
+              <li>Verify the Bitcoin attestation with independent tooling.</li>
+              <li>
+                Report pending separately; never treat a simulated proof as
+                Bitcoin confirmation.
+              </li>
+            </ol>
+          </article>
+        </div>
+        <div class="evidence-route" aria-label="Evidence chain">
+          <span>Original receipt</span><span aria-hidden="true">→</span
+          ><span>vote leaves</span><span aria-hidden="true">→</span
+          ><span>Merkle paths</span><span aria-hidden="true">→</span
+          ><span>votes root</span><span aria-hidden="true">→</span
+          ><span>manifest</span><span aria-hidden="true">→</span
+          ><span>root digest</span><span aria-hidden="true">→</span
+          ><span>OTS / Bitcoin proof</span>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <h3>Without the original receipt</h3>
+            <p>
+              A stored or pasted secret can check inclusion in the current
+              supplied record. It cannot establish agreement with the original
+              cast-time ballot: the operator knows the secret too.
+            </p>
+            <p class="caption">
+              A fresh receipt download is not independent cast-time evidence.
+              Import receipt secrets locally; do not send them to the hosted
+              verifier’s server.
+            </p>
+          </div>
+          <div class="card">
+            <h3>What the timestamp establishes</h3>
+            <p>
+              Evidence that the committed bytes existed no later than the
+              Bitcoin timestamp. It does not establish voter authorization,
+              truthful metadata, correct tallies, or the actual finishing time.
+            </p>
+            <p class="caption">
+              An omitted or withheld path prevents a successful inclusion check;
+              it is not a cryptographic proof of non-inclusion.
+            </p>
+          </div>
+        </div>
+        <details>
+          <summary>Answer labels, PDFs and attachment limits</summary>
+          <div class="detail-body">
+            <p>
+              Resolve answer labels from a hash-verified canonical
+              <code>poll</code> section only when results policy permits access
+              or the voter imports a retained copy. Otherwise display receipt
+              labels as cast-time claims, with proven IDs.
+            </p>
+            <p>
+              Final covered results and all three protocol PDFs render from the
+              saved sections. The signer protocol uses the separately protected
+              signer section. A footer authenticates the referenced record, not
+              the exact PDF bytes; a modified PDF can retain a valid footer.
+            </p>
+            <p>
+              Attachment metadata is committed in v1; attachment file contents
+              are not. Public hashes alone cannot reveal or prove the
+              correctness of undisclosed tally contents.
+            </p>
+          </div>
+        </details>
+      </section>
+      <section id="delivery-plan" aria-labelledby="delivery-title">
+        <div class="section-head">
+          <span class="number">06</span>
+          <h2 id="delivery-title">Where implementation stands</h2>
+        </div>
+        <p class="section-intro">
+          Snapshot as of 26 October 2026. Phase 1 supplies the pure algorithms
+          and domain rules; it does not yet make this workflow live. Each later
+          phase ends at a review gate.
+        </p>
+        <ol class="phase-grid">
+          <li class="done">
+            <small>01 / Complete · awaiting review</small
+            ><strong
+              >Canonical records, receipts &amp; cryptographic domain</strong
+            >
+          </li>
+          <li class="next">
+            <small>02 / Next · not started</small
+            ><strong>Atomic voting cutoff &amp; reproducible receipts</strong>
+          </li>
+          <li>
+            <small>03 / Not started</small
+            ><strong>Consistent immutable sealing &amp; dispatch</strong>
+          </li>
+          <li>
+            <small>04 / Not started</small
+            ><strong>Real anchoring &amp; durable recovery</strong>
+          </li>
+          <li>
+            <small>05 / Not started</small
+            ><strong>Authorized exports &amp; standalone CLI</strong>
+          </li>
+          <li>
+            <small>06 / Not started</small
+            ><strong>Receipt emails &amp; first bundle delivery</strong>
+          </li>
+          <li>
+            <small>07 / Not started</small
+            ><strong>Hosted receipt &amp; verification flows</strong>
+          </li>
+          <li>
+            <small>08 / Not started</small
+            ><strong>Frozen final results &amp; all three PDFs</strong>
+          </li>
+          <li>
+            <small>09 / Not started</small
+            ><strong>Rollout rehearsal &amp; release handoff</strong>
+          </li>
+        </ol>
+      </section>
+    </main>
+    <footer>
+      <div class="wrap">
+        <strong>Read alongside the source documents</strong>
+        <div class="sources">
+          <a href="2026-09-11-poll-seal-and-anchor-design.md">Approved design</a
+          ><a href="../plans/2026-09-15-poll-seal-and-anchor.md"
+            >Implementation plan</a
+          ><a href="../src/domain/seal/README.md">Exact v1 domain format</a
+          ><a href="README.md">Documentation index</a>
+        </div>
+        <p class="footer-meta">
+          Standalone HTML · no network dependencies · expand technical notes for
+          detail · status must be updated as phases complete
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

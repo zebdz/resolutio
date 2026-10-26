@@ -1,8 +1,9 @@
 # Poll seal and blockchain anchor — implementation plan
 
 **Created:** 2026-09-15  
-**Revised:** 2026-10-25  
-**Status:** planning complete; implementation not started
+**Revised:** 2026-10-26
+
+**Status:** Phase 1 complete, including type review corrections; awaiting review. Phases 2–9 not started.
 
 **Source of truth:** [approved design](../readmes/2026-09-11-poll-seal-and-anchor-design.md), committed as `8653fa9`.
 This revision replaces the earlier task list and its conflicting format refinements and golden vectors.
@@ -56,19 +57,19 @@ The design determines behavior; this plan determines implementation order and re
 Phases run in this order. The dependencies indicate the contracts each phase extends, not permission
 for parallel implementation.
 
-| Phase | Reviewable result                                         | Depends on      | Status      |
-| ----- | --------------------------------------------------------- | --------------- | ----------- |
-| 1     | Canonical record, receipts and cryptographic domain       | Approved design | Not started |
-| 2     | Atomic voting cutoff and reproducible cast-time receipts  | 1               | Not started |
-| 3     | Consistent immutable sealing and post-commit dispatch     | 1–2             | Not started |
-| 4     | Real anchoring and durable recovery                       | 3               | Not started |
-| 5     | Authorized exports and standalone verifier CLI            | 1, 3–4          | Not started |
-| 6     | Receipt emails and recoverable first bundle delivery      | 2, 4–5          | Not started |
-| 7     | Hosted receipt and verification flows                     | 5–6             | Not started |
-| 8     | Frozen final results and all three PDFs                   | 3, 5, 7         | Not started |
-| 9     | Rollout rehearsal, operational checks and release handoff | 1–8             | Not started |
+| Phase | Reviewable result                                         | Depends on      | Status                    |
+| ----- | --------------------------------------------------------- | --------------- | ------------------------- |
+| 1     | Canonical record, receipts and cryptographic domain       | Approved design | Complete; awaiting review |
+| 2     | Atomic voting cutoff and reproducible cast-time receipts  | 1               | Not started               |
+| 3     | Consistent immutable sealing and post-commit dispatch     | 1–2             | Not started               |
+| 4     | Real anchoring and durable recovery                       | 3               | Not started               |
+| 5     | Authorized exports and standalone verifier CLI            | 1, 3–4          | Not started               |
+| 6     | Receipt emails and recoverable first bundle delivery      | 2, 4–5          | Not started               |
+| 7     | Hosted receipt and verification flows                     | 5–6             | Not started               |
+| 8     | Frozen final results and all three PDFs                   | 3, 5, 7         | Not started               |
+| 9     | Rollout rehearsal, operational checks and release handoff | 1–8             | Not started               |
 
-## Phase 1 — Canonical record and cryptographic domain — NOT STARTED
+## Phase 1 — Canonical record and cryptographic domain — COMPLETE
 
 **Outcome:** a deterministic five-section record and receipt model, usable without the database,
 framework or network. Format correctness is settled before persistence and UI depend on it.
@@ -79,30 +80,75 @@ framework or network. Format correctness is settled before persistence and UI de
 
 **Work and tests first:**
 
-- [ ] Write client-usage tests for `Weight`, leaf construction, Merkle paths, record building and
+- [x] Write client-usage tests for `Weight`, leaf construction, Merkle paths, record building and
       anchor transitions. Add `@noble/hashes` through a small browser-compatible hashing module;
       check the installed version's supported imports rather than copying the old plan's version.
-- [ ] Define versioned record and receipt DTOs from design §4. Specify exact field names, nullability,
+- [x] Define versioned record and receipt DTOs from design §4. Specify exact field names, nullability,
       collection order and decimal representations, including property holdings. Keep v1 fixtures
       self-contained; schema changes after publication require versioning.
-- [ ] Separate NFC preparation, canonical serialization and strict received-byte validation. Test
+- [x] Separate NFC preparation, canonical serialization and strict received-byte validation. Test
       nested key ordering, invalid Unicode, noncanonical JSON, unsupported values, dates and exact
       weight bounds; reject unsupported versions and algorithms.
-- [ ] Pin decoded-key HMAC, leaf and internal-node prefixes, sorted leaves, odd-node promotion,
+- [x] Pin decoded-key HMAC, leaf and internal-node prefixes, sorted leaves, odd-node promotion,
       empty tree and paths for zero through five leaves. Validate fixed bytes/digests with an
       independent reference calculation, not expectations computed by the code under test.
-- [ ] Build all five sections. Test archived content, attachment metadata, deterministic arrays,
+- [x] Build all five sections. Test archived content, attachment metadata, deterministic arrays,
       unique-voter tally arithmetic, anonymous/named/open polls, missing secrets and invalid vote
       relationships. Use exact decimal arithmetic throughout the seal model.
-- [ ] Test signers with true/false/null decisions and non-voters: omit missing decisions/non-voters,
+- [x] Test signers with true/false/null decisions and non-voters: omit missing decisions/non-voters,
       retain phones only for willing voters, and commit an empty list when appropriate.
-- [ ] Model immutable seal contents and anchor transitions through the aggregate. Test initial
+- [x] Model immutable seal contents and anchor transitions through the aggregate. Test initial
       failure without proof, required submission evidence, confirmation prerequisites, retry timing,
       supersession and at most one active anchor. Test proof validation separately from status labels.
+- [x] Apply type review corrections: validated domain IDs/secrets/digests/timestamps, bounded row
+      weights, distinct units, typed ports and anchor state variants. Keep raw DTOs at codecs and
+      prove invalid client usage fails compilation without changing v1 fixture bytes.
 
 **Acceptance:** exact golden record/receipt fixtures are checked in; changing any committed field
 changes its commitment; pure modules load in Node and a browser bundle without Node-only imports.
 Run focused domain tests and typecheck. Mark complete, record evidence, stop for review.
+
+**Completed 2026-10-26 — awaiting user review.**
+
+- Added the pure seal context, immutable record/receipt models, aggregate-owned anchor transitions,
+  repository/provider ports, and English/Russian domain codes. No application or database wiring yet.
+- Defined the exact unpublished v1 format in [the domain reference](../src/domain/seal/README.md),
+  strict schemas, and self-contained golden record/receipt fixtures. Holding sizes use six decimal
+  places; ownership shares preserve the database's eight places. IDs exclude the HMAC separator.
+- `@noble/hashes@2.4.0` is pinned; installed `sha2.js`, `hmac.js`, and `utils.js` exports were checked.
+  Runtime minimum is Node 20.19.0. Zod's existing dependency validates strict DTO shapes.
+- Independent Python `hashlib`/`hmac` calculations reproduce the golden vectors, including trees
+  with zero through five leaves. Expected record tallies are specified independently.
+- Observed red → green for arithmetic, canonical validation, leaves/paths, snapshot invariants,
+  receipts, rehydration and anchor transitions. Regression tests caught reused historical anchor
+  IDs and Node Buffer views sharing proof memory; both root causes are fixed.
+- **Passing after type review:** 99 domain tests in 11 files, including 13 compile-time rejection
+  examples; complete suite **3,430 tests / 328 files**; repository typecheck;
+  scoped domain/test typecheck; scoped ESLint/Prettier; browser-targeted bundle execution without
+  Node globals or builtins; fixture regeneration. Checks used four workers and a 20 GiB memory cap.
+- Boundary details: seal identity is its root digest; DB surrogate IDs belong to adapters. Anchor
+  provider results explicitly distinguish pending, simulated and verified Bitcoin evidence. The
+  domain validates those assertions; real OTS parsing and Bitcoin verification remain Phase 4.
+- No live OTS, database rollout, full Next.js build or interactive browser checks claimed. These
+  require later phases. This phase preserves existing voting/results behavior.
+
+**Type review correction complete, 2026-10-26 — awaiting review.**
+
+- Raw snapshot/receipt/record DTOs remain primitive at serialization boundaries. Parsed core
+  values use distinct validated types; vote and register weights remain exact `RowWeight` values.
+  Arithmetic returns unbounded `Weight` totals, which cannot be reused as bounded row weights.
+- `SealAnchor` is a readonly discriminated union. Confirmations require the real provider and
+  complete evidence; failures require an error/retry time and pair earlier proof with submission
+  time. Rehydration checks untrusted data; transitions retain cross-field timing/identity rules.
+- Observed failing compiler contracts for swapped IDs, unvalidated secrets, incomplete/stub
+  confirmations, mixed units and tally sums used as row weights, then passing contracts. Also
+  observed red → green for parsed vote round trips and value-based weight equality.
+- Regression tests cover structurally compatible objects carrying extra private fields. Outgoing
+  vote/register serializers explicitly list allowed fields, including nested holdings, preventing
+  accidental secret/phone export through object spreads.
+- Golden record/receipt/crypto fixtures and browser compatibility are unchanged. No wire version
+  change or product decision. Future adapters must construct domain values through validated
+  factories; branding does not establish authorization or cryptographic proof authenticity.
 
 ## Phase 2 — Atomic voting and cast-time receipts — NOT STARTED
 
@@ -400,20 +446,20 @@ actual standalone CLI build/run commands. Skipped database/live checks are not p
 
 At each phase boundary, update this record:
 
-| Phase | Completed | Failing test observed | Passing checks/evidence | Review status |
-| ----- | --------- | --------------------- | ----------------------- | ------------- |
-| 1     | No        | —                     | —                       | Not started   |
-| 2     | No        | —                     | —                       | Not started   |
-| 3     | No        | —                     | —                       | Not started   |
-| 4     | No        | —                     | —                       | Not started   |
-| 5     | No        | —                     | —                       | Not started   |
-| 6     | No        | —                     | —                       | Not started   |
-| 7     | No        | —                     | —                       | Not started   |
-| 8     | No        | —                     | —                       | Not started   |
-| 9     | No        | —                     | —                       | Not started   |
+| Phase | Completed       | Failing test observed                                  | Passing checks/evidence                                                                                         | Review status        |
+| ----- | --------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | -------------------- |
+| 1     | Yes, 2026-10-26 | Yes; client usage, type contracts and regression tests | 99 domain / 3,430 total tests; 13 compile rejections; types, lint, format, browser bundle, independent fixtures | Awaiting user review |
+| 2     | No              | —                                                      | —                                                                                                               | Not started          |
+| 3     | No              | —                                                      | —                                                                                                               | Not started          |
+| 4     | No              | —                                                      | —                                                                                                               | Not started          |
+| 5     | No              | —                                                      | —                                                                                                               | Not started          |
+| 6     | No              | —                                                      | —                                                                                                               | Not started          |
+| 7     | No              | —                                                      | —                                                                                                               | Not started          |
+| 8     | No              | —                                                      | —                                                                                                               | Not started          |
+| 9     | No              | —                                                      | —                                                                                                               | Not started          |
 
 ## Unresolved questions
 
-None requiring a product decision before Phase 1. The four review decisions are settled in design
+None requiring a product decision before Phase 2. The four review decisions are settled in design
 §18. If implementation exposes a format or guarantee change, record it and resolve it before coding
 past that boundary; do not silently resurrect the superseded plan's choices.

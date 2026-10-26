@@ -1,7 +1,7 @@
 # Poll seal and blockchain anchor — design
 
 **Date:** 2026-09-11
-**Status:** decisions resolved after review; not yet implemented
+**Status:** decisions resolved; Phase 1 domain complete (2026-10-26), awaiting review. Application integration not started.
 **Reviewed:** 2026-10-25 against the current implementation
 
 ## 1. Problem
@@ -115,6 +115,10 @@ Russian wording confirmed on 2026-09-11.
 ## 4. The sealed record
 
 ### 4.1 Structure
+
+The exact unpublished v1 field shapes, nullability and decimal formats now live in the
+[domain format reference](../src/domain/seal/README.md), with strict schemas and independent golden
+fixtures. This section remains the behavioral design; application integration follows the phased plan.
 
 ```
 root digest = sha256(canonical(manifest))
@@ -354,17 +358,24 @@ layer maps a complete poll-record snapshot into a plain `SealInput` (the anti-co
 The domain/application core owns ports; Prisma, OpenTimestamps, email and web adapters depend inward.
 The builder and aggregates enforce invariants; use cases load, invoke, save and dispatch events.
 
+Phase 1's type review separates those raw DTOs from the validated domain model. Core IDs, receipt
+secrets, salts, digests, timestamps and constrained anchor values use distinct validated types;
+vote/register rows retain bounded `RowWeight` values and tally arithmetic returns unbounded
+`Weight` values. Anchor states form a discriminated union with state-specific required evidence.
+Boundary codecs preserve all v1 bytes and revalidate persisted data. See the
+[domain type and codec contract](../src/domain/seal/README.md#domain-types-and-boundary-codecs).
+
 | File                     | Contents                                                                                                                                                                                                                                                                                                                                                                       |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `PollSeal.ts`            | Aggregate root: id, pollId, version, algorithm, manifest, rootDigest, sealedAt, canonical section bytes, canonical vote preimages, ordered leaf hashes, anchors. Methods: `activeAnchor()`, `submitAnchor(proof)`, `confirmAnchor(proof, height, time)`, `failAnchor(error, nextAttemptAt)`, `supersedeAnchor()`. Illegal transitions return `SEAL_ANCHOR_ILLEGAL_TRANSITION`. |
-| `SealAnchor.ts`          | Entity inside the aggregate: provider, status, pendingProof, confirmedProof, bitcoinHeight, bitcoinTime, attempts, lastError, nextAttemptAt, submittedAt, confirmedAt.                                                                                                                                                                                                         |
+| `SealAnchor.ts`          | Entity inside the aggregate: readonly SUBMITTED/CONFIRMED/FAILED/SUPERSEDED variants, validated IDs/times/proofs and state-specific required fields. Strict persistence decoder; pure transitions.                                                                                                                                                                             |
 | `SealedRecordBuilder.ts` | Pure factory `build(input: SealInput, sealedAt: Date): Result<PollSeal, string>`. Validates invariants, computes sections, tree, manifest, root.                                                                                                                                                                                                                               |
 | `SealInput.ts`           | Plain input types: poll data, participants with optional receipt secret, votes with weight strings, and signer decisions with sealing-time names and consent-gated phone numbers.                                                                                                                                                                                              |
 | `Canonical.ts`           | Explicit NFC input preparation, RFC 8785 serialization and strict canonical-byte verification; date and decimal formatting.                                                                                                                                                                                                                                                    |
 | `MerkleTree.ts`          | `build(leaves)`, `root`, `pathFor(leafHash)`, `verifyPath(leaf, path, root)`.                                                                                                                                                                                                                                                                                                  |
-| `VoteLeaf.ts`            | `deriveSalt(secret, questionId, answerId)`, `hashLeaf(preimage)`.                                                                                                                                                                                                                                                                                                              |
-| `Weight.ts`              | Value object: millionths as `bigint`, `fromDecimalString`, `toDecimalString`, `add`.                                                                                                                                                                                                                                                                                           |
-| `AnchorProvider.ts`      | Port: `submit(rootDigestHex) → Result<{ proof: Uint8Array }>`, `upgrade(proof) → Result<{ complete: boolean; proof: Uint8Array; bitcoinHeight?: number; bitcoinTime?: Date }>`.                                                                                                                                                                                                |
+| `VoteLeaf.ts`            | `parseVotePreimage`, `votePreimageData`, typed `deriveSalt(secret, questionId, answerId)` and `hashLeaf(preimage)`. Bounded RowWeight values stay distinct from unbounded tally sums.                                                                                                                                                                                          |
+| `Weight.ts`              | Value object: millionths as `bigint`, `fromDecimalString`, `toDecimalString`, `add`, `equals`. Row codecs retain the bounded RowWeight brand; sums return Weight.                                                                                                                                                                                                              |
+| `AnchorProvider.ts`      | Port: typed Digest input, pending/simulated or Bitcoin evidence variants with owned AnchorProof bytes, BitcoinHeight and UtcTimestamp. Adapters must verify actual proof contents.                                                                                                                                                                                             |
 | `PollSealRepository.ts`  | Aggregate port: `save(seal)`, `findByPollId`, `findByRootDigest`, `saveAnchors(seal, claimToken)`. Save all changed anchor entities atomically through the root; immutable record fields never change.                                                                                                                                                                         |
 | `SealDomainCodes.ts`     | `SEAL_POLL_NOT_FINISHED`, `SEAL_INCONSISTENT_RECORD`, `SEAL_MISSING_RECEIPT_SECRET`, `SEAL_ANCHOR_ILLEGAL_TRANSITION`, `SEAL_VERSION_UNSUPPORTED`, `SEAL_LEAF_NOT_FOUND`.                                                                                                                                                                                                      |
 

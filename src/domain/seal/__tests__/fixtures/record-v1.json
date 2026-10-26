@@ -1,0 +1,266 @@
+{
+  "input": {
+    "state": "FINISHED",
+    "poll": {
+      "id": "poll1",
+      "title": "Café",
+      "description": "**Decision**",
+      "pollType": "ORGANIZATION",
+      "anonymous": true,
+      "organizationId": "org1",
+      "organizationName": "Organization",
+      "boardId": null,
+      "boardName": null,
+      "metadataCapturedAt": "2026-09-11T11:05:00.000Z",
+      "startDate": "2026-09-10T00:00:00.000Z",
+      "endDate": "2026-09-11T11:00:00.000Z",
+      "finishedAt": "2026-09-11T11:00:00.000Z",
+      "distributionType": "OWNERSHIP_SIZE_WEIGHTED",
+      "propertyAggregation": "RAW_SUM",
+      "weightCriteria": null,
+      "propertyIds": ["property2", "property1"],
+      "createdBy": "admin",
+      "createdAt": "2026-09-09T00:00:00.000Z",
+      "questions": [
+        {
+          "id": "q2",
+          "order": 2,
+          "text": "Second?",
+          "details": null,
+          "questionType": "single-choice",
+          "archivedAt": null,
+          "answers": [
+            {
+              "id": "b1",
+              "order": 0,
+              "text": "B1",
+              "archivedAt": null
+            }
+          ]
+        },
+        {
+          "id": "q0",
+          "order": 0,
+          "text": "Archived?",
+          "details": null,
+          "questionType": "single-choice",
+          "archivedAt": "2026-09-11T10:00:00.123Z",
+          "answers": [
+            {
+              "id": "old",
+              "order": 0,
+              "text": "OLD",
+              "archivedAt": "2026-09-11T10:00:00.123Z"
+            }
+          ]
+        },
+        {
+          "id": "q1",
+          "order": 1,
+          "text": "First?",
+          "details": "Pick several",
+          "questionType": "multiple-choice",
+          "archivedAt": null,
+          "answers": [
+            {
+              "id": "a2",
+              "order": 0,
+              "text": "A2",
+              "archivedAt": null
+            },
+            {
+              "id": "a1",
+              "order": 0,
+              "text": "A1",
+              "archivedAt": null
+            },
+            {
+              "id": "a9",
+              "order": 9,
+              "text": "A9",
+              "archivedAt": "2026-09-11T10:00:00.123Z"
+            }
+          ]
+        }
+      ],
+      "attachments": [
+        {
+          "id": "file2",
+          "fileName": "appendix.pdf",
+          "size": 200,
+          "mimeType": "application/pdf"
+        },
+        {
+          "id": "file1",
+          "fileName": "agenda.pdf",
+          "size": 100,
+          "mimeType": "application/pdf"
+        }
+      ]
+    },
+    "participants": [
+      {
+        "userId": "user3",
+        "lastName": "Last3",
+        "firstName": "First3",
+        "middleName": null,
+        "weight": "3.000000",
+        "snapshotAt": "2026-09-10T00:00:00.000Z",
+        "holdings": [],
+        "willingToSignProtocol": true,
+        "phoneNumber": "+70000000003",
+        "receiptSecret": null
+      },
+      {
+        "userId": "user2",
+        "lastName": "Last2",
+        "firstName": "First2",
+        "middleName": null,
+        "weight": "2.000001",
+        "snapshotAt": "2026-09-10T00:00:00.000Z",
+        "holdings": [],
+        "willingToSignProtocol": false,
+        "phoneNumber": "+70000000002",
+        "receiptSecret": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f"
+      },
+      {
+        "userId": "user1",
+        "lastName": "Last1",
+        "firstName": "First1",
+        "middleName": null,
+        "weight": "1.234567",
+        "snapshotAt": "2026-09-10T00:00:00.000Z",
+        "holdings": [
+          {
+            "propertyId": "property1",
+            "propertyName": "House",
+            "assetId": "asset1",
+            "assetName": "Flat",
+            "size": "80.123456",
+            "sizeUnit": "SQUARE_METERS",
+            "share": "0.12345678"
+          }
+        ],
+        "willingToSignProtocol": true,
+        "phoneNumber": "+70000000001",
+        "receiptSecret": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+      }
+    ],
+    "votes": [
+      {
+        "pollId": "poll1",
+        "userId": "user2",
+        "questionId": "q2",
+        "answerId": "b1",
+        "weight": "2.000001",
+        "castAt": "2026-09-11T10:00:00.123Z"
+      },
+      {
+        "pollId": "poll1",
+        "userId": "user2",
+        "questionId": "q1",
+        "answerId": "a1",
+        "weight": "2.000001",
+        "castAt": "2026-09-11T10:00:00.123Z"
+      },
+      {
+        "pollId": "poll1",
+        "userId": "user1",
+        "questionId": "q2",
+        "answerId": "b1",
+        "weight": "1.234567",
+        "castAt": "2026-09-11T10:00:00.123Z"
+      },
+      {
+        "pollId": "poll1",
+        "userId": "user1",
+        "questionId": "q1",
+        "answerId": "a2",
+        "weight": "1.234567",
+        "castAt": "2026-09-11T10:00:00.123Z"
+      },
+      {
+        "pollId": "poll1",
+        "userId": "user1",
+        "questionId": "q1",
+        "answerId": "a1",
+        "weight": "1.234567",
+        "castAt": "2026-09-11T10:00:00.123Z"
+      }
+    ]
+  },
+  "sealedAt": "2026-09-11T11:05:01.000Z",
+  "record": {
+    "manifest": "{\"algorithm\":\"sha256\",\"pollId\":\"poll1\",\"sealedAt\":\"2026-09-11T11:05:01.000Z\",\"sections\":{\"poll\":{\"hash\":\"5e9368142349b36d5a0404780736a36d5ba92203b72a7f2f2020c54a1c408d0e\"},\"register\":{\"hash\":\"5c38f696c8ffd962069fb253a6cbbd014d79d953a8118cd188678156cd52830e\"},\"signers\":{\"hash\":\"923dd6a96944f67c181c76d21186c94e7b0b9556b3cb75ca662956875323fd58\"},\"tallies\":{\"hash\":\"9a60899c9ab85a5f0bb29ddbf79ef95cb016ef63dcdf4578fd2d42069e2a960f\"},\"votes\":{\"leafCount\":5,\"root\":\"fb7438132499d7e20617be5c8eaf94e55a149d920b5c878d18c097cc909e7dc1\"}},\"version\":1}",
+    "rootDigest": "753cc468ecefe2f8cbf567cf13a03d10df97aa58aaa78da979619dddcfdb0822",
+    "sections": {
+      "poll": "{\"anonymous\":true,\"attachments\":[{\"fileName\":\"agenda.pdf\",\"id\":\"file1\",\"mimeType\":\"application/pdf\",\"size\":100},{\"fileName\":\"appendix.pdf\",\"id\":\"file2\",\"mimeType\":\"application/pdf\",\"size\":200}],\"boardId\":null,\"boardName\":null,\"createdAt\":\"2026-09-09T00:00:00.000Z\",\"createdBy\":\"admin\",\"description\":\"**Decision**\",\"distributionType\":\"OWNERSHIP_SIZE_WEIGHTED\",\"endDate\":\"2026-09-11T11:00:00.000Z\",\"finishedAt\":\"2026-09-11T11:00:00.000Z\",\"id\":\"poll1\",\"metadataCapturedAt\":\"2026-09-11T11:05:00.000Z\",\"organizationId\":\"org1\",\"organizationName\":\"Organization\",\"pollType\":\"ORGANIZATION\",\"propertyAggregation\":\"RAW_SUM\",\"propertyIds\":[\"property1\",\"property2\"],\"questions\":[{\"answers\":[{\"archivedAt\":\"2026-09-11T10:00:00.123Z\",\"id\":\"old\",\"order\":0,\"text\":\"OLD\"}],\"archivedAt\":\"2026-09-11T10:00:00.123Z\",\"details\":null,\"id\":\"q0\",\"order\":0,\"questionType\":\"single-choice\",\"text\":\"Archived?\"},{\"answers\":[{\"archivedAt\":null,\"id\":\"a1\",\"order\":0,\"text\":\"A1\"},{\"archivedAt\":null,\"id\":\"a2\",\"order\":0,\"text\":\"A2\"},{\"archivedAt\":\"2026-09-11T10:00:00.123Z\",\"id\":\"a9\",\"order\":9,\"text\":\"A9\"}],\"archivedAt\":null,\"details\":\"Pick several\",\"id\":\"q1\",\"order\":1,\"questionType\":\"multiple-choice\",\"text\":\"First?\"},{\"answers\":[{\"archivedAt\":null,\"id\":\"b1\",\"order\":0,\"text\":\"B1\"}],\"archivedAt\":null,\"details\":null,\"id\":\"q2\",\"order\":2,\"questionType\":\"single-choice\",\"text\":\"Second?\"}],\"startDate\":\"2026-09-10T00:00:00.000Z\",\"title\":\"Café\",\"weightCriteria\":null}",
+      "tallies": "{\"questions\":[{\"answers\":[{\"answerId\":\"a1\",\"totalWeight\":\"3.234568\",\"voteCount\":2},{\"answerId\":\"a2\",\"totalWeight\":\"1.234567\",\"voteCount\":1}],\"participantWeight\":\"3.234568\",\"questionId\":\"q1\",\"totalVotes\":3,\"totalWeight\":\"4.469135\"},{\"answers\":[{\"answerId\":\"b1\",\"totalWeight\":\"3.234568\",\"voteCount\":2}],\"participantWeight\":\"3.234568\",\"questionId\":\"q2\",\"totalVotes\":2,\"totalWeight\":\"3.234568\"}],\"totalParticipantWeight\":\"6.234568\",\"totalParticipants\":3}",
+      "register": "[{\"firstName\":\"First1\",\"holdings\":[{\"assetId\":\"asset1\",\"assetName\":\"Flat\",\"propertyId\":\"property1\",\"propertyName\":\"House\",\"share\":\"0.12345678\",\"size\":\"80.123456\",\"sizeUnit\":\"SQUARE_METERS\"}],\"lastName\":\"Last1\",\"middleName\":null,\"snapshotAt\":\"2026-09-10T00:00:00.000Z\",\"userId\":\"user1\",\"voted\":true,\"weight\":\"1.234567\"},{\"firstName\":\"First2\",\"holdings\":[],\"lastName\":\"Last2\",\"middleName\":null,\"snapshotAt\":\"2026-09-10T00:00:00.000Z\",\"userId\":\"user2\",\"voted\":true,\"weight\":\"2.000001\"},{\"firstName\":\"First3\",\"holdings\":[],\"lastName\":\"Last3\",\"middleName\":null,\"snapshotAt\":\"2026-09-10T00:00:00.000Z\",\"userId\":\"user3\",\"voted\":false,\"weight\":\"3.000000\"}]",
+      "signers": "[{\"firstName\":\"First1\",\"lastName\":\"Last1\",\"middleName\":null,\"phoneNumber\":\"+70000000001\",\"userId\":\"user1\",\"willingToSignProtocol\":true},{\"firstName\":\"First2\",\"lastName\":\"Last2\",\"middleName\":null,\"phoneNumber\":null,\"userId\":\"user2\",\"willingToSignProtocol\":false}]"
+    },
+    "votes": [
+      {
+        "preimage": {
+          "pollId": "poll1",
+          "userId": "user1",
+          "questionId": "q2",
+          "answerId": "b1",
+          "weight": "1.234567",
+          "castAt": "2026-09-11T10:00:00.123Z",
+          "salt": "c7fa3560e29d0985089800b4e932806022e2b3b6c0785fe4b6f728e6f4ce31fe"
+        },
+        "hash": "22859bdf301fd2540d99d989ca16eebce90e4d2c0ef6b08eed2cd9a3c706e222"
+      },
+      {
+        "preimage": {
+          "pollId": "poll1",
+          "userId": "user2",
+          "questionId": "q2",
+          "answerId": "b1",
+          "weight": "2.000001",
+          "castAt": "2026-09-11T10:00:00.123Z",
+          "salt": "47edaa54779d639c0b3cf62725c45745087874d32e6f2b0f1360618d5e5b7876"
+        },
+        "hash": "38f23a55034244136051dc3cd44d11912f7bcdc0511ed1c84e7830d978406417"
+      },
+      {
+        "preimage": {
+          "pollId": "poll1",
+          "userId": "user1",
+          "questionId": "q1",
+          "answerId": "a1",
+          "weight": "1.234567",
+          "castAt": "2026-09-11T10:00:00.123Z",
+          "salt": "88b50956d86c5498a1ae3ba90833beff0f79bb4a556abeea8dff3f6edf72d389"
+        },
+        "hash": "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e"
+      },
+      {
+        "preimage": {
+          "pollId": "poll1",
+          "userId": "user1",
+          "questionId": "q1",
+          "answerId": "a2",
+          "weight": "1.234567",
+          "castAt": "2026-09-11T10:00:00.123Z",
+          "salt": "3db521b35b16dc4cebac7efb05a131fa989191472b2273d34a96d3528f3f08ed"
+        },
+        "hash": "916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2"
+      },
+      {
+        "preimage": {
+          "pollId": "poll1",
+          "userId": "user2",
+          "questionId": "q1",
+          "answerId": "a1",
+          "weight": "2.000001",
+          "castAt": "2026-09-11T10:00:00.123Z",
+          "salt": "116a42ab9e3c37032dabf97993666556f7bc810334e66a79daf046d8435154e4"
+        },
+        "hash": "e0325ab0fe79b24ae924c7f670f13fcedd6de98235ba182f6fc9e53e2a91bdf6"
+      }
+    ]
+  },
+  "receipt": "{\"algorithm\":\"sha256\",\"leaves\":[{\"answerText\":\"B1\",\"hash\":\"22859bdf301fd2540d99d989ca16eebce90e4d2c0ef6b08eed2cd9a3c706e222\",\"preimage\":{\"answerId\":\"b1\",\"castAt\":\"2026-09-11T10:00:00.123Z\",\"pollId\":\"poll1\",\"questionId\":\"q2\",\"salt\":\"c7fa3560e29d0985089800b4e932806022e2b3b6c0785fe4b6f728e6f4ce31fe\",\"userId\":\"user1\",\"weight\":\"1.234567\"},\"questionText\":\"Second?\"},{\"answerText\":\"A1\",\"hash\":\"3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e\",\"preimage\":{\"answerId\":\"a1\",\"castAt\":\"2026-09-11T10:00:00.123Z\",\"pollId\":\"poll1\",\"questionId\":\"q1\",\"salt\":\"88b50956d86c5498a1ae3ba90833beff0f79bb4a556abeea8dff3f6edf72d389\",\"userId\":\"user1\",\"weight\":\"1.234567\"},\"questionText\":\"First?\"},{\"answerText\":\"A2\",\"hash\":\"916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2\",\"preimage\":{\"answerId\":\"a2\",\"castAt\":\"2026-09-11T10:00:00.123Z\",\"pollId\":\"poll1\",\"questionId\":\"q1\",\"salt\":\"3db521b35b16dc4cebac7efb05a131fa989191472b2273d34a96d3528f3f08ed\",\"userId\":\"user1\",\"weight\":\"1.234567\"},\"questionText\":\"First?\"}],\"pollId\":\"poll1\",\"pollTitle\":\"Café\",\"receiptSecret\":\"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\",\"userId\":\"user1\",\"version\":1}"
+}

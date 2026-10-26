@@ -1,0 +1,798 @@
+<!doctype html>
+<!-- User-facing explanation of the approved poll seal and anchor design.
+     Keep guarantees and availability aligned with 2026-09-11-poll-seal-and-anchor-design.md;
+     this preview describes planned behavior, not a currently released feature. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="A plain-language guide to saving your voting receipt, checking your vote and understanding what a digital seal and independent timestamp can prove."
+    />
+    <title>Your vote, with evidence you can keep · Resolutio</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #fafaf5;
+        --white: #fff;
+        --ink: #19362f;
+        --muted: #50645c;
+        --green: #175e4b;
+        --wash: #eaf2e8;
+        --line: #d5dfd1;
+        --amber: #81541f;
+        --sand: #fff3d8;
+        --red: #8b3430;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font:
+          16px/1.65 system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+      }
+      .wrap {
+        width: min(1000px, calc(100% - 48px));
+        margin: auto;
+      }
+      a,
+      summary {
+        cursor: pointer;
+      }
+      a {
+        color: var(--green);
+        text-underline-offset: 4px;
+      }
+      :focus-visible {
+        outline: 3px solid var(--amber);
+        outline-offset: 5px;
+      }
+      .skip {
+        position: absolute;
+        left: 20px;
+        top: -80px;
+        padding: 10px;
+        background: white;
+      }
+      .skip:focus {
+        top: 10px;
+      }
+      header {
+        border-bottom: 1px solid var(--line);
+      }
+      header .wrap {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        padding: 22px 0;
+      }
+      .brand {
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        font-size: 13px;
+      }
+      .header-note {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .preview {
+        padding: 12px 16px;
+        border: 1px solid #e6cf98;
+        border-radius: 6px;
+        background: var(--sand);
+        color: #62491e;
+        font-size: 13px;
+        margin-top: 24px;
+      }
+      .hero {
+        padding: 48px 0 34px;
+      }
+      .eyebrow {
+        color: var(--green);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      h1 {
+        font:
+          normal clamp(2.6rem, 6vw, 4.5rem)/1.08 Georgia,
+          'Times New Roman',
+          serif;
+        letter-spacing: -0.04em;
+        margin: 18px 0 20px;
+        max-width: 850px;
+      }
+      h1 span {
+        color: var(--green);
+      }
+      .lede {
+        max-width: 720px;
+        color: var(--muted);
+        font-size: 20px;
+        line-height: 1.6;
+        margin: 0;
+      }
+      h2 {
+        font-size: 26px;
+        line-height: 1.3;
+        letter-spacing: -0.025em;
+        margin: 0 0 22px;
+      }
+      h3 {
+        font-size: 18px;
+        line-height: 1.4;
+        margin: 0 0 10px;
+      }
+      p {
+        margin: 0 0 14px;
+      }
+      .promise {
+        margin: 0 0 40px;
+        padding: 23px 26px;
+        background: var(--green);
+        color: white;
+        border-radius: 9px;
+        font-size: 18px;
+        line-height: 1.55;
+      }
+      .promise strong {
+        font-weight: 650;
+      }
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        padding: 0;
+        list-style: none;
+        counter-reset: steps;
+      }
+      .steps li {
+        padding: 24px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+      }
+      .steps li::before {
+        counter-increment: steps;
+        content: counter(steps);
+        display: grid;
+        place-items: center;
+        width: 33px;
+        height: 33px;
+        background: var(--wash);
+        color: var(--green);
+        border-radius: 50%;
+        font-weight: 700;
+        font-size: 14px;
+        margin-bottom: 18px;
+      }
+      .steps p {
+        color: var(--muted);
+        font-size: 15px;
+      }
+      .steps p:last-child {
+        margin-bottom: 0;
+      }
+      section {
+        margin-bottom: 40px;
+      }
+      .example {
+        background: var(--wash);
+        border-radius: 10px;
+        padding: 28px;
+        margin-top: 30px;
+      }
+      .example-label {
+        font-size: 11px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 15px;
+      }
+      .comparison {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        gap: 24px;
+      }
+      .paper {
+        background: white;
+        border: 1px solid #c9d8c5;
+        border-radius: 6px;
+        padding: 21px 24px;
+      }
+      .paper-label {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 12px;
+      }
+      .paper .question {
+        font-size: 16px;
+        margin-bottom: 14px;
+      }
+      .answer {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .check {
+        border: 1px solid #99b29b;
+        width: 24px;
+        height: 24px;
+        display: grid;
+        place-items: center;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .compare-arrow {
+        color: var(--green);
+        font-size: 26px;
+      }
+      .example-result {
+        margin: 20px 0 0;
+        font-size: 15px;
+      }
+      .example-result strong {
+        display: block;
+        margin-bottom: 5px;
+      }
+      details {
+        border-top: 1px solid var(--line);
+      }
+      summary {
+        padding: 17px 0;
+        font-weight: 650;
+        font-size: 15px;
+      }
+      details .answer-body {
+        padding: 0 0 19px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+      details .answer-body p:last-child {
+        margin-bottom: 0;
+      }
+      .example details {
+        margin-top: 18px;
+        border-top-color: #bacdb7;
+      }
+      .example details .answer-body {
+        color: var(--ink);
+        padding-bottom: 0;
+      }
+      .mismatch {
+        color: var(--red);
+        font-weight: 650;
+      }
+      .counting {
+        padding: 25px 28px;
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--green);
+        background: white;
+        border-radius: 6px;
+      }
+      .counting h2 {
+        font-size: 21px;
+        margin-bottom: 12px;
+      }
+      .counting p {
+        font-size: 15px;
+        color: var(--muted);
+      }
+      .counting ol {
+        padding-left: 22px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+      .counting li {
+        margin: 10px 0;
+      }
+      .counting details {
+        margin-bottom: 18px;
+      }
+      .counting p:last-child {
+        margin-bottom: 0;
+      }
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 28px;
+      }
+      .two-col .note {
+        border-top: 2px solid var(--green);
+        padding-top: 18px;
+      }
+      .two-col p {
+        color: var(--muted);
+        font-size: 15px;
+      }
+      .statuses {
+        list-style: none;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        padding: 0;
+      }
+      .statuses li {
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 20px;
+        background: white;
+      }
+      .pill {
+        display: inline-block;
+        border-radius: 4px;
+        padding: 4px 8px;
+        color: var(--green);
+        background: var(--wash);
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 11px;
+      }
+      .pill.pending {
+        background: var(--sand);
+        color: var(--amber);
+      }
+      .statuses p {
+        font-size: 14px;
+        color: var(--muted);
+        margin-bottom: 0;
+      }
+      .save {
+        background: var(--wash);
+        padding: 24px 28px;
+        border-radius: 9px;
+      }
+      .save h2 {
+        font-size: 22px;
+        margin-bottom: 12px;
+      }
+      .save ul {
+        padding-left: 21px;
+        margin: 0;
+        font-size: 15px;
+      }
+      .save li {
+        margin: 7px 0;
+      }
+      .caption {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      footer {
+        padding: 25px 0 34px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+      }
+      footer .wrap {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+      }
+      @media (max-width: 720px) {
+        .steps {
+          grid-template-columns: 1fr;
+        }
+        .steps li {
+          padding: 21px;
+        }
+        .two-col {
+          grid-template-columns: 1fr;
+          gap: 14px;
+        }
+        .hero {
+          padding-top: 32px;
+        }
+        .lede {
+          font-size: 18px;
+        }
+        .promise {
+          font-size: 17px;
+        }
+        .comparison {
+          gap: 12px;
+        }
+        .paper {
+          padding: 16px;
+        }
+      }
+      @media (max-width: 460px) {
+        .wrap {
+          width: calc(100% - 32px);
+        }
+        header .wrap {
+          align-items: baseline;
+        }
+        .header-note {
+          max-width: 145px;
+          text-align: right;
+        }
+        h2 {
+          font-size: 23px;
+        }
+        .comparison {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        .compare-arrow {
+          text-align: center;
+          transform: rotate(90deg);
+          line-height: 1;
+        }
+        .example {
+          padding: 20px;
+        }
+        .statuses {
+          grid-template-columns: 1fr;
+        }
+        .counting,
+        .save,
+        .promise {
+          padding: 20px;
+        }
+        footer .wrap {
+          display: block;
+        }
+      }
+      @media print {
+        body {
+          background: white;
+          font-size: 11px;
+        }
+        .wrap {
+          width: 100%;
+        }
+        header .wrap {
+          padding: 10px 0;
+        }
+        .hero {
+          padding: 20px 0;
+        }
+        h1 {
+          font-size: 32px;
+        }
+        .lede {
+          font-size: 15px;
+        }
+        .promise {
+          background: white;
+          color: var(--ink);
+          border: 1px solid var(--line);
+          font-size: 15px;
+          margin-bottom: 20px;
+        }
+        section {
+          margin-bottom: 24px;
+        }
+        .steps li,
+        .example,
+        .counting,
+        .note,
+        details,
+        .save {
+          break-inside: avoid;
+        }
+        details::details-content {
+          content-visibility: visible;
+          display: block;
+        }
+        .skip {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a href="#guide" class="skip">Skip to guide</a>
+    <header>
+      <div class="wrap">
+        <div class="brand">RESOLUTIO</div>
+        <div class="header-note">A simple guide to checking your vote</div>
+      </div>
+    </header>
+    <main id="guide" class="wrap">
+      <div class="preview">
+        <strong>Feature preview.</strong> The receipt and verification features
+        described here are being built. This guide explains how they will work.
+      </div>
+      <div class="hero">
+        <div class="eyebrow">Your vote. Your evidence.</div>
+        <h1>Know what happened<br />to <span>your vote.</span></h1>
+        <p class="lede">
+          Keep a copy of the vote you submitted. Compare it with the final
+          voting record. Keep independent evidence that makes later changes
+          detectable.
+        </p>
+      </div>
+      <div class="promise">
+        <strong
+          >A successful receipt check shows that your saved ballot is included
+          unchanged in the sealed voting record.</strong
+        >
+        The seal and a confirmed timestamp then let that record be checked for
+        later changes.
+      </div>
+      <section aria-labelledby="steps-title">
+        <h2 id="steps-title">Three things make this possible</h2>
+        <ol class="steps">
+          <li>
+            <h3>Your original receipt</h3>
+            <p>
+              After submitting your vote, check that the receipt shows your
+              intended answers. Save the original receipt file, either
+              downloaded or attached to your receipt email.
+            </p>
+            <p>It gives you a copy to compare with the final record.</p>
+          </li>
+          <li>
+            <h3>A sealed voting record</h3>
+            <p>
+              After voting closes, the recorded votes and results are sealed
+              together. They receive a mathematical “fingerprint” that changes
+              if their contents change.
+            </p>
+            <p>Changes can be detected by comparing against the saved proof.</p>
+          </li>
+          <li>
+            <h3>An independent timestamp</h3>
+            <p>
+              A confirmed timestamp records the fingerprint using Bitcoin. It
+              provides evidence that the sealed record existed by that time.
+            </p>
+            <p>
+              You can keep the proof and check it independently of our website.
+            </p>
+          </li>
+        </ol>
+        <div
+          class="example"
+          aria-label="Illustration of comparing an original receipt with a final record"
+        >
+          <div class="example-label">
+            An example — not a real vote or verification result
+          </div>
+          <div class="comparison">
+            <div class="paper">
+              <div class="paper-label">Your original receipt</div>
+              <div class="question">Create a shared garden?</div>
+              <div class="answer">
+                <span class="check" aria-hidden="true">✓</span>Yes
+              </div>
+            </div>
+            <div class="compare-arrow" aria-hidden="true">→</div>
+            <div class="paper">
+              <div class="paper-label">The sealed voting record</div>
+              <div class="question">Create a shared garden?</div>
+              <div class="answer">
+                <span class="check" aria-hidden="true">✓</span>Yes
+              </div>
+            </div>
+          </div>
+          <p class="example-result">
+            <strong>A match confirms your saved choice is included.</strong>The
+            real check compares your whole ballot, including its recorded
+            weight, rather than just the answer shown in this illustration.
+          </p>
+          <details>
+            <summary>
+              What if “Yes” becomes “No”, or a choice is missing?
+            </summary>
+            <div class="answer-body">
+              <p>
+                <span class="mismatch"
+                  >The original-receipt check cannot pass.</span
+                >
+                A changed, missing or extra choice in the supplied ballot will
+                not match your saved receipt. Keep the original file and the
+                verification result so the issue can be investigated.
+              </p>
+            </div>
+          </details>
+        </div>
+      </section>
+      <section class="counting" aria-labelledby="count-title">
+        <h2 id="count-title">You can check the totals, too</h2>
+        <p>
+          In a non-anonymous poll, participants with access to the full voting
+          record can verify the count using the sealed vote records.
+          <strong
+            >Other voters’ original receipts and secret codes remain
+            private.</strong
+          >
+        </p>
+        <ol>
+          <li>
+            <strong>Download the voting record.</strong> It contains the
+            questions and answers, participant identities, recorded choices and
+            voting weights, published totals, and verification evidence.
+          </li>
+          <li>
+            <strong>Check the files with an independent verifier.</strong> It
+            checks that the downloaded votes and results match the sealed
+            fingerprint. Timestamp confirmation is checked separately.
+          </li>
+          <li>
+            <strong>Recount and compare.</strong> The verifier counts the
+            selections and adds their voting weights for each answer, then
+            compares those calculations with the published totals. You can also
+            inspect the vote entries yourself.
+          </li>
+        </ol>
+        <p>
+          This establishes that the totals match the votes in the sealed record.
+          Comparing a voter’s original receipt with that record is the separate
+          check that their ballot matches the one they saved when voting.
+        </p>
+        <details>
+          <summary>
+            How can a vote be checked without its private receipt?
+          </summary>
+          <div class="answer-body">
+            <p>
+              Each shared vote record includes the individual random value
+              (called a “salt”) needed to check its fingerprint. This does not
+              reveal the secret code from the voter’s receipt. You can verify
+              the sealed record and recount its votes without collecting anyone
+              else’s original receipt.
+            </p>
+          </div>
+        </details>
+        <p>
+          <strong>Anonymous polls have a limitation:</strong> ordinary
+          participants cannot see other people’s votes, so they cannot
+          independently check the whole count. They can still verify their own
+          ballots, but the seal and timestamp alone do not guarantee that the
+          totals are correct.
+        </p>
+      </section>
+      <section class="two-col" aria-label="Independence and privacy">
+        <div class="note">
+          <h2>Evidence you can keep</h2>
+          <p>
+            Your original receipt helps reveal a change between casting and
+            sealing. Saved proof of the sealed record helps reveal changes made
+            later—even by the platform operator.
+          </p>
+          <p>
+            You or someone you trust can use independent software to check
+            downloaded evidence. You do not have to rely solely on a “verified”
+            badge on our website.
+          </p>
+        </div>
+        <div class="note">
+          <h2>Your vote stays within its access rules</h2>
+          <p>
+            The public timestamp contains only the record’s fingerprint. It does
+            not publish your name or choices.
+          </p>
+          <p>
+            Poll visibility rules still apply, including authorized
+            administrators’ access. Your receipt contains private voting
+            information: keep the file and its code private.
+          </p>
+        </div>
+      </section>
+      <section aria-labelledby="status-title">
+        <h2 id="status-title">
+          A closed poll may still be waiting for its timestamp
+        </h2>
+        <ul class="statuses">
+          <li>
+            <span class="pill pending">Timestamp pending</span>
+            <p>
+              The timestamp proof is still being processed. Your receipt can be
+              checked against an available sealed record separately; Bitcoin
+              confirmation has not yet been established.
+            </p>
+          </li>
+          <li>
+            <span class="pill">Timestamp confirmed</span>
+            <p>
+              The proof has verified Bitcoin evidence. It establishes that the
+              sealed record existed by the recorded timestamp, not the exact
+              moment you voted or the poll closed.
+            </p>
+          </li>
+        </ul>
+        <p class="caption">
+          A poll marked unsealed has no seal proof to check. Older polls may
+          remain unsealed.
+        </p>
+      </section>
+      <section class="save" aria-labelledby="save-title">
+        <h2 id="save-title">What you should do</h2>
+        <ul>
+          <li>
+            <strong>After voting:</strong> review and save the original receipt
+            file. Keep the email attachment if that is how you received it.
+          </li>
+          <li>
+            <strong>After the poll is sealed:</strong> check your vote using
+            that original receipt. Read the ballot-check and timestamp results
+            separately.
+          </li>
+          <li>
+            <strong>Keep the evidence:</strong> save the downloadable record and
+            proof files available to you, including the confirmed proof when
+            ready.
+          </li>
+          <li>
+            <strong>If a check fails or cannot finish:</strong> keep your
+            original files unchanged and ask the poll organizer to investigate.
+            An incomplete check does not, by itself, establish what went wrong.
+          </li>
+        </ul>
+      </section>
+      <section aria-labelledby="questions-title">
+        <h2 id="questions-title">A few common questions</h2>
+        <details>
+          <summary>
+            I lost the original receipt. Can I still check my vote?
+          </summary>
+          <div class="answer-body">
+            <p>
+              You can check inclusion of the vote currently supplied by the
+              platform using your receipt code. That is a weaker check: it
+              cannot establish that the vote matches what was originally issued
+              to you. The platform also stores the code. A fresh download does
+              not replace an independently saved original receipt.
+            </p>
+          </div>
+        </details>
+        <details>
+          <summary>Does this make changing votes impossible?</summary>
+          <div class="answer-body">
+            <p>
+              It provides evidence that lets changes be detected against your
+              original receipt and saved proof. It cannot prevent every
+              dishonest act, such as inventing a vote before sealing for someone
+              who never checks. Review your receipt when you receive it and
+              verify it later.
+            </p>
+          </div>
+        </details>
+        <details>
+          <summary>Do I need Bitcoin or a cryptocurrency wallet?</summary>
+          <div class="answer-body">
+            <p>
+              No. Bitcoin is used as a public timestamp record. You do not need
+              to own cryptocurrency or have a wallet to check your poll’s proof.
+            </p>
+          </div>
+        </details>
+        <details>
+          <summary>
+            Does a verification link prove that a PDF has not been edited?
+          </summary>
+          <div class="answer-body">
+            <p>
+              The link verifies the underlying voting record. It does not
+              authenticate the exact PDF file. If you need to check a document,
+              compare its contents with the verified record you are allowed to
+              view.
+            </p>
+          </div>
+        </details>
+      </section>
+    </main>
+    <footer>
+      <div class="wrap">
+        <span>Keep your receipt. Check your vote. Save the proof.</span
+        ><span>Resolutio · Feature preview · October 2026</span>
+      </div>
+    </footer>
+  </body>
+</html>

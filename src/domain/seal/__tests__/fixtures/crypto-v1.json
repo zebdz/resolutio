@@ -1,0 +1,268 @@
+{
+  "secret": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "leaves": [
+    {
+      "preimage": {
+        "pollId": "poll1",
+        "questionId": "q1",
+        "answerId": "a1",
+        "userId": "user1",
+        "weight": "1.234567",
+        "castAt": "2026-09-11T10:00:00.123Z",
+        "salt": "88b50956d86c5498a1ae3ba90833beff0f79bb4a556abeea8dff3f6edf72d389"
+      },
+      "canonical": "{\"answerId\":\"a1\",\"castAt\":\"2026-09-11T10:00:00.123Z\",\"pollId\":\"poll1\",\"questionId\":\"q1\",\"salt\":\"88b50956d86c5498a1ae3ba90833beff0f79bb4a556abeea8dff3f6edf72d389\",\"userId\":\"user1\",\"weight\":\"1.234567\"}",
+      "hash": "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e"
+    },
+    {
+      "preimage": {
+        "pollId": "poll1",
+        "questionId": "q1",
+        "answerId": "a2",
+        "userId": "user1",
+        "weight": "1.234567",
+        "castAt": "2026-09-11T10:00:00.123Z",
+        "salt": "3db521b35b16dc4cebac7efb05a131fa989191472b2273d34a96d3528f3f08ed"
+      },
+      "canonical": "{\"answerId\":\"a2\",\"castAt\":\"2026-09-11T10:00:00.123Z\",\"pollId\":\"poll1\",\"questionId\":\"q1\",\"salt\":\"3db521b35b16dc4cebac7efb05a131fa989191472b2273d34a96d3528f3f08ed\",\"userId\":\"user1\",\"weight\":\"1.234567\"}",
+      "hash": "916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2"
+    },
+    {
+      "preimage": {
+        "pollId": "poll1",
+        "questionId": "q1",
+        "answerId": "a3",
+        "userId": "user1",
+        "weight": "1.234567",
+        "castAt": "2026-09-11T10:00:00.123Z",
+        "salt": "384efb07ef999f0d7c237f06cd3cef05481720a5a27013b84a792ddb728a7188"
+      },
+      "canonical": "{\"answerId\":\"a3\",\"castAt\":\"2026-09-11T10:00:00.123Z\",\"pollId\":\"poll1\",\"questionId\":\"q1\",\"salt\":\"384efb07ef999f0d7c237f06cd3cef05481720a5a27013b84a792ddb728a7188\",\"userId\":\"user1\",\"weight\":\"1.234567\"}",
+      "hash": "26bc288add8ffd628cb3630ca5cfaf11658340bb75fd51f73b5f67e40d2e8fef"
+    },
+    {
+      "preimage": {
+        "pollId": "poll1",
+        "questionId": "q1",
+        "answerId": "a4",
+        "userId": "user1",
+        "weight": "1.234567",
+        "castAt": "2026-09-11T10:00:00.123Z",
+        "salt": "a7159f4ec16aa0d7e344d14afdfc26540956efbfc802e3a4233b9ad1c47feda2"
+      },
+      "canonical": "{\"answerId\":\"a4\",\"castAt\":\"2026-09-11T10:00:00.123Z\",\"pollId\":\"poll1\",\"questionId\":\"q1\",\"salt\":\"a7159f4ec16aa0d7e344d14afdfc26540956efbfc802e3a4233b9ad1c47feda2\",\"userId\":\"user1\",\"weight\":\"1.234567\"}",
+      "hash": "9d1697ad75ade167d0eac04d060f3930cfefc2807161dd348dfe03fbaae393b0"
+    },
+    {
+      "preimage": {
+        "pollId": "poll1",
+        "questionId": "q1",
+        "answerId": "a5",
+        "userId": "user1",
+        "weight": "1.234567",
+        "castAt": "2026-09-11T10:00:00.123Z",
+        "salt": "54d9f0d3439e3567964ef04daedafc09cb2d36ab425a04687e6569c4bc80cb0e"
+      },
+      "canonical": "{\"answerId\":\"a5\",\"castAt\":\"2026-09-11T10:00:00.123Z\",\"pollId\":\"poll1\",\"questionId\":\"q1\",\"salt\":\"54d9f0d3439e3567964ef04daedafc09cb2d36ab425a04687e6569c4bc80cb0e\",\"userId\":\"user1\",\"weight\":\"1.234567\"}",
+      "hash": "4e6a18adbf1c63fcd974c92d8658bca60def69396c0512afdbf9be6b000bf98f"
+    }
+  ],
+  "trees": [
+    {
+      "root": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "leaves": [],
+      "paths": {}
+    },
+    {
+      "root": "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e",
+      "leaves": [
+        "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e"
+      ],
+      "paths": {
+        "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e": []
+      }
+    },
+    {
+      "root": "4cf397806c200a5510376be4f5e79796c9009b7ce675e2bfef38fd9fd96fef89",
+      "leaves": [
+        "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e",
+        "916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2"
+      ],
+      "paths": {
+        "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e": [
+          {
+            "hash": "916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2",
+            "side": "right"
+          }
+        ],
+        "916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2": [
+          {
+            "hash": "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e",
+            "side": "left"
+          }
+        ]
+      }
+    },
+    {
+      "root": "3b566e03cf1fe89d3a21dc7f707b0686f7cac0ca86f83d85b15be265306a2321",
+      "leaves": [
+        "26bc288add8ffd628cb3630ca5cfaf11658340bb75fd51f73b5f67e40d2e8fef",
+        "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e",
+        "916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2"
+      ],
+      "paths": {
+        "26bc288add8ffd628cb3630ca5cfaf11658340bb75fd51f73b5f67e40d2e8fef": [
+          {
+            "hash": "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e",
+            "side": "right"
+          },
+          {
+            "hash": "916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2",
+            "side": "right"
+          }
+        ],
+        "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e": [
+          {
+            "hash": "26bc288add8ffd628cb3630ca5cfaf11658340bb75fd51f73b5f67e40d2e8fef",
+            "side": "left"
+          },
+          {
+            "hash": "916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2",
+            "side": "right"
+          }
+        ],
+        "916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2": [
+          {
+            "hash": "320e33d05d3836b16924524e2fe172e3461a397671b8a83eb1fffca68c49bacc",
+            "side": "left"
+          }
+        ]
+      }
+    },
+    {
+      "root": "2a7bd4a9137ae2627acce47aa4a0954d5b79add02b68e744d151e39f753f4573",
+      "leaves": [
+        "26bc288add8ffd628cb3630ca5cfaf11658340bb75fd51f73b5f67e40d2e8fef",
+        "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e",
+        "916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2",
+        "9d1697ad75ade167d0eac04d060f3930cfefc2807161dd348dfe03fbaae393b0"
+      ],
+      "paths": {
+        "26bc288add8ffd628cb3630ca5cfaf11658340bb75fd51f73b5f67e40d2e8fef": [
+          {
+            "hash": "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e",
+            "side": "right"
+          },
+          {
+            "hash": "9fcae2ff8d921492796b8146da2fe5b217cb16fa0225b26777e6f59fb378c89c",
+            "side": "right"
+          }
+        ],
+        "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e": [
+          {
+            "hash": "26bc288add8ffd628cb3630ca5cfaf11658340bb75fd51f73b5f67e40d2e8fef",
+            "side": "left"
+          },
+          {
+            "hash": "9fcae2ff8d921492796b8146da2fe5b217cb16fa0225b26777e6f59fb378c89c",
+            "side": "right"
+          }
+        ],
+        "916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2": [
+          {
+            "hash": "9d1697ad75ade167d0eac04d060f3930cfefc2807161dd348dfe03fbaae393b0",
+            "side": "right"
+          },
+          {
+            "hash": "320e33d05d3836b16924524e2fe172e3461a397671b8a83eb1fffca68c49bacc",
+            "side": "left"
+          }
+        ],
+        "9d1697ad75ade167d0eac04d060f3930cfefc2807161dd348dfe03fbaae393b0": [
+          {
+            "hash": "916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2",
+            "side": "left"
+          },
+          {
+            "hash": "320e33d05d3836b16924524e2fe172e3461a397671b8a83eb1fffca68c49bacc",
+            "side": "left"
+          }
+        ]
+      }
+    },
+    {
+      "root": "4ef07a981340a57f6c7cece9e46522a3cc1dc1ab9b16aa86690cb2b85a98fed6",
+      "leaves": [
+        "26bc288add8ffd628cb3630ca5cfaf11658340bb75fd51f73b5f67e40d2e8fef",
+        "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e",
+        "4e6a18adbf1c63fcd974c92d8658bca60def69396c0512afdbf9be6b000bf98f",
+        "916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2",
+        "9d1697ad75ade167d0eac04d060f3930cfefc2807161dd348dfe03fbaae393b0"
+      ],
+      "paths": {
+        "26bc288add8ffd628cb3630ca5cfaf11658340bb75fd51f73b5f67e40d2e8fef": [
+          {
+            "hash": "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e",
+            "side": "right"
+          },
+          {
+            "hash": "849ca5c45a2ecde99a9b6807a4dcb8dfc0f935987c8b52304d61c36420065f7e",
+            "side": "right"
+          },
+          {
+            "hash": "9d1697ad75ade167d0eac04d060f3930cfefc2807161dd348dfe03fbaae393b0",
+            "side": "right"
+          }
+        ],
+        "3c11fb8220632c6ccccf3cfd2be2d9c3948e784c0094e4dd05cbb2fef91ec50e": [
+          {
+            "hash": "26bc288add8ffd628cb3630ca5cfaf11658340bb75fd51f73b5f67e40d2e8fef",
+            "side": "left"
+          },
+          {
+            "hash": "849ca5c45a2ecde99a9b6807a4dcb8dfc0f935987c8b52304d61c36420065f7e",
+            "side": "right"
+          },
+          {
+            "hash": "9d1697ad75ade167d0eac04d060f3930cfefc2807161dd348dfe03fbaae393b0",
+            "side": "right"
+          }
+        ],
+        "4e6a18adbf1c63fcd974c92d8658bca60def69396c0512afdbf9be6b000bf98f": [
+          {
+            "hash": "916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2",
+            "side": "right"
+          },
+          {
+            "hash": "320e33d05d3836b16924524e2fe172e3461a397671b8a83eb1fffca68c49bacc",
+            "side": "left"
+          },
+          {
+            "hash": "9d1697ad75ade167d0eac04d060f3930cfefc2807161dd348dfe03fbaae393b0",
+            "side": "right"
+          }
+        ],
+        "916f256521210fa9c2eecfc8a992beaf88c6eaab1b191028736dd6af37c763a2": [
+          {
+            "hash": "4e6a18adbf1c63fcd974c92d8658bca60def69396c0512afdbf9be6b000bf98f",
+            "side": "left"
+          },
+          {
+            "hash": "320e33d05d3836b16924524e2fe172e3461a397671b8a83eb1fffca68c49bacc",
+            "side": "left"
+          },
+          {
+            "hash": "9d1697ad75ade167d0eac04d060f3930cfefc2807161dd348dfe03fbaae393b0",
+            "side": "right"
+          }
+        ],
+        "9d1697ad75ade167d0eac04d060f3930cfefc2807161dd348dfe03fbaae393b0": [
+          {
+            "hash": "5876c7ab04189553414ae9055f6ef747018956760150b2773bf88a4d4dc45e93",
+            "side": "left"
+          }
+        ]
+      }
+    }
+  ]
+}

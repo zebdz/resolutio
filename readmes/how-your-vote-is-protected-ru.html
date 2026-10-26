@@ -1,0 +1,825 @@
+<!doctype html>
+<!-- Russian user guide; keep meaning aligned with how-your-vote-is-protected.html.
+     Keep guarantees and availability aligned with 2026-09-11-poll-seal-and-anchor-design.md;
+     this preview describes planned behavior, not a currently released feature. -->
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Простое объяснение того, как сохранить квитанцию, проверить свой голос и понять, что подтверждают цифровая печать и независимая отметка времени."
+    />
+    <title>Как проверить свой голос · Resolutio</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #fafaf5;
+        --white: #fff;
+        --ink: #19362f;
+        --muted: #50645c;
+        --green: #175e4b;
+        --wash: #eaf2e8;
+        --line: #d5dfd1;
+        --amber: #81541f;
+        --sand: #fff3d8;
+        --red: #8b3430;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font:
+          16px/1.65 system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          sans-serif;
+      }
+      .wrap {
+        width: min(1000px, calc(100% - 48px));
+        margin: auto;
+      }
+      a,
+      summary {
+        cursor: pointer;
+      }
+      a {
+        color: var(--green);
+        text-underline-offset: 4px;
+      }
+      :focus-visible {
+        outline: 3px solid var(--amber);
+        outline-offset: 5px;
+      }
+      .skip {
+        position: absolute;
+        left: 20px;
+        top: -80px;
+        padding: 10px;
+        background: white;
+      }
+      .skip:focus {
+        top: 10px;
+      }
+      header {
+        border-bottom: 1px solid var(--line);
+      }
+      header .wrap {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        padding: 22px 0;
+      }
+      .brand {
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        font-size: 13px;
+      }
+      .header-note {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .preview {
+        padding: 12px 16px;
+        border: 1px solid #e6cf98;
+        border-radius: 6px;
+        background: var(--sand);
+        color: #62491e;
+        font-size: 13px;
+        margin-top: 24px;
+      }
+      .hero {
+        padding: 48px 0 34px;
+      }
+      .eyebrow {
+        color: var(--green);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+      h1 {
+        font:
+          normal clamp(2.6rem, 6vw, 4.5rem)/1.08 Georgia,
+          'Times New Roman',
+          serif;
+        letter-spacing: -0.04em;
+        margin: 18px 0 20px;
+        max-width: 850px;
+      }
+      h1 span {
+        color: var(--green);
+      }
+      .lede {
+        max-width: 720px;
+        color: var(--muted);
+        font-size: 20px;
+        line-height: 1.6;
+        margin: 0;
+      }
+      h2 {
+        font-size: 26px;
+        line-height: 1.3;
+        letter-spacing: -0.025em;
+        margin: 0 0 22px;
+      }
+      h3 {
+        font-size: 18px;
+        line-height: 1.4;
+        margin: 0 0 10px;
+      }
+      p {
+        margin: 0 0 14px;
+      }
+      .promise {
+        margin: 0 0 40px;
+        padding: 23px 26px;
+        background: var(--green);
+        color: white;
+        border-radius: 9px;
+        font-size: 18px;
+        line-height: 1.55;
+      }
+      .promise strong {
+        font-weight: 650;
+      }
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 18px;
+        padding: 0;
+        list-style: none;
+        counter-reset: steps;
+      }
+      .steps li {
+        padding: 24px;
+        background: white;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+      }
+      .steps li::before {
+        counter-increment: steps;
+        content: counter(steps);
+        display: grid;
+        place-items: center;
+        width: 33px;
+        height: 33px;
+        background: var(--wash);
+        color: var(--green);
+        border-radius: 50%;
+        font-weight: 700;
+        font-size: 14px;
+        margin-bottom: 18px;
+      }
+      .steps p {
+        color: var(--muted);
+        font-size: 15px;
+      }
+      .steps p:last-child {
+        margin-bottom: 0;
+      }
+      section {
+        margin-bottom: 40px;
+      }
+      .example {
+        background: var(--wash);
+        border-radius: 10px;
+        padding: 28px;
+        margin-top: 30px;
+      }
+      .example-label {
+        font-size: 11px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 15px;
+      }
+      .comparison {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr;
+        align-items: center;
+        gap: 24px;
+      }
+      .paper {
+        background: white;
+        border: 1px solid #c9d8c5;
+        border-radius: 6px;
+        padding: 21px 24px;
+      }
+      .paper-label {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 12px;
+      }
+      .paper .question {
+        font-size: 16px;
+        margin-bottom: 14px;
+      }
+      .answer {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        font-size: 18px;
+        font-weight: 700;
+      }
+      .check {
+        border: 1px solid #99b29b;
+        width: 24px;
+        height: 24px;
+        display: grid;
+        place-items: center;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+      .compare-arrow {
+        color: var(--green);
+        font-size: 26px;
+      }
+      .example-result {
+        margin: 20px 0 0;
+        font-size: 15px;
+      }
+      .example-result strong {
+        display: block;
+        margin-bottom: 5px;
+      }
+      details {
+        border-top: 1px solid var(--line);
+      }
+      summary {
+        padding: 17px 0;
+        font-weight: 650;
+        font-size: 15px;
+      }
+      details .answer-body {
+        padding: 0 0 19px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+      details .answer-body p:last-child {
+        margin-bottom: 0;
+      }
+      .example details {
+        margin-top: 18px;
+        border-top-color: #bacdb7;
+      }
+      .example details .answer-body {
+        color: var(--ink);
+        padding-bottom: 0;
+      }
+      .mismatch {
+        color: var(--red);
+        font-weight: 650;
+      }
+      .counting {
+        padding: 25px 28px;
+        border: 1px solid var(--line);
+        border-left: 4px solid var(--green);
+        background: white;
+        border-radius: 6px;
+      }
+      .counting h2 {
+        font-size: 21px;
+        margin-bottom: 12px;
+      }
+      .counting p {
+        font-size: 15px;
+        color: var(--muted);
+      }
+      .counting ol {
+        padding-left: 22px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+      .counting li {
+        margin: 10px 0;
+      }
+      .counting details {
+        margin-bottom: 18px;
+      }
+      .counting p:last-child {
+        margin-bottom: 0;
+      }
+      .two-col {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 28px;
+      }
+      .two-col .note {
+        border-top: 2px solid var(--green);
+        padding-top: 18px;
+      }
+      .two-col p {
+        color: var(--muted);
+        font-size: 15px;
+      }
+      .statuses {
+        list-style: none;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        padding: 0;
+      }
+      .statuses li {
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 20px;
+        background: white;
+      }
+      .pill {
+        display: inline-block;
+        border-radius: 4px;
+        padding: 4px 8px;
+        color: var(--green);
+        background: var(--wash);
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 11px;
+      }
+      .pill.pending {
+        background: var(--sand);
+        color: var(--amber);
+      }
+      .statuses p {
+        font-size: 14px;
+        color: var(--muted);
+        margin-bottom: 0;
+      }
+      .save {
+        background: var(--wash);
+        padding: 24px 28px;
+        border-radius: 9px;
+      }
+      .save h2 {
+        font-size: 22px;
+        margin-bottom: 12px;
+      }
+      .save ul {
+        padding-left: 21px;
+        margin: 0;
+        font-size: 15px;
+      }
+      .save li {
+        margin: 7px 0;
+      }
+      .caption {
+        font-size: 13px;
+        color: var(--muted);
+      }
+      footer {
+        padding: 25px 0 34px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 12px;
+      }
+      footer .wrap {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+      }
+      @media (max-width: 720px) {
+        .steps {
+          grid-template-columns: 1fr;
+        }
+        .steps li {
+          padding: 21px;
+        }
+        .two-col {
+          grid-template-columns: 1fr;
+          gap: 14px;
+        }
+        .hero {
+          padding-top: 32px;
+        }
+        .lede {
+          font-size: 18px;
+        }
+        .promise {
+          font-size: 17px;
+        }
+        .comparison {
+          gap: 12px;
+        }
+        .paper {
+          padding: 16px;
+        }
+      }
+      @media (max-width: 460px) {
+        .wrap {
+          width: calc(100% - 32px);
+        }
+        header .wrap {
+          align-items: baseline;
+        }
+        .header-note {
+          max-width: 145px;
+          text-align: right;
+        }
+        h2 {
+          font-size: 23px;
+        }
+        .comparison {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        .compare-arrow {
+          text-align: center;
+          transform: rotate(90deg);
+          line-height: 1;
+        }
+        .example {
+          padding: 20px;
+        }
+        .statuses {
+          grid-template-columns: 1fr;
+        }
+        .counting,
+        .save,
+        .promise {
+          padding: 20px;
+        }
+        footer .wrap {
+          display: block;
+        }
+      }
+      @media print {
+        body {
+          background: white;
+          font-size: 11px;
+        }
+        .wrap {
+          width: 100%;
+        }
+        header .wrap {
+          padding: 10px 0;
+        }
+        .hero {
+          padding: 20px 0;
+        }
+        h1 {
+          font-size: 32px;
+        }
+        .lede {
+          font-size: 15px;
+        }
+        .promise {
+          background: white;
+          color: var(--ink);
+          border: 1px solid var(--line);
+          font-size: 15px;
+          margin-bottom: 20px;
+        }
+        section {
+          margin-bottom: 24px;
+        }
+        .steps li,
+        .example,
+        .counting,
+        .note,
+        details,
+        .save {
+          break-inside: avoid;
+        }
+        details::details-content {
+          content-visibility: visible;
+          display: block;
+        }
+        .skip {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <a href="#guide" class="skip">Перейти к руководству</a>
+    <header>
+      <div class="wrap">
+        <div class="brand">RESOLUTIO</div>
+        <div class="header-note">
+          Простое руководство по проверке своего голоса
+        </div>
+      </div>
+    </header>
+    <main id="guide" class="wrap">
+      <div class="preview">
+        <strong>Функция в разработке.</strong> Квитанции и проверки, описанные
+        здесь, ещё разрабатываются. Это руководство объясняет, как они будут
+        работать.
+      </div>
+      <div class="hero">
+        <div class="eyebrow">Ваш голос. Ваши доказательства.</div>
+        <h1>Узнайте, что произошло<br />с <span>вашим голосом.</span></h1>
+        <p class="lede">
+          Сохраните квитанцию с выбранными ответами. Сравните её с итоговыми
+          данными голосования. Сохраните независимые доказательства, которые
+          помогут обнаружить последующие изменения.
+        </p>
+      </div>
+      <div class="promise">
+        <strong
+          >Успешная проверка исходной квитанции подтверждает, что сохранённый
+          вами бюллетень включён без изменений в данные, закреплённые цифровой
+          печатью.</strong
+        >
+        Печать и подтверждённая отметка времени позволяют проверить, не были ли
+        эти данные изменены позже.
+      </div>
+      <section aria-labelledby="steps-title">
+        <h2 id="steps-title">Три составляющие защиты</h2>
+        <ol class="steps">
+          <li>
+            <h3>Ваша исходная квитанция</h3>
+            <p>
+              После отправки голоса проверьте, что в квитанции указаны именно
+              выбранные вами ответы. Сохраните исходный файл квитанции: скачайте
+              его или сохраните вложение из письма.
+            </p>
+            <p>У вас останется копия для сравнения с итоговыми данными.</p>
+          </li>
+          <li>
+            <h3>Цифровая печать итогов</h3>
+            <p>
+              После завершения голосования записанные голоса и результаты вместе
+              закрепляются цифровой печатью. Они получают математический
+              «отпечаток», который меняется при изменении содержимого.
+            </p>
+            <p>
+              Сравнение с сохранённым подтверждением позволяет обнаружить
+              изменения.
+            </p>
+          </li>
+          <li>
+            <h3>Независимая отметка времени</h3>
+            <p>
+              Подтверждённая отметка времени фиксирует отпечаток с помощью
+              Биткоина. Она доказывает, что данные с цифровой печатью
+              существовали не позднее указанного времени.
+            </p>
+            <p>
+              Подтверждение можно сохранить и проверить независимо от нашего
+              сайта.
+            </p>
+          </li>
+        </ol>
+        <div
+          class="example"
+          aria-label="Пример сравнения исходной квитанции с итоговыми данными"
+        >
+          <div class="example-label">
+            Иллюстрация — не реальный голос и не результат проверки
+          </div>
+          <div class="comparison">
+            <div class="paper">
+              <div class="paper-label">Ваша исходная квитанция</div>
+              <div class="question">Создать общий сад?</div>
+              <div class="answer">
+                <span class="check" aria-hidden="true">✓</span>Да
+              </div>
+            </div>
+            <div class="compare-arrow" aria-hidden="true">→</div>
+            <div class="paper">
+              <div class="paper-label">Данные с цифровой печатью</div>
+              <div class="question">Создать общий сад?</div>
+              <div class="answer">
+                <span class="check" aria-hidden="true">✓</span>Да
+              </div>
+            </div>
+          </div>
+          <p class="example-result">
+            <strong
+              >Совпадение подтверждает, что ваш сохранённый ответ включён в
+              запись.</strong
+            >
+            При настоящей проверке сравнивается весь бюллетень, включая
+            записанный вес голоса, а не только ответ из этой иллюстрации.
+          </p>
+          <details>
+            <summary>
+              Что, если «Да» заменят на «Нет» или один из ответов пропадёт?
+            </summary>
+            <div class="answer-body">
+              <p>
+                <span class="mismatch"
+                  >Проверка по исходной квитанции не пройдёт.</span
+                >
+                Изменённый, отсутствующий или лишний ответ в предоставленном
+                бюллетене не совпадёт с вашей сохранённой квитанцией. Сохраните
+                исходный файл и результат проверки, чтобы можно было разобраться
+                в проблеме.
+              </p>
+            </div>
+          </details>
+        </div>
+      </section>
+      <section class="counting" aria-labelledby="count-title">
+        <h2 id="count-title">Итоги тоже можно проверить</h2>
+        <p>
+          В неанонимном голосовании участники с доступом к полным данным могут
+          проверить подсчёт по записям голосов, закреплённым цифровой печатью.
+          <strong
+            >Исходные квитанции и секретные коды других участников остаются
+            закрытыми.</strong
+          >
+        </p>
+        <ol>
+          <li>
+            <strong>Скачайте данные голосования.</strong> В них входят вопросы и
+            варианты ответов, сведения об участниках, записанные ответы и вес
+            голосов, опубликованные итоги и подтверждения для проверки.
+          </li>
+          <li>
+            <strong>Проверьте файлы независимой программой.</strong> Она
+            проверяет, что скачанные голоса и результаты соответствуют
+            отпечатку, закреплённому цифровой печатью. Подтверждение отметки
+            времени проверяется отдельно.
+          </li>
+          <li>
+            <strong>Пересчитайте и сравните.</strong> Программа подсчитывает
+            число голосов и сумму их весов для каждого варианта ответа, затем
+            сравнивает расчёты с опубликованными итогами. Вы также можете
+            самостоятельно просмотреть записи голосов.
+          </li>
+        </ol>
+        <p>
+          Так можно установить, что итоги соответствуют голосам, закреплённым
+          цифровой печатью. Сравнение исходной квитанции участника с этими
+          данными — отдельная проверка: она подтверждает, что его бюллетень
+          совпадает с тем, который он сохранил при голосовании.
+        </p>
+        <details>
+          <summary>Как проверить голос без личной квитанции участника?</summary>
+          <div class="answer-body">
+            <p>
+              В каждую доступную запись голоса включено индивидуальное случайное
+              значение — «соль», необходимая для проверки его отпечатка. Оно не
+              раскрывает секретный код из квитанции участника. Проверить данные
+              с цифровой печатью и пересчитать голоса можно, не собирая чужие
+              исходные квитанции.
+            </p>
+          </div>
+        </details>
+        <p>
+          <strong>У анонимных голосований есть ограничение:</strong> обычные
+          участники не видят чужие голоса, поэтому не могут самостоятельно
+          проверить весь подсчёт. Свои бюллетени они проверить могут, но
+          цифровая печать и отметка времени сами по себе не гарантируют
+          правильность общих итогов.
+        </p>
+      </section>
+      <section class="two-col" aria-label="Независимость и конфиденциальность">
+        <div class="note">
+          <h2>Доказательства остаются у вас</h2>
+          <p>
+            Исходная квитанция помогает обнаружить изменение между отправкой
+            голоса и созданием цифровой печати. Сохранённое подтверждение данных
+            с печатью помогает обнаружить более поздние изменения — в том числе
+            внесённые оператором платформы.
+          </p>
+          <p>
+            Вы или человек, которому вы доверяете, можете проверить скачанные
+            доказательства с помощью независимого программного обеспечения. Вам
+            не обязательно полагаться только на отметку «проверено» на нашем
+            сайте.
+          </p>
+        </div>
+        <div class="note">
+          <h2>Правила доступа к голосам сохраняются</h2>
+          <p>
+            Публичная отметка времени содержит только отпечаток данных. Ваше имя
+            и выбранные ответы при этом не публикуются.
+          </p>
+          <p>
+            Доступ к голосам определяется правилами конкретного голосования, в
+            том числе правами уполномоченных администраторов. В квитанции
+            содержатся ваши личные данные о голосовании: храните её файл и код в
+            тайне.
+          </p>
+        </div>
+      </section>
+      <section aria-labelledby="status-title">
+        <h2 id="status-title">
+          Голосование завершено, а отметка времени ещё может ожидать
+          подтверждения
+        </h2>
+        <ul class="statuses">
+          <li>
+            <span class="pill pending"
+              >Отметка времени ожидает подтверждения</span
+            >
+            <p>
+              Подтверждение отметки времени ещё обрабатывается. Если данные с
+              цифровой печатью уже доступны, квитанцию можно проверить отдельно.
+              Подтверждения в Биткоине пока нет.
+            </p>
+          </li>
+          <li>
+            <span class="pill">Отметка времени подтверждена</span>
+            <p>
+              Подтверждение в Биткоине проверено. Оно доказывает, что данные с
+              цифровой печатью существовали не позднее указанного времени, но не
+              устанавливает точный момент подачи голоса или завершения
+              голосования.
+            </p>
+          </li>
+        </ul>
+        <p class="caption">
+          У голосования с отметкой «без цифровой печати» нет подтверждения
+          печати для проверки. Старые голосования могут остаться без печати.
+        </p>
+      </section>
+      <section class="save" aria-labelledby="save-title">
+        <h2 id="save-title">Что нужно сделать</h2>
+        <ul>
+          <li>
+            <strong>После голосования:</strong> проверьте и сохраните исходный
+            файл квитанции. Если он пришёл по почте, сохраните вложение из
+            письма.
+          </li>
+          <li>
+            <strong>После создания цифровой печати:</strong> проверьте свой
+            голос по исходной квитанции. Отдельно посмотрите результаты проверки
+            бюллетеня и отметки времени.
+          </li>
+          <li>
+            <strong>Сохраните доказательства:</strong> скачайте доступные вам
+            файлы с данными голосования и подтверждениями, в том числе
+            подтверждённую отметку времени, когда она будет готова.
+          </li>
+          <li>
+            <strong>Если проверка не прошла или не завершилась:</strong>
+            сохраните исходные файлы без изменений и попросите организатора
+            голосования разобраться. Незавершённая проверка сама по себе не
+            устанавливает причину проблемы.
+          </li>
+        </ul>
+      </section>
+      <section aria-labelledby="questions-title">
+        <h2 id="questions-title">Частые вопросы</h2>
+        <details>
+          <summary>
+            Я потерял исходную квитанцию. Можно ли всё ещё проверить голос?
+          </summary>
+          <div class="answer-body">
+            <p>
+              По коду квитанции можно проверить включение голоса, который
+              платформа предоставляет сейчас. Это менее сильная проверка: она не
+              позволяет установить, совпадает ли он с данными, выданными вам
+              первоначально. Платформа тоже хранит этот код. Скачанная заново
+              квитанция не заменяет исходный файл, который вы сохранили у себя
+              после голосования.
+            </p>
+          </div>
+        </details>
+        <details>
+          <summary>Значит ли это, что изменить голоса невозможно?</summary>
+          <div class="answer-body">
+            <p>
+              Сравнение с исходной квитанцией и сохранённым подтверждением
+              позволяет обнаружить изменения. Но защита не предотвращает любой
+              обман: например, подделку голоса до создания печати от имени
+              человека, который ничего не проверит. Просмотрите квитанцию при
+              получении и проверьте её позже по итоговым данным.
+            </p>
+          </div>
+        </details>
+        <details>
+          <summary>Нужны ли мне биткоины или криптовалютный кошелёк?</summary>
+          <div class="answer-body">
+            <p>
+              Нет. Биткоин используется для публичной фиксации отметки времени.
+              Чтобы проверить подтверждение своего голосования, вам не нужно
+              владеть криптовалютой или иметь кошелёк.
+            </p>
+          </div>
+        </details>
+        <details>
+          <summary>
+            Доказывает ли ссылка на проверку, что PDF не редактировали?
+          </summary>
+          <div class="answer-body">
+            <p>
+              По ссылке проверяются данные голосования, на которых основан
+              документ. Она не подтверждает неизменность самого PDF-файла. Если
+              нужно проверить документ, сравните его содержимое с проверенными
+              данными, к которым у вас есть доступ.
+            </p>
+          </div>
+        </details>
+      </section>
+    </main>
+    <footer>
+      <div class="wrap">
+        <span
+          >Сохраните квитанцию. Проверьте свой голос. Сохраните
+          доказательства.</span
+        >
+        <span>Resolutio · Функция в разработке · октябрь 2026</span>
+      </div>
+    </footer>
+  </body>
+</html>
