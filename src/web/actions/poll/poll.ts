@@ -1,5 +1,28 @@
 'use server';
 
+/** Poll actions authenticate/rate-limit requests, wire application ports to Prisma
+ * adapters and translate results for clients. Snapshot discard has an explicit transaction. */
+import { PageNumber, PageSize } from '@/domain/shared/Pagination';
+import { Instant } from '@/domain/shared/Instant';
+import { PollReadPolicy } from '@/domain/poll/PollReadPolicy';
+import type { PollSnapshot } from '@/domain/poll/Poll';
+import type { UserPollView, PollSearchView } from './PollQueryViews';
+import {
+  readCreatePollForm,
+  readUpdatePollForm,
+  readQuestionForm,
+} from './PollFormData';
+import {
+  PollId,
+  BoardId,
+  OrganizationId,
+  QuestionId,
+  AnswerId,
+} from '@/domain/shared/EntityIds';
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
 import { getTranslations } from 'next-intl/server';
 import { CreatePollUseCase } from '@/application/poll/CreatePollUseCase';
 import { PreviewPollWeightConfigUseCase } from '@/application/poll/PreviewPollWeightConfigUseCase';
@@ -19,6 +42,7 @@ import { SubmitPollToAdminUseCase } from '@/application/poll/SubmitPollToAdminUs
 import { ReturnPollToDraftUseCase } from '@/application/poll/ReturnPollToDraftUseCase';
 import { DeactivatePollUseCase } from '@/application/poll/DeactivatePollUseCase';
 import { DiscardSnapshotUseCase } from '@/application/poll/DiscardSnapshotUseCase';
+import { PrismaPollSnapshotTransaction } from '@/infrastructure/repositories/PrismaPollSnapshotTransaction';
 import { FinishPollUseCase } from '@/application/poll/FinishPollUseCase';
 import {
   createPollSchema,
@@ -50,7 +74,6 @@ import { getCurrentUser } from '../../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
-import { normalizeFormText } from '@/web/actions/utils/normalizeFormText';
 import { QuestionType } from '@/domain/poll/QuestionType';
 import { PollState } from '@/domain/poll/PollState';
 import { PollSearchFilters } from '@/domain/poll/PollRepository';
@@ -80,12 +103,16 @@ const organizationPropertyRepository = new PrismaOrganizationPropertyRepository(
 );
 
 const profanityChecker = LeoProfanityChecker.getInstance();
+const ids = new CryptoIdGenerator();
+const clock = new SystemClock();
 
 // Use cases
 const createPollUseCase = new CreatePollUseCase(
   pollRepository,
   boardRepository,
   organizationRepository,
+  ids,
+  clock,
   profanityChecker
 );
 const updatePollUseCase = new UpdatePollUseCase(
@@ -99,6 +126,8 @@ const addQuestionUseCase = new AddQuestionUseCase(
   questionRepository,
   answerRepository,
   userRepository,
+  ids,
+  clock,
   profanityChecker
 );
 const updateQuestionUseCase = new UpdateQuestionUseCase(
@@ -112,7 +141,8 @@ const deleteQuestionUseCase = new DeleteQuestionUseCase(
   pollRepository,
   questionRepository,
   voteRepository,
-  userRepository
+  userRepository,
+  clock
 );
 const createAnswerUseCase = new CreateAnswerUseCase(
   pollRepository,
@@ -120,6 +150,8 @@ const createAnswerUseCase = new CreateAnswerUseCase(
   answerRepository,
   voteRepository,
   userRepository,
+  ids,
+  clock,
   profanityChecker
 );
 const updateAnswerUseCase = new UpdateAnswerUseCase(
@@ -135,7 +167,8 @@ const deleteAnswerUseCase = new DeleteAnswerUseCase(
   questionRepository,
   answerRepository,
   voteRepository,
-  userRepository
+  userRepository,
+  clock
 );
 const updateQuestionOrderUseCase = new UpdateQuestionOrderUseCase(
   pollRepository,
@@ -153,7 +186,9 @@ const takeSnapshotUseCase = new TakeSnapshotUseCase(
   organizationRepository,
   userRepository,
   pollEligibleMemberRepository,
-  pollWeightCalculator
+  pollWeightCalculator,
+  ids,
+  clock
 );
 const activatePollUseCase = new ActivatePollUseCase(
   pollRepository,
@@ -161,19 +196,25 @@ const activatePollUseCase = new ActivatePollUseCase(
   userRepository,
   notificationRepository,
   participantRepository,
-  boardRepository
+  boardRepository,
+  ids,
+  clock
 );
 const submitPollToAdminUseCase = new SubmitPollToAdminUseCase(
   pollRepository,
   organizationRepository,
   userRepository,
-  notificationRepository
+  notificationRepository,
+  ids,
+  clock
 );
 const returnPollToDraftUseCase = new ReturnPollToDraftUseCase(
   pollRepository,
   organizationRepository,
   userRepository,
-  notificationRepository
+  notificationRepository,
+  ids,
+  clock
 );
 const deactivatePollUseCase = new DeactivatePollUseCase(
   pollRepository,
@@ -183,8 +224,7 @@ const deactivatePollUseCase = new DeactivatePollUseCase(
 );
 const discardSnapshotUseCase = new DiscardSnapshotUseCase(
   pollRepository,
-  participantRepository,
-  voteRepository,
+  new PrismaPollSnapshotTransaction(prisma),
   organizationRepository,
   userRepository,
   boardRepository
@@ -196,7 +236,9 @@ const finishPollUseCase = new FinishPollUseCase(
   userRepository,
   notificationRepository,
   participantRepository,
-  boardRepository
+  boardRepository,
+  ids,
+  clock
 );
 const previewPollWeightConfigUseCase = new PreviewPollWeightConfigUseCase(
   pollRepository,
@@ -215,12 +257,14 @@ const updatePollWeightConfigUseCase = new UpdatePollWeightConfigUseCase(
   pollEligibleMemberRepository,
   propertyAssetRepository,
   organizationPropertyRepository,
-  pollWeightCalculator
+  pollWeightCalculator,
+  ids,
+  clock
 );
 
 export async function createPollAction(
   formData: FormData
-): Promise<ActionResult<{ pollId: string }>> {
+): Promise<ActionResult<{ pollId: PollId }>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -240,40 +284,7 @@ export async function createPollAction(
       };
     }
 
-    // Extract form data
-    const boardIdRaw = formData.get('boardId') as string | null;
-    const distributionTypeRaw = formData.get('distributionType') as
-      | string
-      | null;
-    const propertyAggregationRaw = formData.get('propertyAggregation') as
-      | string
-      | null;
-    const propertyIdsRaw = formData.get('propertyIds') as string | null;
-    const pollTypeRaw = formData.get('pollType') as string | null;
-    const anonymousRaw = formData.get('anonymous') as string | null;
-    const input = {
-      title: formData.get('title') as string,
-      description: normalizeFormText(formData.get('description')),
-      organizationId: formData.get('organizationId') as string,
-      boardId: boardIdRaw && boardIdRaw.trim() ? boardIdRaw : null,
-      startDate: new Date(formData.get('startDate') as string),
-      endDate: new Date(formData.get('endDate') as string),
-      distributionType:
-        distributionTypeRaw && distributionTypeRaw.trim()
-          ? distributionTypeRaw
-          : undefined,
-      propertyAggregation:
-        propertyAggregationRaw && propertyAggregationRaw.trim()
-          ? propertyAggregationRaw
-          : undefined,
-      propertyIds: propertyIdsRaw
-        ? (JSON.parse(propertyIdsRaw) as string[])
-        : undefined,
-      pollType: pollTypeRaw && pollTypeRaw.trim() ? pollTypeRaw : undefined,
-      // FormData carries strings, and z.coerce.boolean() treats any non-empty
-      // string as true — including "false". Compare explicitly.
-      anonymous: anonymousRaw === 'true',
-    };
+    const input = readCreatePollForm(formData);
 
     // Validate with Zod
     const validation = createPollSchema(profanityChecker).safeParse(input);
@@ -321,7 +332,7 @@ export async function createPollAction(
 
 export async function addQuestionAction(
   formData: FormData
-): Promise<ActionResult<{ questionId: string }>> {
+): Promise<ActionResult<{ questionId: QuestionId }>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -341,31 +352,8 @@ export async function addQuestionAction(
       };
     }
 
-    // Parse FormData (same format as create page)
-    const detailsValue = formData.get('details') as string | null;
-    const answersJson = formData.get('answers') as string;
-
-    let answerTexts: string[] = [];
-
-    if (answersJson) {
-      try {
-        answerTexts = (JSON.parse(answersJson) as string[])
-          .filter((text) => text.trim())
-          .map((text) => text.trim());
-      } catch (e) {
-        // Invalid JSON, leave answers empty
-      }
-    }
-
-    const parsedInput = {
-      pollId: formData.get('pollId') as string,
-      text: formData.get('text') as string,
-      details: detailsValue && detailsValue.trim() ? detailsValue : undefined,
-      page: parseInt(formData.get('page') as string),
-      order: parseInt(formData.get('order') as string),
-      questionType: formData.get('questionType') as QuestionType,
-      answers: answerTexts,
-    };
+    // Parse FormData (same format as create page).
+    const parsedInput = readQuestionForm(formData);
 
     // Validate with Zod
     const validation =
@@ -477,7 +465,9 @@ export async function updateQuestionOrderAction(input: {
   }
 }
 
-export async function getUserPollsAction(): Promise<ActionResult<any[]>> {
+export async function getUserPollsAction(): Promise<
+  ActionResult<UserPollView[]>
+> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -509,7 +499,7 @@ export async function getUserPollsAction(): Promise<ActionResult<any[]>> {
     // For each poll, check if user can vote and voting progress
     const pollsWithVotingStatus = await Promise.all(
       result.value.map(async (poll) => {
-        const pollJson: any = poll.toJSON();
+        const pollJson = poll.toJSON();
 
         // Check if user can vote
         const participant = await prisma.pollParticipant.findFirst({
@@ -519,7 +509,8 @@ export async function getUserPollsAction(): Promise<ActionResult<any[]>> {
           },
         });
 
-        pollJson.canVote = !!participant;
+        const canVote = !!participant;
+        let hasFinishedVoting = false;
 
         // Check if user has finished voting
         if (participant) {
@@ -532,14 +523,12 @@ export async function getUserPollsAction(): Promise<ActionResult<any[]>> {
             },
           });
 
-          const totalQuestions = pollJson.questions?.length || 0;
-          pollJson.hasFinishedVoting =
+          const totalQuestions = pollJson.questions.length;
+          hasFinishedVoting =
             votesCount >= totalQuestions && totalQuestions > 0;
-        } else {
-          pollJson.hasFinishedVoting = false;
         }
 
-        return pollJson;
+        return { ...pollJson, canVote, hasFinishedVoting };
       })
     );
 
@@ -558,13 +547,24 @@ export async function getUserPollsAction(): Promise<ActionResult<any[]>> {
 }
 
 export async function getPollsByBoardIdAction(
-  boardId: string
-): Promise<ActionResult<any[]>> {
+  rawBoardId: string
+): Promise<ActionResult<PollSnapshot[]>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
     return rateLimited;
   }
+
+  const parsedId = BoardId.safeParse(rawBoardId);
+
+  if (!parsedId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const boardId = parsedId.data;
 
   const t = await getTranslations('common.errors');
 
@@ -617,13 +617,24 @@ export async function getPollsByBoardIdAction(
 }
 
 export async function getPollByIdAction(
-  pollId: string
-): Promise<ActionResult<any>> {
+  rawPollId: string
+): Promise<ActionResult<PollSnapshot>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
     return rateLimited;
   }
+
+  const parsedId = PollId.safeParse(rawPollId);
+
+  if (!parsedId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const pollId = parsedId.data;
 
   const t = await getTranslations('common.errors');
 
@@ -674,7 +685,9 @@ export async function getPollByIdAction(
         poll.organizationId
       );
 
-      if (!isMember && !isAdmin) {
+      if (
+        !PollReadPolicy.canViewPoll(poll, { isAdmin, isOrgMember: isMember })
+      ) {
         return {
           success: false,
           error: await translateErrorCode('organization.errors.notMember'),
@@ -718,14 +731,7 @@ export async function updatePollAction(
       };
     }
 
-    // Extract form data
-    const input = {
-      pollId: formData.get('pollId') as string,
-      title: formData.get('title') as string,
-      description: normalizeFormText(formData.get('description')),
-      startDate: new Date(formData.get('startDate') as string),
-      endDate: new Date(formData.get('endDate') as string),
-    };
+    const input = readUpdatePollForm(formData);
 
     // Validate with Zod
     const validation = updatePollSchema(profanityChecker).safeParse(input);
@@ -770,7 +776,7 @@ export async function updatePollAction(
 }
 
 export async function canEditPollAction(
-  pollId: string
+  rawPollId: string
 ): Promise<
   ActionResult<{ canEdit: boolean; reason?: string; isCreator: boolean }>
 > {
@@ -779,6 +785,17 @@ export async function canEditPollAction(
   if (rateLimited) {
     return rateLimited;
   }
+
+  const parsedId = PollId.safeParse(rawPollId);
+
+  if (!parsedId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const pollId = parsedId.data;
 
   const t = await getTranslations('common.errors');
 
@@ -1067,7 +1084,7 @@ export async function createAnswerAction(data: {
   questionId: string;
   text: string;
   order: number;
-}): Promise<ActionResult<{ answerId: string }>> {
+}): Promise<ActionResult<{ answerId: AnswerId }>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -1176,13 +1193,24 @@ export async function deleteAnswerAction(
  * Activate a poll
  */
 export async function activatePollAction(
-  pollId: string
+  rawPollId: string
 ): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
     return rateLimited;
   }
+
+  const parsedId = PollId.safeParse(rawPollId);
+
+  if (!parsedId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const pollId = parsedId.data;
 
   const t = await getTranslations('common.errors');
 
@@ -1224,13 +1252,24 @@ export async function activatePollAction(
  * The author's call, so this is the one lifecycle action an admin cannot take.
  */
 export async function submitPollToAdminAction(
-  pollId: string
+  rawPollId: string
 ): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
     return rateLimited;
   }
+
+  const parsedId = PollId.safeParse(rawPollId);
+
+  if (!parsedId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const pollId = parsedId.data;
 
   const t = await getTranslations('common.errors');
 
@@ -1272,13 +1311,24 @@ export async function submitPollToAdminAction(
  * recalling it, or an admin returning it for changes.
  */
 export async function returnPollToDraftAction(
-  pollId: string
+  rawPollId: string
 ): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
     return rateLimited;
   }
+
+  const parsedId = PollId.safeParse(rawPollId);
+
+  if (!parsedId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const pollId = parsedId.data;
 
   const t = await getTranslations('common.errors');
 
@@ -1319,13 +1369,24 @@ export async function returnPollToDraftAction(
  * Deactivate a poll
  */
 export async function deactivatePollAction(
-  pollId: string
+  rawPollId: string
 ): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
     return rateLimited;
   }
+
+  const parsedId = PollId.safeParse(rawPollId);
+
+  if (!parsedId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const pollId = parsedId.data;
 
   const t = await getTranslations('common.errors');
 
@@ -1366,13 +1427,24 @@ export async function deactivatePollAction(
  * Finish a poll
  */
 export async function finishPollAction(
-  pollId: string
+  rawPollId: string
 ): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
     return rateLimited;
   }
+
+  const parsedId = PollId.safeParse(rawPollId);
+
+  if (!parsedId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const pollId = parsedId.data;
 
   const t = await getTranslations('common.errors');
 
@@ -1413,13 +1485,24 @@ export async function finishPollAction(
  * Take a participant snapshot (DRAFT → READY)
  */
 export async function takeSnapshotAction(
-  pollId: string
+  rawPollId: string
 ): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
     return rateLimited;
   }
+
+  const parsedId = PollId.safeParse(rawPollId);
+
+  if (!parsedId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const pollId = parsedId.data;
 
   const t = await getTranslations('common.errors');
 
@@ -1461,13 +1544,24 @@ export async function takeSnapshotAction(
  * Only allowed if no votes have been cast
  */
 export async function discardSnapshotAction(
-  pollId: string
+  rawPollId: string
 ): Promise<ActionResult<void>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
     return rateLimited;
   }
+
+  const parsedId = PollId.safeParse(rawPollId);
+
+  if (!parsedId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const pollId = parsedId.data;
 
   const t = await getTranslations('common.errors');
 
@@ -1508,13 +1602,24 @@ export async function discardSnapshotAction(
  * Check if current user can manage a poll (superadmin or org admin)
  */
 export async function canManagePollAction(
-  pollId: string
+  rawPollId: string
 ): Promise<ActionResult<boolean>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
     return rateLimited;
   }
+
+  const parsedId = PollId.safeParse(rawPollId);
+
+  if (!parsedId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const pollId = parsedId.data;
 
   const t = await getTranslations('common.errors');
 
@@ -1584,7 +1689,7 @@ export interface SearchPollsInput {
 
 export async function searchPollsAction(
   input: SearchPollsInput
-): Promise<ActionResult<{ polls: any[]; totalCount: number }>> {
+): Promise<ActionResult<PollSearchView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -1605,19 +1710,32 @@ export async function searchPollsAction(
     const filters: PollSearchFilters = {
       titleSearch: input.titleSearch || undefined,
       statuses: input.statuses,
-      organizationId: input.organizationId || undefined,
-      boardId: input.boardId || undefined,
+      organizationId: input.organizationId
+        ? OrganizationId.parse(input.organizationId)
+        : undefined,
+      boardId: input.boardId ? BoardId.parse(input.boardId) : undefined,
       orgWideOnly: input.orgWideOnly,
-      createdFrom: input.createdFrom ? new Date(input.createdFrom) : undefined,
-      createdTo: input.createdTo ? new Date(input.createdTo) : undefined,
-      startFrom: input.startFrom ? new Date(input.startFrom) : undefined,
-      startTo: input.startTo ? new Date(input.startTo) : undefined,
-      page: input.page,
-      pageSize: input.pageSize,
+      createdFrom: input.createdFrom
+        ? Instant.fromDate(new Date(input.createdFrom))
+        : undefined,
+      createdTo: input.createdTo
+        ? Instant.fromDate(new Date(input.createdTo))
+        : undefined,
+      startFrom: input.startFrom
+        ? Instant.fromDate(new Date(input.startFrom))
+        : undefined,
+      startTo: input.startTo
+        ? Instant.fromDate(new Date(input.startTo))
+        : undefined,
+      page: input.page === undefined ? undefined : PageNumber.parse(input.page),
+      pageSize:
+        input.pageSize === undefined
+          ? undefined
+          : PageSize.parse(input.pageSize),
     };
 
     // Admin org IDs so admins see their orgs' polls even if not a member
-    let adminOrgIds: string[] | undefined;
+    let adminOrgIds: OrganizationId[] | undefined;
 
     if (!isSuperAdmin) {
       const adminOrgs =
@@ -1641,27 +1759,19 @@ export async function searchPollsAction(
     // Enrich with canVote + hasFinishedVoting + org/board names
     const enriched = await Promise.all(
       result.value.polls.map(async (poll) => {
-        const pollJson: any = poll.toJSON();
+        const pollJson = poll.toJSON();
 
         // Org + board names
         const org = await prisma.organization.findUnique({
           where: { id: poll.organizationId },
           select: { name: true, archivedAt: true },
         });
-        pollJson.organizationName = org?.name ?? '';
-        pollJson.isOrgArchived = !!org?.archivedAt;
-
-        if (poll.boardId) {
-          const board = await prisma.board.findUnique({
-            where: { id: poll.boardId },
-            select: { name: true, archivedAt: true },
-          });
-          pollJson.boardName = board?.name ?? '';
-          pollJson.isBoardArchived = !!board?.archivedAt;
-        } else {
-          pollJson.boardName = '';
-          pollJson.isBoardArchived = false;
-        }
+        const board = poll.boardId
+          ? await prisma.board.findUnique({
+              where: { id: poll.boardId },
+              select: { name: true, archivedAt: true },
+            })
+          : null;
 
         // canVote + hasFinishedVoting. An open poll has no participants until
         // people vote, so eligibility there is "authenticated and not done
@@ -1676,13 +1786,21 @@ export async function searchPollsAction(
             question: { pollId: poll.id },
           },
         });
-        const totalQuestions = pollJson.questions?.length || 0;
+        const totalQuestions = pollJson.questions.length;
 
-        pollJson.hasFinishedVoting =
+        const hasFinishedVoting =
           votesCount >= totalQuestions && totalQuestions > 0;
-        pollJson.canVote = pollJson.pollType === 'OPEN' || !!participant;
+        const canVote = pollJson.pollType === 'OPEN' || !!participant;
 
-        return pollJson;
+        return {
+          ...pollJson,
+          organizationName: org?.name ?? '',
+          isOrgArchived: !!org?.archivedAt,
+          boardName: board?.name ?? '',
+          isBoardArchived: !!board?.archivedAt,
+          canVote,
+          hasFinishedVoting,
+        };
       })
     );
 

@@ -1,15 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+/** CAPTCHA policy scenarios isolate environment changes and restore them after each test. */
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { isCaptchaRequired } from '../captchaRequired';
 
 const SITE_KEY = 'NEXT_PUBLIC_TURNSTILE_SITE_KEY';
 
 describe('isCaptchaRequired', () => {
   let originalKey: string | undefined;
-  let originalEnv: string | undefined;
 
   beforeEach(() => {
     originalKey = process.env[SITE_KEY];
-    originalEnv = process.env.NODE_ENV;
   });
 
   afterEach(() => {
@@ -19,14 +18,14 @@ describe('isCaptchaRequired', () => {
       process.env[SITE_KEY] = originalKey;
     }
 
-    process.env.NODE_ENV = originalEnv;
+    vi.unstubAllEnvs();
   });
 
   it('requires a token whenever a site key is configured', () => {
     process.env[SITE_KEY] = '0x4AAAAAAA';
 
     for (const nodeEnv of ['development', 'test', 'production']) {
-      process.env.NODE_ENV = nodeEnv;
+      vi.stubEnv('NODE_ENV', nodeEnv);
       expect(isCaptchaRequired()).toBe(true);
     }
   });
@@ -35,7 +34,7 @@ describe('isCaptchaRequired', () => {
   // leave every auth form permanently unsubmittable.
   it('drops the requirement outside production when no site key is set', () => {
     delete process.env[SITE_KEY];
-    process.env.NODE_ENV = 'development';
+    vi.stubEnv('NODE_ENV', 'development');
 
     expect(isCaptchaRequired()).toBe(false);
   });
@@ -44,14 +43,14 @@ describe('isCaptchaRequired', () => {
   // closed so it surfaces, rather than silently disabling the check.
   it('still requires a token in production when the site key is missing', () => {
     delete process.env[SITE_KEY];
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
 
     expect(isCaptchaRequired()).toBe(true);
   });
 
   it('treats an empty site key as absent', () => {
     process.env[SITE_KEY] = '';
-    process.env.NODE_ENV = 'development';
+    vi.stubEnv('NODE_ENV', 'development');
 
     expect(isCaptchaRequired()).toBe(false);
   });

@@ -1,3 +1,6 @@
+/** Directory clients receive typed membership groups with immutable decision times.
+ * Tests preserve grouping and explicit handling of incomplete legacy records. */
+import { PrismaOrganizationDirectory } from '@/infrastructure/repositories/PrismaOrganizationDirectory';
 import { PrismaClient } from '@/generated/prisma/client';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GetUserOrganizationsUseCase } from '../GetUserOrganizationsUseCase';
@@ -34,7 +37,9 @@ describe('GetUserOrganizationsUseCase', () => {
     };
 
     useCase = new GetUserOrganizationsUseCase({
-      prisma: prisma as unknown as PrismaClient,
+      directory: new PrismaOrganizationDirectory(
+        prisma as unknown as PrismaClient
+      ),
     });
   });
 
@@ -142,7 +147,9 @@ describe('GetUserOrganizationsUseCase', () => {
       expect(result.value.pending[0].organization.name).toBe(
         'Organization One'
       );
-      expect(result.value.pending[0].requestedAt).toBeInstanceOf(Date);
+      expect(result.value.pending[0].requestedAt).toBe(
+        memberships[0].createdAt.toISOString()
+      );
       expect(result.value.member).toEqual([]);
       expect(result.value.rejected).toEqual([]);
     }
@@ -228,7 +235,7 @@ describe('GetUserOrganizationsUseCase', () => {
       const rejected2 = result.value.rejected[1];
       expect(rejected2.organization.name).toBe('Organization One');
       expect(rejected2.rejectionReason).toBe('Does not meet requirements');
-      expect(rejected2.rejectedAt).toEqual(rejectedAt);
+      expect(rejected2.rejectedAt).toEqual(rejectedAt.toISOString());
       expect(rejected2.rejectedBy).toEqual({
         id: 'admin-1',
         firstName: 'Admin',

@@ -1,3 +1,5 @@
+/** Application boundary tests exercise authorization and domain constraints
+ * with deterministic creation dependencies and repository port doubles. */
 import { describe, it, expect } from 'vitest';
 import { CorrectOwnershipUseCase } from '../CorrectOwnershipUseCase';
 import { OrganizationProperty } from '../../../domain/organization/OrganizationProperty';
@@ -43,6 +45,7 @@ function mkOwnership(id: string, share = 0.5): PropertyAssetOwnership {
 }
 
 const cleanChecker: ProfanityChecker = {
+  findProfaneWords: () => [],
   containsProfanity: (t) => t.includes('badword'),
 };
 

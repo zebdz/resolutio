@@ -3,6 +3,10 @@
 // delegates to AddReportAttachmentUseCase which enforces the Draft-state guard,
 // the 20-attachment count cap, and the magic-byte / mime / size validations.
 
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/web/lib/session';
 import {
@@ -24,7 +28,9 @@ const uc = new AddReportAttachmentUseCase(
   reportRepo,
   orgRepo,
   userRepo,
-  attachmentRepo
+  attachmentRepo,
+  new CryptoIdGenerator(),
+  new SystemClock()
 );
 
 export async function POST(request: NextRequest) {

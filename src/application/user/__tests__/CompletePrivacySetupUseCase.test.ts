@@ -1,3 +1,4 @@
+import { UserId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CompletePrivacySetupUseCase } from '../CompletePrivacySetupUseCase';
 import { User } from '@/src/domain/user/User';
@@ -27,6 +28,7 @@ describe('CompletePrivacySetupUseCase', () => {
       findById: vi.fn(),
       findByIds: vi.fn(),
       findByPhoneNumber: vi.fn(),
+      findByEmail: vi.fn(),
       findByNickname: vi.fn(),
       isNicknameAvailable: vi.fn(),
       save: vi.fn(),
@@ -36,12 +38,7 @@ describe('CompletePrivacySetupUseCase', () => {
       searchUsers: vi.fn(),
       searchUserByPhone: vi.fn(),
       isSuperAdmin: vi.fn(),
-      isUserBlocked: vi.fn().mockResolvedValue(false),
-      blockUser: vi.fn(),
-      unblockUser: vi.fn(),
       confirmUser: vi.fn(),
-      getBlockStatus: vi.fn().mockResolvedValue(null),
-      getBlockedUserIds: vi.fn().mockResolvedValue([]),
     };
     useCase = new CompletePrivacySetupUseCase(userRepository);
   });
@@ -55,10 +52,11 @@ describe('CompletePrivacySetupUseCase', () => {
     vi.mocked(userRepository.updatePrivacySettings).mockResolvedValue();
 
     const result = await useCase.execute({
-      userId: 'user-123',
+      userId: UserId.parse('user-123'),
       nickname: 'my_nickname',
       allowFindByName: true,
       allowFindByPhone: false,
+      allowFindByAddress: false,
     });
 
     expect(result.success).toBe(true);
@@ -78,10 +76,11 @@ describe('CompletePrivacySetupUseCase', () => {
     vi.mocked(userRepository.findById).mockResolvedValue(null);
 
     const result = await useCase.execute({
-      userId: 'nonexistent',
+      userId: UserId.parse('nonexistent'),
       nickname: 'my_nickname',
       allowFindByName: true,
       allowFindByPhone: false,
+      allowFindByAddress: false,
     });
 
     expect(result.success).toBe(false);
@@ -96,10 +95,11 @@ describe('CompletePrivacySetupUseCase', () => {
     vi.mocked(userRepository.isNicknameAvailable).mockResolvedValue(false);
 
     const result = await useCase.execute({
-      userId: 'user-123',
+      userId: UserId.parse('user-123'),
       nickname: 'taken_name',
       allowFindByName: true,
       allowFindByPhone: false,
+      allowFindByAddress: false,
     });
 
     expect(result.success).toBe(false);
@@ -117,10 +117,11 @@ describe('CompletePrivacySetupUseCase', () => {
     vi.mocked(userRepository.updatePrivacySettings).mockResolvedValue();
 
     const result = await useCase.execute({
-      userId: 'user-123',
+      userId: UserId.parse('user-123'),
       nickname: 'user_abc12345', // same as existing
       allowFindByName: false,
       allowFindByPhone: false,
+      allowFindByAddress: false,
     });
 
     expect(result.success).toBe(true);
@@ -131,10 +132,11 @@ describe('CompletePrivacySetupUseCase', () => {
     vi.mocked(userRepository.findById).mockResolvedValue(existingUser);
 
     const result = await useCase.execute({
-      userId: 'user-123',
+      userId: UserId.parse('user-123'),
       nickname: 'ab', // too short
       allowFindByName: true,
       allowFindByPhone: false,
+      allowFindByAddress: false,
     });
 
     expect(result.success).toBe(false);
@@ -152,9 +154,10 @@ describe('CompletePrivacySetupUseCase', () => {
     vi.mocked(userRepository.updatePrivacySettings).mockResolvedValue();
 
     const result = await useCase.execute({
-      userId: 'user-123',
+      userId: UserId.parse('user-123'),
       allowFindByName: true,
       allowFindByPhone: true,
+      allowFindByAddress: false,
     });
 
     expect(result.success).toBe(true);

@@ -1,3 +1,4 @@
+import { UserId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, vi } from 'vitest';
 import { PrismaOtpRepository } from '../PrismaOtpRepository';
 import { OtpPurposes } from '@/domain/otp/OtpVerification';
@@ -29,7 +30,7 @@ describe('PrismaOtpRepository.findLatestByUserId', () => {
     } as unknown as PrismaClient;
 
     const otp = await new PrismaOtpRepository(prisma).findLatestByUserId(
-      'user-1',
+      UserId.parse('user-1'),
       OtpPurposes.PHONE_CONFIRMATION
     );
 
@@ -47,7 +48,7 @@ describe('PrismaOtpRepository.findLatestByUserId', () => {
     } as unknown as PrismaClient;
 
     const otp = await new PrismaOtpRepository(prisma).findLatestByUserId(
-      'user-1',
+      UserId.parse('user-1'),
       OtpPurposes.PHONE_CONFIRMATION
     );
 

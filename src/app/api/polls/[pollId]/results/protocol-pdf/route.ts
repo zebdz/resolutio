@@ -1,3 +1,4 @@
+/** Generates the admin-only signing protocol after authorization and explicit contact serialization. */
 import fs from 'fs';
 import path from 'path';
 import { NextRequest, NextResponse } from 'next/server';
@@ -127,7 +128,7 @@ export async function GET(
           lastName: entry.lastName,
           middleName: entry.middleName,
           willingToSignProtocol: entry.willingToSignProtocol,
-          phoneNumber: entry.phoneNumber,
+          phoneNumber: entry.phoneNumber?.getValue() ?? null,
         })),
       },
       t

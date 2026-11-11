@@ -13,26 +13,28 @@
  * client components.
  */
 
+import { AIModelKey, ProviderModelId } from '@/domain/ai/LegalAnalysis';
+
 export interface AIModelInfo {
-  key: string;
-  modelId: string;
+  key: AIModelKey;
+  modelId: ProviderModelId;
   displayName: string;
 }
 
 export const AI_MODELS: readonly AIModelInfo[] = [
   {
-    key: 'google',
-    modelId: 'gemini-2.5-flash',
+    key: AIModelKey.parse('google'),
+    modelId: ProviderModelId.parse('gemini-2.5-flash'),
     displayName: 'Gemini 2.5 Flash',
   },
   {
-    key: 'deepseek',
-    modelId: 'deepseek-chat',
+    key: AIModelKey.parse('deepseek'),
+    modelId: ProviderModelId.parse('deepseek-chat'),
     displayName: 'DeepSeek V3',
   },
 ];
 
-export const AVAILABLE_MODEL_KEYS: readonly string[] = AI_MODELS.map(
+export const AVAILABLE_MODEL_KEYS: readonly AIModelKey[] = AI_MODELS.map(
   (m) => m.key
 );
 

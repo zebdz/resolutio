@@ -1,5 +1,10 @@
 'use client';
 
+/** Presents supported aggregation choices while preserving the domain's closed vocabulary. */
+import {
+  parsePropertyAggregation,
+  type PropertyAggregation,
+} from '@/domain/poll/PropertyAggregation';
 import { useTranslations } from 'next-intl';
 import {
   Radio,
@@ -8,11 +13,9 @@ import {
 } from '@/src/web/components/catalyst/radio';
 import { Label } from '@/src/web/components/catalyst/fieldset';
 
-type AggregationType = 'RAW_SUM' | 'NORMALIZE_PER_PROPERTY';
-
 interface Props {
-  value: AggregationType;
-  onChange: (v: AggregationType) => void;
+  value: PropertyAggregation;
+  onChange: (v: PropertyAggregation) => void;
   disabled?: boolean;
   visible: boolean;
 }
@@ -64,7 +67,17 @@ export function PropertyAggregationSelector({
       </div>
       <RadioGroup
         value={value}
-        onChange={(v) => onChange(v as AggregationType)}
+        onChange={(value: unknown) => {
+          if (typeof value !== 'string') {
+            return;
+          }
+
+          const selected = parsePropertyAggregation(value);
+
+          if (selected.success) {
+            onChange(selected.value);
+          }
+        }}
         disabled={disabled}
       >
         <RadioField>

@@ -1,5 +1,9 @@
 'use server';
 
+/** Metadata-only poll evidence actions validate references before querying domain ports. */
+import { PollId } from '@/domain/shared/EntityIds';
+import type { PollAttachmentMetadata } from '@/domain/poll/PollAttachmentRepository';
+
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { getCurrentUser } from '@/web/lib/session';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
@@ -34,12 +38,10 @@ const removeUseCase = new RemovePollAttachmentUseCase(
 );
 
 /** Metadata only — file bytes never cross to a Client Component. */
-export interface PollAttachmentSummary {
-  id: string;
-  fileName: string;
-  mimeType: string;
-  sizeBytes: number;
-}
+export type PollAttachmentSummary = Pick<
+  PollAttachmentMetadata,
+  'id' | 'fileName' | 'mimeType' | 'sizeBytes'
+>;
 
 type ActionResult<T> =
   | { success: true; data: T }
@@ -56,7 +58,16 @@ export async function listPollAttachmentsAction(
 
   const user = await getCurrentUser();
 
-  const pollResult = await pollRepo.getPollById(pollId);
+  const decodedPollId = PollId.safeParse(pollId);
+
+  if (!decodedPollId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('poll.errors.pollNotFound'),
+    };
+  }
+
+  const pollResult = await pollRepo.getPollById(decodedPollId.data);
 
   if (!pollResult.success || !pollResult.value) {
     return {
@@ -79,7 +90,7 @@ export async function listPollAttachmentsAction(
     };
   }
 
-  const result = await attachmentRepo.findByPollId(pollId);
+  const result = await attachmentRepo.findByPollId(decodedPollId.data);
 
   if (!result.success) {
     return { success: false, error: await translateErrorCode(result.error) };

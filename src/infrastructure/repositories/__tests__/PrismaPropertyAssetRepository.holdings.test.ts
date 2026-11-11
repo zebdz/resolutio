@@ -3,6 +3,12 @@
 // the vote must not change what the protocol says about that vote, so the
 // filter shape is pinned here rather than left to a passing integration run.
 
+import {
+  OrganizationId,
+  PropertyId,
+  UserId,
+} from '../../../domain/shared/EntityIds';
+import { Instant } from '../../../domain/shared/Instant';
 import { describe, it, expect, vi } from 'vitest';
 import { PrismaPropertyAssetRepository } from '../PrismaPropertyAssetRepository';
 
@@ -37,14 +43,29 @@ function row(overrides: {
 }
 
 describe('PrismaPropertyAssetRepository.findHoldingsAsOf', () => {
+  it('rejects invalid property names in historical holding projections', async () => {
+    const { repo } = makeRepo([
+      row({ assetName: 'Unit', size: '10', share: '1', propertyName: '' }),
+    ]);
+    const result = await repo.findHoldingsAsOf({
+      organizationIds: [OrganizationId.parse('org-1')],
+      propertyIds: [],
+      userIds: [UserId.parse('user-1')],
+      asOf: Instant.fromDate(asOf),
+    });
+    expect(result).toEqual({
+      success: false,
+      error: 'common.errors.unexpected',
+    });
+  });
   it('short-circuits with no users', async () => {
     const { repo, findMany } = makeRepo([]);
 
     const result = await repo.findHoldingsAsOf({
-      organizationIds: ['org-1'],
+      organizationIds: ['org-1'].map((id) => OrganizationId.parse(id)),
       propertyIds: [],
       userIds: [],
-      asOf,
+      asOf: Instant.fromDate(asOf),
     });
 
     expect(result.success).toBe(true);
@@ -62,8 +83,8 @@ describe('PrismaPropertyAssetRepository.findHoldingsAsOf', () => {
     const result = await repo.findHoldingsAsOf({
       organizationIds: [],
       propertyIds: [],
-      userIds: ['user-1'],
-      asOf,
+      userIds: ['user-1'].map((id) => UserId.parse(id)),
+      asOf: Instant.fromDate(asOf),
     });
 
     expect(result.success).toBe(true);
@@ -74,10 +95,10 @@ describe('PrismaPropertyAssetRepository.findHoldingsAsOf', () => {
     const { repo, findMany } = makeRepo([]);
 
     await repo.findHoldingsAsOf({
-      organizationIds: ['org-1', 'org-2'],
-      propertyIds: ['prop-1'],
-      userIds: ['user-1'],
-      asOf,
+      organizationIds: ['org-1', 'org-2'].map((id) => OrganizationId.parse(id)),
+      propertyIds: ['prop-1'].map((id) => PropertyId.parse(id)),
+      userIds: ['user-1'].map((id) => UserId.parse(id)),
+      asOf: Instant.fromDate(asOf),
     });
 
     const where = findMany.mock.calls[0][0].where;
@@ -102,10 +123,10 @@ describe('PrismaPropertyAssetRepository.findHoldingsAsOf', () => {
     const { repo, findMany } = makeRepo([]);
 
     await repo.findHoldingsAsOf({
-      organizationIds: ['org-1'],
+      organizationIds: ['org-1'].map((id) => OrganizationId.parse(id)),
       propertyIds: [],
-      userIds: ['user-1'],
-      asOf,
+      userIds: ['user-1'].map((id) => UserId.parse(id)),
+      asOf: Instant.fromDate(asOf),
     });
 
     expect(findMany.mock.calls[0][0].where.asset.property.id).toBeUndefined();
@@ -124,10 +145,10 @@ describe('PrismaPropertyAssetRepository.findHoldingsAsOf', () => {
     ]);
 
     const result = await repo.findHoldingsAsOf({
-      organizationIds: ['org-1'],
+      organizationIds: ['org-1'].map((id) => OrganizationId.parse(id)),
       propertyIds: [],
-      userIds: ['user-1'],
-      asOf,
+      userIds: ['user-1'].map((id) => UserId.parse(id)),
+      asOf: Instant.fromDate(asOf),
     });
 
     expect(result.success).toBe(true);
@@ -171,16 +192,16 @@ describe('PrismaPropertyAssetRepository.findHoldingsAsOf', () => {
     } as any);
 
     const result = await repo.findHoldingsAsOf({
-      organizationIds: ['org-1'],
+      organizationIds: ['org-1'].map((id) => OrganizationId.parse(id)),
       propertyIds: [],
-      userIds: ['user-1'],
-      asOf,
+      userIds: ['user-1'].map((id) => UserId.parse(id)),
+      asOf: Instant.fromDate(asOf),
     });
 
     expect(result.success).toBe(false);
 
     if (!result.success) {
-      expect(result.error).toBe('connection lost');
+      expect(result.error).toBe('common.errors.unexpected');
     }
   });
 });

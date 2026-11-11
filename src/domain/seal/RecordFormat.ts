@@ -16,21 +16,25 @@ import {
   UtcTimestamp,
   HoldingSize,
   OwnershipShare,
+  RecordOrder,
+  RecordByteCount,
+  VoteCount,
+  ParticipantCount,
+  LeafCount,
+  TotalWeight,
 } from './SealValues';
 
 export const hashSchema = Digest.schema;
 export const dateSchema = UtcTimestamp.schema;
-const totalSchema = z.string().regex(/^(0|[1-9][0-9]*)\.[0-9]{6}$/);
-const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const answerSchema = z.strictObject({
   id: AnswerId.schema,
-  order: count,
+  order: RecordOrder.schema,
   text: z.string(),
   archivedAt: dateSchema.nullable(),
 });
 const questionSchema = z.strictObject({
   id: QuestionId.schema,
-  order: count,
+  order: RecordOrder.schema,
   text: z.string(),
   details: z.string().nullable(),
   questionType: z.enum(['single-choice', 'multiple-choice']),
@@ -66,7 +70,7 @@ export const pollSchema = z.strictObject({
     z.strictObject({
       id: AttachmentId.schema,
       fileName: z.string(),
-      size: count,
+      size: RecordByteCount.schema,
       mimeType: z.string(),
     })
   ),
@@ -93,11 +97,21 @@ export const registerEntrySchema = z.strictObject({
   voted: z.boolean(),
   holdings: z.array(holdingSchema),
 });
-export const signerSchema = z.strictObject({
-  ...personFields,
-  willingToSignProtocol: z.boolean(),
-  phoneNumber: z.string().nullable(),
-});
+export const signerSchema = z
+  .discriminatedUnion('willingToSignProtocol', [
+    z.strictObject({
+      ...personFields,
+      willingToSignProtocol: z.literal(false),
+      phoneNumber: z.null(),
+    }),
+    // Historical willing voters may have no phone; preserve that explicit absence.
+    z.strictObject({
+      ...personFields,
+      willingToSignProtocol: z.literal(true),
+      phoneNumber: z.string().nullable(),
+    }),
+  ])
+  .readonly();
 export const talliesSchema = z.strictObject({
   questions: z.array(
     z.strictObject({
@@ -105,17 +119,17 @@ export const talliesSchema = z.strictObject({
       answers: z.array(
         z.strictObject({
           answerId: AnswerId.schema,
-          voteCount: count,
-          totalWeight: totalSchema,
+          voteCount: VoteCount.schema,
+          totalWeight: TotalWeight.schema,
         })
       ),
-      totalVotes: count,
-      totalWeight: totalSchema,
-      participantWeight: totalSchema,
+      totalVotes: VoteCount.schema,
+      totalWeight: TotalWeight.schema,
+      participantWeight: TotalWeight.schema,
     })
   ),
-  totalParticipants: count,
-  totalParticipantWeight: totalSchema,
+  totalParticipants: ParticipantCount.schema,
+  totalParticipantWeight: TotalWeight.schema,
 });
 export const manifestSchema = z.strictObject({
   version: z.literal(1),
@@ -127,7 +141,7 @@ export const manifestSchema = z.strictObject({
     tallies: z.strictObject({ hash: hashSchema }),
     register: z.strictObject({ hash: hashSchema }),
     signers: z.strictObject({ hash: hashSchema }),
-    votes: z.strictObject({ root: hashSchema, leafCount: count }),
+    votes: z.strictObject({ root: hashSchema, leafCount: LeafCount.schema }),
   }),
 });
 export type PollSection = z.infer<typeof pollSchema>;

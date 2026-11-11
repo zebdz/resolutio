@@ -1,3 +1,5 @@
+/** Mail contracts retain validated addresses and serialize only inside the delivery adapter. */
+import { EmailAddress } from '@/domain/user/EmailAddress';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const sendMail = vi.fn();
@@ -27,7 +29,7 @@ describe('NodemailerEmailSender', () => {
     sendMail.mockResolvedValue({ messageId: 'abc' });
 
     const result = await new NodemailerEmailSender(config).send({
-      to: 'ivan@mail.ru',
+      to: EmailAddress.create('ivan@mail.ru'),
       subject: 'Код подтверждения',
       text: 'Ваш код: 123456',
     });
@@ -49,7 +51,7 @@ describe('NodemailerEmailSender', () => {
     sendMail.mockResolvedValue({ messageId: 'abc' });
 
     const result = await new NodemailerEmailSender(config).send({
-      to: 'ivan@mail.ru',
+      to: EmailAddress.create('ivan@mail.ru'),
       subject: 'Код',
       text: 'Ваш код: 123456',
     });
@@ -62,7 +64,7 @@ describe('NodemailerEmailSender', () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const result = await new NodemailerEmailSender(config).send({
-      to: 'ivan@mail.ru',
+      to: EmailAddress.create('ivan@mail.ru'),
       subject: 'Код',
       text: 'Ваш код: 123456',
     });
@@ -77,7 +79,7 @@ describe('NodemailerEmailSender', () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await new NodemailerEmailSender(config).send({
-      to: 'ivan@mail.ru',
+      to: EmailAddress.create('ivan@mail.ru'),
       subject: 'Код',
       text: 'Ваш код: 123456',
     });

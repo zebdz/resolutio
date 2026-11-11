@@ -1,3 +1,23 @@
+/** Participant adapter compatibility: validated storage hydration and stable audit links.
+ * Atomic identity/time regressions live in PrismaParticipantIdentity.test.ts. */
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import {
+  PollId,
+  QuestionId,
+  AnswerId,
+  ParticipantId,
+  ParticipantWeightHistoryId,
+  VoteId,
+  VoteDraftId,
+  UserId,
+  OrganizationId,
+  BoardId,
+} from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PrismaParticipantRepository } from '../PrismaParticipantRepository';
 import { PollParticipant } from '../../../domain/poll/PollParticipant';
@@ -40,32 +60,45 @@ function makePrismaWeightHistory(overrides: Record<string, any> = {}) {
 
 function createActivePoll(id: string): Poll {
   const pollResult = Poll.create(
-    'Test Poll',
-    'Test Description',
-    'org-1',
-    'board-1',
-    'admin-1',
-    new Date('2024-01-01'),
-    new Date('2024-12-31')
+    PollTitle.parse('Test Poll'),
+    PollDescription.parse('Test Description'),
+    OrganizationId.parse('org-1'),
+    BoardId.parse('board-1'),
+    UserId.parse('admin-1'),
+    expectSuccess(
+      PollPeriod.create(new Date('2024-01-01'), new Date('2024-12-31'))
+    ),
+    testCreation(PollId, 'poll-1')
   );
-  const poll = pollResult.value as Poll;
-  (poll as any).props.id = id;
+  const poll = expectSuccess(pollResult) as Poll;
 
-  const questionResult = Question.create('Q1', id, 1, 1, 'single-choice');
-  const question = questionResult.value as Question;
-  (question as any).props.id = 'question-1';
-  const answerResult = Answer.create('A1', 1, question.id);
-  question.addAnswer(answerResult.value as Answer);
+  const questionResult = Question.create(
+    QuestionText.parse('Q1'),
+    PollId.parse(id),
+    testCreation(QuestionId, 'question-1'),
+    PageNumber.parse(1),
+    SortOrder.parse(1),
+    'single-choice'
+  );
+  const question = expectSuccess(questionResult) as Question;
+
+  const answerResult = Answer.create(
+    AnswerText.parse('A1'),
+    SortOrder.parse(1),
+    question.id,
+    testCreation(AnswerId, 'answer-1')
+  );
+  question.addAnswer(expectSuccess(answerResult) as Answer);
   poll.addQuestion(question);
   poll.submitToAdmin();
   poll.takeSnapshot();
-  poll.activate();
 
   return poll;
 }
 
 function createMockPrisma() {
   const tx = {
+    $queryRaw: vi.fn().mockResolvedValue([{ id: 'poll-1' }]),
     pollParticipant: {
       createMany: vi.fn(),
       findMany: vi.fn(),
@@ -74,6 +107,9 @@ function createMockPrisma() {
       createMany: vi.fn(),
     },
     poll: {
+      findUniqueOrThrow: vi
+        .fn()
+        .mockResolvedValue({ revision: 0, state: 'SUBMITTED' }),
       update: vi.fn(),
     },
   };
@@ -106,11 +142,11 @@ describe('PrismaParticipantRepository', () => {
   });
 
   describe('executeActivation', () => {
-    it('creates participants, fetches IDs, creates history, updates poll', async () => {
+    it('creates participants and their supplied audit references, then updates poll', async () => {
       const poll = createActivePoll('poll-1');
 
       const p1 = PollParticipant.reconstitute({
-        id: '',
+        id: 'part-db-1',
         pollId: 'poll-1',
         userId: 'user-1',
         userWeight: 1.0,
@@ -119,7 +155,7 @@ describe('PrismaParticipantRepository', () => {
         createdAt: new Date(),
       });
       const p2 = PollParticipant.reconstitute({
-        id: '',
+        id: 'part-db-2',
         pollId: 'poll-1',
         userId: 'user-2',
         userWeight: 2.0,
@@ -129,8 +165,8 @@ describe('PrismaParticipantRepository', () => {
       });
 
       const h1 = ParticipantWeightHistory.reconstitute({
-        id: '',
-        participantId: '',
+        id: 'wh-1',
+        participantId: 'part-db-1',
         pollId: 'poll-1',
         userId: 'user-1',
         oldWeight: 0,
@@ -140,8 +176,8 @@ describe('PrismaParticipantRepository', () => {
         changedAt: new Date(),
       });
       const h2 = ParticipantWeightHistory.reconstitute({
-        id: '',
-        participantId: '',
+        id: 'wh-2',
+        participantId: 'part-db-2',
         pollId: 'poll-1',
         userId: 'user-2',
         oldWeight: 0,
@@ -177,17 +213,17 @@ describe('PrismaParticipantRepository', () => {
       const result = await repo.executeActivation(poll, [p1, p2], [h1, h2]);
 
       expect(result.success).toBe(true);
-      const participants = result.value as PollParticipant[];
+      const participants = expectSuccess(result) as PollParticipant[];
       expect(participants).toHaveLength(2);
       expect(participants[0].id).toBe('part-db-1');
       expect(participants[1].id).toBe('part-db-2');
     });
 
-    it('maps history records to created participant IDs by index', async () => {
+    it('retains the supplied history participant identity', async () => {
       const poll = createActivePoll('poll-1');
 
       const p1 = PollParticipant.reconstitute({
-        id: '',
+        id: 'part-db-1',
         pollId: 'poll-1',
         userId: 'user-1',
         userWeight: 1.5,
@@ -197,8 +233,8 @@ describe('PrismaParticipantRepository', () => {
       });
 
       const h1 = ParticipantWeightHistory.reconstitute({
-        id: '',
-        participantId: 'placeholder',
+        id: 'wh-1',
+        participantId: 'part-db-1',
         pollId: 'poll-1',
         userId: 'user-1',
         oldWeight: 0,
@@ -210,7 +246,7 @@ describe('PrismaParticipantRepository', () => {
 
       const createdPrismaParticipants = [
         makePrismaParticipant({
-          id: 'real-part-id',
+          id: 'part-db-1',
           userId: 'user-1',
           userWeight: mockDecimal(1.5),
         }),
@@ -227,10 +263,10 @@ describe('PrismaParticipantRepository', () => {
 
       await repo.executeActivation(poll, [p1], [h1]);
 
-      // Verify history was created with the real participant ID (from index mapping)
+      // Verify history retains the identity supplied before persistence.
       const historyCall =
         prisma._tx.participantWeightHistory.createMany.mock.calls[0][0];
-      expect(historyCall.data[0].participantId).toBe('real-part-id');
+      expect(historyCall.data[0].participantId).toBe('part-db-1');
     });
 
     it('skips participant creation when list is empty', async () => {
@@ -270,10 +306,10 @@ describe('PrismaParticipantRepository', () => {
         }),
       ]);
 
-      const result = await repo.getParticipants('poll-1');
+      const result = await repo.getParticipants(PollId.parse('poll-1'));
 
       expect(result.success).toBe(true);
-      const participants = result.value as PollParticipant[];
+      const participants = expectSuccess(result) as PollParticipant[];
       expect(participants).toHaveLength(2);
       expect(participants[0].id).toBe('p-1');
       expect(participants[0].userWeight).toBe(3.14);
@@ -284,22 +320,31 @@ describe('PrismaParticipantRepository', () => {
     it('returns empty array when no participants', async () => {
       prisma.pollParticipant.findMany.mockResolvedValue([]);
 
-      const result = await repo.getParticipants('poll-1');
+      const result = await repo.getParticipants(PollId.parse('poll-1'));
 
       expect(result.success).toBe(true);
-      expect(result.value).toEqual([]);
+      expect(expectSuccess(result)).toEqual([]);
     });
 
     it('returns failure on db error', async () => {
       prisma.pollParticipant.findMany.mockRejectedValue(new Error('db down'));
 
-      const result = await repo.getParticipants('poll-1');
+      const result = await repo.getParticipants(PollId.parse('poll-1'));
 
       expect(result.success).toBe(false);
     });
   });
 
   describe('updateParticipantWeight', () => {
+    beforeEach(() => {
+      prisma._tx.poll.findUniqueOrThrow.mockResolvedValue({
+        state: 'READY',
+        revision: 0,
+      });
+      prisma._tx.vote = { count: vi.fn().mockResolvedValue(0) };
+      prisma._tx.pollParticipant.update = prisma.pollParticipant.update;
+      prisma._tx.participantWeightHistory.create = vi.fn();
+    });
     it('calls update with Decimal-converted weight', async () => {
       prisma.pollParticipant.update.mockResolvedValue({});
 
@@ -313,7 +358,20 @@ describe('PrismaParticipantRepository', () => {
         createdAt: new Date(),
       });
 
-      const result = await repo.updateParticipantWeight(participant);
+      const result = await repo.updateParticipantWeight(
+        participant,
+        ParticipantWeightHistory.reconstitute({
+          id: 'history-1',
+          participantId: participant.id,
+          pollId: participant.pollId,
+          userId: participant.userId,
+          oldWeight: 1,
+          newWeight: participant.userWeight,
+          changedBy: 'admin-1',
+          reason: null,
+          changedAt: new Date(),
+        })
+      );
 
       expect(result.success).toBe(true);
       expect(prisma.pollParticipant.update).toHaveBeenCalledOnce();
@@ -336,7 +394,20 @@ describe('PrismaParticipantRepository', () => {
         createdAt: new Date(),
       });
 
-      const result = await repo.updateParticipantWeight(participant);
+      const result = await repo.updateParticipantWeight(
+        participant,
+        ParticipantWeightHistory.reconstitute({
+          id: 'history-1',
+          participantId: participant.id,
+          pollId: participant.pollId,
+          userId: participant.userId,
+          oldWeight: 1,
+          newWeight: participant.userWeight,
+          changedBy: 'admin-1',
+          reason: null,
+          changedAt: new Date(),
+        })
+      );
 
       expect(result.success).toBe(false);
     });
@@ -352,7 +423,7 @@ describe('PrismaParticipantRepository', () => {
       prisma.participantWeightHistory.create.mockResolvedValue(prismaHistory);
 
       const history = ParticipantWeightHistory.reconstitute({
-        id: '',
+        id: 'wh-1',
         participantId: 'part-1',
         pollId: 'poll-1',
         userId: 'user-1',
@@ -366,7 +437,7 @@ describe('PrismaParticipantRepository', () => {
       const result = await repo.createWeightHistory(history);
 
       expect(result.success).toBe(true);
-      const created = result.value as ParticipantWeightHistory;
+      const created = expectSuccess(result) as ParticipantWeightHistory;
       expect(created.id).toBe('wh-created');
       expect(created.oldWeight).toBe(1.0);
       expect(created.newWeight).toBe(3.0);
@@ -380,7 +451,7 @@ describe('PrismaParticipantRepository', () => {
       );
 
       const history = ParticipantWeightHistory.reconstitute({
-        id: '',
+        id: 'wh-1',
         participantId: 'part-1',
         pollId: 'poll-1',
         userId: 'user-1',
@@ -403,10 +474,10 @@ describe('PrismaParticipantRepository', () => {
         makePrismaParticipant({ id: 'p-1', userWeight: mockDecimal(2.0) })
       );
 
-      const result = await repo.getParticipantById('p-1');
+      const result = await repo.getParticipantById(ParticipantId.parse('p-1'));
 
       expect(result.success).toBe(true);
-      const participant = result.value as PollParticipant;
+      const participant = expectSuccess(result) as PollParticipant;
       expect(participant.id).toBe('p-1');
       expect(participant.userWeight).toBe(2.0);
     });
@@ -414,10 +485,12 @@ describe('PrismaParticipantRepository', () => {
     it('returns null when not found', async () => {
       prisma.pollParticipant.findUnique.mockResolvedValue(null);
 
-      const result = await repo.getParticipantById('nonexistent');
+      const result = await repo.getParticipantById(
+        ParticipantId.parse('nonexistent')
+      );
 
       expect(result.success).toBe(true);
-      expect(result.value).toBeNull();
+      expect(expectSuccess(result)).toBeNull();
     });
   });
 
@@ -427,19 +500,25 @@ describe('PrismaParticipantRepository', () => {
         makePrismaParticipant({ id: 'p-1' })
       );
 
-      const result = await repo.getParticipantByUserAndPoll('poll-1', 'user-1');
+      const result = await repo.getParticipantByUserAndPoll(
+        PollId.parse('poll-1'),
+        UserId.parse('user-1')
+      );
 
       expect(result.success).toBe(true);
-      expect((result.value as PollParticipant).id).toBe('p-1');
+      expect((expectSuccess(result) as PollParticipant).id).toBe('p-1');
     });
 
     it('returns null when no match', async () => {
       prisma.pollParticipant.findUnique.mockResolvedValue(null);
 
-      const result = await repo.getParticipantByUserAndPoll('poll-1', 'user-1');
+      const result = await repo.getParticipantByUserAndPoll(
+        PollId.parse('poll-1'),
+        UserId.parse('user-1')
+      );
 
       expect(result.success).toBe(true);
-      expect(result.value).toBeNull();
+      expect(expectSuccess(result)).toBeNull();
     });
   });
 
@@ -458,10 +537,10 @@ describe('PrismaParticipantRepository', () => {
         }),
       ]);
 
-      const result = await repo.getWeightHistory('poll-1');
+      const result = await repo.getWeightHistory(PollId.parse('poll-1'));
 
       expect(result.success).toBe(true);
-      const history = result.value as ParticipantWeightHistory[];
+      const history = expectSuccess(result) as ParticipantWeightHistory[];
       expect(history).toHaveLength(2);
       expect(history[0].oldWeight).toBe(1.0);
       expect(history[1].newWeight).toBe(3.5);

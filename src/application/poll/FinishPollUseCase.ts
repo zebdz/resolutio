@@ -1,3 +1,9 @@
+/** Authorizes finishing with a validated cutoff instant, commits through the guarded
+ * repository, then performs cleanup/notifications without undoing the cutoff. */
+import { Clock, IdGenerator } from '../shared/EntityCreation';
+import { PollInstant } from '../../domain/poll/PollValues';
+import { z } from 'zod';
+import { PollId, UserId } from '../../domain/shared/EntityIds';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { DraftRepository } from '../../domain/poll/DraftRepository';
@@ -7,7 +13,7 @@ import { UserRepository } from '../../domain/user/UserRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { NotifyPollFinishedUseCase } from '../notification/NotifyPollFinishedUseCase';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 
 interface FinishPollCommand {
   pollId: string;
@@ -22,10 +28,24 @@ export class FinishPollUseCase {
     private userRepository: UserRepository,
     private notificationRepository: NotificationRepository,
     private participantRepository: ParticipantRepository,
-    private boardRepository: BoardRepository
+    private boardRepository: BoardRepository,
+    private ids: IdGenerator,
+    private clock: Clock
   ) {}
 
-  async execute(command: FinishPollCommand): Promise<Result<void, string>> {
+  async execute(
+    rawRequest: FinishPollCommand
+  ): Promise<Result<void, PollUseCaseFailure>> {
+    const decoded = z
+      .object({ pollId: PollId, userId: UserId })
+      .safeParse(rawRequest);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const command = { ...rawRequest, ...decoded.data };
+
     // Get the poll
     const pollResult = await this.pollRepository.getPollById(command.pollId);
 
@@ -72,7 +92,7 @@ export class FinishPollUseCase {
     }
 
     // Mark poll as finished
-    const finishResult = poll.finish();
+    const finishResult = poll.finish(PollInstant.parse(this.clock.now()));
 
     if (!finishResult.success) {
       return failure(finishResult.error);
@@ -86,22 +106,39 @@ export class FinishPollUseCase {
     }
 
     // Clean up all remaining drafts for this poll
-    const deleteDraftsResult = await this.draftRepository.deleteAllPollDrafts(
-      command.pollId
-    );
+    try {
+      const deleteDraftsResult = await this.draftRepository.deleteAllPollDrafts(
+        command.pollId
+      );
 
-    if (!deleteDraftsResult.success) {
-      // Log error but don't fail the operation
-      console.error('Failed to delete poll drafts:', deleteDraftsResult.error);
+      if (!deleteDraftsResult.success) {
+        // Log error but don't fail the operation
+        console.error(
+          'Failed to delete poll drafts:',
+          deleteDraftsResult.error
+        );
+      }
+    } catch {
+      console.error('Failed to delete poll drafts after finish');
     }
 
     // Notify participants
     const notifyUseCase = new NotifyPollFinishedUseCase({
       notificationRepository: this.notificationRepository,
+      ids: this.ids,
+      clock: this.clock,
       participantRepository: this.participantRepository,
     });
     await notifyUseCase
       .execute({ pollId: poll.id, pollTitle: poll.title })
+      .then((outcome) => {
+        if (!outcome.success) {
+          console.error(
+            'Notification delivery failed (NotifyPollFinishedUseCase):',
+            outcome.error
+          );
+        }
+      })
       .catch((err) => {
         console.error('Failed to send poll finished notifications:', err);
       });

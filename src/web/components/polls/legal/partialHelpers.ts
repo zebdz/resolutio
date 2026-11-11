@@ -1,3 +1,9 @@
+/** Completes displayable streaming records while validating their IDs and counts.
+ * Missing explanatory prose keeps its existing empty-string presentation fallback. */
+import {
+  legalAnnotationSchema,
+  legalAnalysisSummarySchema,
+} from '@/domain/ai/LegalAnalysis';
 import type {
   LegalAnnotation,
   LegalAnalysisSummary,
@@ -24,14 +30,16 @@ export function tryCompleteAnnotation(
     return null;
   }
 
-  return {
+  const parsed = legalAnnotationSchema.safeParse({
     questionId: p.questionId,
     answerId: typeof p.answerId === 'string' ? p.answerId : null,
     severity: p.severity,
     issue: p.issue,
     explanation: typeof p.explanation === 'string' ? p.explanation : '',
     legalBasis: typeof p.legalBasis === 'string' ? p.legalBasis : '',
-  };
+  });
+
+  return parsed.success ? parsed.data : null;
 }
 
 export function tryCompleteSummary(
@@ -59,11 +67,13 @@ export function tryCompleteSummary(
     return null;
   }
 
-  return {
+  const parsed = legalAnalysisSummarySchema.safeParse({
     totalIssues: p.totalIssues,
     overallRisk: p.overallRisk,
     recommendation: p.recommendation,
-  };
+  });
+
+  return parsed.success ? parsed.data : null;
 }
 
 export function completeAnnotationsFromPartial(

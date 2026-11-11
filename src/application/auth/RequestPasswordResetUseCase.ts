@@ -1,6 +1,18 @@
+import { AuthenticationError } from './AuthenticationError';
+import { Instant } from '@/domain/shared/Instant';
+import { Clock, IdGenerator } from '@/application/shared/EntityCreation';
+import { OtpCodeGenerator } from './OtpCodeGenerator';
+import { OtpVerificationId } from '@/domain/shared/EntityIds';
+import { OtpEmailDestination } from '@/domain/otp/OtpValues';
+import {
+  ClientIp,
+  Minutes,
+  afterSeconds,
+  secondsFromMinutes,
+} from '@/domain/auth/AuthValues';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { OtpPurposes, OtpVerification } from '@/domain/otp/OtpVerification';
-import { OtpCode } from '@/domain/otp/OtpCode';
+
 import { UserRepository } from '@/domain/user/UserRepository';
 import { User } from '@/domain/user/User';
 import { UserDomainCodes } from '@/domain/user/UserDomainCodes';
@@ -17,11 +29,14 @@ export interface RequestPasswordResetInput {
 }
 
 interface Dependencies {
+  ids: IdGenerator;
+  otpCodeGenerator: OtpCodeGenerator;
+  clock: Clock;
   userRepository: UserRepository;
   otpRepository: OtpRepository;
-  deliveryChannel: OtpDeliveryChannel;
+  deliveryChannel: OtpDeliveryChannel<'email'>;
   otpCodeHasher: OtpCodeHasher;
-  expiryMinutes?: number;
+  expiryMinutes?: Minutes;
 }
 
 /**
@@ -32,23 +47,31 @@ interface Dependencies {
  * reported as a failure, and that verdict reveals nothing.
  */
 export class RequestPasswordResetUseCase {
+  private readonly ids: IdGenerator;
+  private readonly otpCodeGenerator: OtpCodeGenerator;
+  private readonly clock: Clock;
   private readonly userRepository: UserRepository;
   private readonly otpRepository: OtpRepository;
-  private readonly deliveryChannel: OtpDeliveryChannel;
+  private readonly deliveryChannel: OtpDeliveryChannel<'email'>;
   private readonly otpCodeHasher: OtpCodeHasher;
-  private readonly expiryMinutes: number;
+  private readonly expiryMinutes: Minutes;
 
   constructor(deps: Dependencies) {
+    this.ids = deps.ids;
+    this.otpCodeGenerator = deps.otpCodeGenerator;
+    this.clock = deps.clock;
     this.userRepository = deps.userRepository;
     this.otpRepository = deps.otpRepository;
     this.deliveryChannel = deps.deliveryChannel;
     this.otpCodeHasher = deps.otpCodeHasher;
-    this.expiryMinutes = deps.expiryMinutes ?? 10;
+    this.expiryMinutes = deps.expiryMinutes ?? Minutes.parse(10);
   }
 
   async execute(
     input: RequestPasswordResetInput
-  ): Promise<Result<{ requested: true }, string>> {
+  ): Promise<Result<{ requested: true }, AuthenticationError>> {
+    const now = this.clock.now();
+
     if (!input.clientIp) {
       return failure(AuthErrors.MISSING_IP);
     }
@@ -65,7 +88,7 @@ export class RequestPasswordResetUseCase {
           ? await this.userRepository.findByEmail(parsed.email)
           : await this.userRepository.findByPhoneNumber(parsed.phone);
 
-      await this.issueIfEligible(user, input.clientIp);
+      await this.issueIfEligible(user, input.clientIp, now);
     } catch (error) {
       // Log it, then report exactly what the happy path reports.
       console.error('Password reset request failed:', error);
@@ -76,7 +99,8 @@ export class RequestPasswordResetUseCase {
 
   private async issueIfEligible(
     user: User | null,
-    clientIp: string
+    clientIp: string,
+    now: Instant
   ): Promise<void> {
     if (!user || !user.hasConfirmedEmail() || !user.email) {
       return;
@@ -86,34 +110,46 @@ export class RequestPasswordResetUseCase {
 
     const throttle = await readThrottle(
       this.otpRepository,
-      address,
-      this.deliveryChannel.channel,
-      OtpPurposes.PASSWORD_RESET
+      OtpEmailDestination.parse({
+        identifier: address,
+        channel: this.deliveryChannel.channel,
+      }),
+      OtpPurposes.PASSWORD_RESET,
+      now
     );
 
     if (throttle.retryAfterSeconds > 0) {
       return;
     }
 
-    const code = OtpCode.generate();
+    const code = this.otpCodeGenerator.generate();
 
     await this.otpRepository.save(
-      OtpVerification.create({
-        identifier: address,
-        channel: this.deliveryChannel.channel,
-        purpose: OtpPurposes.PASSWORD_RESET,
-        code: this.otpCodeHasher.hash(code.getValue()),
-        clientIp,
-        expiresAt: new Date(Date.now() + this.expiryMinutes * 60 * 1000),
-        userId: user.id,
-      })
+      OtpVerification.create(
+        {
+          ...OtpEmailDestination.parse({
+            identifier: address,
+            channel: this.deliveryChannel.channel,
+          }),
+
+          purpose: OtpPurposes.PASSWORD_RESET,
+          code: this.otpCodeHasher.hash(code.getValue()),
+          clientIp: ClientIp.parse(clientIp),
+          expiresAt: afterSeconds(now, secondsFromMinutes(this.expiryMinutes)),
+          userId: user.id,
+        },
+        { id: this.ids.generate(OtpVerificationId), now }
+      )
     );
 
     await this.deliveryChannel.send(
-      address,
+      OtpEmailDestination.parse({
+        channel: this.deliveryChannel.channel,
+        identifier: address,
+      }).identifier,
       code.getValue(),
       user.language,
-      clientIp,
+      ClientIp.parse(clientIp),
       OtpPurposes.PASSWORD_RESET
     );
   }

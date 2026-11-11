@@ -3,6 +3,7 @@ import { expect, it } from 'vitest';
 import fixture from './fixtures/record-v1.json';
 import { SealedRecordBuilder } from '../SealedRecordBuilder';
 import { SealInput } from '../SealInput';
+import { LeafCount } from '../SealValues';
 import { registerEntrySchema, registerEntryData } from '../RecordFormat';
 
 export function sampleInput(): SealInput {
@@ -227,7 +228,7 @@ it('normalizes text once, orders collections deterministically and freezes all r
   input.poll.title = 'Changed';
   built.value.record.sections.signers = '[]';
   built.value.record.votes[0].preimage.weight = '0.000000';
-  built.value.manifest.sections.votes.leafCount = 0;
+  built.value.manifest.sections.votes.leafCount = LeafCount.parse(0);
   expect(built.value.record).toEqual(fixture.record);
 });
 

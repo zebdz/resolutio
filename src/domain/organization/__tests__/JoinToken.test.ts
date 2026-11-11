@@ -1,3 +1,5 @@
+import { createJoinToken, joinTokenInstant } from './joinTokenTestValues';
+import { JoinTokenMaxUses } from '../JoinTokenValues';
 import { describe, it, expect } from 'vitest';
 import { JoinToken, JoinTokenProps } from '../JoinToken';
 import { JoinTokenDomainCodes } from '../JoinTokenDomainCodes';
@@ -10,7 +12,7 @@ function makeProps(overrides?: Partial<JoinTokenProps>): JoinTokenProps {
   return {
     id: 'jt-1',
     organizationId: 'org-1',
-    token: 'abc123defg',
+    token: 'abc234defg',
     description: 'Test token',
     maxUses: null,
     useCount: 0,
@@ -22,8 +24,17 @@ function makeProps(overrides?: Partial<JoinTokenProps>): JoinTokenProps {
 }
 
 describe('JoinToken.create', () => {
+  it('rejects fractional and non-finite use limits', () => {
+    for (const maxUses of [1.5, NaN, Infinity]) {
+      const result = createJoinToken('org-1', 'user-1', 'Description', maxUses);
+      expect(result).toEqual({
+        success: false,
+        error: JoinTokenDomainCodes.MAX_USES_INVALID,
+      });
+    }
+  });
   it('should succeed with valid description', () => {
-    const result = JoinToken.create('org-1', 'user-1', 'Valid description');
+    const result = createJoinToken('org-1', 'user-1', 'Valid description');
 
     expect(result.success).toBe(true);
 
@@ -38,7 +49,7 @@ describe('JoinToken.create', () => {
   });
 
   it('should fail with empty description', () => {
-    const result = JoinToken.create('org-1', 'user-1', '');
+    const result = createJoinToken('org-1', 'user-1', '');
 
     expect(result.success).toBe(false);
 
@@ -48,7 +59,7 @@ describe('JoinToken.create', () => {
   });
 
   it('should fail with whitespace-only description', () => {
-    const result = JoinToken.create('org-1', 'user-1', '   ');
+    const result = createJoinToken('org-1', 'user-1', '   ');
 
     expect(result.success).toBe(false);
 
@@ -58,7 +69,7 @@ describe('JoinToken.create', () => {
   });
 
   it('should fail with description > 500 chars', () => {
-    const result = JoinToken.create('org-1', 'user-1', 'a'.repeat(501));
+    const result = createJoinToken('org-1', 'user-1', 'a'.repeat(501));
 
     expect(result.success).toBe(false);
 
@@ -68,7 +79,7 @@ describe('JoinToken.create', () => {
   });
 
   it('should fail with maxUses <= 0 (maxUses = 0)', () => {
-    const result = JoinToken.create('org-1', 'user-1', 'desc', 0);
+    const result = createJoinToken('org-1', 'user-1', 'desc', 0);
 
     expect(result.success).toBe(false);
 
@@ -78,7 +89,7 @@ describe('JoinToken.create', () => {
   });
 
   it('should fail with maxUses < 0', () => {
-    const result = JoinToken.create('org-1', 'user-1', 'desc', -5);
+    const result = createJoinToken('org-1', 'user-1', 'desc', -5);
 
     expect(result.success).toBe(false);
 
@@ -88,7 +99,7 @@ describe('JoinToken.create', () => {
   });
 
   it('should succeed with null maxUses (unlimited)', () => {
-    const result = JoinToken.create('org-1', 'user-1', 'desc', null);
+    const result = createJoinToken('org-1', 'user-1', 'desc', null);
 
     expect(result.success).toBe(true);
 
@@ -97,8 +108,8 @@ describe('JoinToken.create', () => {
     }
   });
 
-  it('should generate a 10-char token from valid charset', () => {
-    const result = JoinToken.create('org-1', 'user-1', 'desc');
+  it('retains a valid ten-character supplied token', () => {
+    const result = createJoinToken('org-1', 'user-1', 'desc');
 
     expect(result.success).toBe(true);
 
@@ -125,15 +136,15 @@ describe('JoinToken.reconstitute', () => {
     expect(token.maxUses).toBe(props.maxUses);
     expect(token.useCount).toBe(props.useCount);
     expect(token.createdById).toBe(props.createdById);
-    expect(token.createdAt).toBe(props.createdAt);
-    expect(token.expiredAt).toBe(props.expiredAt);
+    expect(token.createdAt).toEqual(props.createdAt);
+    expect(token.expiredAt).toEqual(props.expiredAt);
   });
 });
 
 describe('JoinToken.expire', () => {
   it('should set expiredAt', () => {
     const token = JoinToken.reconstitute(makeProps());
-    const result = token.expire();
+    const result = token.expire(joinTokenInstant);
 
     expect(result.success).toBe(true);
     expect(token.expiredAt).toBeInstanceOf(Date);
@@ -141,7 +152,7 @@ describe('JoinToken.expire', () => {
 
   it('should fail if already expired', () => {
     const token = JoinToken.reconstitute(makeProps({ expiredAt: new Date() }));
-    const result = token.expire();
+    const result = token.expire(joinTokenInstant);
 
     expect(result.success).toBe(false);
 
@@ -175,7 +186,7 @@ describe('JoinToken.reactivate', () => {
 describe('JoinToken.updateMaxUses', () => {
   it('should update value', () => {
     const token = JoinToken.reconstitute(makeProps());
-    const result = token.updateMaxUses(10);
+    const result = token.updateMaxUses(10 as JoinTokenMaxUses);
 
     expect(result.success).toBe(true);
     expect(token.maxUses).toBe(10);
@@ -183,7 +194,7 @@ describe('JoinToken.updateMaxUses', () => {
 
   it('should fail with <= 0', () => {
     const token = JoinToken.reconstitute(makeProps());
-    const result = token.updateMaxUses(0);
+    const result = token.updateMaxUses(0 as JoinTokenMaxUses);
 
     expect(result.success).toBe(false);
 
@@ -194,7 +205,7 @@ describe('JoinToken.updateMaxUses', () => {
 
   it('should fail with negative value', () => {
     const token = JoinToken.reconstitute(makeProps());
-    const result = token.updateMaxUses(-1);
+    const result = token.updateMaxUses(-1 as JoinTokenMaxUses);
 
     expect(result.success).toBe(false);
 
@@ -288,12 +299,13 @@ describe('JoinToken.toJSON', () => {
 });
 
 const mockProfanityChecker: ProfanityChecker = {
+  findProfaneWords: () => [],
   containsProfanity: (text: string) => text.includes('badword'),
 };
 
 describe('JoinToken profanity check', () => {
   it('should reject description with profanity', () => {
-    const result = JoinToken.create(
+    const result = createJoinToken(
       'org-1',
       'user-1',
       'badword invite',
@@ -308,7 +320,7 @@ describe('JoinToken profanity check', () => {
   });
 
   it('should pass clean description with profanityChecker', () => {
-    const result = JoinToken.create(
+    const result = createJoinToken(
       'org-1',
       'user-1',
       'Clean invite link',
@@ -319,7 +331,7 @@ describe('JoinToken profanity check', () => {
   });
 
   it('should pass without profanityChecker (backward compat)', () => {
-    const result = JoinToken.create('org-1', 'user-1', 'Any description');
+    const result = createJoinToken('org-1', 'user-1', 'Any description');
     expect(result.success).toBe(true);
   });
 });

@@ -1,3 +1,5 @@
+/** Validates raw profile input before it enters application commands. */
+import { UserId } from '@/domain/shared/EntityIds';
 import { z } from 'zod';
 import {
   NICKNAME_MIN_LENGTH,
@@ -10,7 +12,7 @@ import { AddressDomainCodes } from '../../domain/user/Address';
 
 export const updateUserProfileSchema = (profanityChecker: ProfanityChecker) =>
   z.object({
-    userId: z.string().min(1, 'User ID is required'),
+    userId: UserId,
     language: z.enum(['en', 'ru']).optional(),
     nickname: z
       .string()

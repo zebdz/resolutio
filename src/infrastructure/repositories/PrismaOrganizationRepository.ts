@@ -1,3 +1,13 @@
+/** Organization adapter decodes database identities/names and persists aggregate
+ * creation inputs. Hierarchy projections never manufacture unnamed domain nodes. */
+import { FirstName, LastName, MiddleName } from '../../domain/user/UserValues';
+import { OrganizationId, UserId } from '../../domain/shared/EntityIds';
+import { ResultLimit, ResultCount } from '../../domain/shared/Pagination';
+import {
+  OrganizationName,
+  MemberRemovalReason,
+  MemberCount,
+} from '../../domain/organization/OrganizationValues';
 import { Prisma, PrismaClient } from '@/generated/prisma/client';
 import { Organization } from '../../domain/organization/Organization';
 import {
@@ -17,6 +27,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
     const created = await this.prisma.organization.create({
       data: {
+        id: data.id,
         name: data.name,
         description: data.description,
         parentId: data.parentId,
@@ -47,7 +58,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
-  async findById(id: string): Promise<Organization | null> {
+  async findById(id: OrganizationId): Promise<Organization | null> {
     const org = await this.prisma.organization.findUnique({
       where: { id },
     });
@@ -68,7 +79,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
-  async findByName(name: string): Promise<Organization | null> {
+  async findByName(name: OrganizationName): Promise<Organization | null> {
     const org = await this.prisma.organization.findUnique({
       where: { name },
     });
@@ -89,7 +100,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
-  async findByCreatorId(creatorId: string): Promise<Organization[]> {
+  async findByCreatorId(creatorId: UserId): Promise<Organization[]> {
     const orgs = await this.prisma.organization.findMany({
       where: { createdById: creatorId },
     });
@@ -108,7 +119,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     );
   }
 
-  async findByParentId(parentId: string): Promise<Organization[]> {
+  async findByParentId(parentId: OrganizationId): Promise<Organization[]> {
     const orgs = await this.prisma.organization.findMany({
       where: { parentId },
     });
@@ -127,9 +138,11 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     );
   }
 
-  async getAncestorIds(organizationId: string): Promise<string[]> {
-    const ancestors: string[] = [];
-    let currentId: string | null = organizationId;
+  async getAncestorIds(
+    organizationId: OrganizationId
+  ): Promise<OrganizationId[]> {
+    const ancestors: OrganizationId[] = [];
+    let currentId: OrganizationId | null = organizationId;
 
     while (currentId) {
       const org: { parentId: string | null } | null =
@@ -142,16 +155,19 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         break;
       }
 
-      ancestors.push(org.parentId);
-      currentId = org.parentId;
+      const parentId = OrganizationId.parse(org.parentId);
+      ancestors.push(parentId);
+      currentId = parentId;
     }
 
     return ancestors;
   }
 
-  async getDescendantIds(organizationId: string): Promise<string[]> {
-    const descendants: string[] = [];
-    const queue: string[] = [organizationId];
+  async getDescendantIds(
+    organizationId: OrganizationId
+  ): Promise<OrganizationId[]> {
+    const descendants: OrganizationId[] = [];
+    const queue: OrganizationId[] = [organizationId];
 
     while (queue.length > 0) {
       const currentId = queue.shift()!;
@@ -162,15 +178,18 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       });
 
       for (const child of children) {
-        descendants.push(child.id);
-        queue.push(child.id);
+        const childId = OrganizationId.parse(child.id);
+        descendants.push(childId);
+        queue.push(childId);
       }
     }
 
     return descendants;
   }
 
-  async getFullTreeOrgIds(organizationId: string): Promise<string[]> {
+  async getFullTreeOrgIds(
+    organizationId: OrganizationId
+  ): Promise<OrganizationId[]> {
     const ancestorIds = await this.getAncestorIds(organizationId);
     const rootId =
       ancestorIds.length > 0
@@ -182,8 +201,8 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }
 
   async isUserExactMember(
-    userId: string,
-    organizationId: string
+    userId: UserId,
+    organizationId: OrganizationId
   ): Promise<boolean> {
     const membership = await this.prisma.organizationUser.findFirst({
       where: { userId, organizationId, status: 'accepted' },
@@ -193,7 +212,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return membership !== null;
   }
 
-  async isUserMember(userId: string, organizationId: string): Promise<boolean> {
+  async isUserMember(
+    userId: UserId,
+    organizationId: OrganizationId
+  ): Promise<boolean> {
     // Check membership in this org or any descendant
     const descendantIds = await this.getDescendantIds(organizationId);
     const allOrgIds = [organizationId, ...descendantIds];
@@ -209,7 +231,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return !!membership;
   }
 
-  async isUserAdmin(userId: string, organizationId: string): Promise<boolean> {
+  async isUserAdmin(
+    userId: UserId,
+    organizationId: OrganizationId
+  ): Promise<boolean> {
     const admin = await this.prisma.organizationAdminUser.findUnique({
       where: {
         organizationId_userId: {
@@ -222,16 +247,16 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return !!admin;
   }
 
-  async getAdminUserIds(organizationId: string): Promise<string[]> {
+  async getAdminUserIds(organizationId: OrganizationId): Promise<UserId[]> {
     const admins = await this.prisma.organizationAdminUser.findMany({
       where: { organizationId },
       select: { userId: true },
     });
 
-    return admins.map((a) => a.userId);
+    return admins.map((a) => UserId.parse(a.userId));
   }
 
-  async findMembershipsByUserId(userId: string): Promise<Organization[]> {
+  async findMembershipsByUserId(userId: UserId): Promise<Organization[]> {
     const memberships = await this.prisma.organizationUser.findMany({
       where: {
         userId,
@@ -258,7 +283,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }
 
   async findAdminOrganizationsByUserId(
-    userId: string
+    userId: UserId
   ): Promise<Organization[]> {
     const adminRoles = await this.prisma.organizationAdminUser.findMany({
       where: {
@@ -310,8 +335,8 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }
 
   async findAcceptedMemberUserIdsIncludingDescendants(
-    organizationId: string
-  ): Promise<string[]> {
+    organizationId: OrganizationId
+  ): Promise<UserId[]> {
     // Get all descendant org IDs
     const descendantIds = await this.getDescendantIds(organizationId);
     const allOrgIds = [organizationId, ...descendantIds];
@@ -326,10 +351,16 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
 
     // Deduplicate
-    return [...new Set(members.map((m: { userId: string }) => m.userId))];
+    return [
+      ...new Set(
+        members.map((m: { userId: string }) => UserId.parse(m.userId))
+      ),
+    ];
   }
 
-  async findAcceptedMemberUserIdsForOrgs(orgIds: string[]): Promise<string[]> {
+  async findAcceptedMemberUserIdsForOrgs(
+    orgIds: OrganizationId[]
+  ): Promise<UserId[]> {
     if (orgIds.length === 0) {
       return [];
     }
@@ -340,12 +371,12 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       distinct: ['userId'],
     });
 
-    return rows.map((r: { userId: string }) => r.userId);
+    return rows.map((r: { userId: string }) => UserId.parse(r.userId));
   }
 
   async removeUserFromOrganization(
-    userId: string,
-    organizationId: string
+    userId: UserId,
+    organizationId: OrganizationId
   ): Promise<void> {
     await this.prisma.organizationUser.delete({
       where: {
@@ -358,10 +389,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }
 
   async removeMemberFromOrganization(
-    organizationId: string,
-    userId: string,
-    removedByUserId: string,
-    reason: string
+    organizationId: OrganizationId,
+    userId: UserId,
+    removedByUserId: UserId,
+    reason: MemberRemovalReason
   ): Promise<void> {
     await this.prisma.$transaction([
       this.prisma.organizationUser.delete({
@@ -373,7 +404,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     ]);
   }
 
-  async findPendingRequestsByUserId(userId: string): Promise<Organization[]> {
+  async findPendingRequestsByUserId(userId: UserId): Promise<Organization[]> {
     const memberships = await this.prisma.organizationUser.findMany({
       where: {
         userId,
@@ -399,9 +430,11 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     );
   }
 
-  async getAncestors(organizationId: string): Promise<OrganizationAncestor[]> {
+  async getAncestors(
+    organizationId: OrganizationId
+  ): Promise<OrganizationAncestor[]> {
     const ancestors: OrganizationAncestor[] = [];
-    let currentId: string | null = organizationId;
+    let currentId: OrganizationId | null = organizationId;
     const MAX_DEPTH = 100;
 
     while (currentId && ancestors.length < MAX_DEPTH) {
@@ -435,19 +468,19 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       });
 
       ancestors.push({
-        id: parent.id,
-        name: parent.name,
-        memberCount: memberCount.length,
+        id: OrganizationId.parse(parent.id),
+        name: OrganizationName.parse(parent.name),
+        memberCount: MemberCount.parse(memberCount.length),
       });
 
-      currentId = parent.id;
+      currentId = OrganizationId.parse(parent.id);
     }
 
     return ancestors;
   }
 
   async getChildrenWithStats(
-    organizationId: string
+    organizationId: OrganizationId
   ): Promise<OrganizationAncestor[]> {
     const children = await this.prisma.organization.findMany({
       where: { parentId: organizationId, archivedAt: null },
@@ -462,14 +495,14 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
     return children.map(
       (child: { id: string; name: string; _count: { members: number } }) => ({
-        id: child.id,
-        name: child.name,
-        memberCount: child._count.members,
+        id: OrganizationId.parse(child.id),
+        name: OrganizationName.parse(child.name),
+        memberCount: MemberCount.parse(child._count.members),
       })
     );
   }
 
-  async getHierarchyTree(organizationId: string): Promise<{
+  async getHierarchyTree(organizationId: OrganizationId): Promise<{
     ancestors: OrganizationAncestor[];
     tree: OrganizationTreeNode;
   }> {
@@ -487,7 +520,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }
 
   private async buildSubtree(
-    orgId: string,
+    orgId: OrganizationId,
     depth: number
   ): Promise<OrganizationTreeNode> {
     const MAX_DEPTH = 100;
@@ -501,10 +534,14 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       where: { organizationId: orgId, status: 'accepted' },
     });
 
+    if (!org) {
+      throw new Error('common.errors.unexpected');
+    }
+
     const node: OrganizationTreeNode = {
-      id: org?.id ?? orgId,
-      name: org?.name ?? '',
-      memberCount,
+      id: OrganizationId.parse(org.id),
+      name: OrganizationName.parse(org.name),
+      memberCount: MemberCount.parse(memberCount),
       children: [],
     };
 
@@ -519,25 +556,25 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
 
     node.children = await Promise.all(
       children.map((child: { id: string }) =>
-        this.buildSubtree(child.id, depth + 1)
+        this.buildSubtree(OrganizationId.parse(child.id), depth + 1)
       )
     );
 
     return node;
   }
 
-  async findAdminUserIds(organizationId: string): Promise<string[]> {
+  async findAdminUserIds(organizationId: OrganizationId): Promise<UserId[]> {
     const admins = await this.prisma.organizationAdminUser.findMany({
       where: { organizationId },
       select: { userId: true },
     });
 
-    return admins.map((a) => a.userId);
+    return admins.map((a) => UserId.parse(a.userId));
   }
 
   async setParentId(
-    organizationId: string,
-    parentId: string | null
+    organizationId: OrganizationId,
+    parentId: OrganizationId | null
   ): Promise<void> {
     await this.prisma.organization.update({
       where: { id: organizationId },
@@ -550,7 +587,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }
 
   async getRootAllowMultiTreeMembership(
-    organizationId: string
+    organizationId: OrganizationId
   ): Promise<boolean> {
     const ancestorIds = await this.getAncestorIds(organizationId);
     const rootId =
@@ -567,8 +604,8 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }
 
   async findUsersWithMultipleMembershipsInOrgs(
-    orgIds: string[]
-  ): Promise<string[]> {
+    orgIds: OrganizationId[]
+  ): Promise<UserId[]> {
     if (orgIds.length === 0) {
       return [];
     }
@@ -586,11 +623,11 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       },
     });
 
-    return result.map((r: { userId: string }) => r.userId);
+    return result.map((r: { userId: string }) => UserId.parse(r.userId));
   }
 
   async setAllowMultiTreeMembership(
-    organizationId: string,
+    organizationId: OrganizationId,
     value: boolean | null
   ): Promise<void> {
     await this.prisma.organization.update({
@@ -599,13 +636,19 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
-  async addAdmin(organizationId: string, userId: string): Promise<void> {
+  async addAdmin(
+    organizationId: OrganizationId,
+    userId: UserId
+  ): Promise<void> {
     await this.prisma.organizationAdminUser.create({
       data: { organizationId, userId },
     });
   }
 
-  async removeAdmin(organizationId: string, userId: string): Promise<void> {
+  async removeAdmin(
+    organizationId: OrganizationId,
+    userId: UserId
+  ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       const adminCount = await tx.organizationAdminUser.count({
         where: { organizationId },
@@ -621,20 +664,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     });
   }
 
-  async findAllWithStats(excludeUserMemberships?: string): Promise<
-    Array<{
-      organization: Organization;
-      memberCount: number;
-      firstAdmin: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        middleName: string | null;
-      } | null;
-      parentOrg: { id: string; name: string } | null;
-    }>
-  > {
-    const whereClause: any = {
+  async findAllWithStats(
+    excludeUserMemberships?: UserId
+  ): Promise<OrganizationWithStats[]> {
+    const whereClause: Prisma.OrganizationWhereInput = {
       archivedAt: null,
     };
 
@@ -697,30 +730,36 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         archivedAt: org.archivedAt,
         allowMultiTreeMembership: org.allowMultiTreeMembership ?? null,
       }),
-      memberCount: org._count.members,
+      memberCount: MemberCount.parse(org._count.members),
       firstAdmin:
         org.admins.length > 0
           ? {
-              id: org.admins[0].user.id,
-              firstName: org.admins[0].user.firstName,
-              lastName: org.admins[0].user.lastName,
-              middleName: org.admins[0].user.middleName,
+              id: UserId.parse(org.admins[0].user.id),
+              firstName: FirstName.parse(org.admins[0].user.firstName),
+              lastName: LastName.parse(org.admins[0].user.lastName),
+              middleName:
+                org.admins[0].user.middleName === null
+                  ? null
+                  : MiddleName.parse(org.admins[0].user.middleName),
             }
           : null,
       parentOrg: org.parent
-        ? { id: org.parent.id, name: org.parent.name }
+        ? {
+            id: OrganizationId.parse(org.parent.id),
+            name: OrganizationName.parse(org.parent.name),
+          }
         : null,
     }));
   }
 
   async searchOrganizationsWithStats(
     filters: OrganizationSearchFilters,
-    excludeUserMemberships?: string
+    excludeUserMemberships?: UserId
   ): Promise<{
     organizations: OrganizationWithStats[];
-    totalCount: number;
+    totalCount: ResultCount;
   }> {
-    const where: any = {};
+    const where: Prisma.OrganizationWhereInput = {};
 
     if (!filters.includeArchived) {
       where.archivedAt = null;
@@ -749,7 +788,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       ];
     }
 
-    const findManyArgs: any = {
+    const findManyArgs = {
       where,
       include: {
         _count: {
@@ -773,12 +812,13 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         parent: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'desc' },
-    };
-
-    if (filters.page && filters.pageSize) {
-      findManyArgs.skip = (filters.page - 1) * filters.pageSize;
-      findManyArgs.take = filters.pageSize;
-    }
+      ...(filters.page && filters.pageSize
+        ? {
+            skip: (filters.page - 1) * filters.pageSize,
+            take: filters.pageSize,
+          }
+        : {}),
+    } satisfies Prisma.OrganizationFindManyArgs;
 
     const [organizations, totalCount] = await Promise.all([
       this.prisma.organization.findMany(findManyArgs),
@@ -786,7 +826,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     ]);
 
     return {
-      organizations: organizations.map((org: any) => ({
+      organizations: organizations.map((org) => ({
         organization: Organization.reconstitute({
           id: org.id,
           name: org.name,
@@ -797,29 +837,35 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
           archivedAt: org.archivedAt,
           allowMultiTreeMembership: org.allowMultiTreeMembership ?? null,
         }),
-        memberCount: org._count.members,
+        memberCount: MemberCount.parse(org._count.members),
         firstAdmin:
           org.admins.length > 0
             ? {
-                id: org.admins[0].user.id,
-                firstName: org.admins[0].user.firstName,
-                lastName: org.admins[0].user.lastName,
-                middleName: org.admins[0].user.middleName,
+                id: UserId.parse(org.admins[0].user.id),
+                firstName: FirstName.parse(org.admins[0].user.firstName),
+                lastName: LastName.parse(org.admins[0].user.lastName),
+                middleName:
+                  org.admins[0].user.middleName === null
+                    ? null
+                    : MiddleName.parse(org.admins[0].user.middleName),
               }
             : null,
         parentOrg: org.parent
-          ? { id: org.parent.id, name: org.parent.name }
+          ? {
+              id: OrganizationId.parse(org.parent.id),
+              name: OrganizationName.parse(org.parent.name),
+            }
           : null,
       })),
-      totalCount,
+      totalCount: ResultCount.parse(totalCount),
     };
   }
 
   async searchByNameFuzzy(
     query: string,
-    excludeIds: string[],
-    limit: number
-  ): Promise<Array<{ id: string; name: string }>> {
+    excludeIds: OrganizationId[],
+    limit: ResultLimit
+  ): Promise<Array<{ id: OrganizationId; name: OrganizationName }>> {
     // Sanitize: strip SQL wildcards, limit length
     const sanitized = query.replace(/[%_]/g, '').slice(0, 100);
 
@@ -831,7 +877,9 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     const pattern = '%' + sanitized.split('').join('%') + '%';
 
     if (excludeIds.length > 0) {
-      return this.prisma.$queryRaw<Array<{ id: string; name: string }>>`
+      const rows = await this.prisma.$queryRaw<
+        Array<{ id: string; name: string }>
+      >`
         SELECT id, name FROM organizations
         WHERE LOWER(name) LIKE LOWER(${pattern})
           AND archived_at IS NULL
@@ -839,14 +887,26 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         ORDER BY name
         LIMIT ${limit}
       `;
+
+      return rows.map((row) => ({
+        id: OrganizationId.parse(row.id),
+        name: OrganizationName.parse(row.name),
+      }));
     }
 
-    return this.prisma.$queryRaw<Array<{ id: string; name: string }>>`
+    const rows = await this.prisma.$queryRaw<
+      Array<{ id: string; name: string }>
+    >`
       SELECT id, name FROM organizations
       WHERE LOWER(name) LIKE LOWER(${pattern})
         AND archived_at IS NULL
       ORDER BY name
       LIMIT ${limit}
     `;
+
+    return rows.map((row) => ({
+      id: OrganizationId.parse(row.id),
+      name: OrganizationName.parse(row.name),
+    }));
   }
 }

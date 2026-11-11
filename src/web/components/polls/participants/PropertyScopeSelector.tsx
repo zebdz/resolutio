@@ -1,5 +1,7 @@
 'use client';
 
+/** Selects offered property references without erasing the caller's validated identity type. */
+
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
@@ -9,25 +11,25 @@ import {
 } from '@/src/web/components/catalyst/checkbox';
 import { Label } from '@/src/web/components/catalyst/fieldset';
 
-interface Property {
-  id: string;
+interface Property<Id extends string> {
+  id: Id;
   name: string;
 }
 
-interface DescendantGroup {
+interface DescendantGroup<Id extends string> {
   orgId: string;
   orgName: string;
-  properties: Property[];
+  properties: Property<Id>[];
 }
 
-interface Props {
+interface Props<Id extends string> {
   // Direct org's properties — always shown.
-  properties: Property[];
+  properties: Property<Id>[];
   // Descendant orgs' properties — shown behind an "Include sub-organizations"
   // expand button. Only non-empty groups are rendered.
-  descendantGroups?: DescendantGroup[];
-  selectedIds: string[];
-  onChange: (ids: string[]) => void;
+  descendantGroups?: DescendantGroup<Id>[];
+  selectedIds: Id[];
+  onChange: (ids: Id[]) => void;
   disabled?: boolean;
   // Drives helper-text wording. For ownership modes the picker scopes the
   // weight calc; for EQUAL it acts as a voter eligibility filter — same
@@ -35,14 +37,14 @@ interface Props {
   mode: 'equal' | 'ownership';
 }
 
-export function PropertyScopeSelector({
+export function PropertyScopeSelector<Id extends string>({
   properties,
   descendantGroups,
   selectedIds,
   onChange,
   disabled,
   mode,
-}: Props) {
+}: Props<Id>) {
   const t = useTranslations('poll.propertyScope');
   const nonEmptyGroups = (descendantGroups ?? []).filter(
     (g) => g.properties.length > 0
@@ -54,7 +56,7 @@ export function PropertyScopeSelector({
   );
   const [expanded, setExpanded] = useState(hasSelectedDescendant);
 
-  function toggle(id: string, checked: boolean) {
+  function toggle(id: Id, checked: boolean) {
     if (checked) {
       onChange([...selectedIds, id]);
     } else {

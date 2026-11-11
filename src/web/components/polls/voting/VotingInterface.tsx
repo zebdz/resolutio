@@ -1,5 +1,7 @@
 'use client';
 
+/** Edits local ballot selections from the server's authorized plain voting view. */
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -14,36 +16,11 @@ import VotingQuestion from './VotingQuestion';
 import VotingProgress from './VotingProgress';
 import VotingControls from './VotingControls';
 import { toast } from 'sonner';
-import type { QuestionType } from '@/src/domain/poll/QuestionType';
-
-interface Question {
-  id: string;
-  text: string;
-  details: string | null;
-  page: number;
-  order: number;
-  questionType: QuestionType;
-  answers: Answer[];
-}
-
-interface Answer {
-  id: string;
-  text: string;
-  order: number;
-}
-
-interface Poll {
-  id: string;
-  title: string;
-  description: string;
-  questions: Question[];
-}
-
-interface VoteDraft {
-  id: string;
-  questionId: string;
-  answerId: string;
-}
+import type {
+  VotingQuestionView as Question,
+  VotingPollView as Poll,
+  VotingDraftView as VoteDraft,
+} from '@/web/actions/poll/VotingProgressView';
 
 interface VotingInterfaceProps {
   poll: Poll;
@@ -66,7 +43,7 @@ export default function VotingInterface({
   const router = useRouter();
 
   // Group questions by page
-  const questionsByPage = poll.questions.reduce(
+  const questionsByPage = poll.questions.reduce<Record<number, Question[]>>(
     (acc, question) => {
       if (!acc[question.page]) {
         acc[question.page] = [];
@@ -76,7 +53,7 @@ export default function VotingInterface({
 
       return acc;
     },
-    {} as Record<number, Question[]>
+    {}
   );
 
   const pages = Object.keys(questionsByPage)

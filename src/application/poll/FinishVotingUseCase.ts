@@ -1,4 +1,22 @@
-import { Result, success, failure } from '../../domain/shared/Result';
+/** Coordinates ballot acceptance and owner-only receipt replay. Repositories
+ * enforce the cutoff under lock; cleanup is best effort after commit. */
+import { SealDomainCode } from '../../domain/seal/SealDomainCodes';
+import { PollWriteFailure } from '../../domain/poll/PollWriteFailure';
+import { VotingWeight } from '@/domain/poll/VotingWeight';
+import { Result, failure, success } from '../../domain/shared/Result';
+import { validateBallot, BallotFacts } from '@/domain/poll/BallotPolicy';
+import { RecordedBallot } from '@/domain/poll/BallotSnapshot';
+import {
+  PollId,
+  UserId,
+  ParticipantId,
+  VoteId,
+  ParticipantWeightHistoryId,
+} from '@/domain/shared/EntityIds';
+import { Clock, IdGenerator } from '@/application/shared/EntityCreation';
+import { PollType } from '@/domain/poll/PollType';
+import { ReceiptSecretGenerator } from './ReceiptSecretGenerator';
+import { VoteReceiptView, voteReceiptView } from './VoteReceiptView';
 import { Vote } from '../../domain/poll/Vote';
 import { PollParticipant } from '../../domain/poll/PollParticipant';
 import { ParticipantWeightHistory } from '../../domain/poll/ParticipantWeightHistory';
@@ -10,7 +28,7 @@ import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { DraftRepository } from '../../domain/poll/DraftRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
 
 export interface FinishVotingInput {
@@ -18,6 +36,11 @@ export interface FinishVotingInput {
   userId: string;
   willingToSignProtocol: boolean;
 }
+
+type DecodedFinishVotingInput = Omit<FinishVotingInput, 'pollId' | 'userId'> & {
+  pollId: PollId;
+  userId: UserId;
+};
 
 export class FinishVotingUseCase {
   constructor(
@@ -27,12 +50,61 @@ export class FinishVotingUseCase {
     private draftRepository: DraftRepository,
     private organizationRepository: OrganizationRepository,
     private boardRepository: BoardRepository,
-    private userRepository: UserRepository
+    private userRepository: UserRepository,
+    private receiptSecretGenerator: ReceiptSecretGenerator,
+    private ids: IdGenerator,
+    private clock: Clock
   ) {}
 
-  async execute(input: FinishVotingInput): Promise<Result<void, string>> {
-    const { pollId, userId } = input;
+  async execute(
+    input: FinishVotingInput
+  ): Promise<Result<VoteReceiptView, PollUseCaseFailure | SealDomainCode>> {
+    const decodedPollId = PollId.safeParse(input.pollId);
+    const decodedUserId = UserId.safeParse(input.userId);
 
+    if (!decodedPollId.success || !decodedUserId.success) {
+      return failure(PollDomainCodes.INVALID_BALLOT);
+    }
+
+    const pollId = decodedPollId.data;
+    const userId = decodedUserId.data;
+    const replay = await this.participantRepository.getCastBallot(
+      pollId,
+      userId
+    );
+
+    if (!replay.success) {
+      return replay;
+    }
+
+    if (replay.value) {
+      return voteReceiptView(replay.value);
+    }
+
+    const result = await this.cast({ ...input, pollId, userId });
+
+    if (result.success) {
+      return result;
+    }
+
+    // A competing request may have committed and removed the drafts after our
+    // initial lookup. Recover its receipt instead of reporting a failed cast.
+    const concurrent = await this.participantRepository.getCastBallot(
+      pollId,
+      userId
+    );
+
+    if (concurrent.success && concurrent.value) {
+      return voteReceiptView(concurrent.value);
+    }
+
+    return result;
+  }
+
+  private async cast(
+    input: DecodedFinishVotingInput
+  ): Promise<Result<VoteReceiptView, PollUseCaseFailure | SealDomainCode>> {
+    const { pollId, userId } = input;
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(pollId);
 
@@ -69,21 +141,17 @@ export class FinishVotingUseCase {
     // this vote is persisted (join-on-vote below).
     const isOpen = poll.isOpen();
 
-    let participant: PollParticipant | null = null;
+    const participantResult =
+      await this.participantRepository.getParticipantByUserAndPoll(
+        pollId,
+        userId
+      );
 
-    if (!isOpen) {
-      const participantResult =
-        await this.participantRepository.getParticipantByUserAndPoll(
-          pollId,
-          userId
-        );
-
-      if (!participantResult.success) {
-        return failure(participantResult.error);
-      }
-
-      participant = participantResult.value;
+    if (!participantResult.success) {
+      return failure(participantResult.error);
     }
+
+    const participant = participantResult.value;
 
     let isConfirmedUser = false;
 
@@ -123,46 +191,68 @@ export class FinishVotingUseCase {
 
     const drafts = draftsResult.value;
 
-    // 6. Validate that all questions are answered
-    const questions = poll.questions.filter((q) => !q.isArchived());
-    const answeredQuestionIds = new Set(drafts.map((d) => d.questionId));
-
-    if (answeredQuestionIds.size !== questions.length) {
-      return failure(PollDomainCodes.MUST_ANSWER_ALL_QUESTIONS);
+    // Early feedback uses the same domain policy as the locked write boundary.
+    // Only the latter can authorize persistence after concurrent lifecycle changes.
+    if (!isOpen && !participant) {
+      return failure(PollDomainCodes.NOT_PARTICIPANT);
     }
 
-    // 6b. Validate single-choice questions have exactly 1 draft
-    const draftsByQuestion = new Map<string, number>();
+    const voteWeight = isOpen
+      ? VotingWeight.parse(1)
+      : (participant?.userWeight ?? VotingWeight.parse(1));
+    const facts = BallotFacts.safeParse({
+      poll: {
+        state: poll.state,
+        archived: poll.isArchived(),
+        pollType: isOpen ? PollType.OPEN : PollType.ORGANIZATION,
+        questions: poll.questions
+          .filter((q) => !q.isArchived())
+          .map((q) => ({
+            id: q.id,
+            questionType: q.questionType,
+            answerIds: q.answers
+              .filter((a) => !a.isArchived())
+              .map((a) => a.id),
+          })),
+      },
+      voter: {
+        userId,
+        weight: voteWeight.toFixed(6),
+        participant: participant !== null,
+        confirmed: isConfirmedUser,
+      },
+      votes: drafts.map((d) => ({
+        questionId: d.questionId,
+        answerId: d.answerId,
+        userId,
+        weight: voteWeight.toFixed(6),
+      })),
+    });
 
-    for (const draft of drafts) {
-      draftsByQuestion.set(
-        draft.questionId,
-        (draftsByQuestion.get(draft.questionId) || 0) + 1
-      );
+    if (!facts.success) {
+      return failure(PollDomainCodes.INVALID_BALLOT);
     }
 
-    for (const question of questions) {
-      if (question.questionType === 'single-choice') {
-        const draftCount = draftsByQuestion.get(question.id) || 0;
+    const validation = validateBallot(
+      facts.data.poll,
+      facts.data.voter,
+      facts.data.votes
+    );
 
-        if (draftCount > 1) {
-          return failure(PollDomainCodes.SINGLE_CHOICE_MULTIPLE_ANSWERS);
-        }
-      }
+    if (!validation.success) {
+      return validation;
     }
-
-    // 7. Create votes from drafts. Open polls are one person = one vote;
-    // organization polls use the weight the snapshot assigned.
-    const voteWeight = isOpen ? 1 : participant!.userWeight;
 
     const votes: Vote[] = [];
+    const castAt = this.clock.now();
 
     for (const draft of drafts) {
       const voteResult = Vote.create(
         draft.questionId,
         draft.answerId,
         userId,
-        voteWeight
+        voteWeight,
+        { id: this.ids.generate(VoteId), now: castAt }
       );
 
       if (!voteResult.success) {
@@ -175,20 +265,31 @@ export class FinishVotingUseCase {
     // 8. Persist the vote. An open-poll voter joins the poll at this moment:
     // participant row, its initial weight-history entry and the votes are
     // written in a single transaction so a voter never exists without a vote.
+    const secret = this.receiptSecretGenerator.generate();
+    let committed: Result<RecordedBallot, PollWriteFailure>;
+
     if (isOpen) {
-      const newParticipantResult = PollParticipant.create(poll.id, userId, 1);
+      const newParticipantResult = participant
+        ? success(participant)
+        : PollParticipant.create(
+            poll.id,
+            userId,
+            { id: this.ids.generate(ParticipantId), now: castAt },
+            VotingWeight.parse(1)
+          );
 
       if (!newParticipantResult.success) {
         return failure(newParticipantResult.error);
       }
 
       const historyResult = ParticipantWeightHistory.create(
-        '', // participantId assigned inside the transaction
+        newParticipantResult.value.id,
         poll.id,
         userId,
-        0,
-        1,
+        VotingWeight.parse(0),
+        VotingWeight.parse(1),
         userId, // the voter joins on their own initiative
+        { id: this.ids.generate(ParticipantWeightHistoryId), now: castAt },
         'open-poll-join'
       );
 
@@ -196,45 +297,45 @@ export class FinishVotingUseCase {
         return failure(historyResult.error);
       }
 
-      const joinResult = await this.participantRepository.joinAndVote(
+      committed = await this.participantRepository.joinAndVote(
         newParticipantResult.value,
         historyResult.value,
         votes,
-        input.willingToSignProtocol
+        input.willingToSignProtocol,
+        secret
+      );
+    } else {
+      if (!participant) {
+        return failure(PollDomainCodes.NOT_PARTICIPANT);
+      }
+
+      committed = await this.participantRepository.castVotes(
+        participant.id,
+        votes,
+        input.willingToSignProtocol,
+        secret
+      );
+    }
+
+    if (!committed.success) {
+      return committed;
+    }
+
+    // Cleanup is outside the committed ballot boundary. Email will follow the
+    // same rule in Phase 6: its failure cannot encourage another cast.
+    try {
+      const cleanup = await this.draftRepository.deleteUserDrafts(
+        pollId,
+        userId
       );
 
-      if (!joinResult.success) {
-        return failure(joinResult.error);
+      if (!cleanup.success) {
+        console.error('Failed to delete vote drafts:', cleanup.error);
       }
-    } else {
-      const createVotesResult = await this.voteRepository.createVotes(votes);
-
-      if (!createVotesResult.success) {
-        return failure(createVotesResult.error);
-      }
-
-      // 9. Save willingToSignProtocol
-      const protocolResult =
-        await this.participantRepository.updateWillingToSignProtocol(
-          participant!.id,
-          input.willingToSignProtocol
-        );
-
-      if (!protocolResult.success) {
-        return failure(protocolResult.error);
-      }
+    } catch {
+      console.error('Failed to delete vote drafts after commit');
     }
 
-    // 10. Delete user's drafts
-    const deleteResult = await this.draftRepository.deleteUserDrafts(
-      pollId,
-      userId
-    );
-
-    if (!deleteResult.success) {
-      return failure(deleteResult.error);
-    }
-
-    return success(undefined);
+    return voteReceiptView(committed.value);
   }
 }

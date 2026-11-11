@@ -1,3 +1,5 @@
+/** Renders authorized join-link preview metadata using validated application projections. */
+import { PrismaOrganizationDirectory } from '@/infrastructure/repositories/PrismaOrganizationDirectory';
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
@@ -29,7 +31,7 @@ export async function generateMetadata({
   const getPublicInfoUseCase = new GetJoinTokenPublicInfoUseCase({
     joinTokenRepository,
     organizationRepository,
-    prisma,
+    directory: new PrismaOrganizationDirectory(prisma),
   });
 
   const result = await getPublicInfoUseCase.execute(token);
@@ -95,7 +97,7 @@ export default async function JoinTokenPage({
   const getPublicInfoUseCase = new GetJoinTokenPublicInfoUseCase({
     joinTokenRepository,
     organizationRepository,
-    prisma,
+    directory: new PrismaOrganizationDirectory(prisma),
   });
 
   const result = await getPublicInfoUseCase.execute(token);

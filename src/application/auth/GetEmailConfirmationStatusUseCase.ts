@@ -1,3 +1,9 @@
+import { AuthenticationError } from './AuthenticationError';
+import { UserId } from '@/domain/shared/EntityIds';
+
+import { Clock } from '@/application/shared/EntityCreation';
+import { OtpEmailDestination } from '@/domain/otp/OtpValues';
+import { Seconds } from '@/domain/auth/AuthValues';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { OtpPurposes } from '@/domain/otp/OtpVerification';
 import { UserRepository } from '@/domain/user/UserRepository';
@@ -7,15 +13,16 @@ import { OtpDeliveryChannel } from './OtpDeliveryChannel';
 import { OtpStatus, readOtpStatus } from './OtpStatus';
 
 export interface GetEmailConfirmationStatusInput {
-  userId: string;
+  userId: UserId;
 }
 
 export type EmailConfirmationStatus = OtpStatus;
 
 interface Dependencies {
+  clock: Clock;
   otpRepository: OtpRepository;
   userRepository: UserRepository;
-  deliveryChannel: OtpDeliveryChannel;
+  deliveryChannel: OtpDeliveryChannel<'email'>;
 }
 
 /**
@@ -24,11 +31,13 @@ interface Dependencies {
  * address can still be entered, and when the next one may be requested.
  */
 export class GetEmailConfirmationStatusUseCase {
+  private readonly clock: Clock;
   private readonly otpRepository: OtpRepository;
   private readonly userRepository: UserRepository;
-  private readonly deliveryChannel: OtpDeliveryChannel;
+  private readonly deliveryChannel: OtpDeliveryChannel<'email'>;
 
   constructor(deps: Dependencies) {
+    this.clock = deps.clock;
     this.otpRepository = deps.otpRepository;
     this.userRepository = deps.userRepository;
     this.deliveryChannel = deps.deliveryChannel;
@@ -36,7 +45,8 @@ export class GetEmailConfirmationStatusUseCase {
 
   async execute(
     input: GetEmailConfirmationStatusInput
-  ): Promise<Result<EmailConfirmationStatus, string>> {
+  ): Promise<Result<EmailConfirmationStatus, AuthenticationError>> {
+    const now = this.clock.now();
     const user = await this.userRepository.findById(input.userId);
 
     if (!user) {
@@ -45,16 +55,26 @@ export class GetEmailConfirmationStatusUseCase {
 
     // Nothing to confirm: no address on file, or it already is.
     if (!user.email || user.hasConfirmedEmail()) {
-      return success({ hasPendingCode: false, retryAfterSeconds: 0 });
+      return success({
+        hasPendingCode: false,
+        retryAfterSeconds: Seconds.parse(0),
+      });
     }
 
     return success(
-      await readOtpStatus(this.otpRepository, {
-        userId: user.id,
-        identifier: user.email.getValue(),
-        channel: this.deliveryChannel.channel,
-        purpose: OtpPurposes.EMAIL_CONFIRMATION,
-      })
+      await readOtpStatus(
+        this.otpRepository,
+        {
+          destination: OtpEmailDestination.parse({
+            identifier: user.email.getValue(),
+            channel: this.deliveryChannel.channel,
+          }),
+          userId: user.id,
+
+          purpose: OtpPurposes.EMAIL_CONFIRMATION,
+        },
+        now
+      )
     );
   }
 }

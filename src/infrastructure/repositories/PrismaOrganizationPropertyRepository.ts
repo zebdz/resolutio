@@ -1,22 +1,27 @@
+/** Prisma property adapter validates persisted values and keeps application-
+ * supplied identity/time stable through storage. Storage failures stay opaque. */
+import { PropertyCount } from '@/domain/organization/PropertyValues';
+import { OrganizationName } from '../../domain/organization/OrganizationValues';
+import { OrganizationId, PropertyId } from '../../domain/shared/EntityIds';
 import { PrismaClient } from '@/generated/prisma/client';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { OrganizationProperty } from '../../domain/organization/OrganizationProperty';
 import {
   OrganizationPropertyRepository,
+  PropertyRepositoryError,
   PropertiesByOrg,
 } from '../../domain/organization/OrganizationPropertyRepository';
-import { SizeUnitValue } from '../../domain/organization/SizeUnit';
 
 export class PrismaOrganizationPropertyRepository implements OrganizationPropertyRepository {
   constructor(private prisma: PrismaClient) {}
 
   async findByOrganizationTree(
-    rootOrgId: string
-  ): Promise<Result<PropertiesByOrg[], string>> {
+    rootOrgId: OrganizationId
+  ): Promise<Result<PropertiesByOrg[], PropertyRepositoryError>> {
     try {
       // Descendants walk — mirrors PrismaOrganizationRepository.getDescendantIds.
-      const descendants: string[] = [];
-      const queue: string[] = [rootOrgId];
+      const descendants: OrganizationId[] = [];
+      const queue: OrganizationId[] = [rootOrgId];
 
       while (queue.length > 0) {
         const currentId = queue.shift()!;
@@ -26,8 +31,9 @@ export class PrismaOrganizationPropertyRepository implements OrganizationPropert
         });
 
         for (const child of children) {
-          descendants.push(child.id);
-          queue.push(child.id);
+          const childId = OrganizationId.parse(child.id);
+          descendants.push(childId);
+          queue.push(childId);
         }
       }
 
@@ -44,33 +50,34 @@ export class PrismaOrganizationPropertyRepository implements OrganizationPropert
         orderBy: [{ organizationId: 'asc' }, { createdAt: 'asc' }],
       });
 
-      const groupsMap = new Map<string, OrganizationProperty[]>();
+      const groupsMap = new Map<OrganizationId, OrganizationProperty[]>();
 
       for (const orgId of allOrgIds) {
         groupsMap.set(orgId, []);
       }
 
       for (const row of properties) {
-        const list = groupsMap.get(row.organizationId) ?? [];
+        const list =
+          groupsMap.get(OrganizationId.parse(row.organizationId)) ?? [];
         list.push(this.toEntity(row));
-        groupsMap.set(row.organizationId, list);
+        groupsMap.set(OrganizationId.parse(row.organizationId), list);
       }
 
       return success(
         allOrgIds.map((orgId) => ({
           orgId,
-          orgName: orgNameById.get(orgId) ?? '',
+          orgName: OrganizationName.parse(orgNameById.get(orgId)),
           properties: groupsMap.get(orgId) ?? [],
         }))
       );
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findByOrganization(
-    organizationId: string
-  ): Promise<Result<OrganizationProperty[], string>> {
+    organizationId: OrganizationId
+  ): Promise<Result<OrganizationProperty[], PropertyRepositoryError>> {
     try {
       const rows = await this.prisma.organizationProperty.findMany({
         where: { organizationId, archivedAt: null },
@@ -79,13 +86,13 @@ export class PrismaOrganizationPropertyRepository implements OrganizationPropert
 
       return success(rows.map((r) => this.toEntity(r)));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findAllByOrganizationIncludingArchived(
-    organizationId: string
-  ): Promise<Result<OrganizationProperty[], string>> {
+    organizationId: OrganizationId
+  ): Promise<Result<OrganizationProperty[], PropertyRepositoryError>> {
     try {
       const rows = await this.prisma.organizationProperty.findMany({
         where: { organizationId },
@@ -94,13 +101,13 @@ export class PrismaOrganizationPropertyRepository implements OrganizationPropert
 
       return success(rows.map((r) => this.toEntity(r)));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findById(
-    id: string
-  ): Promise<Result<OrganizationProperty | null, string>> {
+    id: PropertyId
+  ): Promise<Result<OrganizationProperty | null, PropertyRepositoryError>> {
     try {
       const row = await this.prisma.organizationProperty.findUnique({
         where: { id },
@@ -108,27 +115,27 @@ export class PrismaOrganizationPropertyRepository implements OrganizationPropert
 
       return success(row ? this.toEntity(row) : null);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async countNonArchived(
-    organizationId: string
-  ): Promise<Result<number, string>> {
+    organizationId: OrganizationId
+  ): Promise<Result<PropertyCount, PropertyRepositoryError>> {
     try {
       const n = await this.prisma.organizationProperty.count({
         where: { organizationId, archivedAt: null },
       });
 
-      return success(n);
+      return success(PropertyCount.parse(n));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async hasAnyNonArchived(
-    organizationIds: string[]
-  ): Promise<Result<Map<string, boolean>, string>> {
+    organizationIds: OrganizationId[]
+  ): Promise<Result<Map<OrganizationId, boolean>, PropertyRepositoryError>> {
     try {
       if (organizationIds.length === 0) {
         return success(new Map());
@@ -142,28 +149,31 @@ export class PrismaOrganizationPropertyRepository implements OrganizationPropert
         },
         _count: { _all: true },
       });
-      const map = new Map<string, boolean>();
+      const map = new Map<OrganizationId, boolean>();
 
       for (const id of organizationIds) {
         map.set(id, false);
       }
 
       for (const r of rows) {
-        map.set(r.organizationId, r._count._all > 0);
+        map.set(OrganizationId.parse(r.organizationId), r._count._all > 0);
       }
 
       return success(map);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async save(
     property: OrganizationProperty
-  ): Promise<Result<OrganizationProperty, string>> {
+  ): Promise<Result<OrganizationProperty, PropertyRepositoryError>> {
     try {
       const created = await this.prisma.organizationProperty.create({
         data: {
+          id: property.id,
+          createdAt: property.createdAt,
+          archivedAt: property.archivedAt,
           organizationId: property.organizationId,
           name: property.name,
           address: property.address,
@@ -173,11 +183,13 @@ export class PrismaOrganizationPropertyRepository implements OrganizationPropert
 
       return success(this.toEntity(created));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
-  async update(property: OrganizationProperty): Promise<Result<void, string>> {
+  async update(
+    property: OrganizationProperty
+  ): Promise<Result<void, PropertyRepositoryError>> {
     try {
       await this.prisma.$transaction(async (tx) => {
         // Cascade archive/unarchive across non-archived assets:
@@ -196,7 +208,7 @@ export class PrismaOrganizationPropertyRepository implements OrganizationPropert
 
       return success(undefined);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -214,7 +226,7 @@ export class PrismaOrganizationPropertyRepository implements OrganizationPropert
       organizationId: row.organizationId,
       name: row.name,
       address: row.address,
-      sizeUnit: row.sizeUnit as SizeUnitValue,
+      sizeUnit: row.sizeUnit,
       createdAt: row.createdAt,
       archivedAt: row.archivedAt,
     });

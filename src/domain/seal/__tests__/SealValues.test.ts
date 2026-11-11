@@ -10,8 +10,20 @@ import {
   PollId,
   ReceiptSecret,
   UtcTimestamp,
+  OwnershipShare,
 } from '../SealValues';
+import { OwnershipShare as OrganizationShare } from '../../organization/PropertyValues';
 import { sealResult } from '../SealDomainCodes';
+
+it('keeps organization zero shares separate from positive sealed holding rows', () => {
+  const zero = OrganizationShare.parse(0);
+  expect(zero).toBe(0);
+  expect(sealResult(() => OwnershipShare.parse(zero.toFixed(8))).success).toBe(
+    false
+  );
+  const positive = OrganizationShare.parse(0.00000001);
+  expect(OwnershipShare.parse(positive.toFixed(8))).toBe('0.00000001');
+});
 
 it.each([
   () => PollId.parse(''),

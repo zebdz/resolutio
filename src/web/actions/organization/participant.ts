@@ -1,5 +1,19 @@
 'use server';
 
+/** Authorized participant administration. List responses explicitly serialize
+ * public fields and exclude receipt credentials from domain objects. */
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
+import {
+  serializeParticipants,
+  ParticipantsView,
+} from './serializeParticipants';
+import {
+  serializeWeightHistory,
+  WeightHistoryView,
+} from './serializeWeightHistory';
 import { getTranslations } from 'next-intl/server';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { GetParticipantsUseCase } from '@/application/poll/GetParticipantsUseCase';
@@ -16,7 +30,6 @@ import {
   PrismaBoardRepository,
 } from '@/infrastructure/index';
 import { getCurrentUser } from '../../lib/session';
-import { User } from '@/domain/user/User';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
 import { z } from 'zod';
@@ -36,6 +49,8 @@ const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 const boardRepository = new PrismaBoardRepository(prisma);
 const profanityChecker = LeoProfanityChecker.getInstance();
+const ids = new CryptoIdGenerator();
+const clock = new SystemClock();
 
 // Use cases
 const getParticipantsUseCase = new GetParticipantsUseCase(
@@ -43,8 +58,7 @@ const getParticipantsUseCase = new GetParticipantsUseCase(
   participantRepository,
   voteRepository,
   organizationRepository,
-  userRepository,
-  prisma
+  userRepository
 );
 const updateParticipantWeightUseCase = new UpdateParticipantWeightUseCase(
   pollRepository,
@@ -53,6 +67,8 @@ const updateParticipantWeightUseCase = new UpdateParticipantWeightUseCase(
   organizationRepository,
   userRepository,
   boardRepository,
+  ids,
+  clock,
   profanityChecker
 );
 const removeParticipantUseCase = new RemoveParticipantUseCase(
@@ -67,8 +83,7 @@ const getWeightHistoryUseCase = new GetWeightHistoryUseCase(
   pollRepository,
   participantRepository,
   organizationRepository,
-  userRepository,
-  prisma
+  userRepository
 );
 
 // Schema for weight update
@@ -88,7 +103,7 @@ const UpdateWeightSchema = z.object({
  */
 export async function getParticipantsAction(
   pollId: string
-): Promise<ActionResult<any>> {
+): Promise<ActionResult<ParticipantsView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -123,7 +138,7 @@ export async function getParticipantsAction(
 
     return {
       success: true,
-      data: result.value,
+      data: serializeParticipants(result.value),
     };
   } catch (error) {
     console.error('Get participants error:', error);
@@ -257,7 +272,7 @@ export async function removeParticipantAction(
  */
 export async function getWeightHistoryAction(
   pollId: string
-): Promise<ActionResult<any>> {
+): Promise<ActionResult<WeightHistoryView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -291,19 +306,7 @@ export async function getWeightHistoryAction(
     }
 
     // Serialize history data for client component
-    const serializedHistory = result.value.history.map((item) => ({
-      id: item.history.id,
-      participantId: item.history.participantId,
-      oldWeight: item.history.oldWeight,
-      newWeight: item.history.newWeight,
-      reason: item.history.reason || '',
-      changedBy: User.formatFullName(
-        item.changedByUser.firstName,
-        item.changedByUser.lastName,
-        item.changedByUser.middleName
-      ),
-      changedAt: item.history.changedAt.toISOString(),
-    }));
+    const serializedHistory = serializeWeightHistory(result.value);
 
     return {
       success: true,

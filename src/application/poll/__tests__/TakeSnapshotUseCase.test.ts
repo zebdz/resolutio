@@ -1,3 +1,22 @@
+/** Snapshot application tests preserve eligibility, weight scope and lifecycle rules.
+ * Explicit creation inputs and typed references exercise current domain contracts. */
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { BoardId, UserId, PropertyId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import {
+  pollFixtureCreation,
+  pollFixtureIds,
+  pollFixtureClock,
+} from '@/application/poll/__tests__/pollFixtureCreation';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { QuestionId, AnswerId, PollId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TakeSnapshotUseCase } from '../TakeSnapshotUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -33,33 +52,49 @@ describe('TakeSnapshotUseCase', () => {
   beforeEach(() => {
     // Create a poll in DRAFT state with question + answer
     const pollResult = Poll.create(
-      'Test Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'admin-1',
-      new Date('2024-01-01'),
-      new Date('2024-12-31')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('admin-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2024-01-01'), new Date('2024-12-31'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
-    poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    poll = expectSuccess(pollResult);
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      id: 'poll-1',
+    });
 
     const questionResult = Question.create(
-      'Question 1',
+      QuestionText.parse('Question 1'),
       poll.id,
-      1,
-      1,
+      pollFixtureCreation(QuestionId),
+      PageNumber.parse(1),
+      SortOrder.parse(1),
       'single-choice'
     );
-    const question = questionResult.value;
-    (question as any).props.id = 'question-1';
-    const answerResult = Answer.create('Answer 1', 1, question.id);
-    question.addAnswer(answerResult.value);
+    let question = expectSuccess(questionResult);
+    question = Question.reconstitute({
+      ...question.toJSON(),
+      answers: question.answers,
+      id: 'question-1',
+    });
+    const answerResult = Answer.create(
+      AnswerText.parse('Answer 1'),
+      SortOrder.parse(1),
+      question.id,
+      pollFixtureCreation(AnswerId)
+    );
+    question.addAnswer(expectSuccess(answerResult));
     poll.addQuestion(question);
     poll.submitToAdmin();
 
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
       updatePoll: vi.fn().mockResolvedValue(success(undefined)),
     };
 
@@ -126,7 +161,9 @@ describe('TakeSnapshotUseCase', () => {
       organizationRepository as OrganizationRepository,
       userRepository as UserRepository,
       eligibleMemberRepository as PollEligibleMemberRepository,
-      pollWeightCalculator as PollWeightCalculator
+      pollWeightCalculator as PollWeightCalculator,
+      pollFixtureIds,
+      pollFixtureClock
     );
   });
 
@@ -150,7 +187,7 @@ describe('TakeSnapshotUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.ORGANIZATION_ARCHIVED);
+    expect(expectFailure(result)).toBe(PollErrors.ORGANIZATION_ARCHIVED);
   });
 
   it('should succeed when organization is not archived', async () => {
@@ -171,7 +208,7 @@ describe('TakeSnapshotUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.NOT_FOUND);
+    expect(expectFailure(result)).toBe(PollErrors.NOT_FOUND);
   });
 
   it('should fail if user is not authorized', async () => {
@@ -183,7 +220,7 @@ describe('TakeSnapshotUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.NOT_AUTHORIZED);
+    expect(expectFailure(result)).toBe(PollErrors.NOT_AUTHORIZED);
   });
 
   it('should fail if board is archived', async () => {
@@ -203,7 +240,7 @@ describe('TakeSnapshotUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
+    expect(expectFailure(result)).toBe(PollErrors.BOARD_ARCHIVED);
   });
 
   // ── Distribution type scenarios ────────────────────────────────────────────
@@ -211,20 +248,48 @@ describe('TakeSnapshotUseCase', () => {
   it('EQUAL with no property scope: all org members become participants with weight 1, eligible members populated for all', async () => {
     // Org-wide poll (boardId=null), EQUAL distribution, no propertyIds
     const orgPollResult = Poll.create(
-      'Org Poll',
-      'desc',
-      'org-1',
+      PollTitle.parse('Org Poll'),
+      PollDescription.parse('desc'),
+      OrganizationId.parse('org-1'),
       null, // org-wide
-      'admin-1',
-      new Date('2024-01-01'),
-      new Date('2024-12-31')
+      UserId.parse('admin-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2024-01-01'), new Date('2024-12-31'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
-    const orgPoll = orgPollResult.value;
-    (orgPoll as any).props.id = 'poll-org-1';
+    let orgPoll = expectSuccess(orgPollResult);
+    orgPoll = Poll.reconstitute({
+      ...orgPoll.toJSON(),
+      questions: orgPoll.questions,
+      id: 'poll-org-1',
+    });
     // distributionType defaults to 'EQUAL', propertyIds defaults to []
-    const q = Question.create('Q', orgPoll.id, 1, 1, 'single-choice').value;
-    (q as any).props.id = 'q-org-1';
-    q.addAnswer(Answer.create('A', 1, q.id).value);
+    let q = expectSuccess(
+      Question.create(
+        QuestionText.parse('Q'),
+        orgPoll.id,
+        pollFixtureCreation(QuestionId),
+        PageNumber.parse(1),
+        SortOrder.parse(1),
+        'single-choice'
+      )
+    );
+    q = Question.reconstitute({
+      ...q.toJSON(),
+      answers: q.answers,
+      id: 'q-org-1',
+    });
+    q.addAnswer(
+      expectSuccess(
+        Answer.create(
+          AnswerText.parse('A'),
+          SortOrder.parse(1),
+          q.id,
+          pollFixtureCreation(AnswerId)
+        )
+      )
+    );
     orgPoll.addQuestion(q);
     orgPoll.submitToAdmin();
 
@@ -271,20 +336,48 @@ describe('TakeSnapshotUseCase', () => {
 
   it('OWNERSHIP_UNIT_COUNT with no scope: only members with positive ownership become participants; all are in eligible members', async () => {
     const orgPollResult = Poll.create(
-      'Ownership Poll',
-      'desc',
-      'org-1',
+      PollTitle.parse('Ownership Poll'),
+      PollDescription.parse('desc'),
+      OrganizationId.parse('org-1'),
       null,
-      'admin-1',
-      new Date('2024-01-01'),
-      new Date('2024-12-31')
+      UserId.parse('admin-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2024-01-01'), new Date('2024-12-31'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
-    const orgPoll = orgPollResult.value;
-    (orgPoll as any).props.id = 'poll-own-1';
+    let orgPoll = expectSuccess(orgPollResult);
+    orgPoll = Poll.reconstitute({
+      ...orgPoll.toJSON(),
+      questions: orgPoll.questions,
+      id: 'poll-own-1',
+    });
     orgPoll.applyWeightConfig('OWNERSHIP_UNIT_COUNT', 'RAW_SUM', []);
-    const q = Question.create('Q', orgPoll.id, 1, 1, 'single-choice').value;
-    (q as any).props.id = 'q-own-1';
-    q.addAnswer(Answer.create('A', 1, q.id).value);
+    let q = expectSuccess(
+      Question.create(
+        QuestionText.parse('Q'),
+        orgPoll.id,
+        pollFixtureCreation(QuestionId),
+        PageNumber.parse(1),
+        SortOrder.parse(1),
+        'single-choice'
+      )
+    );
+    q = Question.reconstitute({
+      ...q.toJSON(),
+      answers: q.answers,
+      id: 'q-own-1',
+    });
+    q.addAnswer(
+      expectSuccess(
+        Answer.create(
+          AnswerText.parse('A'),
+          SortOrder.parse(1),
+          q.id,
+          pollFixtureCreation(AnswerId)
+        )
+      )
+    );
     orgPoll.addQuestion(q);
     orgPoll.submitToAdmin();
 
@@ -335,20 +428,48 @@ describe('TakeSnapshotUseCase', () => {
 
   it('EQUAL with property scope: only members owning in selected properties become participants', async () => {
     const orgPollResult = Poll.create(
-      'Scoped Equal Poll',
-      'desc',
-      'org-1',
+      PollTitle.parse('Scoped Equal Poll'),
+      PollDescription.parse('desc'),
+      OrganizationId.parse('org-1'),
       null,
-      'admin-1',
-      new Date('2024-01-01'),
-      new Date('2024-12-31')
+      UserId.parse('admin-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2024-01-01'), new Date('2024-12-31'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
-    const orgPoll = orgPollResult.value;
-    (orgPoll as any).props.id = 'poll-scope-1';
-    orgPoll.applyWeightConfig('EQUAL', 'RAW_SUM', ['prop-2']); // only prop-2 in scope
-    const q = Question.create('Q', orgPoll.id, 1, 1, 'single-choice').value;
-    (q as any).props.id = 'q-scope-1';
-    q.addAnswer(Answer.create('A', 1, q.id).value);
+    let orgPoll = expectSuccess(orgPollResult);
+    orgPoll = Poll.reconstitute({
+      ...orgPoll.toJSON(),
+      questions: orgPoll.questions,
+      id: 'poll-scope-1',
+    });
+    orgPoll.applyWeightConfig('EQUAL', 'RAW_SUM', [PropertyId.parse('prop-2')]); // only prop-2 in scope
+    let q = expectSuccess(
+      Question.create(
+        QuestionText.parse('Q'),
+        orgPoll.id,
+        pollFixtureCreation(QuestionId),
+        PageNumber.parse(1),
+        SortOrder.parse(1),
+        'single-choice'
+      )
+    );
+    q = Question.reconstitute({
+      ...q.toJSON(),
+      answers: q.answers,
+      id: 'q-scope-1',
+    });
+    q.addAnswer(
+      expectSuccess(
+        Answer.create(
+          AnswerText.parse('A'),
+          SortOrder.parse(1),
+          q.id,
+          pollFixtureCreation(AnswerId)
+        )
+      )
+    );
     orgPoll.addQuestion(q);
     orgPoll.submitToAdmin();
 
@@ -400,36 +521,65 @@ describe('TakeSnapshotUseCase', () => {
   // ── Open polls ─────────────────────────────────────────────────────────────
 
   function makeOpenPoll(withQuestion = true): Poll {
-    const openPoll = Poll.create(
-      'Open Poll',
-      'Everyone may vote',
-      'org-1',
-      null,
-      'admin-1',
-      new Date('2026-01-01'),
-      new Date('2026-02-01'),
-      undefined,
-      'OPEN'
-    ).value;
-    (openPoll as any).props.id = 'poll-open';
+    let openPoll = expectSuccess(
+      Poll.create(
+        PollTitle.parse('Open Poll'),
+        PollDescription.parse('Everyone may vote'),
+        OrganizationId.parse('org-1'),
+        null,
+        UserId.parse('admin-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-01'), new Date('2026-02-01'))
+        ),
+        testCreation(PollId, 'poll-1'),
+        undefined,
+        'OPEN'
+      )
+    );
+    openPoll = Poll.reconstitute({
+      ...openPoll.toJSON(),
+      questions: openPoll.questions,
+      id: 'poll-open',
+    });
 
     if (withQuestion) {
-      const question = Question.create(
-        'Question 1',
-        openPoll.id,
-        1,
-        1,
-        'single-choice'
-      ).value;
-      (question as any).props.id = 'question-open-1';
-      question.addAnswer(Answer.create('Answer 1', 1, question.id).value);
+      let question = expectSuccess(
+        Question.create(
+          QuestionText.parse('Question 1'),
+          openPoll.id,
+          pollFixtureCreation(QuestionId),
+          PageNumber.parse(1),
+          SortOrder.parse(1),
+          'single-choice'
+        )
+      );
+      question = Question.reconstitute({
+        ...question.toJSON(),
+        answers: question.answers,
+        id: 'question-open-1',
+      });
+      question.addAnswer(
+        expectSuccess(
+          Answer.create(
+            AnswerText.parse('Answer 1'),
+            SortOrder.parse(1),
+            question.id,
+            pollFixtureCreation(AnswerId)
+          )
+        )
+      );
       openPoll.addQuestion(question);
       openPoll.submitToAdmin();
     } else {
       // A question-less poll cannot be submitted the normal way, so the state
       // is forced: the point of the case is that takeSnapshot still checks for
       // questions itself rather than trusting submit to have done it.
-      (openPoll as any).props.state = PollState.SUBMITTED;
+      openPoll = Poll.reconstitute({
+        ...openPoll.toJSON(),
+        questions: openPoll.questions,
+        finishedAt: null,
+        state: PollState.SUBMITTED,
+      });
     }
 
     return openPoll;
@@ -437,7 +587,9 @@ describe('TakeSnapshotUseCase', () => {
 
   it('OPEN poll: transitions to READY without creating participants or eligible members', async () => {
     const openPoll = makeOpenPoll();
-    pollRepository.getPollById = vi.fn().mockResolvedValue(success(openPoll));
+    pollRepository.getPollById = vi
+      .fn()
+      .mockImplementation(async () => success(openPoll));
 
     const result = await useCase.execute({
       pollId: 'poll-open',
@@ -454,7 +606,9 @@ describe('TakeSnapshotUseCase', () => {
 
   it('OPEN poll: does not resolve org members', async () => {
     const openPoll = makeOpenPoll();
-    pollRepository.getPollById = vi.fn().mockResolvedValue(success(openPoll));
+    pollRepository.getPollById = vi
+      .fn()
+      .mockImplementation(async () => success(openPoll));
     organizationRepository.findAcceptedMemberUserIdsIncludingDescendants = vi
       .fn()
       .mockResolvedValue(['user-1']);
@@ -468,7 +622,9 @@ describe('TakeSnapshotUseCase', () => {
 
   it('OPEN poll with no questions is still rejected', async () => {
     const openPoll = makeOpenPoll(false);
-    pollRepository.getPollById = vi.fn().mockResolvedValue(success(openPoll));
+    pollRepository.getPollById = vi
+      .fn()
+      .mockImplementation(async () => success(openPoll));
 
     const result = await useCase.execute({
       pollId: 'poll-open',
@@ -476,7 +632,7 @@ describe('TakeSnapshotUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_NO_QUESTIONS);
+    expect(expectFailure(result)).toBe(PollDomainCodes.POLL_NO_QUESTIONS);
     expect(pollRepository.updatePoll).not.toHaveBeenCalled();
   });
 });

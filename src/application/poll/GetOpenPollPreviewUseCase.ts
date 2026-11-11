@@ -1,16 +1,23 @@
+/** Poll application boundary validates requests, invokes domain behavior and
+ * preserves known failure codes across authorization and persistence ports. */
+import { PollUseCaseFailure } from './PollErrors';
+import { PollTitle, PollDescription } from '../../domain/poll/PollContent';
+import { z } from 'zod';
+import { PollId, PollAttachmentId } from '../../domain/shared/EntityIds';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { OrganizationName } from '../../domain/organization/OrganizationValues';
 import { PollState } from '../../domain/poll/PollState';
 
 export interface OpenPollPreview {
-  title: string;
-  description: string;
+  title: PollTitle;
+  description: PollDescription;
   // Ids only, so the description renderer can resolve inline refs to this
   // poll's own files and refuse anything else. Bytes stay server-side.
-  attachmentIds: string[];
+  attachmentIds: PollAttachmentId[];
   state: PollState;
-  organizationName: string;
+  organizationName: OrganizationName;
 }
 
 /**
@@ -28,9 +35,17 @@ export class GetOpenPollPreviewUseCase {
     private organizationRepository: OrganizationRepository
   ) {}
 
-  async execute(input: {
+  async execute(rawRequest: {
     pollId: string;
-  }): Promise<Result<OpenPollPreview | null, string>> {
+  }): Promise<Result<OpenPollPreview | null, PollUseCaseFailure>> {
+    const decoded = z.object({ pollId: PollId }).safeParse(rawRequest);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawRequest, ...decoded.data };
+
     const pollResult = await this.pollRepository.getPollById(input.pollId);
 
     if (!pollResult.success) {

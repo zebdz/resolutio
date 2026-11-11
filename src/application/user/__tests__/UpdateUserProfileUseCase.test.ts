@@ -1,3 +1,5 @@
+/** Profile updates preserve privacy/provenance and return localized domain validation codes. */
+import { UserId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UpdateUserProfileUseCase } from '../UpdateUserProfileUseCase';
 import { UpdateUserProfileSchema } from '../UpdateUserProfileSchema';
@@ -32,6 +34,7 @@ describe('UpdateUserProfileUseCase', () => {
       findById: vi.fn(),
       findByIds: vi.fn(),
       findByPhoneNumber: vi.fn(),
+      findByEmail: vi.fn(),
       findByNickname: vi.fn(),
       isNicknameAvailable: vi.fn(),
       save: vi.fn(),
@@ -41,12 +44,7 @@ describe('UpdateUserProfileUseCase', () => {
       searchUsers: vi.fn(),
       searchUserByPhone: vi.fn(),
       isSuperAdmin: vi.fn(),
-      isUserBlocked: vi.fn().mockResolvedValue(false),
-      blockUser: vi.fn(),
-      unblockUser: vi.fn(),
       confirmUser: vi.fn(),
-      getBlockStatus: vi.fn().mockResolvedValue(null),
-      getBlockedUserIds: vi.fn().mockResolvedValue([]),
     };
     useCase = new UpdateUserProfileUseCase(userRepository);
   });
@@ -59,7 +57,7 @@ describe('UpdateUserProfileUseCase', () => {
       );
 
       const result = await useCase.execute({
-        userId: 'user-123',
+        userId: UserId.parse('user-123'),
         language: 'ru',
       });
 
@@ -76,7 +74,7 @@ describe('UpdateUserProfileUseCase', () => {
       vi.mocked(userRepository.findById).mockResolvedValue(null);
 
       const result = await useCase.execute({
-        userId: 'nonexistent',
+        userId: UserId.parse('nonexistent'),
         language: 'ru',
       });
 
@@ -94,10 +92,10 @@ describe('UpdateUserProfileUseCase', () => {
 
       await expect(
         useCase.execute({
-          userId: 'user-123',
+          userId: UserId.parse('user-123'),
           language: 'invalid' as any,
         })
-      ).rejects.toThrow('Language');
+      ).rejects.toThrow(UserDomainCodes.LANGUAGE_INVALID);
     });
 
     it('should handle no updates gracefully', async () => {
@@ -107,7 +105,7 @@ describe('UpdateUserProfileUseCase', () => {
       );
 
       const result = await useCase.execute({
-        userId: 'user-123',
+        userId: UserId.parse('user-123'),
       });
 
       expect(result.success).toBe(true);
@@ -123,7 +121,7 @@ describe('UpdateUserProfileUseCase', () => {
       );
 
       const result = await useCase.execute({
-        userId: 'user-123',
+        userId: UserId.parse('user-123'),
         nickname: 'new_nick',
       });
 
@@ -139,7 +137,7 @@ describe('UpdateUserProfileUseCase', () => {
       vi.mocked(userRepository.isNicknameAvailable).mockResolvedValue(false);
 
       const result = await useCase.execute({
-        userId: 'user-123',
+        userId: UserId.parse('user-123'),
         nickname: 'taken_nick',
       });
 
@@ -157,7 +155,7 @@ describe('UpdateUserProfileUseCase', () => {
       );
 
       const result = await useCase.execute({
-        userId: 'user-123',
+        userId: UserId.parse('user-123'),
         nickname: 'john_doe_123',
       });
 
@@ -173,7 +171,7 @@ describe('UpdateUserProfileUseCase', () => {
       );
 
       const result = await useCase.execute({
-        userId: 'user-123',
+        userId: UserId.parse('user-123'),
         allowFindByName: true,
         allowFindByPhone: true,
       });
@@ -195,7 +193,7 @@ describe('UpdateUserProfileUseCase', () => {
       );
 
       const result = await useCase.execute({
-        userId: 'user-123',
+        userId: UserId.parse('user-123'),
         language: 'ru',
       });
 
@@ -211,7 +209,7 @@ describe('UpdateUserProfileUseCase', () => {
 
       // existingUser has allowFindByName=false, allowFindByPhone=false
       const result = await useCase.execute({
-        userId: 'user-123',
+        userId: UserId.parse('user-123'),
         allowFindByName: false,
         allowFindByPhone: false,
       });
@@ -224,7 +222,7 @@ describe('UpdateUserProfileUseCase', () => {
       vi.mocked(userRepository.findById).mockResolvedValue(existingUser);
 
       const result = await useCase.execute({
-        userId: 'user-123',
+        userId: UserId.parse('user-123'),
         nickname: 'ab',
       });
 
@@ -242,7 +240,7 @@ describe('UpdateUserProfileUseCase', () => {
       );
 
       const result = await useCase.execute({
-        userId: 'user-123',
+        userId: UserId.parse('user-123'),
         address: {
           country: 'Russia',
           city: 'Moscow',
@@ -289,7 +287,7 @@ describe('UpdateUserProfileUseCase', () => {
       );
 
       const result = await useCase.execute({
-        userId: 'user-123',
+        userId: UserId.parse('user-123'),
         address: null,
       });
 
@@ -310,7 +308,7 @@ describe('UpdateUserProfileUseCase', () => {
       );
 
       const result = await useCase.execute({
-        userId: 'user-123',
+        userId: UserId.parse('user-123'),
         allowFindByAddress: true,
       });
 
@@ -327,7 +325,7 @@ describe('UpdateUserProfileUseCase', () => {
       vi.mocked(userRepository.findById).mockResolvedValue(existingUser);
 
       const result = await useCase.execute({
-        userId: 'user-123',
+        userId: UserId.parse('user-123'),
         address: {
           country: 'Russia',
           city: '',
@@ -339,6 +337,31 @@ describe('UpdateUserProfileUseCase', () => {
       expect(result.success).toBe(false);
     });
 
+    it.each(['houseFiasId', 'flatFiasId'])(
+      'returns a validation code for malformed %s without saving',
+      async (key) => {
+        vi.mocked(userRepository.findById).mockResolvedValue(existingUser);
+
+        const result = await useCase.execute({
+          userId: existingUser.id,
+          address: {
+            country: 'Russia',
+            city: 'Moscow',
+            street: 'Tverskaya',
+            building: '12',
+            apartment: '2',
+            [key]: 'invalid-id',
+          },
+        });
+
+        expect(result).toEqual({
+          success: false,
+          error: 'domain.user.address.registryIdInvalid',
+        });
+        expect(userRepository.save).not.toHaveBeenCalled();
+      }
+    );
+
     it('should pass DaData provenance fields through to the domain address', async () => {
       vi.mocked(userRepository.findById).mockResolvedValue(existingUser);
       vi.mocked(userRepository.save).mockImplementation((user) =>
@@ -346,7 +369,7 @@ describe('UpdateUserProfileUseCase', () => {
       );
 
       const result = await useCase.execute({
-        userId: 'user-123',
+        userId: UserId.parse('user-123'),
         address: {
           country: 'Россия',
           city: 'Ростов-на-Дону',
@@ -379,7 +402,7 @@ describe('UpdateUserProfileUseCase', () => {
   describe('UpdateUserProfileSchema', () => {
     it('should reject an address with no apartment when not a private house', () => {
       const result = UpdateUserProfileSchema.safeParse({
-        userId: 'user-1',
+        userId: UserId.parse('user-1'),
         address: {
           country: 'Россия',
           city: 'Ростов-на-Дону',
@@ -400,7 +423,7 @@ describe('UpdateUserProfileUseCase', () => {
 
     it('should accept an address with no apartment for a private house', () => {
       const result = UpdateUserProfileSchema.safeParse({
-        userId: 'user-1',
+        userId: UserId.parse('user-1'),
         address: {
           country: 'Россия',
           city: 'Ростов-на-Дону',

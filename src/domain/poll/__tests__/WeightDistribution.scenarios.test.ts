@@ -14,13 +14,28 @@
 //   parkingLot (20 spots of 12m² each = 240m²) — owned rows in "C"
 
 import { describe, it, expect } from 'vitest';
-import { computeWeights, WeightDistributionInput } from '../WeightDistribution';
+import {
+  computeWeights as calculateWeights,
+  WeightDistributionInput,
+} from '../WeightDistribution';
+import { z } from 'zod';
+import { UserId } from '../../shared/EntityIds';
 import { DistributionType } from '../DistributionType';
 import { PropertyAggregation } from '../PropertyAggregation';
 
-const ALICE = 'alice';
-const BOB = 'bob';
-const HELEN = 'helen';
+function computeWeights(input: z.input<typeof WeightDistributionInput>) {
+  const result = calculateWeights(WeightDistributionInput.parse(input));
+
+  if (!result.success) {
+    throw new Error(result.error);
+  }
+
+  return result.value;
+}
+
+const ALICE = UserId.parse('alice');
+const BOB = UserId.parse('bob');
+const HELEN = UserId.parse('helen');
 
 const APT_HOUSE = 'prop-apt-house';
 const PARKING_LOT = 'prop-parking-lot';
@@ -51,7 +66,7 @@ function split(assetId: string, owners: { userId: string; share: number }[]) {
 describe('WeightDistribution — narrative scenarios', () => {
   describe('EQUAL mode', () => {
     it('with no scope, every candidate gets weight 1 regardless of ownership', () => {
-      const input: WeightDistributionInput = {
+      const input: z.input<typeof WeightDistributionInput> = {
         candidates: [ALICE, BOB, HELEN],
         distributionType: DistributionType.EQUAL,
         propertyAggregation: PropertyAggregation.RAW_SUM,
@@ -66,7 +81,7 @@ describe('WeightDistribution — narrative scenarios', () => {
     });
 
     it('with explicit scope, only owners in the scope get weight 1', () => {
-      const input: WeightDistributionInput = {
+      const input: z.input<typeof WeightDistributionInput> = {
         candidates: [ALICE, BOB, HELEN],
         distributionType: DistributionType.EQUAL,
         propertyAggregation: PropertyAggregation.RAW_SUM,

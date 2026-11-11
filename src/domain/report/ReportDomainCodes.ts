@@ -1,4 +1,5 @@
 export const ReportDomainCodes = {
+  REPORT_INVALID_DATA: 'domain.report.invalidData',
   REPORT_TITLE_EMPTY: 'domain.report.titleEmpty',
   REPORT_TITLE_TOO_LONG: 'domain.report.titleTooLong',
   REPORT_BODY_EMPTY: 'domain.report.bodyEmpty',

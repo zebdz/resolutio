@@ -1,5 +1,7 @@
 'use client';
 
+/** Renders the authorized plain results view supplied by the server action. */
+
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Badge } from '@/src/web/components/catalyst/badge';
@@ -9,49 +11,10 @@ import ExportProtocolPdfButton from './ExportProtocolPdfButton';
 import ExportNamedProtocolPdfButton from './ExportNamedProtocolPdfButton';
 import { PollState } from '@/src/domain/poll/PollState';
 import { User } from '@/domain/user/User';
-import type { QuestionType } from '@/src/domain/poll/QuestionType';
-
-interface AnswerResult {
-  answerId: string;
-  answerText: string;
-  voteCount: number;
-  weightedVotes: number;
-  percentage: number;
-  voters: {
-    userId: string;
-    userName: string;
-    weight: number;
-  }[];
-}
-
-interface QuestionResult {
-  questionId: string;
-  questionText: string;
-  questionType: QuestionType;
-  totalVotes: number;
-  totalWeight: number;
-  participantWeight: number;
-  answers: AnswerResult[];
-}
-
-interface ProtocolSignWillingnessEntry {
-  userId: string;
-  firstName: string;
-  lastName: string;
-  middleName: string | null;
-  willingToSignProtocol: boolean;
-  // Server sends this only for admins, and only for willing participants.
-  phoneNumber: string | null;
-}
-
-interface PollResultsData {
-  pollId: string;
-  totalParticipants: number;
-  totalWeight: number;
-  votedParticipants: number;
-  questions: QuestionResult[];
-  protocolSignWillingness: ProtocolSignWillingnessEntry[];
-}
+import type {
+  AnswerResult,
+  PollResultsData,
+} from '@/web/actions/poll/PollResultsView';
 
 interface PollResultsProps {
   results: PollResultsData;

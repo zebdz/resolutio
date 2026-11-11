@@ -1,23 +1,23 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+/** Inbox clients retain recipient scope/paging and propagate each explicit read failure.
+ * A valid empty result remains distinct from an unavailable list or count. */
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { NotificationCount } from '@/domain/notification/NotificationContent';
+import { notificationTestContent } from '@/application/notification/__tests__/notificationTestValues';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { success, failure } from '@/domain/shared/Result';
 import { GetNotificationsUseCase } from '../GetNotificationsUseCase';
-import { NotificationRepository } from '../../../domain/notification/NotificationRepository';
+import { NotificationReader } from '@/domain/notification/NotificationReader';
+import { UserId } from '@/domain/shared/EntityIds';
 import { Notification } from '../../../domain/notification/Notification';
 
-class MockNotificationRepository implements NotificationRepository {
+class MockNotificationReader implements NotificationReader {
   private notifications: Notification[] = [];
-  private unreadCounts: Map<string, number> = new Map();
+  private unreadCounts: Map<UserId, NotificationCount> = new Map();
 
-  async save(notification: Notification): Promise<Notification> {
-    return notification;
-  }
-  async saveBatch(): Promise<void> {}
-  async findById(): Promise<Notification | null> {
-    return null;
-  }
   async findByUserId(
-    userId: string,
-    options?: { limit?: number; offset?: number }
-  ): Promise<Notification[]> {
+    userId: UserId,
+    options?: Parameters<NotificationReader['findByUserId']>[1]
+  ): ReturnType<NotificationReader['findByUserId']> {
     let results = this.notifications.filter((n) => n.userId === userId);
 
     if (options?.offset) {
@@ -28,19 +28,21 @@ class MockNotificationRepository implements NotificationRepository {
       results = results.slice(0, options.limit);
     }
 
-    return results;
+    return success(results);
   }
-  async getUnreadCount(userId: string): Promise<number> {
-    return this.unreadCounts.get(userId) || 0;
+  async getUnreadCount(
+    userId: UserId
+  ): ReturnType<NotificationReader['getUnreadCount']> {
+    return success(NotificationCount.parse(this.unreadCounts.get(userId) || 0));
   }
-  async markAsRead(): Promise<void> {}
-  async markAllAsRead(): Promise<void> {}
-  async findByIds(): Promise<Notification[]> {
-    return [];
-  }
-  async deleteByIds(): Promise<void> {}
-  async getCountByUserId(userId: string): Promise<number> {
-    return this.notifications.filter((n) => n.userId === userId).length;
+  async getCountByUserId(
+    userId: UserId
+  ): ReturnType<NotificationReader['getCountByUserId']> {
+    return success(
+      NotificationCount.parse(
+        this.notifications.filter((n) => n.userId === userId).length
+      )
+    );
   }
 
   // Test helpers
@@ -48,7 +50,7 @@ class MockNotificationRepository implements NotificationRepository {
     this.notifications.push(notification);
   }
   setUnreadCount(userId: string, count: number) {
-    this.unreadCounts.set(userId, count);
+    this.unreadCounts.set(UserId.parse(userId), NotificationCount.parse(count));
   }
 }
 
@@ -56,28 +58,47 @@ function createNotification(
   userId: string,
   id: string = 'notif-1'
 ): Notification {
-  return Notification.reconstitute({
-    id,
-    userId,
-    type: 'org_joined_parent',
-    title: 'notification.types.orgJoinedParent.title',
-    body: 'notification.types.orgJoinedParent.body',
-    data: null,
-    readAt: null,
-    createdAt: new Date(),
-  });
+  return expectSuccess(
+    Notification.restore({
+      ...notificationTestContent,
+      id,
+      userId,
+      readAt: null,
+      createdAt: new Date(),
+    })
+  );
 }
 
 describe('GetNotificationsUseCase', () => {
   let useCase: GetNotificationsUseCase;
-  let notifRepo: MockNotificationRepository;
+  let notifRepo: MockNotificationReader;
 
   beforeEach(() => {
-    notifRepo = new MockNotificationRepository();
+    notifRepo = new MockNotificationReader();
     useCase = new GetNotificationsUseCase({
-      notificationRepository: notifRepo,
+      notificationReader: notifRepo,
     });
   });
+
+  it('propagates an unavailable inbox instead of throwing or fabricating an empty list', async () => {
+    vi.spyOn(notifRepo, 'findByUserId').mockResolvedValue(
+      failure('common.errors.unexpected')
+    );
+    expect(await useCase.execute({ userId: 'user-1' })).toEqual(
+      failure('common.errors.unexpected')
+    );
+  });
+  it.each(['getUnreadCount', 'getCountByUserId'] as const)(
+    'propagates an unavailable %s alongside a valid list',
+    async (method) => {
+      vi.spyOn(notifRepo, method).mockResolvedValue(
+        failure('common.errors.unexpected')
+      );
+      expect(await useCase.execute({ userId: 'user-1' })).toEqual(
+        failure('common.errors.unexpected')
+      );
+    }
+  );
 
   it('should return notifications, unread count and total count for user', async () => {
     notifRepo.addNotification(createNotification('user-1', 'n-1'));

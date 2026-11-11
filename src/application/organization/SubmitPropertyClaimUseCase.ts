@@ -1,9 +1,24 @@
+/** Application boundary validates raw requests before invoking property/claim
+ * behavior, and supplies explicit identity/time through injected dependencies. */
+import { OrganizationUseCaseFailure } from './OrganizationErrors';
+import {
+  OrganizationId,
+  UserId,
+  AssetId,
+  PropertyClaimId,
+  PropertyClaimAttachmentId,
+} from '../../domain/shared/EntityIds';
+import { Clock, IdGenerator, entityCreation } from '../shared/EntityCreation';
+import { Instant } from '../../domain/shared/Instant';
 import { PropertyClaim } from '../../domain/organization/PropertyClaim';
 import { PropertyClaimRepository } from '../../domain/organization/PropertyClaimRepository';
 import { PropertyAssetRepository } from '../../domain/organization/PropertyAssetRepository';
 import { OrganizationPropertyRepository } from '../../domain/organization/OrganizationPropertyRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
-import { PropertyClaimAttachment } from '../../domain/organization/PropertyClaimAttachment';
+import {
+  PropertyClaimAttachment,
+  parsePropertyClaimAttachmentMetadata,
+} from '../../domain/organization/PropertyClaimAttachment';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { OrganizationDomainCodes } from '../../domain/organization/OrganizationDomainCodes';
 import { NotifyPropertyClaimSubmittedUseCase } from '../notification/NotifyPropertyClaimSubmittedUseCase';
@@ -24,6 +39,8 @@ export interface SubmitPropertyClaimInput {
 }
 
 export interface SubmitPropertyClaimDependencies {
+  ids: IdGenerator;
+  clock: Clock;
   claimRepository: PropertyClaimRepository;
   assetRepository: PropertyAssetRepository;
   propertyRepository: OrganizationPropertyRepository;
@@ -38,17 +55,37 @@ export class SubmitPropertyClaimUseCase {
 
   async execute(
     input: SubmitPropertyClaimInput
-  ): Promise<Result<PropertyClaim, string>> {
+  ): Promise<Result<PropertyClaim, OrganizationUseCaseFailure>> {
+    const organizationId = OrganizationId.safeParse(input.organizationId);
+
+    if (!organizationId.success) {
+      return failure(OrganizationDomainCodes.NOT_ORG_MEMBER);
+    }
+
+    const userId = UserId.safeParse(input.userId);
+
+    if (!userId.success) {
+      return failure(OrganizationDomainCodes.NOT_ORG_MEMBER);
+    }
+
+    const assetId = AssetId.safeParse(input.assetId);
+
+    if (!assetId.success) {
+      return failure(
+        OrganizationDomainCodes.PROPERTY_CLAIM_ASSET_NOT_CLAIMABLE
+      );
+    }
+
     if (
       !(await this.deps.organizationRepository.isUserMember(
-        input.userId,
-        input.organizationId
+        userId.data,
+        organizationId.data
       ))
     ) {
       return failure(OrganizationDomainCodes.NOT_ORG_MEMBER);
     }
 
-    const aRes = await this.deps.assetRepository.findAssetById(input.assetId);
+    const aRes = await this.deps.assetRepository.findAssetById(assetId.data);
 
     if (!aRes.success || !aRes.value || aRes.value.isArchived()) {
       return failure(
@@ -62,7 +99,7 @@ export class SubmitPropertyClaimUseCase {
     if (
       !pRes.success ||
       !pRes.value ||
-      pRes.value.organizationId !== input.organizationId ||
+      pRes.value.organizationId !== organizationId.data ||
       pRes.value.isArchived()
     ) {
       return failure(
@@ -107,7 +144,7 @@ export class SubmitPropertyClaimUseCase {
       return failure(pending.error);
     }
 
-    if (pending.value.some((c) => c.userId === input.userId)) {
+    if (pending.value.some((c) => c.userId === userId.data)) {
       return failure(
         OrganizationDomainCodes.PROPERTY_CLAIM_OWN_PENDING_FOR_ASSET
       );
@@ -122,7 +159,7 @@ export class SubmitPropertyClaimUseCase {
     // Repeat-after-denial cooldown: same user, same asset, within REPEAT_COOLDOWN_MS of last decision.
     const latest =
       await this.deps.claimRepository.findLatestDecidedForUserAndAsset(
-        input.userId,
+        userId.data,
         asset.id
       );
 
@@ -130,8 +167,16 @@ export class SubmitPropertyClaimUseCase {
       return failure(latest.error);
     }
 
+    const creation = entityCreation(
+      PropertyClaimId,
+      this.deps.ids,
+      this.deps.clock
+    );
+
     if (latest.value && latest.value.decidedAt) {
-      const age = Date.now() - latest.value.decidedAt.getTime();
+      const age =
+        Instant.toDate(creation.now).getTime() -
+        latest.value.decidedAt.getTime();
 
       if (age < REPEAT_COOLDOWN_MS) {
         return failure(
@@ -146,12 +191,29 @@ export class SubmitPropertyClaimUseCase {
     let attachmentEntity: PropertyClaimAttachment | null = null;
 
     if (input.attachment) {
-      const attR = PropertyClaimAttachment.createWithBytes({
-        claimId: '__pending__',
+      const metadata = parsePropertyClaimAttachmentMetadata({
         fileName: input.attachment.fileName,
         mimeType: input.attachment.mimeType,
-        bytes: input.attachment.bytes,
+        sizeBytes: input.attachment.bytes.length,
       });
+
+      if (!metadata.success) {
+        return metadata;
+      }
+
+      const attR = PropertyClaimAttachment.createWithBytes(
+        {
+          claimId: creation.id,
+          fileName: metadata.value.fileName,
+          mimeType: metadata.value.mimeType,
+          bytes: input.attachment.bytes,
+        },
+        entityCreation(
+          PropertyClaimAttachmentId,
+          this.deps.ids,
+          this.deps.clock
+        )
+      );
 
       if (!attR.success) {
         return failure(attR.error);
@@ -161,9 +223,10 @@ export class SubmitPropertyClaimUseCase {
     }
 
     const created = PropertyClaim.submit(
-      input.organizationId,
-      input.userId,
-      asset.id
+      organizationId.data,
+      userId.data,
+      asset.id,
+      creation
     );
 
     if (!created.success) {
@@ -187,7 +250,13 @@ export class SubmitPropertyClaimUseCase {
       return failure(saved.error);
     }
 
-    await this.deps.notify.execute({ claimId: saved.value.id });
+    const delivery = await this.deps.notify.execute({
+      claimId: saved.value.id,
+    });
+
+    if (!delivery.success) {
+      return failure('common.errors.unexpected');
+    }
 
     return success(saved.value);
   }

@@ -11,33 +11,28 @@
 // migration ever gets dropped or rewritten incorrectly, only a real-DB
 // test catches it.
 //
-// The test is gated on DATABASE_URL — skipped silently in environments
-// where no DB is available, so it doesn't break unrelated CI runs.
-//
-// Isolation: every fixture row created here is deleted in `afterAll` so
-// the DB is left exactly as it was found.
-
-import 'dotenv/config';
+// Uses the disposable schema harness, never an application's DATABASE_URL.
+// Ordinary unit runs skip it; the explicit database suite runs these constraints.
+import { pollDatabase } from './pollDatabase';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { PrismaClient } from '@/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 
-const HAS_DB = Boolean(process.env.DATABASE_URL);
+const HAS_DB = Boolean(process.env.POLL_TEST_DATABASE_URL);
 
 describe.skipIf(!HAS_DB)(
   'PrismaPropertyAssetRepository — DB unique constraint on (asset, user) active rows',
   () => {
     let prisma: PrismaClient;
-    let pool: pg.Pool;
+    let db: Awaited<ReturnType<typeof pollDatabase>>;
     // Every fixture row is recorded here so cleanup never strands data.
     const cleanup: Array<() => Promise<unknown>> = [];
 
     beforeAll(async () => {
-      pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-      const adapter = new PrismaPg(pool);
-      prisma = new PrismaClient({ adapter });
-    });
+      db = await pollDatabase();
+      prisma = db.prisma;
+    }, 30_000);
 
     afterAll(async () => {
       // Run cleanups in reverse order (child rows before parents). Each
@@ -50,8 +45,7 @@ describe.skipIf(!HAS_DB)(
         }
       }
 
-      await prisma.$disconnect();
-      await pool.end();
+      await db?.close();
     });
 
     it('rejects a second active ownership row for the same (asset, user) with P2002', async () => {

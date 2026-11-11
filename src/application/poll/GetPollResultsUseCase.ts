@@ -1,3 +1,29 @@
+/** Authorized poll results preserve domain IDs and weighted tally units.
+ * Viewer facts and signing consent remain server-only authorization inputs. */
+import {
+  VoteCount,
+  ParticipantCount,
+  TotalVotingWeight,
+  VotingPercentage,
+  sumVotingWeights,
+  percentageOfWeight,
+} from '../../domain/poll/ResultTallies';
+import { VotingWeight } from '../../domain/poll/VotingWeight';
+import {
+  AnswerText,
+  QuestionText,
+  QuestionDetails,
+} from '../../domain/poll/QuestionValues';
+import { QuestionType } from '../../domain/poll/QuestionType';
+import { PollWriteFailure } from '../../domain/poll/PollWriteFailure';
+import { PollError } from './PollErrors';
+import { z } from 'zod';
+import {
+  PollId,
+  UserId,
+  QuestionId,
+  AnswerId,
+} from '../../domain/shared/EntityIds';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { Poll } from '../../domain/poll/Poll';
 import { Vote } from '../../domain/poll/Vote';
@@ -7,6 +33,7 @@ import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { PollErrors } from './PollErrors';
 import { UserRepository } from '@/src/domain/user/UserRepository';
+import { PhoneNumber } from '@/domain/user/PhoneNumber';
 import {
   PollResultsPolicy,
   ResultsViewerFacts,
@@ -18,52 +45,56 @@ export interface GetPollResultsInput {
 }
 
 export interface AnswerResult {
-  answerId: string;
-  answerText: string;
-  voteCount: number;
-  totalWeight: number;
-  percentage: number;
+  answerId: AnswerId;
+  answerText: AnswerText;
+  voteCount: VoteCount;
+  totalWeight: TotalVotingWeight;
+  percentage: VotingPercentage;
   voters: Array<{
-    userId: string;
+    userId: UserId;
     userName: {
       firstName: string;
       lastName: string;
       middleName: string | null;
     };
-    weight: number;
+    weight: VotingWeight;
   }>;
 }
 
 export interface QuestionResult {
-  questionId: string;
-  questionText: string;
-  questionDetails: string | null;
-  questionType: string;
+  questionId: QuestionId;
+  questionText: QuestionText;
+  questionDetails: QuestionDetails | null;
+  questionType: QuestionType;
   answers: AnswerResult[];
-  totalVotes: number;
+  totalVotes: VoteCount;
   // Σ unique voters' weights for this question. Same as Σ answer weights for
   // single-choice; for multi-choice each voter is counted once even when they
   // pick multiple answers. Use this (not Σ answer weights) for "% of building"
   // since voter participation is by definition per person, not per ticked box.
-  participantWeight: number;
+  participantWeight: TotalVotingWeight;
 }
 
-export interface ProtocolSignWillingnessEntry {
-  userId: string;
+interface ProtocolSignerIdentity {
+  userId: UserId;
   firstName: string;
   lastName: string;
   middleName: string | null;
-  willingToSignProtocol: boolean;
-  // Non-null only when willingToSignProtocol is true — the voter consented to
-  // signing and to sharing their phone as a single combined statement.
-  phoneNumber: string | null;
 }
+
+// Non-null only when willingToSignProtocol is true — the voter consented to
+// signing and to sharing their phone as a single combined statement.
+export type ProtocolSignWillingnessEntry = ProtocolSignerIdentity &
+  (
+    | { willingToSignProtocol: true; phoneNumber: PhoneNumber | null }
+    | { willingToSignProtocol: false; phoneNumber: null }
+  );
 
 export interface GetPollResultsResult {
   poll: Poll;
   results: QuestionResult[];
-  totalParticipants: number;
-  totalParticipantWeight: number;
+  totalParticipants: ParticipantCount;
+  totalParticipantWeight: TotalVotingWeight;
   canViewVoterNames: boolean;
   // Sign-willingness carries phone numbers gathered under a separate consent,
   // so it is gated apart from the voting record and stays admin-only even when
@@ -85,8 +116,23 @@ export class GetPollResultsUseCase {
   ) {}
 
   async execute(
-    input: GetPollResultsInput
-  ): Promise<Result<GetPollResultsResult, string>> {
+    rawRequest: GetPollResultsInput
+  ): Promise<
+    Result<
+      GetPollResultsResult,
+      PollWriteFailure | PollError | 'common.errors.validationFailed'
+    >
+  > {
+    const decoded = z
+      .object({ pollId: PollId, userId: UserId })
+      .safeParse(rawRequest);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawRequest, ...decoded.data };
+
     const { pollId, userId } = input;
 
     // 1. Check if poll exists
@@ -151,13 +197,12 @@ export class GetPollResultsUseCase {
     const participants = participantsResult.value;
 
     // 5. Calculate total participant weight
-    const totalParticipantWeight = participants.reduce(
-      (sum, p) => sum + p.userWeight,
-      0
+    const totalParticipantWeight = sumVotingWeights(
+      participants.map((p) => p.userWeight)
     );
 
     // 6. Group votes by question
-    const votesByQuestion = new Map<string, Vote[]>();
+    const votesByQuestion = new Map<QuestionId, Vote[]>();
 
     for (const vote of votes) {
       if (!votesByQuestion.has(vote.questionId)) {
@@ -172,7 +217,7 @@ export class GetPollResultsUseCase {
 
     // 8. Fetch users so that we can show voter names if needed
     const usersInfo = new Map<
-      string,
+      UserId,
       { firstName: string; lastName: string; middleName: string | null }
     >();
     const users = await this.userRepository.findByIds(
@@ -197,7 +242,7 @@ export class GetPollResultsUseCase {
       const questionVotes = votesByQuestion.get(question.id) || [];
 
       // Group votes by answer
-      const votesByAnswer = new Map<string, Vote[]>();
+      const votesByAnswer = new Map<AnswerId, Vote[]>();
 
       for (const vote of questionVotes) {
         if (!votesByAnswer.has(vote.answerId)) {
@@ -215,20 +260,19 @@ export class GetPollResultsUseCase {
         }
 
         const answerVotes = votesByAnswer.get(answer.id) || [];
-        const totalWeight = answerVotes.reduce(
-          (sum, v) => sum + v.userWeight,
-          0
+        const totalWeight = sumVotingWeights(
+          answerVotes.map((v) => v.userWeight)
         );
 
-        const percentage =
-          totalParticipantWeight > 0
-            ? (totalWeight / totalParticipantWeight) * 100
-            : 0;
+        const percentage = percentageOfWeight(
+          totalWeight,
+          totalParticipantWeight
+        );
 
         answerResults.push({
           answerId: answer.id,
           answerText: answer.text,
-          voteCount: answerVotes.length,
+          voteCount: VoteCount.parse(answerVotes.length),
           totalWeight,
           percentage,
           voters: answerVotes.map((v) => ({
@@ -245,7 +289,7 @@ export class GetPollResultsUseCase {
 
       // Dedupe by userId — a multi-choice voter casting N votes contributes
       // their weight only once to the participation total.
-      const uniqueVoterWeights = new Map<string, number>();
+      const uniqueVoterWeights = new Map<UserId, VotingWeight>();
 
       for (const v of questionVotes) {
         if (!uniqueVoterWeights.has(v.userId)) {
@@ -253,9 +297,8 @@ export class GetPollResultsUseCase {
         }
       }
 
-      const participantWeight = Array.from(uniqueVoterWeights.values()).reduce(
-        (s, w) => s + w,
-        0
+      const participantWeight = sumVotingWeights(
+        Array.from(uniqueVoterWeights.values())
       );
 
       results.push({
@@ -264,7 +307,7 @@ export class GetPollResultsUseCase {
         questionDetails: question.details,
         questionType: question.questionType,
         answers: answerResults,
-        totalVotes: questionVotes.length,
+        totalVotes: VoteCount.parse(questionVotes.length),
         participantWeight,
       });
     }
@@ -286,12 +329,14 @@ export class GetPollResultsUseCase {
           firstName: user?.firstName ?? 'Unknown',
           lastName: user?.lastName ?? 'Unknown',
           middleName: user?.middleName ?? null,
-          willingToSignProtocol: isWilling,
           // Someone who declined refused the whole combined consent, so their
           // number stays hidden even though we hold it.
-          phoneNumber: isWilling
-            ? (user?.phoneNumber.getValue() ?? null)
-            : null,
+          ...(isWilling
+            ? {
+                willingToSignProtocol: true as const,
+                phoneNumber: user?.phoneNumber ?? null,
+              }
+            : { willingToSignProtocol: false as const, phoneNumber: null }),
         };
       });
     }
@@ -299,7 +344,7 @@ export class GetPollResultsUseCase {
     return success({
       poll,
       results,
-      totalParticipants: participants.length,
+      totalParticipants: ParticipantCount.parse(participants.length),
       totalParticipantWeight,
       canViewVoterNames,
       canViewSignWillingness,

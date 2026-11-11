@@ -1,4 +1,9 @@
+/** Vote adapter regressions preserve assigned identity/time and decimal read values.
+ * Alternate insert APIs must retain the same values as atomic ballot persistence. */
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { Prisma } from '@/generated/prisma/client';
+import { PollId, UserId } from '@/domain/shared/EntityIds';
 import { PrismaVoteRepository } from '../PrismaVoteRepository';
 import { Vote } from '../../../domain/poll/Vote';
 
@@ -41,6 +46,40 @@ describe('PrismaVoteRepository', () => {
     repo = new PrismaVoteRepository(prisma);
   });
 
+  it('preserves supplied identity and cast time on both alternate insert paths', async () => {
+    const createdAt = new Date('2026-10-26T10:00:00.123Z');
+    const vote = Vote.reconstitute({
+      id: 'v1',
+      questionId: 'q1',
+      answerId: 'a1',
+      userId: 'u1',
+      userWeight: 1,
+      createdAt,
+    });
+    prisma.vote.create.mockImplementation(
+      async ({ data }: { data: Prisma.VoteUncheckedCreateInput }) => ({
+        ...data,
+        id: data.id ?? 'database-vote',
+      })
+    );
+    const saved = await repo.createVote(vote);
+    expect(saved.success).toBe(true);
+
+    if (saved.success) {
+      expect(saved.value.id).toBe(vote.id);
+    }
+
+    await repo.createVotes([vote]);
+    expect(prisma.vote.create.mock.calls[0][0].data.id).toBe(vote.id);
+    expect(prisma.vote.createMany.mock.calls[0][0].data[0].id).toBe(vote.id);
+    expect(prisma.vote.create.mock.calls[0][0].data.createdAt).toEqual(
+      createdAt
+    );
+    expect(prisma.vote.createMany.mock.calls[0][0].data[0].createdAt).toEqual(
+      createdAt
+    );
+  });
+
   describe('hasUserFinishedVoting', () => {
     it('returns true when user voted on all questions', async () => {
       prisma.question.count.mockResolvedValue(2);
@@ -49,39 +88,51 @@ describe('PrismaVoteRepository', () => {
         { questionId: 'q-2' },
       ]);
 
-      const result = await repo.hasUserFinishedVoting('poll-1', 'user-1');
+      const result = await repo.hasUserFinishedVoting(
+        PollId.parse('poll-1'),
+        UserId.parse('user-1')
+      );
 
       expect(result.success).toBe(true);
-      expect(result.value).toBe(true);
+      expect(expectSuccess(result)).toBe(true);
     });
 
     it('returns false when user voted on some questions', async () => {
       prisma.question.count.mockResolvedValue(3);
       prisma.vote.groupBy.mockResolvedValue([{ questionId: 'q-1' }]);
 
-      const result = await repo.hasUserFinishedVoting('poll-1', 'user-1');
+      const result = await repo.hasUserFinishedVoting(
+        PollId.parse('poll-1'),
+        UserId.parse('user-1')
+      );
 
       expect(result.success).toBe(true);
-      expect(result.value).toBe(false);
+      expect(expectSuccess(result)).toBe(false);
     });
 
     it('returns false when user voted on no questions', async () => {
       prisma.question.count.mockResolvedValue(2);
       prisma.vote.groupBy.mockResolvedValue([]);
 
-      const result = await repo.hasUserFinishedVoting('poll-1', 'user-1');
+      const result = await repo.hasUserFinishedVoting(
+        PollId.parse('poll-1'),
+        UserId.parse('user-1')
+      );
 
       expect(result.success).toBe(true);
-      expect(result.value).toBe(false);
+      expect(expectSuccess(result)).toBe(false);
     });
 
     it('returns false when poll has zero questions', async () => {
       prisma.question.count.mockResolvedValue(0);
 
-      const result = await repo.hasUserFinishedVoting('poll-1', 'user-1');
+      const result = await repo.hasUserFinishedVoting(
+        PollId.parse('poll-1'),
+        UserId.parse('user-1')
+      );
 
       expect(result.success).toBe(true);
-      expect(result.value).toBe(false);
+      expect(expectSuccess(result)).toBe(false);
       // groupBy should not be called when totalQuestions is 0
       expect(prisma.vote.groupBy).not.toHaveBeenCalled();
     });
@@ -89,7 +140,10 @@ describe('PrismaVoteRepository', () => {
     it('returns failure on db error', async () => {
       prisma.question.count.mockRejectedValue(new Error('db down'));
 
-      const result = await repo.hasUserFinishedVoting('poll-1', 'user-1');
+      const result = await repo.hasUserFinishedVoting(
+        PollId.parse('poll-1'),
+        UserId.parse('user-1')
+      );
 
       expect(result.success).toBe(false);
     });
@@ -99,25 +153,25 @@ describe('PrismaVoteRepository', () => {
     it('returns true when votes exist', async () => {
       prisma.vote.count.mockResolvedValue(5);
 
-      const result = await repo.pollHasVotes('poll-1');
+      const result = await repo.pollHasVotes(PollId.parse('poll-1'));
 
       expect(result.success).toBe(true);
-      expect(result.value).toBe(true);
+      expect(expectSuccess(result)).toBe(true);
     });
 
     it('returns false when no votes exist', async () => {
       prisma.vote.count.mockResolvedValue(0);
 
-      const result = await repo.pollHasVotes('poll-1');
+      const result = await repo.pollHasVotes(PollId.parse('poll-1'));
 
       expect(result.success).toBe(true);
-      expect(result.value).toBe(false);
+      expect(expectSuccess(result)).toBe(false);
     });
 
     it('returns failure on db error', async () => {
       prisma.vote.count.mockRejectedValue(new Error('db down'));
 
-      const result = await repo.pollHasVotes('poll-1');
+      const result = await repo.pollHasVotes(PollId.parse('poll-1'));
 
       expect(result.success).toBe(false);
     });
@@ -136,10 +190,10 @@ describe('PrismaVoteRepository', () => {
       ];
       prisma.vote.findMany.mockResolvedValue(prismaVotes);
 
-      const result = await repo.getVotesByPoll('poll-1');
+      const result = await repo.getVotesByPoll(PollId.parse('poll-1'));
 
       expect(result.success).toBe(true);
-      const votes = result.value as Vote[];
+      const votes = expectSuccess(result) as Vote[];
       expect(votes).toHaveLength(2);
 
       expect(votes[0].id).toBe('v-1');
@@ -154,16 +208,16 @@ describe('PrismaVoteRepository', () => {
     it('returns empty array when no votes', async () => {
       prisma.vote.findMany.mockResolvedValue([]);
 
-      const result = await repo.getVotesByPoll('poll-1');
+      const result = await repo.getVotesByPoll(PollId.parse('poll-1'));
 
       expect(result.success).toBe(true);
-      expect(result.value).toEqual([]);
+      expect(expectSuccess(result)).toEqual([]);
     });
 
     it('returns failure on db error', async () => {
       prisma.vote.findMany.mockRejectedValue(new Error('db down'));
 
-      const result = await repo.getVotesByPoll('poll-1');
+      const result = await repo.getVotesByPoll(PollId.parse('poll-1'));
 
       expect(result.success).toBe(false);
     });
@@ -228,7 +282,7 @@ describe('PrismaVoteRepository', () => {
       prisma.vote.create.mockResolvedValue(prismaVote);
 
       const vote = Vote.reconstitute({
-        id: '',
+        id: 'v-created',
         questionId: 'q-1',
         answerId: 'a-1',
         userId: 'user-1',
@@ -239,7 +293,7 @@ describe('PrismaVoteRepository', () => {
       const result = await repo.createVote(vote);
 
       expect(result.success).toBe(true);
-      const created = result.value as Vote;
+      const created = expectSuccess(result) as Vote;
       expect(created.id).toBe('v-created');
       expect(created.userWeight).toBe(1.0);
     });
@@ -251,10 +305,13 @@ describe('PrismaVoteRepository', () => {
         makePrismaVote({ id: 'v-1', userWeight: mockDecimal(3.0) }),
       ]);
 
-      const result = await repo.getUserVotes('poll-1', 'user-1');
+      const result = await repo.getUserVotes(
+        PollId.parse('poll-1'),
+        UserId.parse('user-1')
+      );
 
       expect(result.success).toBe(true);
-      const votes = result.value as Vote[];
+      const votes = expectSuccess(result) as Vote[];
       expect(votes).toHaveLength(1);
       expect(votes[0].userWeight).toBe(3.0);
     });

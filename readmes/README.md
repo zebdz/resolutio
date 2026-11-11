@@ -5,9 +5,9 @@ this index does not require loading every reference or historical plan.
 
 ## Active work
 
-| Feature                    | Design                                                       | Implementation plan                                        | Status                                             |
-| -------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- | -------------------------------------------------- |
-| Poll sealing and anchoring | [Approved design](2026-09-11-poll-seal-and-anchor-design.md) | [Phased plan](../plans/2026-09-15-poll-seal-and-anchor.md) | Phase 1 type corrections complete; awaiting review |
+| Feature                    | Design                                                       | Implementation plan                                        | Status                                               |
+| -------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- | ---------------------------------------------------- |
+| Poll sealing and anchoring | [Approved design](2026-09-11-poll-seal-and-anchor-design.md) | [Phased plan](../plans/2026-09-15-poll-seal-and-anchor.md) | Phase 2 type corrections verified; Phase 3 unstarted |
 
 Visual walkthrough: [Poll seal and anchor flow](poll-seal-and-anchor-flow.html) — lifecycle,
 record commitments, access rules, recovery and verification.
@@ -17,6 +17,8 @@ User guide: [English](how-your-vote-is-protected.html),
 feature preview explaining receipts, verification, privacy and the limits of the guarantees.
 
 ## Reference documents
+
+Current migration evidence: [Domain type completion audit](2026-11-10-domain-type-completion-audit.md).
 
 These are entry points, not a claim that every document has been audited against the current code.
 Verify commands and implementation details against the relevant source, tests and configuration.
@@ -32,6 +34,11 @@ Verify commands and implementation details against the relevant source, tests an
 | OTP behavior                     | [OTP throttle](OTP-Throttle.md), [Russian version](OTP-Throttle-ru.md) |
 
 ## Designs and history
+
+- Domain type migration: [completion audit](2026-11-10-domain-type-completion-audit.md),
+  [assessment](2026-10-26-domain-type-migration-assessment.md),
+  [archived plan](../plans/archive/2026-10-26-domain-type-migration.md). Complete 2026-11-10;
+  4,267 unit / 25 database checks pass; no commits.
 
 - Other feature designs are in this directory, usually named `YYYY-MM-DD-<feature>-design.md`.
   Find the relevant feature by filename first. A design records intended behavior; its presence

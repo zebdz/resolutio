@@ -1,11 +1,23 @@
+/** Authorizes an analysis request and evaluates typed, persisted quota settings.
+ * Typed setting failures propagate before quota queries; one supplied instant anchors all counts. */
+import { z } from 'zod';
+import { PollId, UserId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
+import { Language } from '@/domain/user/UserValues';
+import { AIModelKey } from '@/domain/ai/LegalAnalysis';
+import { Clock } from '@/application/shared/EntityCreation';
+import { readSystemSetting } from '@/application/systemSetting/readSystemSetting';
 import type { Result } from '@/domain/shared/Result';
 import { success, failure } from '@/domain/shared/Result';
 import type { PollRepository } from '@/domain/poll/PollRepository';
 import type { OrganizationRepository } from '@/domain/organization/OrganizationRepository';
 import type { LegalCheckRepository } from '@/domain/ai/LegalCheckRepository';
-import type { SystemSettingRepository } from '@/domain/systemSetting/SystemSettingRepository';
+import type {
+  SystemSettingRepository,
+  SystemSettingReadError,
+} from '@/domain/systemSetting/SystemSettingRepository';
 import type { Poll } from '@/domain/poll/Poll';
-import { AIErrors } from './AIErrors';
+import { AIError, AIErrors } from './AIErrors';
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -13,12 +25,6 @@ const SETTING_KEYS = {
   MAX_PER_HOUR: 'legal_check_max_per_admin_per_hour',
   DAILY_TOKEN_CAP: 'legal_check_daily_token_cap',
   MIN_ORG_SIZE: 'legal_check_min_org_size',
-} as const;
-
-const DEFAULTS = {
-  MAX_PER_HOUR: 10,
-  DAILY_TOKEN_CAP: 100_000,
-  MIN_ORG_SIZE: 3,
 } as const;
 
 export interface AnalyzePollLegalityInput {
@@ -31,12 +37,13 @@ export interface AnalyzePollLegalityInput {
 
 export interface ValidatedAnalysisInput {
   poll: Poll;
-  model: string;
-  locale: string;
-  userId: string;
+  model: AIModelKey;
+  locale: Language;
+  userId: UserId;
 }
 
 export interface AnalyzePollLegalityDependencies {
+  clock: Clock;
   pollRepository: PollRepository;
   organizationRepository: OrganizationRepository;
   legalCheckRepository: LegalCheckRepository;
@@ -49,7 +56,7 @@ export class AnalyzePollLegalityUseCase {
   private legalCheckRepository: LegalCheckRepository;
   private systemSettingRepository: SystemSettingRepository;
 
-  constructor(deps: AnalyzePollLegalityDependencies) {
+  constructor(private readonly deps: AnalyzePollLegalityDependencies) {
     this.pollRepository = deps.pollRepository;
     this.organizationRepository = deps.organizationRepository;
     this.legalCheckRepository = deps.legalCheckRepository;
@@ -58,8 +65,31 @@ export class AnalyzePollLegalityUseCase {
 
   async validate(
     input: AnalyzePollLegalityInput
-  ): Promise<Result<ValidatedAnalysisInput, string>> {
-    const pollResult = await this.pollRepository.getPollById(input.pollId);
+  ): Promise<
+    Result<
+      ValidatedAnalysisInput,
+      AIError | 'common.errors.validationFailed' | SystemSettingReadError
+    >
+  > {
+    const parsed = z
+      .object({
+        pollId: PollId,
+        userId: UserId,
+        model: AIModelKey,
+        locale: Language,
+      })
+      .safeParse(input);
+
+    if (!parsed.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const command = { ...input, ...parsed.data };
+    const now = Instant.toDate(this.deps.clock.now());
+    const since = Instant.fromDate(new Date(now.getTime() - ONE_HOUR_MS));
+    const dayStart = new Date(now);
+    dayStart.setHours(0, 0, 0, 0);
+    const pollResult = await this.pollRepository.getPollById(command.pollId);
 
     if (!pollResult.success || !pollResult.value) {
       return failure(AIErrors.POLL_NOT_FOUND);
@@ -67,9 +97,9 @@ export class AnalyzePollLegalityUseCase {
 
     const poll = pollResult.value;
 
-    if (!input.isSuperadmin) {
+    if (!command.isSuperadmin) {
       const isAdmin = await this.organizationRepository.isUserAdmin(
-        input.userId,
+        command.userId,
         poll.organizationId
       );
 
@@ -82,11 +112,17 @@ export class AnalyzePollLegalityUseCase {
       return failure(AIErrors.POLL_NOT_READY);
     }
 
-    if (!input.isSuperadmin) {
-      const minOrgSize = await this.getNumericSetting(
-        SETTING_KEYS.MIN_ORG_SIZE,
-        DEFAULTS.MIN_ORG_SIZE
+    if (!command.isSuperadmin) {
+      const minOrgSizeSetting = await readSystemSetting(
+        this.systemSettingRepository,
+        SETTING_KEYS.MIN_ORG_SIZE
       );
+
+      if (!minOrgSizeSetting.success) {
+        return minOrgSizeSetting;
+      }
+
+      const minOrgSize = minOrgSizeSetting.value.value;
 
       if (minOrgSize > 0) {
         const memberIds =
@@ -100,28 +136,41 @@ export class AnalyzePollLegalityUseCase {
       }
     }
 
-    if (!input.isSuperadmin) {
-      const maxPerHour = await this.getNumericSetting(
-        SETTING_KEYS.MAX_PER_HOUR,
-        DEFAULTS.MAX_PER_HOUR
+    if (!command.isSuperadmin) {
+      const maxPerHourSetting = await readSystemSetting(
+        this.systemSettingRepository,
+        SETTING_KEYS.MAX_PER_HOUR
       );
+
+      if (!maxPerHourSetting.success) {
+        return maxPerHourSetting;
+      }
+
+      const maxPerHour = maxPerHourSetting.value.value;
       const recentCount = await this.legalCheckRepository.countRecentChecks(
-        input.userId,
-        ONE_HOUR_MS
+        command.userId,
+        since
       );
 
       if (recentCount >= maxPerHour) {
         return failure(AIErrors.RATE_LIMIT_EXCEEDED);
       }
 
-      const dailyTokenCap = await this.getNumericSetting(
-        SETTING_KEYS.DAILY_TOKEN_CAP,
-        DEFAULTS.DAILY_TOKEN_CAP
+      const dailyTokenCapSetting = await readSystemSetting(
+        this.systemSettingRepository,
+        SETTING_KEYS.DAILY_TOKEN_CAP
       );
+
+      if (!dailyTokenCapSetting.success) {
+        return dailyTokenCapSetting;
+      }
+
+      const dailyTokenCap = dailyTokenCapSetting.value.value;
 
       if (dailyTokenCap > 0) {
         const dailyTokens = await this.legalCheckRepository.sumDailyTokens(
-          input.userId
+          command.userId,
+          Instant.fromDate(dayStart)
         );
 
         if (dailyTokens >= dailyTokenCap) {
@@ -132,24 +181,9 @@ export class AnalyzePollLegalityUseCase {
 
     return success({
       poll,
-      model: input.model,
-      locale: input.locale,
-      userId: input.userId,
+      model: command.model,
+      locale: command.locale,
+      userId: command.userId,
     });
-  }
-
-  private async getNumericSetting(
-    key: string,
-    defaultValue: number
-  ): Promise<number> {
-    const raw = await this.systemSettingRepository.get(key);
-
-    if (raw === null) {
-      return defaultValue;
-    }
-
-    const parsed = parseInt(raw, 10);
-
-    return Number.isFinite(parsed) ? parsed : defaultValue;
   }
 }

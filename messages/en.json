@@ -793,6 +793,7 @@
       "pollNotFound": "Poll not found",
       "questionNotFound": "Question not found",
       "answerNotFound": "Answer not found",
+      "participantNotFound": "Participant not found",
       "cannotModifyFinished": "Cannot modify a finished poll",
       "cannotModifyActive": "Cannot modify an active poll",
       "cannotModifyHasVotes": "Cannot modify a poll that has votes",
@@ -1356,21 +1357,25 @@
       "propertyClaimAttachmentFileNameEmpty": "Proof file name is required",
       "propertyClaimAttachmentNotFound": "Proof file not found",
       "notOrgMember": "You are not a member of this organization",
-      "lastAdmin": "Cannot remove the last admin of an organization"
+      "lastAdmin": "Cannot remove the last admin of an organization",
+      "notOrgAdmin": "You are not an administrator of this organization."
     },
     "joinParentRequest": {
       "messageEmpty": "Message cannot be empty",
       "messageTooLong": "Message cannot exceed {maxLength} characters",
       "notPending": "Join parent request is not pending",
-      "rejectionReasonRequired": "Rejection reason is required"
+      "rejectionReasonRequired": "Rejection reason is required",
+      "rejectionReasonTooLong": "Rejection reason must not exceed 500 characters"
     },
     "invitation": {
-      "notPending": "Invitation is no longer pending"
+      "notPending": "Invitation is no longer pending",
+      "invalidData": "The invitation data is invalid."
     },
     "board": {
       "boardNameEmpty": "Board name cannot be empty",
       "boardNameTooLong": "Board name cannot exceed {maxLength} characters",
-      "boardAlreadyArchived": "Board is already archived"
+      "boardAlreadyArchived": "Board is already archived",
+      "boardInvalidData": "The board data is invalid."
     },
     "otp": {
       "invalidCodeFormat": "Code must be 6 digits"
@@ -1380,6 +1385,8 @@
       "answerTextTooLong": "Answer text cannot exceed {maxLength} characters",
       "answerOrderNegative": "Answer order must be a positive number",
       "answerAlreadyArchived": "Answer is already archived",
+      "questionInvalidData": "The question data is invalid.",
+      "answerInvalidData": "The answer data is invalid.",
       "questionTextEmpty": "Question text cannot be empty",
       "questionTextTooLong": "Question text cannot exceed {maxLength} characters",
       "questionDetailsTooLong": "Question details cannot exceed {maxLength} characters",
@@ -1420,6 +1427,9 @@
       "alreadyVoted": "You have already voted in this poll",
       "notParticipant": "You are not a participant in this poll",
       "mustAnswerAllQuestions": "You must answer all questions before finishing",
+      "receiptSecretImmutable": "The receipt code cannot be changed.",
+      "invalidBallot": "The ballot contains invalid selections. Reload the poll and try again.",
+      "stale": "The poll changed. Reload it and try again.",
       "invalidWeight": "Invalid vote weight",
       "cannotModifyParticipantsHasVotes": "Cannot modify participants - poll already has votes",
       "questionInvalidPage": "Invalid question page number",
@@ -1450,7 +1460,8 @@
       "attachmentLimitReached": "A poll may have at most {limit} attachments",
       "attachmentNotFound": "Attachment not found",
       "descriptionInvalidAttachmentRef": "The description references a file that does not belong to this poll",
-      "cannotChangeAttachmentsActive": "Attachments cannot be changed once voting has started"
+      "cannotChangeAttachmentsActive": "Attachments cannot be changed once voting has started",
+      "invalidId": "Invalid poll identifier"
     },
     "user": {
       "userNotFound": "User not found",
@@ -1478,8 +1489,10 @@
         "cityRequired": "City is required",
         "streetRequired": "Street is required",
         "buildingRequired": "Building is required",
-        "apartmentRequired": "Apartment number is required"
-      }
+        "apartmentRequired": "Apartment number is required",
+        "registryIdInvalid": "Select the address again: its registry reference is invalid"
+      },
+      "languageInvalid": "The language is invalid."
     },
     "joinToken": {
       "descriptionEmpty": "Token description is required",
@@ -1509,11 +1522,22 @@
       "attachmentMagicMismatch": "File contents do not match the declared type",
       "attachmentLimitReached": "Maximum {maxCount} attachments per report",
       "pollAudienceTooNarrow": "Poll audience must cover the report's audience",
-      "pollNotFound": "Poll not found"
+      "pollNotFound": "Poll not found",
+      "invalidData": "The report data is invalid."
     },
     "shared": {
       "containsProfanity": "Contains inappropriate language",
-      "containsProfanityWithWords": "Contains inappropriate language: {words}"
+      "containsProfanityWithWords": "Contains inappropriate language: {words}",
+      "invalidAttachmentMetadata": "The attachment metadata is invalid."
+    },
+    "notification": {
+      "invalidData": "The notification data is invalid."
+    },
+    "legalCheck": {
+      "checkedByRequired": "The user requesting the check is required.",
+      "invalidData": "The legal check data is invalid.",
+      "pollNotFound": "Poll not found.",
+      "alreadyInProgress": "A legal check is already in progress."
     }
   },
   "phone": {

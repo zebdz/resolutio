@@ -1,3 +1,9 @@
+/** Poll application boundary validates requests, invokes domain behavior and
+ * preserves known failure codes across authorization and persistence ports. */
+import { Clock, IdGenerator } from '../shared/EntityCreation';
+import { Instant } from '../../domain/shared/Instant';
+import { z } from 'zod';
+import { PollId, UserId } from '../../domain/shared/EntityIds';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
@@ -6,7 +12,7 @@ import { UserRepository } from '../../domain/user/UserRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { NotifyPollActivatedUseCase } from '../notification/NotifyPollActivatedUseCase';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 
 interface ActivatePollCommand {
   pollId: string;
@@ -24,10 +30,24 @@ export class ActivatePollUseCase {
     private userRepository: UserRepository,
     private notificationRepository: NotificationRepository,
     private participantRepository: ParticipantRepository,
-    private boardRepository: BoardRepository
+    private boardRepository: BoardRepository,
+    private ids: IdGenerator,
+    private clock: Clock
   ) {}
 
-  async execute(command: ActivatePollCommand): Promise<Result<void, string>> {
+  async execute(
+    rawRequest: ActivatePollCommand
+  ): Promise<Result<void, PollUseCaseFailure>> {
+    const decoded = z
+      .object({ pollId: PollId, userId: UserId })
+      .safeParse(rawRequest);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const command = { ...rawRequest, ...decoded.data };
+
     const pollResult = await this.pollRepository.getPollById(command.pollId);
 
     if (!pollResult.success) {
@@ -89,7 +109,7 @@ export class ActivatePollUseCase {
     // Notify. Organization polls reach their snapshot participants; open polls
     // have none yet, so the organization's own members (including descendants)
     // are told instead — outsiders arrive through the shared link.
-    let recipientUserIds: string[] = [];
+    let recipientUserIds: UserId[] = [];
 
     if (poll.isOpen()) {
       recipientUserIds =
@@ -107,9 +127,19 @@ export class ActivatePollUseCase {
 
     const notifyUseCase = new NotifyPollActivatedUseCase({
       notificationRepository: this.notificationRepository,
+      ids: this.ids,
+      clock: this.clock,
     });
     await notifyUseCase
       .execute({ pollId: poll.id, pollTitle: poll.title, recipientUserIds })
+      .then((outcome) => {
+        if (!outcome.success) {
+          console.error(
+            'Notification delivery failed (NotifyPollActivatedUseCase):',
+            outcome.error
+          );
+        }
+      })
       .catch((err) => {
         console.error('Failed to send poll activated notifications:', err);
       });

@@ -1,3 +1,28 @@
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { PollInstant } from '@/domain/poll/PollValues';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { VotingWeight } from '@/domain/poll/VotingWeight';
+/** Poll use-case compatibility: explicit creation fixtures and repository ports
+ * preserve authorization, eligibility and expected user-visible outcomes. */
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import {
+  PollId,
+  QuestionId,
+  AnswerId,
+  ParticipantId,
+  VoteId,
+  VoteDraftId,
+  UserId,
+  BoardId,
+  OrganizationId,
+} from '@/domain/shared/EntityIds';
+import { createQuestionIds, questionClock } from './questionTestValues';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SubmitDraftUseCase } from '../SubmitDraftUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -41,39 +66,44 @@ describe('SubmitDraftUseCase', () => {
   beforeEach(() => {
     // Create a poll
     const pollResult = Poll.create(
-      'Test Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'user-admin',
-      new Date('2026-01-15'),
-      new Date('2026-02-15')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-admin'),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(pollResult.success).toBe(true);
-    poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    poll = expectSuccess(pollResult);
 
     // Create a question
     const questionResult = Question.create(
-      'Test Question',
+      QuestionText.parse('Test Question'),
       poll.id,
-      1,
-      0,
+      testCreation(QuestionId, 'question-1'),
+      PageNumber.parse(1),
+      SortOrder.parse(0),
       'single-choice'
     );
     expect(questionResult.success).toBe(true);
-    question = questionResult.value;
-    (question as any).props.id = 'question-1';
+    question = expectSuccess(questionResult);
 
     // Create an answer and add to question
-    const answerResult = Answer.create('Test Answer', 1, question.id);
+    const answerResult = Answer.create(
+      AnswerText.parse('Test Answer'),
+      SortOrder.parse(1),
+      question.id,
+      testCreation(AnswerId, 'answer-1')
+    );
     expect(answerResult.success).toBe(true);
-    answer = answerResult.value;
-    (answer as any).props.id = 'answer-1';
+    answer = expectSuccess(answerResult);
     question.addAnswer(answer);
 
     // Add questions to poll and activate
-    (poll as any).props.questions = [question];
+    poll = Poll.reconstitute({ ...poll.toJSON(), questions: [question] });
     poll.submitToAdmin();
     poll.takeSnapshot();
     poll.activate();
@@ -81,16 +111,16 @@ describe('SubmitDraftUseCase', () => {
     // Create a participant
     const participantResult = PollParticipant.create(
       poll.id,
-      'user-1',
-      new Decimal(1.0).toNumber()
+      UserId.parse('user-1'),
+      testCreation(ParticipantId, 'participant-1'),
+      VotingWeight.parse(new Decimal(1.0).toNumber())
     );
     expect(participantResult.success).toBe(true);
-    participant = participantResult.value;
-    (participant as any).props.id = 'participant-1';
+    participant = expectSuccess(participantResult);
 
     // Mock repositories
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
     };
 
     participantRepository = {
@@ -139,7 +169,9 @@ describe('SubmitDraftUseCase', () => {
       draftRepository as DraftRepository,
       organizationRepository as OrganizationRepository,
       boardRepository as BoardRepository,
-      userRepository as UserRepository
+      userRepository as UserRepository,
+      createQuestionIds(),
+      questionClock
     );
   });
 
@@ -177,17 +209,18 @@ describe('SubmitDraftUseCase', () => {
   it('should reject when poll not active', async () => {
     // Create inactive poll
     const inactivePollResult = Poll.create(
-      'Inactive Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'user-admin',
-      new Date('2026-01-15'),
-      new Date('2026-02-15')
+      PollTitle.parse('Inactive Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-admin'),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(inactivePollResult.success).toBe(true);
-    const inactivePoll = inactivePollResult.value;
-    (inactivePoll as any).props.id = 'poll-2';
+    const inactivePoll = expectSuccess(inactivePollResult);
 
     pollRepository.getPollById = vi
       .fn()
@@ -209,7 +242,7 @@ describe('SubmitDraftUseCase', () => {
   });
 
   it('should reject when poll is finished', async () => {
-    poll.finish();
+    poll.finish(PollInstant.parse(new Date().toISOString()));
 
     const result = await useCase.execute({
       userId: 'user-1',
@@ -285,6 +318,7 @@ describe('SubmitDraftUseCase', () => {
   });
 
   it('should allow multiple drafts for multiple-choice questions', async () => {
+    question.updateType('multiple-choice');
     const result = await useCase.execute({
       userId: 'user-1',
       pollId: poll.id,
@@ -299,6 +333,7 @@ describe('SubmitDraftUseCase', () => {
   });
 
   it('should allow unselecting (removing) a draft for multiple-choice questions', async () => {
+    question.updateType('multiple-choice');
     const result = await useCase.execute({
       userId: 'user-1',
       pollId: poll.id,
@@ -340,7 +375,7 @@ describe('SubmitDraftUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.ORGANIZATION_ARCHIVED);
+    expect(expectFailure(result)).toBe(PollErrors.ORGANIZATION_ARCHIVED);
   });
 
   it('should fail if board is archived', async () => {
@@ -363,30 +398,43 @@ describe('SubmitDraftUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
+    expect(expectFailure(result)).toBe(PollErrors.BOARD_ARCHIVED);
   });
   describe('open polls', () => {
     let openPoll: Poll;
 
     beforeEach(() => {
-      openPoll = Poll.create(
-        'Open Poll',
-        'Everyone may vote',
-        'org-1',
-        null,
-        'user-admin',
-        new Date('2026-01-15'),
-        new Date('2026-02-15'),
-        undefined,
-        'OPEN'
-      ).value;
-      (openPoll as any).props.id = 'poll-1';
-      (openPoll as any).props.questions = [question];
+      openPoll = expectSuccess(
+        Poll.create(
+          PollTitle.parse('Open Poll'),
+          PollDescription.parse('Everyone may vote'),
+          OrganizationId.parse('org-1'),
+          null,
+          UserId.parse('user-admin'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          testCreation(PollId, 'poll-1'),
+          undefined,
+          'OPEN'
+        )
+      );
+      openPoll = Poll.reconstitute({
+        ...openPoll.toJSON(),
+        questions: openPoll.questions,
+        id: 'poll-1',
+      });
+      openPoll = Poll.reconstitute({
+        ...openPoll.toJSON(),
+        questions: [question],
+      });
       openPoll.submitToAdmin();
       openPoll.takeSnapshot();
       openPoll.activate();
 
-      pollRepository.getPollById = vi.fn().mockResolvedValue(success(openPoll));
+      pollRepository.getPollById = vi
+        .fn()
+        .mockImplementation(async () => success(openPoll));
       participantRepository.getParticipantByUserAndPoll = vi
         .fn()
         .mockResolvedValue(success(null));
@@ -431,7 +479,7 @@ describe('SubmitDraftUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.USER_NOT_CONFIRMED);
+      expect(expectFailure(result)).toBe(PollDomainCodes.USER_NOT_CONFIRMED);
     });
 
     it('rejects a user who already finished voting', async () => {
@@ -448,7 +496,7 @@ describe('SubmitDraftUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.ALREADY_VOTED);
+      expect(expectFailure(result)).toBe(PollDomainCodes.ALREADY_VOTED);
     });
   });
 });

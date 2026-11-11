@@ -1,3 +1,8 @@
+import { Seconds } from '@/domain/auth/AuthValues';
+import { OtpCount, OtpDestination } from '@/domain/otp/OtpValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
+import { authTestDependencies } from '@/application/auth/__tests__/authTestValues';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GetPhoneConfirmationStatusUseCase } from '../GetPhoneConfirmationStatusUseCase';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
@@ -31,10 +36,11 @@ class MockOtpRepository implements OtpRepository {
   }
 
   async findLatestByIdentifier(
-    identifier: string,
-    channel: OtpChannel,
+    destination: OtpDestination,
     purpose: OtpPurpose
   ): Promise<OtpVerification | null> {
+    const { identifier, channel } = destination;
+
     return this.latest(
       (o) =>
         o.identifier === identifier &&
@@ -56,29 +62,31 @@ class MockOtpRepository implements OtpRepository {
     return otp;
   }
 
-  async countRecentByClientIp(): Promise<number> {
-    return 0;
+  async countRecentByClientIp(): Promise<OtpCount> {
+    return OtpCount.parse(0);
   }
 
   async countRecentByIdentifier(
-    identifier: string,
-    channel: OtpChannel,
+    destination: OtpDestination,
     purpose: OtpPurpose,
-    sinceHours: number
-  ): Promise<number> {
-    const since = new Date(Date.now() - sinceHours * 3600 * 1000);
+    cutoff: Instant
+  ): Promise<OtpCount> {
+    const { identifier, channel } = destination;
+    const since = Instant.toDate(cutoff);
 
-    return Array.from(this.otps.values()).filter(
-      (o) =>
-        o.identifier === identifier &&
-        o.channel === channel &&
-        o.purpose === purpose &&
-        o.createdAt >= since
-    ).length;
+    return OtpCount.parse(
+      Array.from(this.otps.values()).filter(
+        (o) =>
+          o.identifier === identifier &&
+          o.channel === channel &&
+          o.purpose === purpose &&
+          Instant.toDate(o.createdAt) >= since
+      ).length
+    );
   }
 
-  async deleteAllForUser(): Promise<number> {
-    return 0;
+  async deleteAllForUser(): Promise<OtpCount> {
+    return OtpCount.parse(0);
   }
 
   async deleteExpired(): Promise<void> {}
@@ -92,7 +100,11 @@ class MockOtpRepository implements OtpRepository {
       return null;
     }
 
-    return all.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    return all.sort(
+      (a, b) =>
+        Instant.toDate(b.createdAt).getTime() -
+        Instant.toDate(a.createdAt).getTime()
+    )[0];
   }
 }
 
@@ -117,7 +129,7 @@ const userRepository = {
 const smsChannel = {
   channel: 'sms',
   send: async () => ({ success: true }),
-} as OtpDeliveryChannel;
+} as OtpDeliveryChannel<'sms'>;
 
 function makeOtp(
   overrides: {
@@ -158,6 +170,7 @@ describe('GetPhoneConfirmationStatusUseCase', () => {
 
     otpRepository = new MockOtpRepository();
     useCase = new GetPhoneConfirmationStatusUseCase({
+      ...authTestDependencies(),
       otpRepository,
       userRepository,
       deliveryChannel: smsChannel,
@@ -171,27 +184,27 @@ describe('GetPhoneConfirmationStatusUseCase', () => {
   it('reports a pending code and the wait before the next one right after a send', async () => {
     otpRepository.addOtp(makeOtp());
 
-    const result = await useCase.execute({ userId: 'user-1' });
+    const result = await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(result.success).toBe(true);
 
     if (result.success) {
       expect(result.value).toEqual({
         hasPendingCode: true,
-        retryAfterSeconds: 60,
+        retryAfterSeconds: Seconds.parse(60),
       });
     }
   });
 
   it('reports nothing pending and no wait when no code was ever sent', async () => {
-    const result = await useCase.execute({ userId: 'user-1' });
+    const result = await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(result.success).toBe(true);
 
     if (result.success) {
       expect(result.value).toEqual({
         hasPendingCode: false,
-        retryAfterSeconds: 0,
+        retryAfterSeconds: Seconds.parse(0),
       });
     }
   });
@@ -201,7 +214,7 @@ describe('GetPhoneConfirmationStatusUseCase', () => {
       makeOtp({ createdAt: new Date(Date.now() - 11 * 60 * 1000) })
     );
 
-    const result = await useCase.execute({ userId: 'user-1' });
+    const result = await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(result.success && result.value.hasPendingCode).toBe(false);
   });
@@ -209,7 +222,7 @@ describe('GetPhoneConfirmationStatusUseCase', () => {
   it('does not count a verified code as pending', async () => {
     otpRepository.addOtp(makeOtp({ verifiedAt: new Date() }));
 
-    const result = await useCase.execute({ userId: 'user-1' });
+    const result = await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(result.success && result.value.hasPendingCode).toBe(false);
   });
@@ -217,7 +230,7 @@ describe('GetPhoneConfirmationStatusUseCase', () => {
   it('does not count a code with no attempts left as pending', async () => {
     otpRepository.addOtp(makeOtp({ attempts: 5 }));
 
-    const result = await useCase.execute({ userId: 'user-1' });
+    const result = await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(result.success && result.value.hasPendingCode).toBe(false);
   });
@@ -225,28 +238,28 @@ describe('GetPhoneConfirmationStatusUseCase', () => {
   it('reports no wait once the throttle delay has passed', async () => {
     otpRepository.addOtp(makeOtp({ createdAt: new Date(Date.now() - 61_000) }));
 
-    const result = await useCase.execute({ userId: 'user-1' });
+    const result = await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(result.success).toBe(true);
 
     if (result.success) {
       expect(result.value).toEqual({
         hasPendingCode: true,
-        retryAfterSeconds: 0,
+        retryAfterSeconds: Seconds.parse(0),
       });
     }
   });
 
   it('ignores codes issued to other users', async () => {
-    otpRepository.addOtp(makeOtp({ userId: 'someone-else' }));
+    otpRepository.addOtp(makeOtp({ userId: UserId.parse('someone-else') }));
 
-    const result = await useCase.execute({ userId: 'user-1' });
+    const result = await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(result.success && result.value.hasPendingCode).toBe(false);
   });
 
   it('fails when the user does not exist', async () => {
-    const result = await useCase.execute({ userId: 'ghost' });
+    const result = await useCase.execute({ userId: UserId.parse('ghost') });
 
     expect(result.success).toBe(false);
   });

@@ -1,3 +1,4 @@
+import { SystemClock } from '@/infrastructure/shared/SystemEntityCreation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { AuthLayout } from '@/src/web/components/catalyst/auth-layout';
 import { ConfirmPhoneForm } from '@/web/components/auth/ConfirmPhoneForm';
@@ -13,6 +14,7 @@ import { readReturnToCookieServer } from '@/web/lib/returnTo.server';
 import { redirectLocalized } from '@/web/lib/redirectLocalized';
 
 const statusUseCase = new GetPhoneConfirmationStatusUseCase({
+  clock: new SystemClock(),
   otpRepository: new PrismaOtpRepository(prisma),
   userRepository: new PrismaUserRepository(prisma),
   deliveryChannel: createSmsDeliveryChannelFromEnv(),

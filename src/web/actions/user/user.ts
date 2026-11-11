@@ -1,5 +1,8 @@
 'use server';
 
+/** User actions decode transport input and serialize privacy-filtered user values. */
+import { PhoneNumber, PHONE_NUMBER_REGEX } from '@/domain/user/PhoneNumber';
+import type { User } from '@/domain/user/User';
 import { getTranslations } from 'next-intl/server';
 import { UpdateUserProfileUseCase } from '@/src/application/user/UpdateUserProfileUseCase';
 import { CompletePrivacySetupUseCase } from '@/src/application/user/CompletePrivacySetupUseCase';
@@ -233,15 +236,16 @@ export async function completePrivacySetupAction(
   }
 }
 
-export async function searchUserByPhoneAction(phone: string): Promise<
-  ActionResult<{
-    id: string;
-    firstName: string;
-    lastName: string;
-    middleName?: string;
-    nickname: string;
-  } | null>
-> {
+export type UserPhoneSearchView = Pick<
+  User,
+  'id' | 'firstName' | 'lastName' | 'middleName'
+> & {
+  nickname: string;
+};
+
+export async function searchUserByPhoneAction(
+  phone: string
+): Promise<ActionResult<UserPhoneSearchView | null>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -267,7 +271,10 @@ export async function searchUserByPhoneAction(phone: string): Promise<
       return { success: true, data: null };
     }
 
-    const user = await userRepository.searchUserByPhone(phone.trim());
+    // A partial or malformed search cannot match a stored E.164 number.
+    const user = PHONE_NUMBER_REGEX.test(phone.trim())
+      ? await userRepository.searchUserByPhone(PhoneNumber.create(phone.trim()))
+      : null;
 
     if (!user) {
       // Record failed attempt for rate limiting

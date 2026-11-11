@@ -1,3 +1,7 @@
+/** Decodes organization scope before loading creation options for an authorized member. */
+import { notFound } from 'next/navigation';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import { PageSize } from '@/domain/shared/Pagination';
 import { getLocale, getTranslations } from 'next-intl/server';
 
 import { Link } from '@/src/i18n/routing';
@@ -35,7 +39,16 @@ export default async function NewReportPage({
   const user = currentUser;
   const t = await getTranslations('report.pages');
   const sp = await searchParams;
-  const organizationId = sp.organizationId;
+  const decodedOrg =
+    sp.organizationId === undefined
+      ? null
+      : OrganizationId.safeParse(sp.organizationId);
+
+  if (decodedOrg !== null && !decodedOrg.success) {
+    notFound();
+  }
+
+  const organizationId = decodedOrg?.data;
 
   if (!organizationId) {
     const memberships = await orgRepo.findMembershipsByUserId(user.id);
@@ -83,7 +96,10 @@ export default async function NewReportPage({
 
   const [boards, pollsResult] = await Promise.all([
     boardRepo.findByOrganizationId(organizationId),
-    pollRepo.searchPolls({ organizationId, pageSize: 200 }, user.id),
+    pollRepo.searchPolls(
+      { organizationId, pageSize: PageSize.parse(200) },
+      user.id
+    ),
   ]);
 
   const orgBoards = boards.map((b) => ({ id: b.id, name: b.name }));

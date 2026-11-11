@@ -1,10 +1,15 @@
+/** Persists validated analysis snapshots and maps quota results into core units. */
+import { PollId, UserId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
+import { TokenCount, LegalCheckCount } from '@/domain/ai/LegalAnalysis';
+import { AnalysisTokenUsage } from '@/domain/ai/LegalCheckRepository';
 import type { PrismaClient } from '@/generated/prisma/client';
 import type { LegalCheckRepository } from '@/domain/ai/LegalCheckRepository';
 import { LegalCheck } from '@/domain/ai/LegalCheck';
 import type {
   LegalAnnotation,
   LegalAnalysisSummary,
-} from '@/application/ai/legalAnalysisSchema';
+} from '@/domain/ai/LegalAnalysis';
 
 export class PrismaLegalCheckRepository implements LegalCheckRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -24,6 +29,7 @@ export class PrismaLegalCheckRepository implements LegalCheckRepository {
     const saved = await this.prisma.pollLegalCheck.upsert({
       where: { pollId: legalCheck.pollId },
       create: {
+        id: legalCheck.id,
         pollId: legalCheck.pollId,
         ...data,
       },
@@ -34,8 +40,8 @@ export class PrismaLegalCheckRepository implements LegalCheckRepository {
       id: saved.id,
       pollId: saved.pollId,
       model: saved.model,
-      annotations: saved.annotations as unknown as LegalAnnotation[],
-      summary: saved.summary as unknown as LegalAnalysisSummary,
+      annotations: saved.annotations,
+      summary: saved.summary,
       overallRisk: saved.overallRisk,
       totalIssues: saved.totalIssues,
       checkedBy: saved.checkedBy,
@@ -44,7 +50,7 @@ export class PrismaLegalCheckRepository implements LegalCheckRepository {
   }
 
   async findByPollId(
-    pollId: string
+    pollId: PollId
   ): Promise<{ check: LegalCheck; isStale: boolean } | null> {
     const found = await this.prisma.pollLegalCheck.findUnique({
       where: { pollId },
@@ -59,8 +65,8 @@ export class PrismaLegalCheckRepository implements LegalCheckRepository {
         id: found.id,
         pollId: found.pollId,
         model: found.model,
-        annotations: found.annotations as unknown as LegalAnnotation[],
-        summary: found.summary as unknown as LegalAnalysisSummary,
+        annotations: found.annotations,
+        summary: found.summary,
         overallRisk: found.overallRisk,
         totalIssues: found.totalIssues,
         checkedBy: found.checkedBy,
@@ -70,7 +76,7 @@ export class PrismaLegalCheckRepository implements LegalCheckRepository {
     };
   }
 
-  async markStale(pollId: string): Promise<void> {
+  async markStale(pollId: PollId): Promise<void> {
     await this.prisma.pollLegalCheck.updateMany({
       where: { pollId },
       data: { isStale: true },
@@ -78,45 +84,42 @@ export class PrismaLegalCheckRepository implements LegalCheckRepository {
   }
 
   async logCheckAttempt(
-    pollId: string,
-    checkedBy: string,
-    inputTokens: number,
-    outputTokens: number
+    pollId: PollId,
+    checkedBy: UserId,
+    usage: AnalysisTokenUsage,
+    at: Instant
   ): Promise<void> {
     await this.prisma.pollLegalCheckLog.create({
-      data: { pollId, checkedBy, inputTokens, outputTokens },
+      data: {
+        pollId,
+        checkedBy,
+        inputTokens: usage.input,
+        outputTokens: usage.output,
+        checkedAt: Instant.toDate(at),
+      },
     });
   }
-
   async countRecentChecks(
-    checkedBy: string,
-    windowMs: number
-  ): Promise<number> {
-    const since = new Date(Date.now() - windowMs);
-
-    return this.prisma.pollLegalCheckLog.count({
-      where: {
-        checkedBy,
-        checkedAt: { gte: since },
-      },
-    });
+    checkedBy: UserId,
+    since: Instant
+  ): Promise<LegalCheckCount> {
+    return LegalCheckCount.parse(
+      await this.prisma.pollLegalCheckLog.count({
+        where: { checkedBy, checkedAt: { gte: Instant.toDate(since) } },
+      })
+    );
   }
-
-  async sumDailyTokens(checkedBy: string): Promise<number> {
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-
+  async sumDailyTokens(
+    checkedBy: UserId,
+    dayStart: Instant
+  ): Promise<TokenCount> {
     const result = await this.prisma.pollLegalCheckLog.aggregate({
-      where: {
-        checkedBy,
-        checkedAt: { gte: startOfDay },
-      },
-      _sum: {
-        inputTokens: true,
-        outputTokens: true,
-      },
+      where: { checkedBy, checkedAt: { gte: Instant.toDate(dayStart) } },
+      _sum: { inputTokens: true, outputTokens: true },
     });
 
-    return (result._sum.inputTokens ?? 0) + (result._sum.outputTokens ?? 0);
+    return TokenCount.parse(
+      (result._sum.inputTokens ?? 0) + (result._sum.outputTokens ?? 0)
+    );
   }
 }

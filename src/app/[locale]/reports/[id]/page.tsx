@@ -1,3 +1,6 @@
+/** Server report view resolves validated references and serializes only authorized content. */
+import { OrganizationId, UserId } from '@/domain/shared/EntityIds';
+import { PageSize } from '@/domain/shared/Pagination';
 import { getLocale, getTranslations } from 'next-intl/server';
 
 import { Link } from '@/src/i18n/routing';
@@ -119,11 +122,14 @@ export default async function ReportDetailPage({
 
   const [authorUser, isAdmin, isSuperAdmin] = currentUser
     ? await Promise.all([
-        userRepo.findById(report.createdById),
-        orgRepo.isUserAdmin(currentUser.id, report.organizationId),
+        userRepo.findById(UserId.parse(report.createdById)),
+        orgRepo.isUserAdmin(
+          currentUser.id,
+          OrganizationId.parse(report.organizationId)
+        ),
         userRepo.isSuperAdmin(currentUser.id),
       ])
-    : [await userRepo.findById(report.createdById), false, false];
+    : [await userRepo.findById(UserId.parse(report.createdById)), false, false];
 
   const author = authorUser
     ? {
@@ -141,7 +147,7 @@ export default async function ReportDetailPage({
     fileName: a.fileName,
     mimeType: a.mimeType,
     sizeBytes: a.sizeBytes,
-    createdAt: a.createdAt.toISOString(),
+    createdAt: a.createdAt,
   }));
   const serializedPolls = polls.map((p) => ({
     id: p.id,

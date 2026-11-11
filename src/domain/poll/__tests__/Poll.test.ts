@@ -1,3 +1,24 @@
+/** Poll lifecycle and editing invariants. Finish fixtures use stored identities
+ * so event validation is exercised without bypassing aggregate construction. */
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { PollInstant } from '@/domain/poll/PollValues';
+import {
+  QuestionText,
+  AnswerText,
+  QuestionDetails,
+} from '@/domain/poll/QuestionValues';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { BoardId, UserId, PropertyId } from '@/domain/shared/EntityIds';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import { OrganizationId, PollAttachmentId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
+import { pollFixtureCreation } from '@/application/poll/__tests__/pollFixtureCreation';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { PollId, QuestionId, AnswerId } from '@/domain/shared/EntityIds';
 import { describe, it, expect } from 'vitest';
 import { Poll } from '../Poll';
 import { Question } from '../Question';
@@ -5,25 +26,43 @@ import { Answer } from '../Answer';
 import { PollDomainCodes } from '../PollDomainCodes';
 import { POLL_ATTACHMENT_COUNT_LIMIT } from '../PollAttachment';
 import { PollState } from '../PollState';
+import { PollType } from '../PollType';
 import { ProfanityChecker } from '../../shared/profanity/ProfanityChecker';
 import { SharedDomainCodes } from '../../shared/SharedDomainCodes';
 
+// Reconstitute the stored identity before lifecycle events can be emitted.
+function persistedPoll(poll: Poll): Poll {
+  return Poll.reconstitute({
+    ...poll.toJSON(),
+    id: 'poll-1',
+    questions: poll.questions,
+  });
+}
+
 const mockProfanityChecker: ProfanityChecker = {
   containsProfanity: (text: string) => text.includes('badword'),
+  findProfaneWords: (text: string) =>
+    text.includes('badword') ? ['badword'] : [],
 };
 
 // Helper: create a question with an answer (required for poll activation)
 function createQuestionWithAnswer(pollId: string): Question {
   const questionResult = Question.create(
-    'Test Question',
-    pollId,
-    1,
-    0,
+    QuestionText.parse('Test Question'),
+    PollId.parse(pollId),
+    testCreation(QuestionId, 'question-1'),
+    PageNumber.parse(1),
+    SortOrder.parse(0),
     'single-choice'
   );
-  const question = questionResult.value;
-  const answerResult = Answer.create('Test Answer', 1, question.id);
-  question.addAnswer(answerResult.value);
+  const question = expectSuccess(questionResult);
+  const answerResult = Answer.create(
+    AnswerText.parse('Test Answer'),
+    SortOrder.parse(1),
+    question.id,
+    testCreation(AnswerId, 'answer-1')
+  );
+  question.addAnswer(expectSuccess(answerResult));
 
   return question;
 }
@@ -32,36 +71,40 @@ describe('Poll Domain', () => {
   describe('canEdit', () => {
     it('should allow editing when poll is not active, not finished, and has no votes', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       expect(pollResult.success).toBe(true);
-      const poll = pollResult.value;
+      const poll = expectSuccess(pollResult);
 
       const canEditResult = poll.canEdit(false);
       expect(canEditResult.success).toBe(true);
-      expect(canEditResult.value).toBe(true);
+      expect(expectSuccess(canEditResult)).toBe(true);
     });
 
     it('should not allow editing when poll is active', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       expect(pollResult.success).toBe(true);
-      const poll = pollResult.value;
+      const poll = expectSuccess(pollResult);
 
       // Add a question with answer so we can activate the poll
       poll.addQuestion(createQuestionWithAnswer(poll.id));
@@ -74,67 +117,75 @@ describe('Poll Domain', () => {
 
       const canEditResult = poll.canEdit(false);
       expect(canEditResult.success).toBe(true);
-      expect(canEditResult.value).toBe(false);
+      expect(expectSuccess(canEditResult)).toBe(false);
     });
 
     it('should not allow editing when poll is finished', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       expect(pollResult.success).toBe(true);
-      const poll = pollResult.value;
+      const poll = persistedPoll(expectSuccess(pollResult));
 
       // Finish poll (must go through READY → ACTIVE first)
       poll.addQuestion(createQuestionWithAnswer(poll.id));
       poll.submitToAdmin();
       poll.takeSnapshot();
       poll.activate();
-      poll.finish();
+      expect(
+        poll.finish(PollInstant.parse(new Date().toISOString())).success
+      ).toBe(true);
 
       const canEditResult = poll.canEdit(false);
       expect(canEditResult.success).toBe(true);
-      expect(canEditResult.value).toBe(false);
+      expect(expectSuccess(canEditResult)).toBe(false);
     });
 
     it('should not allow editing when poll has votes', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       expect(pollResult.success).toBe(true);
-      const poll = pollResult.value;
+      const poll = expectSuccess(pollResult);
 
       const canEditResult = poll.canEdit(true);
       expect(canEditResult.success).toBe(true);
-      expect(canEditResult.value).toBe(false);
+      expect(expectSuccess(canEditResult)).toBe(false);
     });
 
     it('should not allow editing when poll is both active and has votes', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       expect(pollResult.success).toBe(true);
-      const poll = pollResult.value;
+      const poll = expectSuccess(pollResult);
 
       // Add a question with answer so we can activate the poll
       poll.addQuestion(createQuestionWithAnswer(poll.id));
@@ -146,23 +197,25 @@ describe('Poll Domain', () => {
 
       const canEditResult = poll.canEdit(true);
       expect(canEditResult.success).toBe(true);
-      expect(canEditResult.value).toBe(false);
+      expect(expectSuccess(canEditResult)).toBe(false);
     });
   });
 
   describe('updateTitle', () => {
     it('should fail if poll is active', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
-      const poll = pollResult.value;
+      const poll = expectSuccess(pollResult);
 
       // Add a question with answer so we can activate the poll
       poll.addQuestion(createQuestionWithAnswer(poll.id));
@@ -172,25 +225,29 @@ describe('Poll Domain', () => {
       const activateResult = poll.activate();
       expect(activateResult.success).toBe(true);
 
-      const result = poll.updateTitle('New Title');
+      const result = poll.updateTitle(PollTitle.parse('New Title'));
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED);
+      expect(expectFailure(result)).toBe(
+        PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED
+      );
     });
   });
 
   describe('updateDescription', () => {
     it('should fail if poll is active', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
-      const poll = pollResult.value;
+      const poll = expectSuccess(pollResult);
 
       // Add a question with answer so we can activate the poll
       poll.addQuestion(createQuestionWithAnswer(poll.id));
@@ -200,25 +257,31 @@ describe('Poll Domain', () => {
       const activateResult = poll.activate();
       expect(activateResult.success).toBe(true);
 
-      const result = poll.updateDescription('New Description');
+      const result = poll.updateDescription(
+        PollDescription.parse('New Description')
+      );
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED);
+      expect(expectFailure(result)).toBe(
+        PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED
+      );
     });
   });
 
   describe('updateDates', () => {
     it('should fail if poll is active', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
-      const poll = pollResult.value;
+      const poll = expectSuccess(pollResult);
 
       // Add a question with answer so we can activate the poll
       poll.addQuestion(createQuestionWithAnswer(poll.id));
@@ -229,24 +292,29 @@ describe('Poll Domain', () => {
       expect(activateResult.success).toBe(true);
 
       const result = poll.updateDates(
-        new Date('2026-01-20'),
-        new Date('2026-02-20')
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-20'), new Date('2026-02-20'))
+        )
       );
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED);
+      expect(expectFailure(result)).toBe(
+        PollDomainCodes.POLL_CANNOT_UPDATE_FINISHED
+      );
     });
   });
 
   describe('Participant Snapshot Management', () => {
     it('should be in DRAFT state initially (no snapshot)', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       expect(pollResult.success).toBe(true);
@@ -260,13 +328,15 @@ describe('Poll Domain', () => {
 
     it('should be in READY state after taking snapshot', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       expect(pollResult.success).toBe(true);
@@ -282,13 +352,15 @@ describe('Poll Domain', () => {
 
     it('should allow modifying participants in READY state with no votes', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       expect(pollResult.success).toBe(true);
@@ -304,13 +376,15 @@ describe('Poll Domain', () => {
 
     it('should not allow modifying participants when votes exist', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       expect(pollResult.success).toBe(true);
@@ -326,13 +400,15 @@ describe('Poll Domain', () => {
 
     it('should not allow modifying participants in DRAFT state', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       expect(pollResult.success).toBe(true);
@@ -347,13 +423,15 @@ describe('Poll Domain', () => {
   describe('Weight Criteria', () => {
     it('should have null weight criteria initially', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       expect(pollResult.success).toBe(true);
@@ -366,13 +444,15 @@ describe('Poll Domain', () => {
 
     it('should set weight criteria', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       expect(pollResult.success).toBe(true);
@@ -386,13 +466,15 @@ describe('Poll Domain', () => {
 
     it('should allow clearing weight criteria', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       expect(pollResult.success).toBe(true);
@@ -410,29 +492,41 @@ describe('Poll Domain', () => {
   describe('addAnswerToQuestion', () => {
     it('should add answer to existing question', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
-      const poll = pollResult.value;
+      const poll = expectSuccess(pollResult);
 
       // Add a question without answers
       const questionResult = Question.create(
-        'Test Question',
+        QuestionText.parse('Test Question'),
         poll.id,
-        1,
-        0,
+        testCreation(QuestionId, 'question-2'),
+        PageNumber.parse(1),
+        SortOrder.parse(0),
         'single-choice'
       );
-      const question = questionResult.value;
-      (question as any).props.id = 'question-1';
+      let question = expectSuccess(questionResult);
+      question = Question.reconstitute({
+        ...question.toJSON(),
+        answers: question.answers,
+        id: 'question-1',
+      });
       poll.addQuestion(question);
 
-      const result = poll.addAnswerToQuestion('question-1', 'New Answer', 1);
+      const result = poll.addAnswerToQuestion(
+        QuestionId.parse('question-1'),
+        AnswerText.parse('New Answer'),
+        SortOrder.parse(1),
+        testCreation(AnswerId, 'answer-2')
+      );
       expect(result.success).toBe(true);
 
       // Verify answer was added
@@ -443,28 +537,40 @@ describe('Poll Domain', () => {
 
     it('should fail if poll is active', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
-      const poll = pollResult.value;
+      const poll = expectSuccess(pollResult);
 
       // Add question with answer
       const questionResult = Question.create(
-        'Test Question',
+        QuestionText.parse('Test Question'),
         poll.id,
-        1,
-        0,
+        testCreation(QuestionId, 'question-3'),
+        PageNumber.parse(1),
+        SortOrder.parse(0),
         'single-choice'
       );
-      const question = questionResult.value;
-      (question as any).props.id = 'question-1';
-      const answerResult = Answer.create('Test Answer', 1, question.id);
-      question.addAnswer(answerResult.value);
+      let question = expectSuccess(questionResult);
+      question = Question.reconstitute({
+        ...question.toJSON(),
+        answers: question.answers,
+        id: 'question-1',
+      });
+      const answerResult = Answer.create(
+        AnswerText.parse('Test Answer'),
+        SortOrder.parse(1),
+        question.id,
+        testCreation(AnswerId, 'answer-3')
+      );
+      question.addAnswer(expectSuccess(answerResult));
       poll.addQuestion(question);
 
       // Activate through state machine
@@ -472,126 +578,185 @@ describe('Poll Domain', () => {
       poll.takeSnapshot();
       poll.activate();
 
-      const result = poll.addAnswerToQuestion('question-1', 'New Answer', 2);
+      const result = poll.addAnswerToQuestion(
+        QuestionId.parse('question-1'),
+        AnswerText.parse('New Answer'),
+        SortOrder.parse(2),
+        testCreation(AnswerId, 'answer-4')
+      );
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.POLL_CANNOT_ADD_ANSWER_ACTIVE);
+      expect(expectFailure(result)).toBe(
+        PollDomainCodes.POLL_CANNOT_ADD_ANSWER_ACTIVE
+      );
     });
 
     it('should fail if poll is finished', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
-      const poll = pollResult.value;
+      const poll = persistedPoll(expectSuccess(pollResult));
 
       // Add question with answer
       const questionResult = Question.create(
-        'Test Question',
+        QuestionText.parse('Test Question'),
         poll.id,
-        1,
-        0,
+        testCreation(QuestionId, 'question-4'),
+        PageNumber.parse(1),
+        SortOrder.parse(0),
         'single-choice'
       );
-      const question = questionResult.value;
-      (question as any).props.id = 'question-1';
-      const answerResult = Answer.create('Test Answer', 1, question.id);
-      question.addAnswer(answerResult.value);
+      let question = expectSuccess(questionResult);
+      question = Question.reconstitute({
+        ...question.toJSON(),
+        answers: question.answers,
+        id: 'question-1',
+      });
+      const answerResult = Answer.create(
+        AnswerText.parse('Test Answer'),
+        SortOrder.parse(1),
+        question.id,
+        testCreation(AnswerId, 'answer-5')
+      );
+      question.addAnswer(expectSuccess(answerResult));
       poll.addQuestion(question);
 
       // Finish through state machine
       poll.submitToAdmin();
       poll.takeSnapshot();
       poll.activate();
-      poll.finish();
+      expect(
+        poll.finish(PollInstant.parse(new Date().toISOString())).success
+      ).toBe(true);
 
-      const result = poll.addAnswerToQuestion('question-1', 'New Answer', 2);
+      const result = poll.addAnswerToQuestion(
+        QuestionId.parse('question-1'),
+        AnswerText.parse('New Answer'),
+        SortOrder.parse(2),
+        testCreation(AnswerId, 'answer-6')
+      );
       expect(result.success).toBe(false);
-      expect(result.error).toBe(
+      expect(expectFailure(result)).toBe(
         PollDomainCodes.POLL_CANNOT_ADD_ANSWER_FINISHED
       );
     });
 
     it('should fail if question not found', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
-      const poll = pollResult.value;
+      const poll = expectSuccess(pollResult);
 
-      const result = poll.addAnswerToQuestion('non-existent', 'New Answer', 1);
+      const result = poll.addAnswerToQuestion(
+        QuestionId.parse('non-existent'),
+        AnswerText.parse('New Answer'),
+        SortOrder.parse(1),
+        testCreation(AnswerId, 'answer-7')
+      );
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.QUESTION_NOT_FOUND);
+      expect(expectFailure(result)).toBe(PollDomainCodes.QUESTION_NOT_FOUND);
     });
 
     it('should fail if question is archived', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
-      const poll = pollResult.value;
+      const poll = expectSuccess(pollResult);
 
       const questionResult = Question.create(
-        'Test Question',
+        QuestionText.parse('Test Question'),
         poll.id,
-        1,
-        0,
+        testCreation(QuestionId, 'question-5'),
+        PageNumber.parse(1),
+        SortOrder.parse(0),
         'single-choice'
       );
-      const question = questionResult.value;
-      (question as any).props.id = 'question-1';
+      let question = expectSuccess(questionResult);
+      question = Question.reconstitute({
+        ...question.toJSON(),
+        answers: question.answers,
+        id: 'question-1',
+      });
       poll.addQuestion(question);
 
       // Archive the question
-      question.archive();
+      question.archive(Instant.parse('2026-01-02T00:00:00.000Z'));
 
-      const result = poll.addAnswerToQuestion('question-1', 'New Answer', 1);
+      const result = poll.addAnswerToQuestion(
+        QuestionId.parse('question-1'),
+        AnswerText.parse('New Answer'),
+        SortOrder.parse(1),
+        testCreation(AnswerId, 'answer-8')
+      );
       expect(result.success).toBe(false);
-      expect(result.error).toBe(
+      expect(expectFailure(result)).toBe(
         PollDomainCodes.QUESTION_CANNOT_ADD_ANSWER_ARCHIVED
       );
     });
 
     it('should fail with invalid answer text', () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
-      const poll = pollResult.value;
+      const poll = expectSuccess(pollResult);
 
       const questionResult = Question.create(
-        'Test Question',
+        QuestionText.parse('Test Question'),
         poll.id,
-        1,
-        0,
+        testCreation(QuestionId, 'question-6'),
+        PageNumber.parse(1),
+        SortOrder.parse(0),
         'single-choice'
       );
-      const question = questionResult.value;
-      (question as any).props.id = 'question-1';
+      let question = expectSuccess(questionResult);
+      question = Question.reconstitute({
+        ...question.toJSON(),
+        answers: question.answers,
+        id: 'question-1',
+      });
       poll.addQuestion(question);
 
-      const result = poll.addAnswerToQuestion('question-1', '', 1);
+      const result = poll.addAnswerToQuestion(
+        QuestionId.parse('question-1'),
+
+        // @ts-expect-error Exercise runtime rejection of malformed caller content.
+        '',
+        SortOrder.parse(1),
+        testCreation(AnswerId, 'answer-9')
+      );
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.ANSWER_TEXT_EMPTY);
+      expect(expectFailure(result)).toBe(PollDomainCodes.ANSWER_TEXT_EMPTY);
     });
   });
 
@@ -599,29 +764,37 @@ describe('Poll Domain', () => {
     describe('initial state', () => {
       it('should have DRAFT state by default', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
 
         expect(pollResult.success).toBe(true);
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
         expect(poll.state).toBe(PollState.DRAFT);
       });
     });
 
     function draftWithQuestion() {
-      const poll = Poll.create(
-        'Test Poll',
-        'Test Description',
-        'board-1',
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15')
-      ).value;
+      const poll = expectSuccess(
+        Poll.create(
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
+        )
+      );
       poll.addQuestion(createQuestionWithAnswer(poll.id));
 
       return poll;
@@ -640,19 +813,24 @@ describe('Poll Domain', () => {
       // Caught here rather than at snapshot so the author sees it while the
       // poll is still theirs to fix.
       it('should fail if poll has no questions', () => {
-        const poll = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
-        ).value;
+        const poll = expectSuccess(
+          Poll.create(
+            PollTitle.parse('Test Poll'),
+            PollDescription.parse('Test Description'),
+            OrganizationId.parse('org-1'),
+            BoardId.parse('board-1'),
+            UserId.parse('user-1'),
+            expectSuccess(
+              PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+            ),
+            pollFixtureCreation(PollId)
+          )
+        );
 
         const result = poll.submitToAdmin();
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(PollDomainCodes.POLL_NO_QUESTIONS);
+        expect(expectFailure(result)).toBe(PollDomainCodes.POLL_NO_QUESTIONS);
       });
 
       it('should fail if the poll was already submitted', () => {
@@ -662,7 +840,7 @@ describe('Poll Domain', () => {
         const result = poll.submitToAdmin();
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_DRAFT);
+        expect(expectFailure(result)).toBe(PollDomainCodes.POLL_MUST_BE_DRAFT);
       });
     });
 
@@ -687,7 +865,9 @@ describe('Poll Domain', () => {
         const result = poll.returnToDraft();
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_SUBMITTED);
+        expect(expectFailure(result)).toBe(
+          PollDomainCodes.POLL_MUST_BE_SUBMITTED
+        );
       });
 
       it('should fail on a poll that was never submitted', () => {
@@ -696,7 +876,9 @@ describe('Poll Domain', () => {
         const result = poll.returnToDraft();
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_SUBMITTED);
+        expect(expectFailure(result)).toBe(
+          PollDomainCodes.POLL_MUST_BE_SUBMITTED
+        );
       });
     });
 
@@ -719,7 +901,9 @@ describe('Poll Domain', () => {
         const result = poll.takeSnapshot();
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_SUBMITTED);
+        expect(expectFailure(result)).toBe(
+          PollDomainCodes.POLL_MUST_BE_SUBMITTED
+        );
         expect(poll.state).toBe(PollState.DRAFT);
       });
 
@@ -731,7 +915,9 @@ describe('Poll Domain', () => {
         const result = poll.takeSnapshot();
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_SUBMITTED);
+        expect(expectFailure(result)).toBe(
+          PollDomainCodes.POLL_MUST_BE_SUBMITTED
+        );
       });
     });
 
@@ -740,11 +926,15 @@ describe('Poll Domain', () => {
         const poll = draftWithQuestion();
         poll.submitToAdmin();
 
-        const result = poll.updateTitle('Changed behind the admin');
+        const result = poll.updateTitle(
+          PollTitle.parse('Changed behind the admin')
+        );
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(PollDomainCodes.POLL_CANNOT_UPDATE_SUBMITTED);
-        expect(poll.canEdit(false).value).toBe(false);
+        expect(expectFailure(result)).toBe(
+          PollDomainCodes.POLL_CANNOT_UPDATE_SUBMITTED
+        );
+        expect(expectSuccess(poll.canEdit(false))).toBe(false);
       });
 
       it('allows edits again after a recall', () => {
@@ -752,8 +942,10 @@ describe('Poll Domain', () => {
         poll.submitToAdmin();
         poll.returnToDraft();
 
-        expect(poll.updateTitle('Changed after recall').success).toBe(true);
-        expect(poll.canEdit(false).value).toBe(true);
+        expect(
+          poll.updateTitle(PollTitle.parse('Changed after recall')).success
+        ).toBe(true);
+        expect(expectSuccess(poll.canEdit(false))).toBe(true);
       });
     });
 
@@ -763,14 +955,17 @@ describe('Poll Domain', () => {
       // their back and leave them waiting on a poll they had already sent.
       it('should return to SUBMITTED when no votes, not to DRAFT', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
         poll.addQuestion(createQuestionWithAnswer(poll.id));
         poll.submitToAdmin();
         poll.takeSnapshot();
@@ -785,14 +980,17 @@ describe('Poll Domain', () => {
       // submit it a second time.
       it('leaves the poll ready to be frozen again', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
         poll.addQuestion(createQuestionWithAnswer(poll.id));
         poll.submitToAdmin();
         poll.takeSnapshot();
@@ -804,14 +1002,17 @@ describe('Poll Domain', () => {
 
       it('should fail if poll has votes', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
         poll.addQuestion(createQuestionWithAnswer(poll.id));
         poll.submitToAdmin();
         poll.takeSnapshot();
@@ -819,40 +1020,46 @@ describe('Poll Domain', () => {
         const result = poll.discardSnapshot(true);
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(
+        expect(expectFailure(result)).toBe(
           PollDomainCodes.POLL_CANNOT_DISCARD_SNAPSHOT_HAS_VOTES
         );
       });
 
       it('should fail if poll is not in READY state', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
 
         const result = poll.discardSnapshot(false);
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_READY);
+        expect(expectFailure(result)).toBe(PollDomainCodes.POLL_MUST_BE_READY);
       });
     });
 
     describe('activate (READY → ACTIVE)', () => {
       it('should transition from READY to ACTIVE', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
         poll.addQuestion(createQuestionWithAnswer(poll.id));
         poll.submitToAdmin();
         poll.takeSnapshot();
@@ -865,33 +1072,39 @@ describe('Poll Domain', () => {
 
       it('should fail if poll is not in READY state', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
 
         const result = poll.activate();
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_READY);
+        expect(expectFailure(result)).toBe(PollDomainCodes.POLL_MUST_BE_READY);
       });
     });
 
     describe('deactivate (ACTIVE → READY)', () => {
       it('should transition from ACTIVE to READY', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
         poll.addQuestion(createQuestionWithAnswer(poll.id));
         poll.submitToAdmin();
         poll.takeSnapshot();
@@ -905,39 +1118,45 @@ describe('Poll Domain', () => {
 
       it('should fail if poll is not in ACTIVE state', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
 
         const result = poll.deactivate();
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
+        expect(expectFailure(result)).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
       });
     });
 
     describe('finish (ACTIVE → FINISHED)', () => {
       it('should transition from ACTIVE to FINISHED', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = persistedPoll(expectSuccess(pollResult));
         poll.addQuestion(createQuestionWithAnswer(poll.id));
         poll.submitToAdmin();
         poll.takeSnapshot();
         poll.activate();
 
-        const result = poll.finish();
+        const result = poll.finish(PollInstant.parse(new Date().toISOString()));
 
         expect(result.success).toBe(true);
         expect(poll.state).toBe(PollState.FINISHED);
@@ -945,33 +1164,39 @@ describe('Poll Domain', () => {
 
       it('should fail if poll is not in ACTIVE state', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = persistedPoll(expectSuccess(pollResult));
 
-        const result = poll.finish();
+        const result = poll.finish(PollInstant.parse(new Date().toISOString()));
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
+        expect(expectFailure(result)).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
       });
     });
 
     describe('canModifyParticipants with state machine', () => {
       it('should allow modifying participants in READY state with no votes', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
         poll.addQuestion(createQuestionWithAnswer(poll.id));
         poll.submitToAdmin();
         poll.takeSnapshot();
@@ -981,14 +1206,17 @@ describe('Poll Domain', () => {
 
       it('should not allow modifying participants in READY state with votes', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
         poll.addQuestion(createQuestionWithAnswer(poll.id));
         poll.submitToAdmin();
         poll.takeSnapshot();
@@ -998,28 +1226,34 @@ describe('Poll Domain', () => {
 
       it('should not allow modifying participants in DRAFT state', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
 
         expect(poll.canModifyParticipants(false)).toBe(false);
       });
 
       it('should not allow modifying participants in ACTIVE state with votes', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
         poll.addQuestion(createQuestionWithAnswer(poll.id));
         poll.submitToAdmin();
         poll.takeSnapshot();
@@ -1030,19 +1264,24 @@ describe('Poll Domain', () => {
 
       it('should not allow modifying participants in FINISHED state', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = persistedPoll(expectSuccess(pollResult));
         poll.addQuestion(createQuestionWithAnswer(poll.id));
         poll.submitToAdmin();
         poll.takeSnapshot();
         poll.activate();
-        poll.finish();
+        expect(
+          poll.finish(PollInstant.parse(new Date().toISOString())).success
+        ).toBe(true);
 
         expect(poll.canModifyParticipants(false)).toBe(false);
       });
@@ -1051,14 +1290,17 @@ describe('Poll Domain', () => {
     describe('helper methods', () => {
       it('isActive should return true only in ACTIVE state', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = persistedPoll(expectSuccess(pollResult));
         poll.addQuestion(createQuestionWithAnswer(poll.id));
 
         expect(poll.isActive()).toBe(false);
@@ -1070,20 +1312,25 @@ describe('Poll Domain', () => {
         poll.activate();
         expect(poll.isActive()).toBe(true);
 
-        poll.finish();
+        expect(
+          poll.finish(PollInstant.parse(new Date().toISOString())).success
+        ).toBe(true);
         expect(poll.isActive()).toBe(false);
       });
 
       it('isFinished should return true only in FINISHED state', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = persistedPoll(expectSuccess(pollResult));
         poll.addQuestion(createQuestionWithAnswer(poll.id));
 
         expect(poll.isFinished()).toBe(false);
@@ -1095,20 +1342,25 @@ describe('Poll Domain', () => {
         poll.activate();
         expect(poll.isFinished()).toBe(false);
 
-        poll.finish();
+        expect(
+          poll.finish(PollInstant.parse(new Date().toISOString())).success
+        ).toBe(true);
         expect(poll.isFinished()).toBe(true);
       });
 
       it('isReady should return true only in READY state', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
         poll.addQuestion(createQuestionWithAnswer(poll.id));
 
         expect(poll.isReady()).toBe(false);
@@ -1123,14 +1375,17 @@ describe('Poll Domain', () => {
 
       it('isDraft should return true only in DRAFT state', () => {
         const pollResult = Poll.create(
-          'Test Poll',
-          'Test Description',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Test Poll'),
+          PollDescription.parse('Test Description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          pollFixtureCreation(PollId)
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
         poll.addQuestion(createQuestionWithAnswer(poll.id));
 
         expect(poll.isDraft()).toBe(true);
@@ -1146,45 +1401,55 @@ describe('Poll Domain', () => {
     describe('create', () => {
       it('should reject profane title', () => {
         const result = Poll.create(
-          'badword title',
-          'Clean description',
-          'org-1',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15'),
+          PollTitle.parse('badword title'),
+          PollDescription.parse('Clean description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          testCreation(PollId, 'poll-1'),
           mockProfanityChecker
         );
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+        expect(expectFailure(result)).toBe(
+          SharedDomainCodes.CONTAINS_PROFANITY
+        );
       });
 
       it('should reject profane description', () => {
         const result = Poll.create(
-          'Clean title',
-          'badword description',
-          'org-1',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15'),
+          PollTitle.parse('Clean title'),
+          PollDescription.parse('badword description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          testCreation(PollId, 'poll-1'),
           mockProfanityChecker
         );
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+        expect(expectFailure(result)).toBe(
+          SharedDomainCodes.CONTAINS_PROFANITY
+        );
       });
 
       it('should allow clean text with profanity checker', () => {
         const result = Poll.create(
-          'Clean title',
-          'Clean description',
-          'org-1',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15'),
+          PollTitle.parse('Clean title'),
+          PollDescription.parse('Clean description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          testCreation(PollId, 'poll-1'),
           mockProfanityChecker
         );
 
@@ -1193,13 +1458,15 @@ describe('Poll Domain', () => {
 
       it('should skip profanity check when checker not provided', () => {
         const result = Poll.create(
-          'badword title',
-          'badword description',
-          'org-1',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('badword title'),
+          PollDescription.parse('badword description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          testCreation(PollId, 'poll-1')
         );
 
         expect(result.success).toBe(true);
@@ -1209,36 +1476,45 @@ describe('Poll Domain', () => {
     describe('updateTitle', () => {
       it('should reject profane title', () => {
         const pollResult = Poll.create(
-          'Clean title',
-          'Clean description',
-          'org-1',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Clean title'),
+          PollDescription.parse('Clean description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          testCreation(PollId, 'poll-1')
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
 
-        const result = poll.updateTitle('badword title', mockProfanityChecker);
+        const result = poll.updateTitle(
+          PollTitle.parse('badword title'),
+          mockProfanityChecker
+        );
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+        expect(expectFailure(result)).toBe(
+          SharedDomainCodes.CONTAINS_PROFANITY
+        );
       });
 
       it('should allow clean title with profanity checker', () => {
         const pollResult = Poll.create(
-          'Clean title',
-          'Clean description',
-          'org-1',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Clean title'),
+          PollDescription.parse('Clean description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          testCreation(PollId, 'poll-1')
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
 
         const result = poll.updateTitle(
-          'New clean title',
+          PollTitle.parse('New clean title'),
           mockProfanityChecker
         );
 
@@ -1249,39 +1525,45 @@ describe('Poll Domain', () => {
     describe('updateDescription', () => {
       it('should reject profane description', () => {
         const pollResult = Poll.create(
-          'Clean title',
-          'Clean description',
-          'org-1',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Clean title'),
+          PollDescription.parse('Clean description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          testCreation(PollId, 'poll-1')
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
 
         const result = poll.updateDescription(
-          'badword description',
+          PollDescription.parse('badword description'),
           mockProfanityChecker
         );
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+        expect(expectFailure(result)).toBe(
+          SharedDomainCodes.CONTAINS_PROFANITY
+        );
       });
 
       it('should allow clean description with profanity checker', () => {
         const pollResult = Poll.create(
-          'Clean title',
-          'Clean description',
-          'org-1',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Clean title'),
+          PollDescription.parse('Clean description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          testCreation(PollId, 'poll-1')
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
 
         const result = poll.updateDescription(
-          'New clean description',
+          PollDescription.parse('New clean description'),
           mockProfanityChecker
         );
 
@@ -1292,65 +1574,83 @@ describe('Poll Domain', () => {
     describe('addAnswerToQuestion', () => {
       it('should reject profane answer text via Answer.create', () => {
         const pollResult = Poll.create(
-          'Clean title',
-          'Clean description',
-          'org-1',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Clean title'),
+          PollDescription.parse('Clean description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          testCreation(PollId, 'poll-1')
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
 
         const questionResult = Question.create(
-          'Test Question',
+          QuestionText.parse('Test Question'),
           poll.id,
-          1,
-          0,
+          testCreation(QuestionId, 'question-7'),
+          PageNumber.parse(1),
+          SortOrder.parse(0),
           'single-choice'
         );
-        const question = questionResult.value;
-        (question as any).props.id = 'question-1';
+        let question = expectSuccess(questionResult);
+        question = Question.reconstitute({
+          ...question.toJSON(),
+          answers: question.answers,
+          id: 'question-1',
+        });
         poll.addQuestion(question);
 
         const result = poll.addAnswerToQuestion(
-          'question-1',
-          'badword answer',
-          1,
+          QuestionId.parse('question-1'),
+          AnswerText.parse('badword answer'),
+          SortOrder.parse(1),
+          testCreation(AnswerId, 'answer-10'),
           mockProfanityChecker
         );
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+        expect(expectFailure(result)).toBe(
+          SharedDomainCodes.CONTAINS_PROFANITY
+        );
       });
 
       it('should allow clean answer text with profanity checker', () => {
         const pollResult = Poll.create(
-          'Clean title',
-          'Clean description',
-          'org-1',
-          'board-1',
-          'user-1',
-          new Date('2026-01-15'),
-          new Date('2026-02-15')
+          PollTitle.parse('Clean title'),
+          PollDescription.parse('Clean description'),
+          OrganizationId.parse('org-1'),
+          BoardId.parse('board-1'),
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          testCreation(PollId, 'poll-1')
         );
-        const poll = pollResult.value;
+        const poll = expectSuccess(pollResult);
 
         const questionResult = Question.create(
-          'Test Question',
+          QuestionText.parse('Test Question'),
           poll.id,
-          1,
-          0,
+          testCreation(QuestionId, 'question-8'),
+          PageNumber.parse(1),
+          SortOrder.parse(0),
           'single-choice'
         );
-        const question = questionResult.value;
-        (question as any).props.id = 'question-1';
+        let question = expectSuccess(questionResult);
+        question = Question.reconstitute({
+          ...question.toJSON(),
+          answers: question.answers,
+          id: 'question-1',
+        });
         poll.addQuestion(question);
 
         const result = poll.addAnswerToQuestion(
-          'question-1',
-          'Clean answer',
-          1,
+          QuestionId.parse('question-1'),
+          AnswerText.parse('Clean answer'),
+          SortOrder.parse(1),
+          testCreation(AnswerId, 'answer-11'),
           mockProfanityChecker
         );
 
@@ -1363,42 +1663,49 @@ describe('Poll Domain', () => {
     describe('create', () => {
       it('should reject profane question text', () => {
         const result = Question.create(
-          'badword question',
-          'poll-1',
-          1,
-          0,
+          QuestionText.parse('badword question'),
+          PollId.parse('poll-1'),
+          testCreation(QuestionId, 'question-9'),
+          PageNumber.parse(1),
+          SortOrder.parse(0),
           'single-choice',
           undefined,
           mockProfanityChecker
         );
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+        expect(expectFailure(result)).toBe(
+          SharedDomainCodes.CONTAINS_PROFANITY
+        );
       });
 
       it('should reject profane question details', () => {
         const result = Question.create(
-          'Clean question',
-          'poll-1',
-          1,
-          0,
+          QuestionText.parse('Clean question'),
+          PollId.parse('poll-1'),
+          testCreation(QuestionId, 'question-10'),
+          PageNumber.parse(1),
+          SortOrder.parse(0),
           'single-choice',
-          'badword details',
+          QuestionDetails.parse('badword details'),
           mockProfanityChecker
         );
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+        expect(expectFailure(result)).toBe(
+          SharedDomainCodes.CONTAINS_PROFANITY
+        );
       });
 
       it('should allow clean text with profanity checker', () => {
         const result = Question.create(
-          'Clean question',
-          'poll-1',
-          1,
-          0,
+          QuestionText.parse('Clean question'),
+          PollId.parse('poll-1'),
+          testCreation(QuestionId, 'question-11'),
+          PageNumber.parse(1),
+          SortOrder.parse(0),
           'single-choice',
-          'Clean details',
+          QuestionDetails.parse('Clean details'),
           mockProfanityChecker
         );
 
@@ -1407,12 +1714,13 @@ describe('Poll Domain', () => {
 
       it('should skip profanity check when checker not provided', () => {
         const result = Question.create(
-          'badword question',
-          'poll-1',
-          1,
-          0,
+          QuestionText.parse('badword question'),
+          PollId.parse('poll-1'),
+          testCreation(QuestionId, 'question-12'),
+          PageNumber.parse(1),
+          SortOrder.parse(0),
           'single-choice',
-          'badword details'
+          QuestionDetails.parse('badword details')
         );
 
         expect(result.success).toBe(true);
@@ -1422,35 +1730,39 @@ describe('Poll Domain', () => {
     describe('updateText', () => {
       it('should reject profane text', () => {
         const questionResult = Question.create(
-          'Clean question',
-          'poll-1',
-          1,
-          0,
+          QuestionText.parse('Clean question'),
+          PollId.parse('poll-1'),
+          testCreation(QuestionId, 'question-13'),
+          PageNumber.parse(1),
+          SortOrder.parse(0),
           'single-choice'
         );
-        const question = questionResult.value;
+        const question = expectSuccess(questionResult);
 
         const result = question.updateText(
-          'badword text',
+          QuestionText.parse('badword text'),
           mockProfanityChecker
         );
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+        expect(expectFailure(result)).toBe(
+          SharedDomainCodes.CONTAINS_PROFANITY
+        );
       });
 
       it('should allow clean text with profanity checker', () => {
         const questionResult = Question.create(
-          'Clean question',
-          'poll-1',
-          1,
-          0,
+          QuestionText.parse('Clean question'),
+          PollId.parse('poll-1'),
+          testCreation(QuestionId, 'question-14'),
+          PageNumber.parse(1),
+          SortOrder.parse(0),
           'single-choice'
         );
-        const question = questionResult.value;
+        const question = expectSuccess(questionResult);
 
         const result = question.updateText(
-          'New clean text',
+          QuestionText.parse('New clean text'),
           mockProfanityChecker
         );
 
@@ -1461,33 +1773,37 @@ describe('Poll Domain', () => {
     describe('updateDetails', () => {
       it('should reject profane details', () => {
         const questionResult = Question.create(
-          'Clean question',
-          'poll-1',
-          1,
-          0,
+          QuestionText.parse('Clean question'),
+          PollId.parse('poll-1'),
+          testCreation(QuestionId, 'question-15'),
+          PageNumber.parse(1),
+          SortOrder.parse(0),
           'single-choice'
         );
-        const question = questionResult.value;
+        const question = expectSuccess(questionResult);
 
         const result = question.updateDetails(
-          'badword details',
+          QuestionDetails.parse('badword details'),
           mockProfanityChecker
         );
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+        expect(expectFailure(result)).toBe(
+          SharedDomainCodes.CONTAINS_PROFANITY
+        );
       });
 
       it('should allow null details with profanity checker', () => {
         const questionResult = Question.create(
-          'Clean question',
-          'poll-1',
-          1,
-          0,
+          QuestionText.parse('Clean question'),
+          PollId.parse('poll-1'),
+          testCreation(QuestionId, 'question-16'),
+          PageNumber.parse(1),
+          SortOrder.parse(0),
           'single-choice',
-          'Some details'
+          QuestionDetails.parse('Some details')
         );
-        const question = questionResult.value;
+        const question = expectSuccess(questionResult);
 
         const result = question.updateDetails(null, mockProfanityChecker);
 
@@ -1496,16 +1812,17 @@ describe('Poll Domain', () => {
 
       it('should allow clean details with profanity checker', () => {
         const questionResult = Question.create(
-          'Clean question',
-          'poll-1',
-          1,
-          0,
+          QuestionText.parse('Clean question'),
+          PollId.parse('poll-1'),
+          testCreation(QuestionId, 'question-17'),
+          PageNumber.parse(1),
+          SortOrder.parse(0),
           'single-choice'
         );
-        const question = questionResult.value;
+        const question = expectSuccess(questionResult);
 
         const result = question.updateDetails(
-          'Clean details',
+          QuestionDetails.parse('Clean details'),
           mockProfanityChecker
         );
 
@@ -1518,21 +1835,25 @@ describe('Poll Domain', () => {
     describe('create', () => {
       it('should reject profane answer text', () => {
         const result = Answer.create(
-          'badword answer',
-          0,
-          'question-1',
+          AnswerText.parse('badword answer'),
+          SortOrder.parse(0),
+          QuestionId.parse('question-1'),
+          testCreation(AnswerId, 'answer-12'),
           mockProfanityChecker
         );
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+        expect(expectFailure(result)).toBe(
+          SharedDomainCodes.CONTAINS_PROFANITY
+        );
       });
 
       it('should allow clean text with profanity checker', () => {
         const result = Answer.create(
-          'Clean answer',
-          0,
-          'question-1',
+          AnswerText.parse('Clean answer'),
+          SortOrder.parse(0),
+          QuestionId.parse('question-1'),
+          testCreation(AnswerId, 'answer-13'),
           mockProfanityChecker
         );
 
@@ -1540,7 +1861,12 @@ describe('Poll Domain', () => {
       });
 
       it('should skip profanity check when checker not provided', () => {
-        const result = Answer.create('badword answer', 0, 'question-1');
+        const result = Answer.create(
+          AnswerText.parse('badword answer'),
+          SortOrder.parse(0),
+          QuestionId.parse('question-1'),
+          testCreation(AnswerId, 'answer-14')
+        );
 
         expect(result.success).toBe(true);
       });
@@ -1548,21 +1874,36 @@ describe('Poll Domain', () => {
 
     describe('updateText', () => {
       it('should reject profane text', () => {
-        const answerResult = Answer.create('Clean answer', 0, 'question-1');
-        const answer = answerResult.value;
+        const answerResult = Answer.create(
+          AnswerText.parse('Clean answer'),
+          SortOrder.parse(0),
+          QuestionId.parse('question-1'),
+          testCreation(AnswerId, 'answer-15')
+        );
+        const answer = expectSuccess(answerResult);
 
-        const result = answer.updateText('badword text', mockProfanityChecker);
+        const result = answer.updateText(
+          AnswerText.parse('badword text'),
+          mockProfanityChecker
+        );
 
         expect(result.success).toBe(false);
-        expect(result.error).toBe(SharedDomainCodes.CONTAINS_PROFANITY);
+        expect(expectFailure(result)).toBe(
+          SharedDomainCodes.CONTAINS_PROFANITY
+        );
       });
 
       it('should allow clean text with profanity checker', () => {
-        const answerResult = Answer.create('Clean answer', 0, 'question-1');
-        const answer = answerResult.value;
+        const answerResult = Answer.create(
+          AnswerText.parse('Clean answer'),
+          SortOrder.parse(0),
+          QuestionId.parse('question-1'),
+          testCreation(AnswerId, 'answer-16')
+        );
+        const answer = expectSuccess(answerResult);
 
         const result = answer.updateText(
-          'New clean text',
+          AnswerText.parse('New clean text'),
           mockProfanityChecker
         );
 
@@ -1576,15 +1917,15 @@ describe('Poll type', () => {
   const startDate = new Date('2026-01-01');
   const endDate = new Date('2026-02-01');
 
-  function createPoll(boardId: string | null, pollType?: string) {
+  function createPoll(boardId: string | null, pollType?: PollType) {
     return Poll.create(
-      'Title',
-      'Description',
-      'org-1',
-      boardId,
-      'user-1',
-      startDate,
-      endDate,
+      PollTitle.parse('Title'),
+      PollDescription.parse('Description'),
+      OrganizationId.parse('org-1'),
+      boardId === null ? null : BoardId.parse(boardId),
+      UserId.parse('user-1'),
+      expectSuccess(PollPeriod.create(startDate, endDate)),
+      testCreation(PollId, 'poll-1'),
       undefined,
       pollType
     );
@@ -1594,37 +1935,40 @@ describe('Poll type', () => {
     const result = createPoll(null);
 
     expect(result.success).toBe(true);
-    expect(result.value.pollType).toBe('ORGANIZATION');
-    expect(result.value.isOpen()).toBe(false);
+    expect(expectSuccess(result).pollType).toBe('ORGANIZATION');
+    expect(expectSuccess(result).isOpen()).toBe(false);
   });
 
   it('should create an OPEN poll with equal weight defaults', () => {
     const result = createPoll(null, 'OPEN');
 
     expect(result.success).toBe(true);
-    expect(result.value.isOpen()).toBe(true);
-    expect(result.value.distributionType).toBe('EQUAL');
-    expect(result.value.propertyAggregation).toBe('RAW_SUM');
-    expect(result.value.propertyIds).toEqual([]);
+    expect(expectSuccess(result).isOpen()).toBe(true);
+    expect(expectSuccess(result).distributionType).toBe('EQUAL');
+    expect(expectSuccess(result).propertyAggregation).toBe('RAW_SUM');
+    expect(expectSuccess(result).propertyIds).toEqual([]);
   });
 
   it('should reject an OPEN poll scoped to a board', () => {
     const result = createPoll('board-1', 'OPEN');
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_OPEN_CANNOT_BE_BOARD_SCOPED);
+    expect(expectFailure(result)).toBe(
+      PollDomainCodes.POLL_OPEN_CANNOT_BE_BOARD_SCOPED
+    );
   });
 
   it('should reject an unknown poll type', () => {
+    // @ts-expect-error Runtime defense against an unchecked caller.
     const result = createPoll(null, 'WHATEVER');
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_TYPE_INVALID);
+    expect(expectFailure(result)).toBe(PollDomainCodes.POLL_TYPE_INVALID);
   });
 
   describe('applyWeightConfig', () => {
     it('should accept the equal defaults on an OPEN poll', () => {
-      const poll = createPoll(null, 'OPEN').value;
+      const poll = expectSuccess(createPoll(null, 'OPEN'));
 
       const result = poll.applyWeightConfig('EQUAL', 'RAW_SUM', []);
 
@@ -1632,7 +1976,7 @@ describe('Poll type', () => {
     });
 
     it('should reject ownership weighting on an OPEN poll', () => {
-      const poll = createPoll(null, 'OPEN').value;
+      const poll = expectSuccess(createPoll(null, 'OPEN'));
 
       const result = poll.applyWeightConfig(
         'OWNERSHIP_UNIT_COUNT',
@@ -1641,27 +1985,33 @@ describe('Poll type', () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.POLL_OPEN_MUST_BE_EQUAL);
+      expect(expectFailure(result)).toBe(
+        PollDomainCodes.POLL_OPEN_MUST_BE_EQUAL
+      );
       expect(poll.distributionType).toBe('EQUAL');
     });
 
     it('should reject a property scope on an OPEN poll', () => {
-      const poll = createPoll(null, 'OPEN').value;
+      const poll = expectSuccess(createPoll(null, 'OPEN'));
 
-      const result = poll.applyWeightConfig('EQUAL', 'RAW_SUM', ['prop-1']);
+      const result = poll.applyWeightConfig('EQUAL', 'RAW_SUM', [
+        PropertyId.parse('prop-1'),
+      ]);
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.POLL_OPEN_MUST_BE_EQUAL);
+      expect(expectFailure(result)).toBe(
+        PollDomainCodes.POLL_OPEN_MUST_BE_EQUAL
+      );
       expect(poll.propertyIds).toEqual([]);
     });
 
     it('should still work normally on an ORGANIZATION poll', () => {
-      const poll = createPoll(null).value;
+      const poll = expectSuccess(createPoll(null));
 
       const result = poll.applyWeightConfig(
         'OWNERSHIP_UNIT_COUNT',
         'NORMALIZE_PER_PROPERTY',
-        ['prop-1']
+        [PropertyId.parse('prop-1')]
       );
 
       expect(result.success).toBe(true);
@@ -1672,15 +2022,17 @@ describe('Poll type', () => {
   });
 
   describe('anonymous flag', () => {
-    function create(pollType?: string, anonymous?: boolean) {
+    function create(pollType?: PollType, anonymous?: boolean) {
       return Poll.create(
-        'Title',
-        'Description',
-        'org-1',
+        PollTitle.parse('Title'),
+        PollDescription.parse('Description'),
+        OrganizationId.parse('org-1'),
         null,
-        'user-1',
-        new Date('2026-01-01'),
-        new Date('2026-02-01'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-01'), new Date('2026-02-01'))
+        ),
+        testCreation(PollId, 'poll-1'),
         undefined,
         pollType,
         anonymous
@@ -1691,32 +2043,32 @@ describe('Poll type', () => {
       const result = create();
 
       expect(result.success).toBe(true);
-      expect(result.value.isAnonymous()).toBe(false);
+      expect(expectSuccess(result).isAnonymous()).toBe(false);
     });
 
     it('should create an anonymous poll when asked', () => {
       const result = create('ORGANIZATION', true);
 
       expect(result.success).toBe(true);
-      expect(result.value.isAnonymous()).toBe(true);
+      expect(expectSuccess(result).isAnonymous()).toBe(true);
     });
 
     it('should allow an anonymous OPEN poll', () => {
       const result = create('OPEN', true);
 
       expect(result.success).toBe(true);
-      expect(result.value.isAnonymous()).toBe(true);
+      expect(expectSuccess(result).isAnonymous()).toBe(true);
     });
 
     it('should allow a named OPEN poll', () => {
       const result = create('OPEN', false);
 
       expect(result.success).toBe(true);
-      expect(result.value.isAnonymous()).toBe(false);
+      expect(expectSuccess(result).isAnonymous()).toBe(false);
     });
 
     it('should round-trip through reconstitute', () => {
-      const created = create('ORGANIZATION', true).value;
+      const created = expectSuccess(create('ORGANIZATION', true));
 
       const restored = Poll.reconstitute(created.toJSON() as any);
 
@@ -1724,7 +2076,7 @@ describe('Poll type', () => {
     });
 
     it('should expose no mutator for the flag', () => {
-      const poll = create().value;
+      const poll = expectSuccess(create());
 
       expect((poll as any).setAnonymous).toBeUndefined();
     });
@@ -1733,13 +2085,15 @@ describe('Poll type', () => {
   describe('description attachments', () => {
     function draftPoll(): Poll {
       const r = Poll.create(
-        'Fence dispute',
-        'The fence was moved.',
-        'org-1',
+        PollTitle.parse('Fence dispute'),
+        PollDescription.parse('The fence was moved.'),
+        OrganizationId.parse('org-1'),
         null,
-        'user-1',
-        new Date('2030-01-01'),
-        new Date('2030-02-01')
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2030-01-01'), new Date('2030-02-01'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       if (!r.success) {
@@ -1755,7 +2109,7 @@ describe('Poll type', () => {
 
     it('should add an attachment id', () => {
       const poll = draftPoll();
-      const result = poll.addAttachment('att1');
+      const result = poll.addAttachment(PollAttachmentId.parse('att1'));
 
       expect(result.success).toBe(true);
       expect(poll.attachmentIds).toEqual(['att1']);
@@ -1765,20 +2119,24 @@ describe('Poll type', () => {
       const poll = draftPoll();
 
       for (let i = 0; i < POLL_ATTACHMENT_COUNT_LIMIT; i++) {
-        expect(poll.addAttachment(`att${i}`).success).toBe(true);
+        expect(
+          poll.addAttachment(PollAttachmentId.parse(`att${i}`)).success
+        ).toBe(true);
       }
 
-      const result = poll.addAttachment('one-too-many');
+      const result = poll.addAttachment(PollAttachmentId.parse('one-too-many'));
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.POLL_ATTACHMENT_LIMIT_REACHED);
+      expect(expectFailure(result)).toBe(
+        PollDomainCodes.POLL_ATTACHMENT_LIMIT_REACHED
+      );
     });
 
     it('should remove an attachment id', () => {
       const poll = draftPoll();
-      poll.addAttachment('att1');
+      poll.addAttachment(PollAttachmentId.parse('att1'));
 
-      const result = poll.removeAttachment('att1');
+      const result = poll.removeAttachment(PollAttachmentId.parse('att1'));
 
       expect(result.success).toBe(true);
       expect(poll.attachmentIds).toEqual([]);
@@ -1786,10 +2144,12 @@ describe('Poll type', () => {
 
     it('should fail to remove an attachment that is not attached', () => {
       const poll = draftPoll();
-      const result = poll.removeAttachment('nope');
+      const result = poll.removeAttachment(PollAttachmentId.parse('nope'));
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.POLL_ATTACHMENT_NOT_FOUND);
+      expect(expectFailure(result)).toBe(
+        PollDomainCodes.POLL_ATTACHMENT_NOT_FOUND
+      );
     });
 
     // attachmentIds lives outside `props`, so the spread in toJSON would
@@ -1798,8 +2158,8 @@ describe('Poll type', () => {
     // inline image render as a blocked placeholder.
     it('should include attachmentIds in toJSON', () => {
       const poll = draftPoll();
-      poll.addAttachment('att1');
-      poll.addAttachment('att2');
+      poll.addAttachment(PollAttachmentId.parse('att1'));
+      poll.addAttachment(PollAttachmentId.parse('att2'));
 
       expect(poll.toJSON().attachmentIds).toEqual(['att1', 'att2']);
     });
@@ -1810,9 +2170,9 @@ describe('Poll type', () => {
 
     it('should not leak internal state through the getter', () => {
       const poll = draftPoll();
-      poll.addAttachment('att1');
+      poll.addAttachment(PollAttachmentId.parse('att1'));
 
-      poll.attachmentIds.push('injected');
+      poll.attachmentIds.push(PollAttachmentId.parse('injected'));
 
       expect(poll.attachmentIds).toEqual(['att1']);
     });
@@ -1824,26 +2184,26 @@ describe('Poll type', () => {
       poll.takeSnapshot();
       poll.activate();
 
-      const result = poll.addAttachment('att1');
+      const result = poll.addAttachment(PollAttachmentId.parse('att1'));
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(
+      expect(expectFailure(result)).toBe(
         PollDomainCodes.POLL_CANNOT_CHANGE_ATTACHMENTS_ACTIVE
       );
     });
 
     it('should fail to remove an attachment once the poll is active', () => {
       const poll = draftPoll();
-      poll.addAttachment('att1');
+      poll.addAttachment(PollAttachmentId.parse('att1'));
       poll.addQuestion(createQuestionWithAnswer(poll.id));
       poll.submitToAdmin();
       poll.takeSnapshot();
       poll.activate();
 
-      const result = poll.removeAttachment('att1');
+      const result = poll.removeAttachment(PollAttachmentId.parse('att1'));
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(
+      expect(expectFailure(result)).toBe(
         PollDomainCodes.POLL_CANNOT_CHANGE_ATTACHMENTS_ACTIVE
       );
     });
@@ -1852,20 +2212,22 @@ describe('Poll type', () => {
   describe('updateDescription attachment refs', () => {
     function draftPollWithAttachment(): Poll {
       const r = Poll.create(
-        'Fence dispute',
-        'Initial text.',
-        'org-1',
+        PollTitle.parse('Fence dispute'),
+        PollDescription.parse('Initial text.'),
+        OrganizationId.parse('org-1'),
         null,
-        'user-1',
-        new Date('2030-01-01'),
-        new Date('2030-02-01')
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2030-01-01'), new Date('2030-02-01'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       if (!r.success) {
         throw new Error('fixture poll failed to build: ' + r.error);
       }
 
-      r.value.addAttachment('own1');
+      r.value.addAttachment(PollAttachmentId.parse('own1'));
 
       return r.value;
     }
@@ -1873,7 +2235,7 @@ describe('Poll type', () => {
     it('should accept a description referencing its own attachment', () => {
       const poll = draftPollWithAttachment();
       const result = poll.updateDescription(
-        'See ![photo](/api/poll-attachments/own1)'
+        PollDescription.parse('See ![photo](/api/poll-attachments/own1)')
       );
 
       expect(result.success).toBe(true);
@@ -1882,11 +2244,11 @@ describe('Poll type', () => {
     it('should reject a description referencing a foreign attachment', () => {
       const poll = draftPollWithAttachment();
       const result = poll.updateDescription(
-        'See ![photo](/api/poll-attachments/foreign9)'
+        PollDescription.parse('See ![photo](/api/poll-attachments/foreign9)')
       );
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(
+      expect(expectFailure(result)).toBe(
         PollDomainCodes.POLL_DESCRIPTION_INVALID_ATTACHMENT_REF
       );
     });
@@ -1894,7 +2256,7 @@ describe('Poll type', () => {
     it('should accept a PDF link ref to its own attachment', () => {
       const poll = draftPollWithAttachment();
       const result = poll.updateDescription(
-        'See [survey.pdf](/api/poll-attachments/own1)'
+        PollDescription.parse('See [survey.pdf](/api/poll-attachments/own1)')
       );
 
       expect(result.success).toBe(true);
@@ -1903,7 +2265,7 @@ describe('Poll type', () => {
     it('should ignore a report-attachment URL, which is not a poll ref', () => {
       const poll = draftPollWithAttachment();
       const result = poll.updateDescription(
-        'See ![x](/api/report-attachments/other1)'
+        PollDescription.parse('See ![x](/api/report-attachments/other1)')
       );
 
       expect(result.success).toBe(true);
@@ -1913,13 +2275,17 @@ describe('Poll type', () => {
     // description necessarily points at another poll's file.
     it('should reject creating a poll whose description already has a ref', () => {
       const result = Poll.create(
-        'Fence dispute',
-        'See ![photo](/api/poll-attachments/someone-elses-file)',
-        'org-1',
+        PollTitle.parse('Fence dispute'),
+        PollDescription.parse(
+          'See ![photo](/api/poll-attachments/someone-elses-file)'
+        ),
+        OrganizationId.parse('org-1'),
         null,
-        'user-1',
-        new Date('2030-01-01'),
-        new Date('2030-02-01')
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2030-01-01'), new Date('2030-02-01'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
 
       expect(result.success).toBe(false);

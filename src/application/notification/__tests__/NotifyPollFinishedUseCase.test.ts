@@ -1,3 +1,7 @@
+/** Verifies Notify Poll Finished behavior through application ports.
+ * Notification doubles return explicit append outcomes, matching the production writer. */
+import { PollId } from '@/domain/shared/EntityIds';
+import { notificationTestInputs } from '@/application/notification/__tests__/notificationTestValues';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NotifyPollFinishedUseCase } from '../NotifyPollFinishedUseCase';
 import { NotificationRepository } from '../../../domain/notification/NotificationRepository';
@@ -10,29 +14,17 @@ import { Result, success } from '../../../domain/shared/Result';
 class MockNotificationRepository implements NotificationRepository {
   private savedBatch: Notification[] = [];
 
-  async save(notification: Notification): Promise<Notification> {
-    return notification;
+  async save(
+    notification: Notification
+  ): ReturnType<NotificationRepository['save']> {
+    return success(notification);
   }
-  async saveBatch(notifications: Notification[]): Promise<void> {
+  async saveBatch(
+    notifications: Notification[]
+  ): ReturnType<NotificationRepository['saveBatch']> {
     this.savedBatch.push(...notifications);
-  }
-  async findById(): Promise<Notification | null> {
-    return null;
-  }
-  async findByUserId(): Promise<Notification[]> {
-    return [];
-  }
-  async getUnreadCount(): Promise<number> {
-    return 0;
-  }
-  async markAsRead(): Promise<void> {}
-  async markAllAsRead(): Promise<void> {}
-  async findByIds(): Promise<Notification[]> {
-    return [];
-  }
-  async deleteByIds(): Promise<void> {}
-  async getCountByUserId(): Promise<number> {
-    return 0;
+
+    return success(undefined);
   }
 
   getSavedBatch() {
@@ -44,47 +36,98 @@ class MockNotificationRepository implements NotificationRepository {
 class MockParticipantRepository implements ParticipantRepository {
   private participants: Map<string, PollParticipant[]> = new Map();
 
-  async createParticipants(): Promise<Result<void, string>> {
+  async createParticipants(): ReturnType<
+    ParticipantRepository['createParticipants']
+  > {
     return success(undefined);
   }
   async getParticipants(
     pollId: string
-  ): Promise<Result<PollParticipant[], string>> {
+  ): ReturnType<ParticipantRepository['getParticipants']> {
     return success(this.participants.get(pollId) || []);
   }
-  async getParticipantById(): Promise<Result<PollParticipant | null, string>> {
-    return success(null);
-  }
-  async getParticipantByUserAndPoll(): Promise<
-    Result<PollParticipant | null, string>
+  async getParticipantById(): ReturnType<
+    ParticipantRepository['getParticipantById']
   > {
     return success(null);
   }
-  async updateParticipantWeight(): Promise<Result<void, string>> {
+  async getParticipantByUserAndPoll(): ReturnType<
+    ParticipantRepository['getParticipantByUserAndPoll']
+  > {
+    return success(null);
+  }
+  async updateParticipantWeight(): ReturnType<
+    ParticipantRepository['updateParticipantWeight']
+  > {
     return success(undefined);
   }
-  async deleteParticipant(): Promise<Result<void, string>> {
+  async deleteParticipant(): ReturnType<
+    ParticipantRepository['deleteParticipant']
+  > {
     return success(undefined);
   }
-  async deleteParticipantsByPollId(): Promise<Result<void, string>> {
+  async deleteParticipantsByPollId(): ReturnType<
+    ParticipantRepository['deleteParticipantsByPollId']
+  > {
     return success(undefined);
   }
-  async createWeightHistory(): Promise<Result<any, string>> {
+  async createWeightHistory(): ReturnType<
+    ParticipantRepository['createWeightHistory']
+  > {
     return success({} as any);
   }
-  async getWeightHistory(): Promise<Result<any[], string>> {
+  async getWeightHistory(): ReturnType<
+    ParticipantRepository['getWeightHistory']
+  > {
     return success([]);
   }
-  async getParticipantWeightHistory(): Promise<Result<any[], string>> {
+  async getParticipantWeightHistory(): ReturnType<
+    ParticipantRepository['getParticipantWeightHistory']
+  > {
     return success([]);
   }
-  async executeActivation(): Promise<Result<PollParticipant[], string>> {
+  async executeActivation(): ReturnType<
+    ParticipantRepository['executeActivation']
+  > {
     return success([]);
   }
 
   // Test helper
   setParticipants(pollId: string, participants: PollParticipant[]) {
     this.participants.set(pollId, participants);
+  }
+
+  async getCastBallot(
+    ..._args: Parameters<ParticipantRepository['getCastBallot']>
+  ): ReturnType<ParticipantRepository['getCastBallot']> {
+    throw new Error('Unexpected test repository call: getCastBallot');
+  }
+  async castVotes(
+    ..._args: Parameters<ParticipantRepository['castVotes']>
+  ): ReturnType<ParticipantRepository['castVotes']> {
+    throw new Error('Unexpected test repository call: castVotes');
+  }
+  async updateWillingToSignProtocol(
+    ..._args: Parameters<ParticipantRepository['updateWillingToSignProtocol']>
+  ): ReturnType<ParticipantRepository['updateWillingToSignProtocol']> {
+    throw new Error(
+      'Unexpected test repository call: updateWillingToSignProtocol'
+    );
+  }
+  async joinAndVote(
+    ..._args: Parameters<ParticipantRepository['joinAndVote']>
+  ): ReturnType<ParticipantRepository['joinAndVote']> {
+    throw new Error('Unexpected test repository call: joinAndVote');
+  }
+  async pollHasVotes(
+    ..._args: Parameters<ParticipantRepository['pollHasVotes']>
+  ): ReturnType<ParticipantRepository['pollHasVotes']> {
+    throw new Error('Unexpected test repository call: pollHasVotes');
+  }
+  async applyWeightConfigChange(
+    ..._args: Parameters<ParticipantRepository['applyWeightConfigChange']>
+  ): ReturnType<ParticipantRepository['applyWeightConfigChange']> {
+    throw new Error('Unexpected test repository call: applyWeightConfigChange');
   }
 }
 
@@ -109,6 +152,7 @@ describe('NotifyPollFinishedUseCase', () => {
     notifRepo = new MockNotificationRepository();
     participantRepo = new MockParticipantRepository();
     useCase = new NotifyPollFinishedUseCase({
+      ...notificationTestInputs,
       notificationRepository: notifRepo,
       participantRepository: participantRepo,
     });
@@ -120,7 +164,10 @@ describe('NotifyPollFinishedUseCase', () => {
       createParticipant('poll-1', 'user-2'),
     ]);
 
-    await useCase.execute({ pollId: 'poll-1', pollTitle: 'Budget Vote' });
+    await useCase.execute({
+      pollId: PollId.parse('poll-1'),
+      pollTitle: 'Budget Vote',
+    });
 
     const saved = notifRepo.getSavedBatch();
     expect(saved).toHaveLength(2);
@@ -143,7 +190,10 @@ describe('NotifyPollFinishedUseCase', () => {
   it('should not create notifications when no participants', async () => {
     participantRepo.setParticipants('poll-1', []);
 
-    await useCase.execute({ pollId: 'poll-1', pollTitle: 'Budget Vote' });
+    await useCase.execute({
+      pollId: PollId.parse('poll-1'),
+      pollTitle: 'Budget Vote',
+    });
 
     expect(notifRepo.getSavedBatch()).toHaveLength(0);
   });
@@ -151,10 +201,13 @@ describe('NotifyPollFinishedUseCase', () => {
   it('should handle getParticipants failure gracefully', async () => {
     participantRepo.getParticipants = async () => ({
       success: false as const,
-      error: 'db error',
+      error: 'common.errors.unexpected',
     });
 
-    await useCase.execute({ pollId: 'poll-1', pollTitle: 'Budget Vote' });
+    await useCase.execute({
+      pollId: PollId.parse('poll-1'),
+      pollTitle: 'Budget Vote',
+    });
 
     expect(notifRepo.getSavedBatch()).toHaveLength(0);
   });

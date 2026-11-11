@@ -1,12 +1,23 @@
+/** Poll creation tests preserve authorization, defaults and domain failure codes.
+ * Weight request vocabulary is decoded before the typed aggregate mutation. */
+import { BoardName } from '@/domain/board/BoardName';
+import { ResultCount } from '@/domain/shared/Pagination';
+import { UpdateQuestionOrderData } from '@/domain/poll/QuestionRepository';
+import { OrganizationId, UserId } from '@/domain/shared/EntityIds';
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { Instant } from '@/domain/shared/Instant';
+import { BoardId } from '@/domain/shared/EntityIds';
+import {
+  pollFixtureIds,
+  pollFixtureClock,
+  pollFixtureCreation,
+} from '@/application/poll/__tests__/pollFixtureCreation';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CreatePollUseCase } from '../CreatePollUseCase';
 import { Poll } from '../../../domain/poll/Poll';
 import { Question } from '../../../domain/poll/Question';
 import { Answer } from '../../../domain/poll/Answer';
-import {
-  PollRepository,
-  UpdateQuestionOrderData,
-} from '../../../domain/poll/PollRepository';
+import { PollRepository } from '../../../domain/poll/PollRepository';
 import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { Organization } from '../../../domain/organization/Organization';
@@ -17,24 +28,29 @@ import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
 
 // Mock PollRepository
 class MockPollRepository implements PollRepository {
+  async searchPolls(): ReturnType<PollRepository['searchPolls']> {
+    return success({ polls: [], totalCount: ResultCount.parse(0) });
+  }
+
   private polls: Map<string, Poll> = new Map();
   private questions: Map<string, Question> = new Map();
   private answers: Map<string, Answer> = new Map();
   private nextId = 1;
 
-  async createPoll(poll: Poll): Promise<Result<Poll, string>> {
-    const id = `poll-${this.nextId++}`;
-    (poll as any).props.id = id;
+  async createPoll(poll: Poll): ReturnType<PollRepository['createPoll']> {
+    const id = poll.id;
     this.polls.set(id, poll);
 
     return success(poll);
   }
 
-  async getPollById(pollId: string): Promise<Result<Poll | null, string>> {
+  async getPollById(pollId: string): ReturnType<PollRepository['getPollById']> {
     return success(this.polls.get(pollId) || null);
   }
 
-  async getPollsByBoardId(boardId: string): Promise<Result<Poll[], string>> {
+  async getPollsByBoardId(
+    boardId: string
+  ): ReturnType<PollRepository['getPollsByBoardId']> {
     const polls = Array.from(this.polls.values()).filter(
       (p) => p.boardId === boardId && !p.isArchived()
     );
@@ -44,7 +60,7 @@ class MockPollRepository implements PollRepository {
 
   async getPollsByOrganizationId(
     orgId: string
-  ): Promise<Result<Poll[], string>> {
+  ): ReturnType<PollRepository['getPollsByOrganizationId']> {
     const polls = Array.from(this.polls.values()).filter(
       (p) => p.organizationId === orgId && !p.isArchived()
     );
@@ -52,31 +68,32 @@ class MockPollRepository implements PollRepository {
     return success(polls);
   }
 
-  async getPollsByUserId(userId: string): Promise<Result<Poll[], string>> {
+  async getPollsByUserId(
+    userId: string
+  ): ReturnType<PollRepository['getPollsByUserId']> {
     return success(Array.from(this.polls.values()));
   }
 
-  async updatePoll(poll: Poll): Promise<Result<void, string>> {
+  async updatePoll(poll: Poll): ReturnType<PollRepository['updatePoll']> {
     this.polls.set(poll.id, poll);
 
     return success(undefined);
   }
 
-  async deletePoll(pollId: string): Promise<Result<void, string>> {
+  async deletePoll(pollId: string): ReturnType<PollRepository['deletePoll']> {
     const poll = this.polls.get(pollId);
 
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
     }
 
-    poll.archive();
+    poll.archive(Instant.parse('2026-01-02T00:00:00.000Z'));
 
     return success(undefined);
   }
 
   async createQuestion(question: Question): Promise<Result<Question, string>> {
-    const id = `question-${this.nextId++}`;
-    (question as any).props.id = id;
+    const id = question.id;
     this.questions.set(id, question);
 
     return success(question);
@@ -126,14 +143,13 @@ class MockPollRepository implements PollRepository {
       return failure(PollErrors.QUESTION_NOT_FOUND);
     }
 
-    question.archive();
+    question.archive(Instant.parse('2026-01-02T00:00:00.000Z'));
 
     return success(undefined);
   }
 
   async createAnswer(answer: Answer): Promise<Result<Answer, string>> {
-    const id = `answer-${this.nextId++}`;
-    (answer as any).props.id = id;
+    const id = answer.id;
     this.answers.set(id, answer);
 
     return success(answer);
@@ -168,7 +184,7 @@ class MockPollRepository implements PollRepository {
       return failure(PollErrors.ANSWER_NOT_FOUND);
     }
 
-    answer.archive();
+    answer.archive(Instant.parse('2026-01-02T00:00:00.000Z'));
 
     return success(undefined);
   }
@@ -202,10 +218,14 @@ class MockBoardRepository implements BoardRepository {
     );
   }
 
-  async findBoardMembers(boardId: string): Promise<{ userId: string }[]> {
+  async findBoardMembers(
+    boardId: string
+  ): ReturnType<BoardRepository['findBoardMembers']> {
     const members = this.members.get(boardId);
 
-    return members ? Array.from(members).map((userId) => ({ userId })) : [];
+    return members
+      ? Array.from(members).map((userId) => ({ userId: UserId.parse(userId) }))
+      : [];
   }
 
   async isUserMember(userId: string, boardId: string): Promise<boolean> {
@@ -241,7 +261,7 @@ class MockBoardRepository implements BoardRepository {
 
   async findActiveBoardsByUserId(
     _userId: string
-  ): Promise<Array<{ id: string; name: string; organizationId: string }>> {
+  ): ReturnType<BoardRepository['findActiveBoardsByUserId']> {
     return [];
   }
 
@@ -289,7 +309,12 @@ class MockOrganizationRepository {
   }> {
     return {
       ancestors: [],
-      tree: { id: '', name: '', memberCount: 0, children: [] },
+      tree: {
+        id: 'org-fixture',
+        name: 'Fixture organization',
+        memberCount: 0,
+        children: [],
+      },
     };
   }
   async getFullTreeOrgIds(): Promise<string[]> {
@@ -322,16 +347,22 @@ describe('CreatePollUseCase', () => {
     useCase = new CreatePollUseCase(
       pollRepository,
       boardRepository,
-      organizationRepository as unknown as OrganizationRepository
+      organizationRepository as unknown as OrganizationRepository,
+      pollFixtureIds,
+      pollFixtureClock
     );
   });
 
   describe('board-specific polls', () => {
     it('should create a poll when user is a board member', async () => {
-      const boardResult = Board.create('Test Board', 'org-1');
+      const boardResult = Board.create(
+        BoardName.parse('Test Board'),
+        OrganizationId.parse('org-1'),
+        pollFixtureCreation(BoardId)
+      );
       expect(boardResult.success).toBe(true);
-      const board = boardResult.value;
-      (board as any).props.id = 'board-1';
+      let board = expectSuccess(boardResult);
+      board = Board.reconstitute({ ...board.toJSON(), id: 'board-1' });
       boardRepository.addBoard(board);
       await boardRepository.addUserToBoard('user-1', 'board-1');
       organizationRepository.addMember('user-1', 'org-1');
@@ -364,10 +395,14 @@ describe('CreatePollUseCase', () => {
     });
 
     it('should allow external board member (non-org member) to create a board-scoped poll', async () => {
-      const boardResult = Board.create('Test Board', 'org-1');
+      const boardResult = Board.create(
+        BoardName.parse('Test Board'),
+        OrganizationId.parse('org-1'),
+        pollFixtureCreation(BoardId)
+      );
       expect(boardResult.success).toBe(true);
-      const board = boardResult.value;
-      (board as any).props.id = 'board-1';
+      let board = expectSuccess(boardResult);
+      board = Board.reconstitute({ ...board.toJSON(), id: 'board-1' });
       boardRepository.addBoard(board);
       await boardRepository.addUserToBoard('user-1', 'board-1');
       // Note: user-1 is NOT added as org member
@@ -396,10 +431,14 @@ describe('CreatePollUseCase', () => {
     });
 
     it('should fail when user is not a board member', async () => {
-      const boardResult = Board.create('Test Board', 'org-1');
+      const boardResult = Board.create(
+        BoardName.parse('Test Board'),
+        OrganizationId.parse('org-1'),
+        pollFixtureCreation(BoardId)
+      );
       expect(boardResult.success).toBe(true);
-      const board = boardResult.value;
-      (board as any).props.id = 'board-1';
+      let board = expectSuccess(boardResult);
+      board = Board.reconstitute({ ...board.toJSON(), id: 'board-1' });
       boardRepository.addBoard(board);
 
       const result = await useCase.execute({
@@ -552,9 +591,13 @@ describe('CreatePollUseCase', () => {
 
   describe('validation', () => {
     it('should fail when title is empty', async () => {
-      const boardResult = Board.create('Test Board', 'org-1');
-      const board = boardResult.value;
-      (board as any).props.id = 'board-1';
+      const boardResult = Board.create(
+        BoardName.parse('Test Board'),
+        OrganizationId.parse('org-1'),
+        pollFixtureCreation(BoardId)
+      );
+      let board = expectSuccess(boardResult);
+      board = Board.reconstitute({ ...board.toJSON(), id: 'board-1' });
       boardRepository.addBoard(board);
       await boardRepository.addUserToBoard('user-1', 'board-1');
 
@@ -576,9 +619,13 @@ describe('CreatePollUseCase', () => {
     });
 
     it('should fail when description is empty', async () => {
-      const boardResult = Board.create('Test Board', 'org-1');
-      const board = boardResult.value;
-      (board as any).props.id = 'board-1';
+      const boardResult = Board.create(
+        BoardName.parse('Test Board'),
+        OrganizationId.parse('org-1'),
+        pollFixtureCreation(BoardId)
+      );
+      let board = expectSuccess(boardResult);
+      board = Board.reconstitute({ ...board.toJSON(), id: 'board-1' });
       boardRepository.addBoard(board);
       await boardRepository.addUserToBoard('user-1', 'board-1');
 
@@ -599,10 +646,14 @@ describe('CreatePollUseCase', () => {
       }
     });
 
-    it('should fail when start date is after end date', async () => {
-      const boardResult = Board.create('Test Board', 'org-1');
-      const board = boardResult.value;
-      (board as any).props.id = 'board-1';
+    it('rejects inverted dates before an unknown poll kind', async () => {
+      const boardResult = Board.create(
+        BoardName.parse('Test Board'),
+        OrganizationId.parse('org-1'),
+        pollFixtureCreation(BoardId)
+      );
+      let board = expectSuccess(boardResult);
+      board = Board.reconstitute({ ...board.toJSON(), id: 'board-1' });
       boardRepository.addBoard(board);
       await boardRepository.addUserToBoard('user-1', 'board-1');
 
@@ -614,6 +665,7 @@ describe('CreatePollUseCase', () => {
         createdBy: 'user-1',
         startDate: new Date('2025-12-31'),
         endDate: new Date('2025-01-01'),
+        pollType: 'UNKNOWN',
       });
 
       expect(result.success).toBe(false);
@@ -626,9 +678,13 @@ describe('CreatePollUseCase', () => {
 
   describe('anonymous flag', () => {
     async function createWith(anonymous?: boolean) {
-      const boardResult = Board.create('Test Board', 'org-1');
-      const board = boardResult.value;
-      (board as any).props.id = 'board-1';
+      const boardResult = Board.create(
+        BoardName.parse('Test Board'),
+        OrganizationId.parse('org-1'),
+        pollFixtureCreation(BoardId)
+      );
+      let board = expectSuccess(boardResult);
+      board = Board.reconstitute({ ...board.toJSON(), id: 'board-1' });
       boardRepository.addBoard(board);
       await boardRepository.addUserToBoard('user-1', 'board-1');
 

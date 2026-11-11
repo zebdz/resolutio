@@ -1,3 +1,10 @@
+/** Verifies Notify Join Parent Request Received behavior through application ports.
+ * Notification doubles return explicit append outcomes, matching the production writer. */
+import { success } from '@/domain/shared/Result';
+import { ResultCount } from '@/domain/shared/Pagination';
+import { UserId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import { notificationTestInputs } from '@/application/notification/__tests__/notificationTestValues';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NotifyJoinParentRequestReceivedUseCase } from '../NotifyJoinParentRequestReceivedUseCase';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
@@ -25,10 +32,12 @@ class MockOrganizationRepository implements OrganizationRepository {
   async findByParentId(): Promise<Organization[]> {
     return [];
   }
-  async getAncestorIds(): Promise<string[]> {
+  async getAncestorIds(): ReturnType<OrganizationRepository['getAncestorIds']> {
     return [];
   }
-  async getDescendantIds(): Promise<string[]> {
+  async getDescendantIds(): ReturnType<
+    OrganizationRepository['getDescendantIds']
+  > {
     return [];
   }
   async isUserMember(): Promise<boolean> {
@@ -49,7 +58,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   async update(org: Organization): Promise<Organization> {
     return org;
   }
-  async findAcceptedMemberUserIdsIncludingDescendants(): Promise<string[]> {
+  async findAcceptedMemberUserIdsIncludingDescendants(): ReturnType<
+    OrganizationRepository['findAcceptedMemberUserIdsIncludingDescendants']
+  > {
     return [];
   }
   async removeUserFromOrganization(): Promise<void> {}
@@ -65,26 +76,36 @@ class MockOrganizationRepository implements OrganizationRepository {
   async getHierarchyTree(): Promise<any> {
     return {
       ancestors: [],
-      tree: { id: '', name: '', memberCount: 0, children: [] },
+      tree: {
+        id: 'org-fixture',
+        name: 'Fixture organization',
+        memberCount: 0,
+        children: [],
+      },
     };
   }
-  async searchOrganizationsWithStats(): Promise<{
-    organizations: any[];
-    totalCount: number;
-  }> {
-    return { organizations: [], totalCount: 0 };
+  async searchOrganizationsWithStats(): ReturnType<
+    OrganizationRepository['searchOrganizationsWithStats']
+  > {
+    return { organizations: [], totalCount: ResultCount.parse(0) };
   }
   async setParentId(): Promise<void> {}
-  async findAdminUserIds(organizationId: string): Promise<string[]> {
-    return this.adminUserIds.get(organizationId) || [];
+  async findAdminUserIds(
+    organizationId: string
+  ): ReturnType<OrganizationRepository['findAdminUserIds']> {
+    return UserId.array().parse(this.adminUserIds.get(organizationId) || []);
   }
 
   async addAdmin(): Promise<void> {}
   async removeAdmin(): Promise<void> {}
-  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+  async searchByNameFuzzy(): ReturnType<
+    OrganizationRepository['searchByNameFuzzy']
+  > {
     return [];
   }
-  async getFullTreeOrgIds(): Promise<string[]> {
+  async getFullTreeOrgIds(): ReturnType<
+    OrganizationRepository['getFullTreeOrgIds']
+  > {
     return [];
   }
   async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
@@ -92,7 +113,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
   async findUsersWithMultipleMembershipsInOrgs(
     _orgIds: string[]
-  ): Promise<string[]> {
+  ): ReturnType<
+    OrganizationRepository['findUsersWithMultipleMembershipsInOrgs']
+  > {
     return [];
   }
   async setAllowMultiTreeMembership(
@@ -107,35 +130,50 @@ class MockOrganizationRepository implements OrganizationRepository {
   setAdminUserIds(orgId: string, userIds: string[]) {
     this.adminUserIds.set(orgId, userIds);
   }
+
+  async isUserExactMember(
+    ..._args: Parameters<OrganizationRepository['isUserExactMember']>
+  ): ReturnType<OrganizationRepository['isUserExactMember']> {
+    throw new Error('Unexpected test repository call: isUserExactMember');
+  }
+  async getAdminUserIds(
+    ..._args: Parameters<OrganizationRepository['getAdminUserIds']>
+  ): ReturnType<OrganizationRepository['getAdminUserIds']> {
+    throw new Error('Unexpected test repository call: getAdminUserIds');
+  }
+  async findAcceptedMemberUserIdsForOrgs(
+    ..._args: Parameters<
+      OrganizationRepository['findAcceptedMemberUserIdsForOrgs']
+    >
+  ): ReturnType<OrganizationRepository['findAcceptedMemberUserIdsForOrgs']> {
+    throw new Error(
+      'Unexpected test repository call: findAcceptedMemberUserIdsForOrgs'
+    );
+  }
+  async removeMemberFromOrganization(
+    ..._args: Parameters<OrganizationRepository['removeMemberFromOrganization']>
+  ): ReturnType<OrganizationRepository['removeMemberFromOrganization']> {
+    throw new Error(
+      'Unexpected test repository call: removeMemberFromOrganization'
+    );
+  }
 }
 
 // Mock NotificationRepository
 class MockNotificationRepository implements NotificationRepository {
   private savedBatch: Notification[] = [];
 
-  async save(notification: Notification): Promise<Notification> {
-    return notification;
+  async save(
+    notification: Notification
+  ): ReturnType<NotificationRepository['save']> {
+    return success(notification);
   }
-  async saveBatch(notifications: Notification[]): Promise<void> {
+  async saveBatch(
+    notifications: Notification[]
+  ): ReturnType<NotificationRepository['saveBatch']> {
     this.savedBatch.push(...notifications);
-  }
-  async findById(): Promise<Notification | null> {
-    return null;
-  }
-  async findByUserId(): Promise<Notification[]> {
-    return [];
-  }
-  async getUnreadCount(): Promise<number> {
-    return 0;
-  }
-  async markAsRead(): Promise<void> {}
-  async markAllAsRead(): Promise<void> {}
-  async findByIds(): Promise<Notification[]> {
-    return [];
-  }
-  async deleteByIds(): Promise<void> {}
-  async getCountByUserId(): Promise<number> {
-    return 0;
+
+    return success(undefined);
   }
 
   getSavedBatch() {
@@ -165,6 +203,7 @@ describe('NotifyJoinParentRequestReceivedUseCase', () => {
     orgRepo = new MockOrganizationRepository();
     notifRepo = new MockNotificationRepository();
     useCase = new NotifyJoinParentRequestReceivedUseCase({
+      ...notificationTestInputs,
       organizationRepository: orgRepo,
       notificationRepository: notifRepo,
     });
@@ -177,7 +216,10 @@ describe('NotifyJoinParentRequestReceivedUseCase', () => {
     orgRepo.addOrganization(parentOrg);
     orgRepo.setAdminUserIds('parent-1', ['admin-1', 'admin-2']);
 
-    await useCase.execute({ childOrgId: 'child-1', parentOrgId: 'parent-1' });
+    await useCase.execute({
+      childOrgId: OrganizationId.parse('child-1'),
+      parentOrgId: OrganizationId.parse('parent-1'),
+    });
 
     const saved = notifRepo.getSavedBatch();
     expect(saved).toHaveLength(2);
@@ -210,7 +252,10 @@ describe('NotifyJoinParentRequestReceivedUseCase', () => {
     orgRepo.addOrganization(parentOrg);
     orgRepo.setAdminUserIds('parent-1', []);
 
-    await useCase.execute({ childOrgId: 'child-1', parentOrgId: 'parent-1' });
+    await useCase.execute({
+      childOrgId: OrganizationId.parse('child-1'),
+      parentOrgId: OrganizationId.parse('parent-1'),
+    });
 
     expect(notifRepo.getSavedBatch()).toHaveLength(0);
   });
@@ -221,8 +266,8 @@ describe('NotifyJoinParentRequestReceivedUseCase', () => {
     orgRepo.setAdminUserIds('parent-1', ['admin-1']);
 
     await useCase.execute({
-      childOrgId: 'nonexistent',
-      parentOrgId: 'parent-1',
+      childOrgId: OrganizationId.parse('nonexistent'),
+      parentOrgId: OrganizationId.parse('parent-1'),
     });
 
     expect(notifRepo.getSavedBatch()).toHaveLength(0);
@@ -233,8 +278,8 @@ describe('NotifyJoinParentRequestReceivedUseCase', () => {
     orgRepo.addOrganization(childOrg);
 
     await useCase.execute({
-      childOrgId: 'child-1',
-      parentOrgId: 'nonexistent',
+      childOrgId: OrganizationId.parse('child-1'),
+      parentOrgId: OrganizationId.parse('nonexistent'),
     });
 
     expect(notifRepo.getSavedBatch()).toHaveLength(0);

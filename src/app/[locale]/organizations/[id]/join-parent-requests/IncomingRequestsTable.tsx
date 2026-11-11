@@ -1,5 +1,8 @@
 'use client';
 
+/** Displays authorized parent requests from refreshed server props. Decisions reload
+ * complete server state instead of constructing partial local decision records. */
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -51,12 +54,11 @@ function StatusBadge({
 }
 
 export function IncomingRequestsTable({
-  requests: initialRequests,
+  requests,
 }: IncomingRequestsTableProps) {
   const t = useTranslations('organization.joinParent');
   const tCommon = useTranslations('common');
   const router = useRouter();
-  const [requests, setRequests] = useState(initialRequests);
   const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] =
     useState<EnrichedJoinParentRequest | null>(null);
@@ -76,11 +78,6 @@ export function IncomingRequestsTable({
     const result = await handleJoinParentRequestAction(formData);
 
     if (result.success) {
-      setRequests((prev) =>
-        prev.map((r) =>
-          r.id === request.id ? { ...r, status: 'accepted' as const } : r
-        )
-      );
       router.refresh();
     } else {
       setError(result.error);
@@ -112,17 +109,6 @@ export function IncomingRequestsTable({
     const result = await handleJoinParentRequestAction(formData);
 
     if (result.success) {
-      setRequests((prev) =>
-        prev.map((r) =>
-          r.id === selectedRequest.id
-            ? {
-                ...r,
-                status: 'rejected' as const,
-                rejectionReason,
-              }
-            : r
-        )
-      );
       setIsRejectDialogOpen(false);
       setSelectedRequest(null);
       setRejectionReason('');

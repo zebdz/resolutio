@@ -1,10 +1,11 @@
+/** Authorizes participant administration and serializes the snapshot for the UI. */
 import { getLocale, getTranslations } from 'next-intl/server';
+import { PollId } from '@/domain/shared/EntityIds';
 import { getCurrentUser } from '@/web/lib/session';
 import { getPollByIdAction } from '@/src/web/actions/poll/poll';
 import { getParticipantsAction } from '@/src/web/actions/organization/participant';
 import ParticipantManagement from '@/src/web/components/polls/participants/ParticipantManagement';
 import { Heading } from '@/src/web/components/catalyst/heading';
-import { ParticipantWithUser } from '@/src/application/poll/GetParticipantsUseCase';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { User } from '@/domain/user/User';
 
@@ -17,8 +18,6 @@ import {
   PrismaVoteRepository,
 } from '@/infrastructure/index';
 import { PollWeightCalculator } from '@/application/poll/PollWeightCalculator';
-import { DistributionType } from '@/domain/poll/DistributionType';
-import { PropertyAggregation } from '@/domain/poll/PropertyAggregation';
 import { redirectLocalized } from '@/web/lib/redirectLocalized';
 
 const organizationRepository = new PrismaOrganizationRepository(prisma);
@@ -47,6 +46,12 @@ export default async function ParticipantsPage({
 
   if (!user) {
     redirectLocalized(await getLocale(), '/login');
+  }
+
+  const typedPollId = PollId.safeParse(pollId);
+
+  if (!typedPollId.success) {
+    redirectLocalized(await getLocale(), '/polls');
   }
 
   // Get poll details
@@ -82,7 +87,7 @@ export default async function ParticipantsPage({
     getParticipantsAction(pollId),
     propertyRepository.findByOrganizationTree(poll.organizationId),
     propertyAssetRepository.orgHasOwnershipData(poll.organizationId),
-    voteRepository.pollHasVotes(pollId),
+    voteRepository.pollHasVotes(typedPollId.data),
   ]);
 
   if (!participantsResult.success) {
@@ -105,19 +110,17 @@ export default async function ParticipantsPage({
   const participantsData = participantsResult.data;
 
   // Serialize participants data for client component
-  const serializedParticipants = participantsData.participants.map(
-    (p: ParticipantWithUser) => ({
-      id: p.participant.id,
-      userId: p.participant.userId,
-      userName: User.formatFullName(
-        p.user.firstName,
-        p.user.lastName,
-        p.user.middleName
-      ),
-      weight: p.participant.userWeight,
-      updatedAt: p.participant.snapshotAt.toISOString(),
-    })
-  );
+  const serializedParticipants = participantsData.participants.map((p) => ({
+    id: p.participant.id,
+    userId: p.participant.userId,
+    userName: User.formatFullName(
+      p.user.firstName,
+      p.user.lastName,
+      p.user.middleName
+    ),
+    weight: p.participant.userWeight,
+    updatedAt: p.participant.snapshotAt.toISOString(),
+  }));
 
   // Serialize properties for client component. First group is direct org
   // (always present, even if empty), rest are descendants.
@@ -148,15 +151,15 @@ export default async function ParticipantsPage({
 
   // "Building total" = theoretical max if every owner were registered. The
   // gap (Building − Registered) is what unregistered owners hold. EQUAL polls
-  // have no such gap, so the calculator returns 0 and the UI hides the column.
+  // have no building denominator; serialize its absence as 0 for the existing UI.
   const buildingTotalResult = await pollWeightCalculator.computeBuildingTotal({
     organizationId: poll.organizationId,
-    distributionType: poll.distributionType as DistributionType,
-    propertyAggregation: poll.propertyAggregation as PropertyAggregation,
+    distributionType: poll.distributionType,
+    propertyAggregation: poll.propertyAggregation,
     propertyIds: poll.propertyIds,
   });
   const buildingTotal = buildingTotalResult.success
-    ? buildingTotalResult.value
+    ? (buildingTotalResult.value ?? 0)
     : 0;
 
   return (
@@ -167,7 +170,7 @@ export default async function ParticipantsPage({
       </div>
 
       <ParticipantManagement
-        pollId={pollId}
+        pollId={poll.id}
         participantsData={{
           participants: serializedParticipants,
           canModify: participantsData.canModify,

@@ -1,3 +1,12 @@
+/** Prisma adapter for validated poll attachment projections.
+ * Stored identities/time are retained; storage failures never expose raw exception text. */
+import { Instant } from '@/domain/shared/Instant';
+import { PollAttachmentId, PollId } from '@/domain/shared/EntityIds';
+import {
+  AttachmentFileName,
+  AttachmentCount,
+} from '@/domain/shared/attachments/AttachmentValues';
+import { PollAttachmentMime } from '@/domain/poll/PollAttachment';
 import { PrismaClient } from '@/generated/prisma/client';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollAttachment } from '../../domain/poll/PollAttachment';
@@ -24,10 +33,12 @@ export class PrismaPollAttachmentRepository implements PollAttachmentRepository 
   async save(
     attachment: PollAttachment,
     bytes: Buffer
-  ): Promise<Result<PollAttachmentMetadata, string>> {
+  ): Promise<Result<PollAttachmentMetadata, 'common.errors.unexpected'>> {
     try {
       const created = await this.prisma.pollAttachment.create({
         data: {
+          id: attachment.id,
+          createdAt: attachment.createdAt,
           pollId: attachment.pollId,
           fileName: attachment.fileName,
           mimeType: attachment.mimeType,
@@ -46,15 +57,15 @@ export class PrismaPollAttachmentRepository implements PollAttachmentRepository 
         select: METADATA_SELECT,
       });
 
-      return success(created);
+      return success(toMetadata(created));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findByPollId(
-    pollId: string
-  ): Promise<Result<PollAttachmentMetadata[], string>> {
+    pollId: PollId
+  ): Promise<Result<PollAttachmentMetadata[], 'common.errors.unexpected'>> {
     try {
       const rows = await this.prisma.pollAttachment.findMany({
         where: { pollId },
@@ -62,30 +73,32 @@ export class PrismaPollAttachmentRepository implements PollAttachmentRepository 
         orderBy: { createdAt: 'asc' },
       });
 
-      return success(rows);
+      return success(rows.map(toMetadata));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findById(
-    id: string
-  ): Promise<Result<PollAttachmentMetadata | null, string>> {
+    id: PollAttachmentId
+  ): Promise<
+    Result<PollAttachmentMetadata | null, 'common.errors.unexpected'>
+  > {
     try {
       const row = await this.prisma.pollAttachment.findUnique({
         where: { id },
         select: METADATA_SELECT,
       });
 
-      return success(row);
+      return success(row === null ? null : toMetadata(row));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findBytesById(
-    id: string
-  ): Promise<Result<PollAttachmentBytes | null, string>> {
+    id: PollAttachmentId
+  ): Promise<Result<PollAttachmentBytes | null, 'common.errors.unexpected'>> {
     try {
       const row = await this.prisma.pollAttachment.findUnique({
         where: { id },
@@ -97,34 +110,53 @@ export class PrismaPollAttachmentRepository implements PollAttachmentRepository 
       }
 
       return success({
-        fileName: row.fileName,
-        mimeType: row.mimeType,
+        fileName: AttachmentFileName.parse(row.fileName),
+        mimeType: PollAttachmentMime.parse(row.mimeType),
         bytes: Buffer.from(row.bytes),
       });
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
-  async countByPollId(pollId: string): Promise<Result<number, string>> {
+  async countByPollId(
+    pollId: PollId
+  ): Promise<Result<AttachmentCount, 'common.errors.unexpected'>> {
     try {
       const count = await this.prisma.pollAttachment.count({
         where: { pollId },
       });
 
-      return success(count);
+      return success(AttachmentCount.parse(count));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
-  async deleteById(id: string): Promise<Result<void, string>> {
+  async deleteById(
+    id: PollAttachmentId
+  ): Promise<Result<void, 'common.errors.unexpected'>> {
     try {
       await this.prisma.pollAttachment.delete({ where: { id } });
 
       return success(undefined);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
+}
+
+function toMetadata(
+  row: Parameters<typeof PollAttachment.reconstitute>[0]
+): PollAttachmentMetadata {
+  const attachment = PollAttachment.reconstitute(row);
+
+  return {
+    id: attachment.id,
+    pollId: attachment.pollId,
+    fileName: attachment.fileName,
+    mimeType: attachment.mimeType,
+    sizeBytes: attachment.sizeBytes,
+    createdAt: Instant.fromDate(attachment.createdAt),
+  };
 }

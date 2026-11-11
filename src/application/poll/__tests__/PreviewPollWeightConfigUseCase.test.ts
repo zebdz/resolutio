@@ -1,3 +1,17 @@
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { VotingWeight } from '@/domain/poll/VotingWeight';
+import { PollState } from '@/domain/poll/PollState';
+import { BoardId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import { UserId, PollEligibleMemberId } from '@/domain/shared/EntityIds';
+import { pollFixtureCreation } from '@/application/poll/__tests__/pollFixtureCreation';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { ParticipantId, PollId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PreviewPollWeightConfigUseCase } from '../PreviewPollWeightConfigUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -16,30 +30,45 @@ import { PollWeightCalculator } from '../PollWeightCalculator';
 
 function makePoll(): Poll {
   const r = Poll.create(
-    'Test Poll',
-    'Test Description',
-    'org-1',
-    'board-1',
-    'admin-user',
-    new Date('2026-01-01'),
-    new Date('2026-12-31')
+    PollTitle.parse('Test Poll'),
+    PollDescription.parse('Test Description'),
+    OrganizationId.parse('org-1'),
+    BoardId.parse('board-1'),
+    UserId.parse('admin-user'),
+    expectSuccess(
+      PollPeriod.create(new Date('2026-01-01'), new Date('2026-12-31'))
+    ),
+    testCreation(PollId, 'poll-1')
   );
   expect(r.success).toBe(true);
-  const poll = r.value!;
-  (poll as any).props.id = 'poll-1';
+  let poll = expectSuccess(r)!;
+  poll = Poll.reconstitute({
+    ...poll.toJSON(),
+    questions: poll.questions,
+    id: 'poll-1',
+  });
 
   return poll;
 }
 
 function makeParticipant(userId: string, weight: number): PollParticipant {
-  const r = PollParticipant.create('poll-1', userId, weight);
+  const r = PollParticipant.create(
+    PollId.parse('poll-1'),
+    UserId.parse(userId),
+    pollFixtureCreation(ParticipantId),
+    VotingWeight.parse(weight)
+  );
   expect(r.success).toBe(true);
 
-  return r.value!;
+  return expectSuccess(r)!;
 }
 
 function makeEligibleMember(userId: string): PollEligibleMember {
-  return PollEligibleMember.create('poll-1', userId, new Date());
+  return PollEligibleMember.create(
+    PollId.parse('poll-1'),
+    UserId.parse(userId),
+    pollFixtureCreation(PollEligibleMemberId)
+  );
 }
 
 describe('PreviewPollWeightConfigUseCase', () => {
@@ -57,7 +86,7 @@ describe('PreviewPollWeightConfigUseCase', () => {
     poll = makePoll();
 
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
     };
 
     participantRepository = {
@@ -154,12 +183,17 @@ describe('PreviewPollWeightConfigUseCase', () => {
   });
 
   describe('state guard — only DRAFT/READY allow weight-config preview', () => {
-    function setState(state: 'ACTIVE' | 'FINISHED') {
-      (poll as any).props.state = state;
+    function setState(state: PollState.ACTIVE | PollState.FINISHED) {
+      poll = Poll.reconstitute({
+        ...poll.toJSON(),
+        questions: poll.questions,
+        finishedAt: null,
+        state: state,
+      });
     }
 
     it('rejects with WEIGHT_CONFIG_LOCKED_AFTER_ACTIVATION when poll is ACTIVE', async () => {
-      setState('ACTIVE');
+      setState(PollState.ACTIVE);
 
       const result = await useCase.execute({
         pollId: 'poll-1',
@@ -179,7 +213,7 @@ describe('PreviewPollWeightConfigUseCase', () => {
     });
 
     it('rejects with WEIGHT_CONFIG_LOCKED_AFTER_ACTIVATION when poll is FINISHED', async () => {
-      setState('FINISHED');
+      setState(PollState.FINISHED);
 
       const result = await useCase.execute({
         pollId: 'poll-1',
@@ -334,18 +368,26 @@ describe('PreviewPollWeightConfigUseCase', () => {
   });
 
   function makeOpenPoll(): Poll {
-    const openPoll = Poll.create(
-      'Open Poll',
-      'Everyone may vote',
-      'org-1',
-      null,
-      'user-admin',
-      new Date('2026-01-15'),
-      new Date('2026-02-15'),
-      undefined,
-      'OPEN'
-    ).value;
-    (openPoll as any).props.id = 'poll-1';
+    let openPoll = expectSuccess(
+      Poll.create(
+        PollTitle.parse('Open Poll'),
+        PollDescription.parse('Everyone may vote'),
+        OrganizationId.parse('org-1'),
+        null,
+        UserId.parse('user-admin'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1'),
+        undefined,
+        'OPEN'
+      )
+    );
+    openPoll = Poll.reconstitute({
+      ...openPoll.toJSON(),
+      questions: openPoll.questions,
+      id: 'poll-1',
+    });
 
     return openPoll;
   }
@@ -362,6 +404,6 @@ describe('PreviewPollWeightConfigUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.OPEN_CONFIG_FIXED);
+    expect(expectFailure(result)).toBe(PollErrors.OPEN_CONFIG_FIXED);
   });
 });

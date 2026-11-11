@@ -1,3 +1,4 @@
+/** Development-only mail adapter exposes rendered messages for local OTP testing. */
 import type {
   EmailMessage,
   EmailSender,
@@ -12,7 +13,7 @@ import type {
 export class StubEmailSender implements EmailSender {
   async send(message: EmailMessage): Promise<EmailSendResult> {
     console.info(
-      `[StubEmailSender] to=${message.to} subject=${message.subject}\n${message.text}`
+      `[StubEmailSender] to=${message.to.getValue()} subject=${message.subject}\n${message.text}`
     );
 
     return { success: true, backdoorPreview: message.text };

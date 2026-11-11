@@ -1,59 +1,55 @@
 'use client';
 
+/** Edits validated weight choices and previews participant changes without erasing domain units. */
+import type { PreviewPollWeightConfigOutput } from '@/application/poll/PreviewPollWeightConfigUseCase';
+import type {
+  PollId,
+  PropertyId,
+  OrganizationId,
+} from '@/domain/shared/EntityIds';
+import type { PollState } from '@/domain/poll/PollState';
+
 import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { DistributionTypeSelector } from './DistributionTypeSelector';
 import { PropertyScopeSelector } from './PropertyScopeSelector';
 import { PropertyAggregationSelector } from './PropertyAggregationSelector';
 
-interface PreviewData {
-  addedParticipants: Array<{ userId: string; newWeight: number }>;
-  removedParticipants: Array<{ userId: string }>;
-  reweightedParticipants: Array<{
-    userId: string;
-    oldWeight: number;
-    newWeight: number;
-  }>;
-  totalWeight: number;
-}
+type PreviewData = PreviewPollWeightConfigOutput;
 
-interface WeightConfigDraft {
-  distributionType: string;
-  propertyAggregation: string;
-  propertyIds: string[];
-}
+export type WeightConfigDraft = PreviewData['effectiveConfig'];
 
 interface DescendantGroup {
-  orgId: string;
+  orgId: OrganizationId;
   orgName: string;
-  properties: Array<{ id: string; name: string }>;
+  properties: Array<{ id: PropertyId; name: string }>;
 }
 
 interface Props {
-  pollId: string;
+  pollId: PollId;
   initialConfig: WeightConfigDraft;
-  properties: Array<{ id: string; name: string }>;
+  properties: Array<{ id: PropertyId; name: string }>;
   descendantGroups?: DescendantGroup[];
   orgHasOwnershipData: boolean;
   votesCast: boolean;
   // Once the poll is ACTIVE or FINISHED the weight config is locked — the
   // backend rejects edits with WEIGHT_CONFIG_LOCKED_AFTER_ACTIVATION. The
   // editor must mirror the gate so admins don't try changes that always fail.
-  pollState: string;
+  pollState: PollState;
   onSaved: () => void;
   previewAction: (args: {
-    pollId: string;
-    distributionType?: string;
-    propertyAggregation?: string;
-    propertyIds?: string[];
+    pollId: PollId;
+    distributionType?: WeightConfigDraft['distributionType'];
+    propertyAggregation?: WeightConfigDraft['propertyAggregation'];
+    propertyIds?: WeightConfigDraft['propertyIds'];
   }) => Promise<
     { success: true; data: PreviewData } | { success: false; error: string }
   >;
   updateAction: (args: {
-    pollId: string;
-    distributionType?: string;
-    propertyAggregation?: string;
-    propertyIds?: string[];
+    pollId: PollId;
+    distributionType?: WeightConfigDraft['distributionType'];
+    propertyAggregation?: WeightConfigDraft['propertyAggregation'];
+    propertyIds?: WeightConfigDraft['propertyIds'];
   }) => Promise<{ success: true } | { success: false; error: string }>;
 }
 
@@ -148,12 +144,7 @@ export function WeightConfigEditor(props: Props) {
         </p>
       )}
       <DistributionTypeSelector
-        value={
-          draft.distributionType as
-            | 'EQUAL'
-            | 'OWNERSHIP_UNIT_COUNT'
-            | 'OWNERSHIP_SIZE_WEIGHTED'
-        }
+        value={draft.distributionType}
         onChange={(v) => handleChange({ distributionType: v })}
         disabled={disabled}
         ownershipDisabledReason={
@@ -175,9 +166,7 @@ export function WeightConfigEditor(props: Props) {
         />
       )}
       <PropertyAggregationSelector
-        value={
-          draft.propertyAggregation as 'RAW_SUM' | 'NORMALIZE_PER_PROPERTY'
-        }
+        value={draft.propertyAggregation}
         onChange={(v) => handleChange({ propertyAggregation: v })}
         disabled={disabled}
         visible={aggregationVisible}

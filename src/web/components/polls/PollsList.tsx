@@ -1,5 +1,8 @@
 'use client';
 
+/** Loads and filters typed poll-list snapshots for an organization. */
+import type { PollListItem } from '@/web/actions/poll/PollQueryViews';
+
 import { useState, useEffect, useCallback, useTransition } from 'react';
 import {
   searchPollsAction,
@@ -14,7 +17,7 @@ const DEFAULT_PAGE_SIZE = 10;
 const ORG_WIDE_VALUE = '__org_wide__';
 
 interface PollsListProps {
-  initialPolls: any[];
+  initialPolls: PollListItem[];
   initialTotalCount: number;
   userId: string;
   adminOrgIds: string[];

@@ -1,7 +1,10 @@
+/** Membership coordination tests preserve tree scope and repository sequencing.
+ * Pure membership selection rules are tested separately in the domain. */
+import { UserId, OrganizationId } from '../../../domain/shared/EntityIds';
 import { describe, it, expect, vi } from 'vitest';
 import { OrganizationMembershipService } from '../OrganizationMembershipService';
-import { OrganizationRepository } from '../OrganizationRepository';
-import { Organization } from '../Organization';
+import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
+import { Organization } from '../../../domain/organization/Organization';
 
 function makeOrg(id: string): Organization {
   return Organization.reconstitute({
@@ -9,85 +12,93 @@ function makeOrg(id: string): Organization {
     name: `Org ${id}`,
     description: 'Test',
     parentId: null,
-    createdById: 'user-1',
+    createdById: UserId.parse('user-1'),
     createdAt: new Date(),
     archivedAt: null,
     allowMultiTreeMembership: false,
   });
 }
 
+type MembershipPorts = Pick<
+  OrganizationRepository,
+  | 'getFullTreeOrgIds'
+  | 'findMembershipsByUserId'
+  | 'removeUserFromOrganization'
+  | 'getDescendantIds'
+  | 'findUsersWithMultipleMembershipsInOrgs'
+>;
+
 function makeMockOrgRepo(
-  overrides?: Partial<OrganizationRepository>
-): OrganizationRepository {
+  overrides?: Partial<MembershipPorts>
+): MembershipPorts {
   return {
-    save: vi.fn(),
-    findById: vi.fn(),
-    findByName: vi.fn(),
-    findByCreatorId: vi.fn(),
-    findByParentId: vi.fn(),
-    getAncestorIds: vi.fn(),
-    getDescendantIds: vi.fn(),
     getFullTreeOrgIds: vi.fn().mockResolvedValue([]),
-    isUserMember: vi.fn(),
-    isUserAdmin: vi.fn(),
     findMembershipsByUserId: vi.fn().mockResolvedValue([]),
-    findAdminOrganizationsByUserId: vi.fn(),
-    findAllWithStats: vi.fn(),
-    searchOrganizationsWithStats: vi.fn(),
-    update: vi.fn(),
-    findAcceptedMemberUserIdsIncludingDescendants: vi.fn(),
     removeUserFromOrganization: vi.fn(),
-    findPendingRequestsByUserId: vi.fn(),
-    getAncestors: vi.fn(),
-    getChildrenWithStats: vi.fn(),
-    getHierarchyTree: vi.fn(),
-    findAdminUserIds: vi.fn(),
-    setParentId: vi.fn(),
-    addAdmin: vi.fn(),
-    removeAdmin: vi.fn(),
-    searchByNameFuzzy: vi.fn(),
-    getRootAllowMultiTreeMembership: vi.fn().mockResolvedValue(false),
+    getDescendantIds: vi.fn().mockResolvedValue([]),
     findUsersWithMultipleMembershipsInOrgs: vi.fn().mockResolvedValue([]),
-    setAllowMultiTreeMembership: vi.fn(),
     ...overrides,
-  } as OrganizationRepository;
+  };
 }
 
 describe('OrganizationMembershipService.removeUserFromHierarchyOrgs', () => {
   it('should remove user from orgs in the hierarchy tree', async () => {
     const removeFromOrg = vi.fn();
     const repo = makeMockOrgRepo({
-      getFullTreeOrgIds: vi.fn().mockResolvedValue(['org-a', 'org-b', 'org-c']),
+      getFullTreeOrgIds: vi
+        .fn()
+        .mockResolvedValue([
+          OrganizationId.parse('org-a'),
+          OrganizationId.parse('org-b'),
+          OrganizationId.parse('org-c'),
+        ]),
       findMembershipsByUserId: vi
         .fn()
-        .mockResolvedValue([makeOrg('org-a'), makeOrg('org-b')]),
+        .mockResolvedValue([
+          makeOrg(OrganizationId.parse('org-a')),
+          makeOrg(OrganizationId.parse('org-b')),
+        ]),
       removeUserFromOrganization: removeFromOrg,
     });
 
     await OrganizationMembershipService.removeUserFromHierarchyOrgs(
-      'user-1',
-      'org-target',
+      UserId.parse('user-1'),
+      OrganizationId.parse('org-target'),
       repo
     );
 
     expect(removeFromOrg).toHaveBeenCalledTimes(2);
-    expect(removeFromOrg).toHaveBeenCalledWith('user-1', 'org-a');
-    expect(removeFromOrg).toHaveBeenCalledWith('user-1', 'org-b');
+    expect(removeFromOrg).toHaveBeenCalledWith(
+      UserId.parse('user-1'),
+      OrganizationId.parse('org-a')
+    );
+    expect(removeFromOrg).toHaveBeenCalledWith(
+      UserId.parse('user-1'),
+      OrganizationId.parse('org-b')
+    );
   });
 
   it('should not remove user from orgs outside the hierarchy', async () => {
     const removeFromOrg = vi.fn();
     const repo = makeMockOrgRepo({
-      getFullTreeOrgIds: vi.fn().mockResolvedValue(['org-a', 'org-b']),
+      getFullTreeOrgIds: vi
+        .fn()
+        .mockResolvedValue([
+          OrganizationId.parse('org-a'),
+          OrganizationId.parse('org-b'),
+        ]),
       findMembershipsByUserId: vi
         .fn()
-        .mockResolvedValue([makeOrg('org-x'), makeOrg('org-y')]),
+        .mockResolvedValue([
+          makeOrg(OrganizationId.parse('org-x')),
+          makeOrg(OrganizationId.parse('org-y')),
+        ]),
       removeUserFromOrganization: removeFromOrg,
     });
 
     await OrganizationMembershipService.removeUserFromHierarchyOrgs(
-      'user-1',
-      'org-target',
+      UserId.parse('user-1'),
+      OrganizationId.parse('org-target'),
       repo
     );
 
@@ -97,14 +108,16 @@ describe('OrganizationMembershipService.removeUserFromHierarchyOrgs', () => {
   it('should do nothing when user has no memberships', async () => {
     const removeFromOrg = vi.fn();
     const repo = makeMockOrgRepo({
-      getFullTreeOrgIds: vi.fn().mockResolvedValue(['org-a']),
+      getFullTreeOrgIds: vi
+        .fn()
+        .mockResolvedValue([OrganizationId.parse('org-a')]),
       findMembershipsByUserId: vi.fn().mockResolvedValue([]),
       removeUserFromOrganization: removeFromOrg,
     });
 
     await OrganizationMembershipService.removeUserFromHierarchyOrgs(
-      'user-1',
-      'org-target',
+      UserId.parse('user-1'),
+      OrganizationId.parse('org-target'),
       repo
     );
 
@@ -122,7 +135,7 @@ describe('OrganizationMembershipService.findUsersWithMultipleTreeMemberships', (
 
     const result =
       await OrganizationMembershipService.findUsersWithMultipleTreeMemberships(
-        'root-1',
+        OrganizationId.parse('root-1'),
         repo
       );
 
@@ -131,7 +144,7 @@ describe('OrganizationMembershipService.findUsersWithMultipleTreeMemberships', (
   });
 
   it('should return userIds of users in multiple orgs within the tree', async () => {
-    const findMultiple = vi.fn().mockResolvedValue(['user-1']);
+    const findMultiple = vi.fn().mockResolvedValue([UserId.parse('user-1')]);
     const repo = makeMockOrgRepo({
       getDescendantIds: vi.fn().mockResolvedValue(['child-1', 'child-2']),
       findUsersWithMultipleMembershipsInOrgs: findMultiple,
@@ -139,11 +152,11 @@ describe('OrganizationMembershipService.findUsersWithMultipleTreeMemberships', (
 
     const result =
       await OrganizationMembershipService.findUsersWithMultipleTreeMemberships(
-        'root-1',
+        OrganizationId.parse('root-1'),
         repo
       );
 
-    expect(result).toEqual(['user-1']);
+    expect(result).toEqual([UserId.parse('user-1')]);
     expect(findMultiple).toHaveBeenCalledWith(['root-1', 'child-1', 'child-2']);
   });
 
@@ -155,7 +168,7 @@ describe('OrganizationMembershipService.findUsersWithMultipleTreeMemberships', (
     });
 
     await OrganizationMembershipService.findUsersWithMultipleTreeMemberships(
-      'root-1',
+      OrganizationId.parse('root-1'),
       repo
     );
 

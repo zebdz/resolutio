@@ -9,7 +9,6 @@ import {
   registerEntrySchema,
 } from './RecordFormat';
 import { requireSeal, SealDomainCodes } from './SealDomainCodes';
-import { SealInput } from './SealInput';
 import { voteSelectionSchema, VoteSelection } from './VoteLeaf';
 import { QuestionId, ReceiptSecret, UserId, UtcTimestamp } from './SealValues';
 
@@ -104,7 +103,7 @@ export function validateSnapshot(
   );
 }
 
-export function parseInput(input: SealInput, sealedAt: UtcTimestamp) {
+export function parseInput(input: unknown, sealedAt: UtcTimestamp) {
   const parsed = inputSchema.safeParse(input);
   requireSeal(parsed.success);
   const source = parsed.data;

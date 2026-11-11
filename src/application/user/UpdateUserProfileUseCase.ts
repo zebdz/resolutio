@@ -1,14 +1,28 @@
+/** Applies validated user profile changes and persists privacy audit updates. */
+import {
+  SharedDomainCodes,
+  SharedDomainCode,
+} from '@/domain/shared/SharedDomainCodes';
+import { UserId } from '@/domain/shared/EntityIds';
 import { User } from '@/src/domain/user/User';
 import { Nickname } from '@/src/domain/user/Nickname';
 import type { UserRepository } from '@/src/domain/user/UserRepository';
 import { ProfanityChecker } from '@/src/domain/shared/profanity/ProfanityChecker';
-import { Address, type AddressProps } from '@/src/domain/user/Address';
+import {
+  Address,
+  AddressDomainCodes,
+  type AddressDomainCode,
+  type AddressProps,
+} from '@/src/domain/user/Address';
 import { Result, success, failure } from '@/src/domain/shared/Result';
-import { UserDomainCodes } from '@/src/domain/user/UserDomainCodes';
+import {
+  UserDomainCodes,
+  UserDomainCode,
+} from '@/src/domain/user/UserDomainCodes';
 import type { Language } from '@/src/domain/user/User';
 
 export interface UpdateUserProfileInput {
-  userId: string;
+  userId: UserId;
   language?: Language;
   nickname?: string;
   allowFindByName?: boolean;
@@ -27,7 +41,11 @@ export class UpdateUserProfileUseCase {
     this.profanityChecker = profanityChecker;
   }
 
-  async execute(input: UpdateUserProfileInput): Promise<Result<User, string>> {
+  async execute(
+    input: UpdateUserProfileInput
+  ): Promise<
+    Result<User, UserDomainCode | AddressDomainCode | SharedDomainCode>
+  > {
     const user = await this.userRepository.findById(input.userId);
 
     if (!user) {
@@ -52,9 +70,8 @@ export class UpdateUserProfileUseCase {
       }
 
       if (!user.nickname.equals(nickname)) {
-        const available = await this.userRepository.isNicknameAvailable(
-          nickname.getValue()
-        );
+        const available =
+          await this.userRepository.isNicknameAvailable(nickname);
 
         if (!available) {
           return failure(UserDomainCodes.NICKNAME_TAKEN);
@@ -74,11 +91,19 @@ export class UpdateUserProfileUseCase {
           const address = Address.create(input.address, this.profanityChecker);
           updatedUser = updatedUser.updateAddress(address);
         } catch (error) {
-          return failure(
+          const code =
             error instanceof Error
-              ? error.message
-              : 'domain.user.address.invalid'
-          );
+              ? [
+                  ...Object.values(AddressDomainCodes),
+                  ...Object.values(SharedDomainCodes),
+                ].find((value) => value === error.message)
+              : undefined;
+
+          if (code) {
+            return failure(code);
+          }
+
+          throw error;
         }
       }
     }

@@ -1,3 +1,14 @@
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { UserId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import { Instant } from '@/domain/shared/Instant';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { PollId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GetOpenPollPreviewUseCase } from '../GetOpenPollPreviewUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -8,19 +19,32 @@ import { Organization } from '../../../domain/organization/Organization';
 import { success } from '../../../domain/shared/Result';
 
 function makePoll(pollType: 'ORGANIZATION' | 'OPEN'): Poll {
-  const poll = Poll.create(
-    'Should we repave the yard?',
-    'Full description here',
-    'org-1',
-    null,
-    'user-admin',
-    new Date('2026-01-01'),
-    new Date('2026-02-01'),
-    undefined,
-    pollType
-  ).value;
-  (poll as any).props.id = 'poll-1';
-  (poll as any).props.state = PollState.ACTIVE;
+  let poll = expectSuccess(
+    Poll.create(
+      PollTitle.parse('Should we repave the yard?'),
+      PollDescription.parse('Full description here'),
+      OrganizationId.parse('org-1'),
+      null,
+      UserId.parse('user-admin'),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-01'), new Date('2026-02-01'))
+      ),
+      testCreation(PollId, 'poll-1'),
+      undefined,
+      pollType
+    )
+  );
+  poll = Poll.reconstitute({
+    ...poll.toJSON(),
+    questions: poll.questions,
+    id: 'poll-1',
+  });
+  poll = Poll.reconstitute({
+    ...poll.toJSON(),
+    questions: poll.questions,
+    finishedAt: null,
+    state: PollState.ACTIVE,
+  });
 
   return poll;
 }
@@ -62,7 +86,7 @@ describe('GetOpenPollPreviewUseCase', () => {
     const result = await useCase.execute({ pollId: 'poll-1' });
 
     expect(result.success).toBe(true);
-    expect(result.value).toEqual({
+    expect(expectSuccess(result)).toEqual({
       title: 'Should we repave the yard?',
       description: 'Full description here',
       // Ids only — the anonymous preview renders the description, so it needs
@@ -81,17 +105,17 @@ describe('GetOpenPollPreviewUseCase', () => {
     const result = await useCase.execute({ pollId: 'poll-1' });
 
     expect(result.success).toBe(true);
-    expect(result.value).toBeNull();
+    expect(expectSuccess(result)).toBeNull();
   });
 
   it('returns null for an archived open poll', async () => {
     const archived = makePoll('OPEN');
-    (archived as any).props.archivedAt = new Date();
+    archived.archive(Instant.parse('2026-01-02T00:00:00.000Z'));
     pollRepository.getPollById = vi.fn().mockResolvedValue(success(archived));
 
     const result = await useCase.execute({ pollId: 'poll-1' });
 
-    expect(result.value).toBeNull();
+    expect(expectSuccess(result)).toBeNull();
   });
 
   it('returns null for an unknown poll', async () => {
@@ -99,7 +123,7 @@ describe('GetOpenPollPreviewUseCase', () => {
 
     const result = await useCase.execute({ pollId: 'nope' });
 
-    expect(result.value).toBeNull();
+    expect(expectSuccess(result)).toBeNull();
   });
 
   it('returns null when the organization is archived', async () => {
@@ -109,7 +133,7 @@ describe('GetOpenPollPreviewUseCase', () => {
 
     const result = await useCase.execute({ pollId: 'poll-1' });
 
-    expect(result.value).toBeNull();
+    expect(expectSuccess(result)).toBeNull();
   });
 
   it('does not ask for the organization when the poll is not open', async () => {
@@ -130,6 +154,6 @@ describe('GetOpenPollPreviewUseCase', () => {
     const result = await useCase.execute({ pollId: 'poll-1' });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe('common.errors.unexpected');
+    expect(expectFailure(result)).toBe('common.errors.unexpected');
   });
 });

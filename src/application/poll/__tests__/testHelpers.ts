@@ -1,3 +1,20 @@
+/** Shared lifecycle fixtures construct valid polls through the public domain API.
+ * Content, identities and positions are validated before aggregate creation. */
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { PollInstant } from '@/domain/poll/PollValues';
+import {
+  PageNumber,
+  SortOrder,
+  QuestionText,
+  AnswerText,
+} from '@/domain/poll/QuestionValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { BoardId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { PollId, QuestionId, AnswerId } from '@/domain/shared/EntityIds';
+import { pollFixtureCreation } from '@/application/poll/__tests__/pollFixtureCreation';
 import { Poll } from '../../../domain/poll/Poll';
 import { Question } from '../../../domain/poll/Question';
 import { Answer } from '../../../domain/poll/Answer';
@@ -12,28 +29,45 @@ export function createDraftPoll(
   createdBy: string
 ): Poll {
   const pollResult = Poll.create(
-    'Test Poll',
-    'Test Description',
-    boardId,
-    createdBy,
-    new Date('2024-01-01'),
-    new Date('2024-12-31')
+    PollTitle.parse('Test Poll'),
+    PollDescription.parse('Test Description'),
+    OrganizationId.parse('org-1'),
+    BoardId.parse(boardId),
+    UserId.parse(createdBy),
+    expectSuccess(
+      PollPeriod.create(new Date('2024-01-01'), new Date('2024-12-31'))
+    ),
+    pollFixtureCreation(PollId)
   );
-  const poll = pollResult.value;
-  (poll as any).props.id = id;
+  let poll = expectSuccess(pollResult);
+  poll = Poll.reconstitute({
+    ...poll.toJSON(),
+    questions: poll.questions,
+    id: id,
+  });
 
   // Add question with answer
   const questionResult = Question.create(
-    'Question 1',
-    id,
-    1,
-    1,
+    QuestionText.parse('Question 1'),
+    PollId.parse(id),
+    pollFixtureCreation(QuestionId),
+    PageNumber.parse(1),
+    SortOrder.parse(1),
     'single-choice'
   );
-  const question = questionResult.value;
-  (question as any).props.id = `${id}-question-1`;
-  const answerResult = Answer.create('Answer 1', 1, question.id);
-  question.addAnswer(answerResult.value);
+  let question = expectSuccess(questionResult);
+  question = Question.reconstitute({
+    ...question.toJSON(),
+    answers: question.answers,
+    id: `${id}-question-1`,
+  });
+  const answerResult = Answer.create(
+    AnswerText.parse('Answer 1'),
+    SortOrder.parse(1),
+    question.id,
+    pollFixtureCreation(AnswerId)
+  );
+  question.addAnswer(expectSuccess(answerResult));
   poll.addQuestion(question);
 
   return poll;
@@ -48,6 +82,7 @@ export function createReadyPoll(
   createdBy: string
 ): Poll {
   const poll = createDraftPoll(id, boardId, createdBy);
+  poll.submitToAdmin();
   poll.takeSnapshot();
 
   return poll;
@@ -76,7 +111,7 @@ export function createFinishedPoll(
   createdBy: string
 ): Poll {
   const poll = createActivePoll(id, boardId, createdBy);
-  poll.finish();
+  poll.finish(PollInstant.parse(new Date().toISOString()));
 
   return poll;
 }

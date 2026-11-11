@@ -23,10 +23,12 @@ export function assertV1(value: unknown): void {
   requireSeal(
     value !== null && typeof value === 'object' && !Array.isArray(value)
   );
-  const header = value as Record<string, unknown>;
-  requireSeal(header.version === 1, SealDomainCodes.SEAL_VERSION_UNSUPPORTED);
   requireSeal(
-    header.algorithm === 'sha256',
+    'version' in value && value.version === 1,
+    SealDomainCodes.SEAL_VERSION_UNSUPPORTED
+  );
+  requireSeal(
+    'algorithm' in value && value.algorithm === 'sha256',
     SealDomainCodes.SEAL_ALGORITHM_UNSUPPORTED
   );
 }

@@ -1,3 +1,4 @@
+import { Session } from '@/domain/user/Session';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { isSuperadminSession } from '../superadminWhitelist';
@@ -23,6 +24,13 @@ describe('checkSuperadminBySessionFallback', () => {
     vi.clearAllMocks();
   });
 
+  it('rejects an invalid session cookie before querying persistence', async () => {
+    expect(
+      await checkSuperadminBySessionFallback('invalid token', '1.2.3.4')
+    ).toBe(false);
+    expect(mockFindById).not.toHaveBeenCalled();
+  });
+
   it('returns false when session not found', async () => {
     mockFindById.mockResolvedValue(null);
 
@@ -35,10 +43,16 @@ describe('checkSuperadminBySessionFallback', () => {
   });
 
   it('returns false when session is expired', async () => {
-    mockFindById.mockResolvedValue({
-      userId: 'user-1',
-      expiresAt: new Date(Date.now() - 1000),
-    });
+    mockFindById.mockResolvedValue(
+      Session.reconstitute({
+        id: 'fixture-session',
+        createdAt: new Date(),
+        ipAddress: null,
+        userAgent: null,
+        userId: 'user-1',
+        expiresAt: new Date(Date.now() - 1000),
+      })
+    );
 
     const result = await checkSuperadminBySessionFallback(
       'expired-sess',
@@ -49,10 +63,16 @@ describe('checkSuperadminBySessionFallback', () => {
   });
 
   it('returns false when user is not superadmin', async () => {
-    mockFindById.mockResolvedValue({
-      userId: 'regular-user',
-      expiresAt: new Date(Date.now() + 60_000),
-    });
+    mockFindById.mockResolvedValue(
+      Session.reconstitute({
+        id: 'fixture-session',
+        createdAt: new Date(),
+        ipAddress: null,
+        userAgent: null,
+        userId: 'regular-user',
+        expiresAt: new Date(Date.now() + 60_000),
+      })
+    );
     mockIsSuperAdmin.mockResolvedValue(false);
 
     const result = await checkSuperadminBySessionFallback(
@@ -64,10 +84,16 @@ describe('checkSuperadminBySessionFallback', () => {
   });
 
   it('returns true and registers whitelist when user is superadmin', async () => {
-    mockFindById.mockResolvedValue({
-      userId: 'superadmin-user',
-      expiresAt: new Date(Date.now() + 60_000),
-    });
+    mockFindById.mockResolvedValue(
+      Session.reconstitute({
+        id: 'fixture-session',
+        createdAt: new Date(),
+        ipAddress: null,
+        userAgent: null,
+        userId: 'superadmin-user',
+        expiresAt: new Date(Date.now() + 60_000),
+      })
+    );
     mockIsSuperAdmin.mockResolvedValue(true);
 
     const result = await checkSuperadminBySessionFallback(
@@ -80,10 +106,16 @@ describe('checkSuperadminBySessionFallback', () => {
   });
 
   it('negative cache: skips DB on repeated non-superadmin checks', async () => {
-    mockFindById.mockResolvedValue({
-      userId: 'attacker',
-      expiresAt: new Date(Date.now() + 60_000),
-    });
+    mockFindById.mockResolvedValue(
+      Session.reconstitute({
+        id: 'fixture-session',
+        createdAt: new Date(),
+        ipAddress: null,
+        userAgent: null,
+        userId: 'attacker',
+        expiresAt: new Date(Date.now() + 60_000),
+      })
+    );
     mockIsSuperAdmin.mockResolvedValue(false);
 
     // First call hits DB

@@ -1,5 +1,13 @@
 'use server';
 
+/** Parent-link actions supply identity/time adapters and serialize authorized
+ * request details without exposing mutable domain instances to browser clients. */
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
+import { UserId, OrganizationId } from '@/domain/shared/EntityIds';
+
 import { revalidatePath } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
 import { RequestJoinParentUseCase } from '@/application/organization/RequestJoinParentUseCase';
@@ -24,6 +32,13 @@ import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateZodFieldErrors } from '@/web/actions/utils/translateZodErrors';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { ActionResult } from './organization';
+import {
+  serializeJoinParentRequest,
+  type ChildParentRequestView,
+  type IncomingParentRequestView,
+  type EnrichedJoinParentRequest,
+} from './JoinParentRequestViews';
+export type { EnrichedJoinParentRequest } from './JoinParentRequestViews';
 
 // Initialize dependencies
 const organizationRepository = new PrismaOrganizationRepository(prisma);
@@ -36,6 +51,8 @@ const profanityChecker = LeoProfanityChecker.getInstance();
 
 // Use cases
 const requestJoinParentUseCase = new RequestJoinParentUseCase({
+  ids: new CryptoIdGenerator(),
+  clock: new SystemClock(),
   organizationRepository,
   joinParentRequestRepository,
   userRepository,
@@ -50,6 +67,8 @@ const cancelJoinParentRequestUseCase = new CancelJoinParentRequestUseCase({
 });
 
 const handleJoinParentRequestUseCase = new HandleJoinParentRequestUseCase({
+  ids: new CryptoIdGenerator(),
+  clock: new SystemClock(),
   organizationRepository,
   joinParentRequestRepository,
   userRepository,
@@ -235,17 +254,7 @@ export async function handleJoinParentRequestAction(
 
 export async function getChildOrgJoinParentRequestAction(
   childOrgId: string
-): Promise<
-  ActionResult<{
-    request: {
-      id: string;
-      parentOrgId: string;
-      parentOrgName: string;
-      message: string;
-      createdAt: Date;
-    } | null;
-  }>
-> {
+): Promise<ActionResult<{ request: ChildParentRequestView | null }>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -303,22 +312,7 @@ export async function getChildOrgJoinParentRequestAction(
 
 export async function getIncomingJoinParentRequestsAction(
   parentOrgId: string
-): Promise<
-  ActionResult<{
-    requests: Array<{
-      id: string;
-      childOrgId: string;
-      childOrgName: string;
-      requestingAdmin: {
-        firstName: string;
-        lastName: string;
-        middleName?: string | null;
-      } | null;
-      message: string;
-      createdAt: Date;
-    }>;
-  }>
-> {
+): Promise<ActionResult<{ requests: IncomingParentRequestView[] }>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -348,7 +342,7 @@ export async function getIncomingJoinParentRequestsAction(
 
     // Resolve child org names and requesting admin names
     const requests = await Promise.all(
-      result.value.map(async (req) => {
+      result.value.map(async (req): Promise<IncomingParentRequestView> => {
         const childOrg = await organizationRepository.findById(req.childOrgId);
         const admin = await userRepository.findById(req.requestingAdminId);
 
@@ -375,29 +369,6 @@ export async function getIncomingJoinParentRequestsAction(
 
     return { success: false, error: t('generic') };
   }
-}
-
-export interface EnrichedJoinParentRequest {
-  id: string;
-  status: 'pending' | 'accepted' | 'rejected';
-  childOrgId: string;
-  childOrgName: string;
-  parentOrgId: string;
-  parentOrgName: string;
-  requestingAdmin: {
-    firstName: string;
-    lastName: string;
-    middleName?: string | null;
-  } | null;
-  handlingAdmin: {
-    firstName: string;
-    lastName: string;
-    middleName?: string | null;
-  } | null;
-  message: string;
-  rejectionReason: string | null;
-  createdAt: Date;
-  handledAt: Date | null;
 }
 
 export async function getAllJoinParentRequestsAction(
@@ -437,8 +408,8 @@ export async function getAllJoinParentRequestsAction(
 
     // Collect all unique user IDs and org IDs for batch lookup
     const allRequests = [...result.value.incoming, ...result.value.outgoing];
-    const userIds = new Set<string>();
-    const orgIds = new Set<string>();
+    const userIds = new Set<UserId>();
+    const orgIds = new Set<OrganizationId>();
 
     for (const req of allRequests) {
       userIds.add(req.requestingAdminId);
@@ -474,32 +445,12 @@ export async function getAllJoinParentRequestsAction(
       const childOrg = orgMap.get(req.childOrgId);
       const parentOrg = orgMap.get(req.parentOrgId);
 
-      return {
-        id: req.id,
-        status: req.status,
-        childOrgId: req.childOrgId,
+      return serializeJoinParentRequest(req, {
         childOrgName: childOrg?.name ?? 'Unknown',
-        parentOrgId: req.parentOrgId,
         parentOrgName: parentOrg?.name ?? 'Unknown',
-        requestingAdmin: requestingAdmin
-          ? {
-              firstName: requestingAdmin.firstName,
-              lastName: requestingAdmin.lastName,
-              middleName: requestingAdmin.middleName,
-            }
-          : null,
-        handlingAdmin: handlingAdmin
-          ? {
-              firstName: handlingAdmin.firstName,
-              lastName: handlingAdmin.lastName,
-              middleName: handlingAdmin.middleName,
-            }
-          : null,
-        message: req.message,
-        rejectionReason: req.rejectionReason,
-        createdAt: req.createdAt,
-        handledAt: req.handledAt,
-      };
+        requestingAdmin: requestingAdmin ?? null,
+        handlingAdmin: handlingAdmin ?? null,
+      });
     };
 
     return {

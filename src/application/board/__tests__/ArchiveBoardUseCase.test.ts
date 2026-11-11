@@ -1,3 +1,17 @@
+/** Board application behavior tests cover authorization, validated request identities
+ * and explicit creation/lifecycle inputs through repository contracts. */
+import { BoardName } from '@/domain/board/BoardName';
+import { MemberCount } from '@/domain/organization/OrganizationValues';
+import { ResultCount } from '@/domain/shared/Pagination';
+import { OrganizationName } from '@/domain/organization/OrganizationValues';
+import { createOrganization } from '@/domain/organization/__tests__/organizationTestValues';
+import { OrganizationId, UserId } from '@/domain/shared/EntityIds';
+import { BoardSummary } from '@/domain/board/BoardRepository';
+import {
+  boardCreation,
+  boardArchiveTime,
+  boardArchiveClock,
+} from './boardTestValues';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ArchiveBoardUseCase } from '../ArchiveBoardUseCase';
 import { Board } from '../../../domain/board/Board';
@@ -28,7 +42,7 @@ class MockBoardRepository implements BoardRepository {
     );
   }
 
-  async findBoardMembers(boardId: string): Promise<{ userId: string }[]> {
+  async findBoardMembers(boardId: string): Promise<{ userId: UserId }[]> {
     return [];
   }
 
@@ -55,9 +69,7 @@ class MockBoardRepository implements BoardRepository {
     return board;
   }
 
-  async findActiveBoardsByUserId(
-    _userId: string
-  ): Promise<Array<{ id: string; name: string; organizationId: string }>> {
+  async findActiveBoardsByUserId(_userId: string): Promise<BoardSummary[]> {
     return [];
   }
 
@@ -73,6 +85,29 @@ class MockBoardRepository implements BoardRepository {
 
 // Mock OrganizationRepository
 class MockOrganizationRepository implements OrganizationRepository {
+  async isUserExactMember(): Promise<boolean> {
+    return false;
+  }
+  async getAdminUserIds(): ReturnType<
+    OrganizationRepository['getAdminUserIds']
+  > {
+    return [];
+  }
+  async findAcceptedMemberUserIdsIncludingDescendants(): ReturnType<
+    OrganizationRepository['findAcceptedMemberUserIdsIncludingDescendants']
+  > {
+    return [];
+  }
+  async findAcceptedMemberUserIdsForOrgs(): ReturnType<
+    OrganizationRepository['findAcceptedMemberUserIdsForOrgs']
+  > {
+    return [];
+  }
+  async removeUserFromOrganization(): Promise<void> {}
+  async removeMemberFromOrganization(): Promise<void> {}
+  async findPendingRequestsByUserId(): Promise<Organization[]> {
+    return [];
+  }
   private organizations: Map<string, Organization> = new Map();
   private admins: Map<string, Set<string>> = new Map();
 
@@ -98,11 +133,15 @@ class MockOrganizationRepository implements OrganizationRepository {
     return [];
   }
 
-  async getAncestorIds(organizationId: string): Promise<string[]> {
+  async getAncestorIds(
+    organizationId: string
+  ): ReturnType<OrganizationRepository['getAncestorIds']> {
     return [];
   }
 
-  async getDescendantIds(organizationId: string): Promise<string[]> {
+  async getDescendantIds(
+    organizationId: string
+  ): ReturnType<OrganizationRepository['getDescendantIds']> {
     return [];
   }
 
@@ -160,44 +199,51 @@ class MockOrganizationRepository implements OrganizationRepository {
     this.admins.clear();
   }
 
-  async getAncestors(): Promise<
-    { id: string; name: string; memberCount: number }[]
+  async getAncestors(): ReturnType<OrganizationRepository['getAncestors']> {
+    return [];
+  }
+
+  async getChildrenWithStats(): ReturnType<
+    OrganizationRepository['getChildrenWithStats']
   > {
     return [];
   }
 
-  async getChildrenWithStats(): Promise<
-    { id: string; name: string; memberCount: number }[]
+  async getHierarchyTree(): ReturnType<
+    OrganizationRepository['getHierarchyTree']
   > {
-    return [];
-  }
-
-  async getHierarchyTree(): Promise<{
-    ancestors: { id: string; name: string; memberCount: number }[];
-    tree: { id: string; name: string; memberCount: number; children: any[] };
-  }> {
     return {
       ancestors: [],
-      tree: { id: '', name: '', memberCount: 0, children: [] },
+      tree: {
+        id: OrganizationId.parse('org-fixture'),
+        name: OrganizationName.parse('Fixture organization'),
+        memberCount: MemberCount.parse(0),
+        children: [],
+      },
     };
   }
-  async searchOrganizationsWithStats(): Promise<{
-    organizations: any[];
-    totalCount: number;
-  }> {
-    return { organizations: [], totalCount: 0 };
+  async searchOrganizationsWithStats(): ReturnType<
+    OrganizationRepository['searchOrganizationsWithStats']
+  > {
+    return { organizations: [], totalCount: ResultCount.parse(0) };
   }
   async setParentId(
     organizationId: string,
     parentId: string | null
   ): Promise<void> {}
-  async findAdminUserIds(): Promise<string[]> {
+  async findAdminUserIds(): ReturnType<
+    OrganizationRepository['findAdminUserIds']
+  > {
     return [];
   }
-  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+  async searchByNameFuzzy(): ReturnType<
+    OrganizationRepository['searchByNameFuzzy']
+  > {
     return [];
   }
-  async getFullTreeOrgIds(): Promise<string[]> {
+  async getFullTreeOrgIds(): ReturnType<
+    OrganizationRepository['getFullTreeOrgIds']
+  > {
     return [];
   }
   async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
@@ -205,7 +251,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
   async findUsersWithMultipleMembershipsInOrgs(
     _orgIds: string[]
-  ): Promise<string[]> {
+  ): ReturnType<
+    OrganizationRepository['findUsersWithMultipleMembershipsInOrgs']
+  > {
     return [];
   }
   async setAllowMultiTreeMembership(
@@ -216,6 +264,9 @@ class MockOrganizationRepository implements OrganizationRepository {
 
 // Mock UserRepository
 class MockUserRepository implements UserRepository {
+  async findByEmail(): Promise<User | null> {
+    return null;
+  }
   private superAdmins: Set<string> = new Set();
 
   async findById(id: string): Promise<User | null> {
@@ -242,7 +293,7 @@ class MockUserRepository implements UserRepository {
     return [];
   }
 
-  async searchUserByPhone(_phone: string): Promise<User | null> {
+  async searchUserByPhone(_phone: PhoneNumber): Promise<User | null> {
     return null;
   }
 
@@ -267,19 +318,10 @@ class MockUserRepository implements UserRepository {
   }
 
   async updatePrivacySettings(): Promise<void> {}
-  async isUserBlocked(): Promise<boolean> {
-    return false;
-  }
-  async blockUser(): Promise<void> {}
-  async unblockUser(): Promise<void> {}
+
   async confirmUser(): Promise<void> {}
-  async getBlockStatus(): Promise<null> {
-    return null;
-  }
+
   async deleteAddress(): Promise<void> {}
-  async getBlockedUserIds(): Promise<string[]> {
-    return [];
-  }
 }
 
 describe('ArchiveBoardUseCase', () => {
@@ -293,9 +335,19 @@ describe('ArchiveBoardUseCase', () => {
     organizationRepository = new MockOrganizationRepository();
     userRepository = new MockUserRepository();
     useCase = new ArchiveBoardUseCase({
+      clock: boardArchiveClock,
       boardRepository,
       organizationRepository,
       userRepository,
+    });
+  });
+
+  it('rejects malformed request identities before repository lookup', async () => {
+    expect(
+      await useCase.execute({ boardId: '', adminUserId: 'admin-1' })
+    ).toEqual({
+      success: false,
+      error: 'common.errors.validationFailed',
     });
   });
 
@@ -316,23 +368,28 @@ describe('ArchiveBoardUseCase', () => {
 
   describe('when user is not an admin of the organization', () => {
     beforeEach(() => {
-      const orgResult = Organization.create(
+      const orgResult = createOrganization(
         'Test Org',
         'Test Desc',
         'creator-1'
       );
 
       if (orgResult.success) {
-        const org = orgResult.value;
-        (org as any).props.id = 'org-1';
+        const org = Organization.reconstitute({
+          ...orgResult.value.toJSON(),
+          id: 'org-1',
+        });
         organizationRepository.addOrganization(org);
       }
 
-      const boardResult = Board.create('Test Board', 'org-1');
+      const boardResult = Board.create(
+        BoardName.parse('Test Board'),
+        OrganizationId.parse('org-1'),
+        boardCreation
+      );
 
       if (boardResult.success) {
         const board = boardResult.value;
-        (board as any).props.id = 'board-1';
         boardRepository.addBoard(board);
       }
     });
@@ -353,26 +410,31 @@ describe('ArchiveBoardUseCase', () => {
 
   describe('when user is an admin', () => {
     beforeEach(() => {
-      const orgResult = Organization.create(
+      const orgResult = createOrganization(
         'Test Org',
         'Test Desc',
         'creator-1'
       );
 
       if (orgResult.success) {
-        const org = orgResult.value;
-        (org as any).props.id = 'org-1';
+        const org = Organization.reconstitute({
+          ...orgResult.value.toJSON(),
+          id: 'org-1',
+        });
         organizationRepository.addOrganization(org);
         organizationRepository.addAdmin('org-1', 'admin-1');
       }
     });
 
     it('should archive a board successfully', async () => {
-      const boardResult = Board.create('Test Board', 'org-1');
+      const boardResult = Board.create(
+        BoardName.parse('Test Board'),
+        OrganizationId.parse('org-1'),
+        boardCreation
+      );
 
       if (boardResult.success) {
         const board = boardResult.value;
-        (board as any).props.id = 'board-1';
         boardRepository.addBoard(board);
       }
 
@@ -387,16 +449,19 @@ describe('ArchiveBoardUseCase', () => {
       const archivedBoard = await boardRepository.findById('board-1');
       expect(archivedBoard).not.toBeNull();
       expect(archivedBoard!.isArchived()).toBe(true);
-      expect(archivedBoard!.archivedAt).not.toBeNull();
+      expect(archivedBoard!.archivedAt).toBe(boardArchiveTime);
     });
 
     it('should fail when trying to archive an already archived board', async () => {
-      const boardResult = Board.create('Test Board', 'org-1');
+      const boardResult = Board.create(
+        BoardName.parse('Test Board'),
+        OrganizationId.parse('org-1'),
+        boardCreation
+      );
 
       if (boardResult.success) {
         const board = boardResult.value;
-        (board as any).props.id = 'board-1';
-        board.archive(); // Archive it first
+        board.archive(boardArchiveTime); // Archive it first
         boardRepository.addBoard(board);
       }
 
@@ -415,15 +480,17 @@ describe('ArchiveBoardUseCase', () => {
 
   describe('when user is a superadmin', () => {
     beforeEach(() => {
-      const orgResult = Organization.create(
+      const orgResult = createOrganization(
         'Test Org',
         'Test Desc',
         'creator-1'
       );
 
       if (orgResult.success) {
-        const org = orgResult.value;
-        (org as any).props.id = 'org-1';
+        const org = Organization.reconstitute({
+          ...orgResult.value.toJSON(),
+          id: 'org-1',
+        });
         organizationRepository.addOrganization(org);
       }
 
@@ -432,11 +499,14 @@ describe('ArchiveBoardUseCase', () => {
     });
 
     it('should archive board without being org admin', async () => {
-      const boardResult = Board.create('Test Board', 'org-1');
+      const boardResult = Board.create(
+        BoardName.parse('Test Board'),
+        OrganizationId.parse('org-1'),
+        boardCreation
+      );
 
       if (boardResult.success) {
         const board = boardResult.value;
-        (board as any).props.id = 'board-1';
         boardRepository.addBoard(board);
       }
 

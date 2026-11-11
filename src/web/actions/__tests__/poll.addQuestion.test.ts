@@ -1,149 +1,44 @@
+/** Question multipart decoding exercises the production parser, including legacy JSON fallbacks.
+ * These checks preserve answer order and trimming without a copied parser implementation. */
 import { describe, it, expect } from 'vitest';
+import { readQuestionForm } from '../poll/PollFormData';
 
-/**
- * Tests for FormData parsing logic in addQuestionAction.
- *
- * This tests the parsing of answers from FormData format (answers[0][text], answers[0][order])
- * to ensure the action correctly handles both FormData and plain object inputs.
- */
+describe('question form decoding', () => {
+  it('trims nonempty answers and preserves their submitted order', () => {
+    const form = new FormData();
+    form.set(
+      'answers',
+      JSON.stringify([' Second ', ' ', 'First', '', 'Third '])
+    );
+    expect(readQuestionForm(form).answers).toEqual([
+      'Second',
+      'First',
+      'Third',
+    ]);
+  });
 
-// Helper function that mimics the parsing logic from addQuestionAction
-function parseAnswersFromFormData(
-  formData: FormData
-): { text: string; order: number }[] {
-  const answers: { text: string; order: number }[] = [];
-  const answerIndices = new Set<number>();
+  it.each([undefined, '', '[broken', '{}', '["Valid",1]'])(
+    'retains the empty-answer validation outcome for %j',
+    (value) => {
+      const form = new FormData();
 
-  // Find all answer indices
-  for (const key of formData.keys()) {
-    const match = key.match(/^answers\[(\d+)\]\[text\]$/);
+      if (value !== undefined) {
+        form.set('answers', value);
+      }
 
-    if (match) {
-      answerIndices.add(parseInt(match[1]));
+      expect(readQuestionForm(form).answers).toEqual([]);
     }
-  }
+  );
 
-  // Build answers array
-  for (const index of Array.from(answerIndices).sort((a, b) => a - b)) {
-    const text = formData.get(`answers[${index}][text]`) as string;
-    const orderStr = formData.get(`answers[${index}][order]`) as string;
+  it('does not treat an uploaded file as answer JSON', () => {
+    const form = new FormData();
+    form.set('answers', new Blob(['["Yes"]']), 'answers.json');
+    expect(readQuestionForm(form).answers).toEqual([]);
+  });
 
-    if (text && text.trim()) {
-      answers.push({
-        text: text.trim(),
-        order: orderStr ? parseInt(orderStr) : index,
-      });
-    }
-  }
-
-  return answers;
-}
-
-describe('addQuestionAction - FormData parsing', () => {
-  describe('parseAnswersFromFormData', () => {
-    it('should parse multiple answers from FormData', () => {
-      const formData = new FormData();
-      formData.append('answers[0][text]', 'Answer 1');
-      formData.append('answers[0][order]', '0');
-      formData.append('answers[1][text]', 'Answer 2');
-      formData.append('answers[1][order]', '1');
-      formData.append('answers[2][text]', 'Answer 3');
-      formData.append('answers[2][order]', '2');
-
-      const result = parseAnswersFromFormData(formData);
-
-      expect(result).toEqual([
-        { text: 'Answer 1', order: 0 },
-        { text: 'Answer 2', order: 1 },
-        { text: 'Answer 3', order: 2 },
-      ]);
-    });
-
-    it('should filter out empty/whitespace answers', () => {
-      const formData = new FormData();
-      formData.append('answers[0][text]', 'Valid Answer');
-      formData.append('answers[0][order]', '0');
-      formData.append('answers[1][text]', '   '); // Whitespace only
-      formData.append('answers[1][order]', '1');
-      formData.append('answers[2][text]', ''); // Empty
-      formData.append('answers[2][order]', '2');
-      formData.append('answers[3][text]', 'Another Valid');
-      formData.append('answers[3][order]', '3');
-
-      const result = parseAnswersFromFormData(formData);
-
-      expect(result).toEqual([
-        { text: 'Valid Answer', order: 0 },
-        { text: 'Another Valid', order: 3 },
-      ]);
-    });
-
-    it('should handle non-sequential indices', () => {
-      const formData = new FormData();
-      formData.append('answers[0][text]', 'First');
-      formData.append('answers[0][order]', '0');
-      formData.append('answers[5][text]', 'Fifth');
-      formData.append('answers[5][order]', '5');
-      formData.append('answers[2][text]', 'Second');
-      formData.append('answers[2][order]', '2');
-
-      const result = parseAnswersFromFormData(formData);
-
-      // Should be sorted by index
-      expect(result).toEqual([
-        { text: 'First', order: 0 },
-        { text: 'Second', order: 2 },
-        { text: 'Fifth', order: 5 },
-      ]);
-    });
-
-    it('should trim whitespace from answer text', () => {
-      const formData = new FormData();
-      formData.append('answers[0][text]', '  Trimmed Answer  ');
-      formData.append('answers[0][order]', '0');
-
-      const result = parseAnswersFromFormData(formData);
-
-      expect(result).toEqual([{ text: 'Trimmed Answer', order: 0 }]);
-    });
-
-    it('should use index as order when order field is missing', () => {
-      const formData = new FormData();
-      formData.append('answers[0][text]', 'Answer without order');
-      // No order field
-
-      const result = parseAnswersFromFormData(formData);
-
-      expect(result).toEqual([{ text: 'Answer without order', order: 0 }]);
-    });
-
-    it('should return empty array when no answers in FormData', () => {
-      const formData = new FormData();
-      formData.append('pollId', 'poll-1');
-      formData.append('text', 'Question text');
-      // No answers
-
-      const result = parseAnswersFromFormData(formData);
-
-      expect(result).toEqual([]);
-    });
-
-    it('should handle the exact format sent from edit page', () => {
-      // This is the exact format that was failing in the bug report
-      const formData = new FormData();
-      formData.append('pollId', 'cmjvnc5md0000i5ij5l557rc3');
-      formData.append('text', 'sec');
-      formData.append('questionType', 'single-choice');
-      formData.append('page', '1');
-      formData.append('order', '1');
-      formData.append('answers[0][text]', 'aa');
-      formData.append('answers[0][order]', '0');
-
-      const result = parseAnswersFromFormData(formData);
-
-      expect(result).toEqual([{ text: 'aa', order: 0 }]);
-      expect(result.length).toBe(1);
-      expect(result.length).toBeGreaterThan(0); // This was the failing check
-    });
+  it('treats whitespace-only optional details as absent', () => {
+    const form = new FormData();
+    form.set('details', '  ');
+    expect(readQuestionForm(form).details).toBeUndefined();
   });
 });

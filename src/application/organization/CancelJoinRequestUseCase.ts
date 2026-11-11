@@ -1,36 +1,63 @@
-import { PrismaClient } from '@/generated/prisma/client';
+/** Cancels only a pending membership request using the domain lifecycle policy.
+ * Reads status through a typed store; the repository removes the allowed link row. */
+import { OrganizationId, UserId } from '../../domain/shared/EntityIds';
+import { MembershipStore } from './MembershipStore';
+import {
+  MembershipReference,
+  requirePendingMembership,
+} from '../../domain/organization/MembershipPolicy';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { CancelJoinRequestInput } from './CancelJoinRequestSchema';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 
 export interface CancelJoinRequestDependencies {
-  prisma: PrismaClient;
+  memberships: Pick<MembershipStore, 'findStatus'>;
   organizationRepository: OrganizationRepository;
 }
 
 export class CancelJoinRequestUseCase {
   constructor(private deps: CancelJoinRequestDependencies) {}
 
-  async execute(input: CancelJoinRequestInput): Promise<Result<void, string>> {
-    const { organizationId, userId } = input;
+  async execute(
+    input: CancelJoinRequestInput
+  ): Promise<Result<void, OrganizationUseCaseFailure>> {
+    const parsedOrganizationId = OrganizationId.safeParse(input.organizationId);
 
-    // Find the join request
-    const request = await this.deps.prisma.organizationUser.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId,
-          userId,
-        },
-      },
-    });
-
-    if (!request) {
-      return failure(OrganizationErrors.REQUEST_NOT_FOUND);
+    if (!parsedOrganizationId.success) {
+      return failure(OrganizationErrors.NOT_FOUND);
     }
 
-    if (request.status !== 'pending') {
-      return failure(OrganizationErrors.NOT_PENDING);
+    const parsedUserId = UserId.safeParse(input.userId);
+
+    if (!parsedUserId.success) {
+      return failure(OrganizationErrors.USER_NOT_FOUND);
+    }
+
+    const command = {
+      ...input,
+      organizationId: parsedOrganizationId.data,
+      userId: parsedUserId.data,
+    };
+
+    const { organizationId, userId } = command;
+
+    // The domain permits cancellation only for an existing pending request.
+    const status = await this.deps.memberships.findStatus(
+      MembershipReference.parse({ organizationId, userId })
+    );
+
+    if (!status.success) {
+      return status;
+    }
+
+    const pending = requirePendingMembership(status.value);
+
+    if (!pending.success) {
+      return pending;
     }
 
     // Delete the OrganizationUser row

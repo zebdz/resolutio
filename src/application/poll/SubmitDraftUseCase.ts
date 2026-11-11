@@ -1,4 +1,20 @@
+/** Saves or removes a voter's provisional selection after eligibility checks.
+ * Removal is explicit; saved drafts receive application-generated identity/time. */
 import { Result, success, failure } from '../../domain/shared/Result';
+import {
+  Clock,
+  IdGenerator,
+  entityCreation,
+} from '@/application/shared/EntityCreation';
+import {
+  AnswerId,
+  PollId,
+  QuestionId,
+  UserId,
+  VoteDraftId,
+} from '@/domain/shared/EntityIds';
+import { PollDomainCodes } from '@/domain/poll/PollDomainCodes';
+import { validateDraftSelection } from '@/domain/poll/DraftSelectionPolicy';
 import { VoteDraft } from '../../domain/poll/VoteDraft';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
@@ -8,16 +24,20 @@ import { OrganizationRepository } from '../../domain/organization/OrganizationRe
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { PollVotingPolicy } from '../../domain/poll/PollVotingPolicy';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 
 export interface SubmitDraftInput {
   pollId: string;
   questionId: string;
   answerId: string;
   userId: string;
-  isSingleChoice: boolean; // If true, delete other drafts for this question first
+  isSingleChoice: boolean; // Legacy wire hint; cardinality comes from the saved question.
   shouldRemove?: boolean; // If true, remove the draft instead of adding it (for unselecting in multiple-choice)
 }
+
+export type SubmitDraftResult =
+  | { readonly kind: 'saved'; readonly draft: VoteDraft }
+  | { readonly kind: 'removed' };
 
 export class SubmitDraftUseCase {
   constructor(
@@ -27,18 +47,33 @@ export class SubmitDraftUseCase {
     private draftRepository: DraftRepository,
     private organizationRepository: OrganizationRepository,
     private boardRepository: BoardRepository,
-    private userRepository: UserRepository
+    private userRepository: UserRepository,
+    private ids: IdGenerator,
+    private clock: Clock
   ) {}
 
-  async execute(input: SubmitDraftInput): Promise<Result<VoteDraft, string>> {
-    const {
-      pollId,
-      questionId,
-      answerId,
-      userId,
-      isSingleChoice,
-      shouldRemove,
-    } = input;
+  async execute(
+    input: SubmitDraftInput
+  ): Promise<Result<SubmitDraftResult, PollUseCaseFailure>> {
+    const { shouldRemove } = input;
+    const decodedPoll = PollId.safeParse(input.pollId);
+    const decodedQuestion = QuestionId.safeParse(input.questionId);
+    const decodedAnswer = AnswerId.safeParse(input.answerId);
+    const decodedUser = UserId.safeParse(input.userId);
+
+    if (
+      !decodedPoll.success ||
+      !decodedQuestion.success ||
+      !decodedAnswer.success ||
+      !decodedUser.success
+    ) {
+      return failure(PollDomainCodes.INVALID_BALLOT);
+    }
+
+    const pollId = decodedPoll.data;
+    const questionId = decodedQuestion.data;
+    const answerId = decodedAnswer.data;
+    const userId = decodedUser.data;
 
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(pollId);
@@ -116,6 +151,12 @@ export class SubmitDraftUseCase {
       return failure(eligibility.error);
     }
 
+    const selection = validateDraftSelection(poll, questionId, answerId);
+
+    if (!selection.success) {
+      return selection;
+    }
+
     // 5. If shouldRemove is true, delete the specific draft and return
     if (shouldRemove) {
       const deleteResult = await this.draftRepository.deleteDraftByAnswer(
@@ -129,14 +170,11 @@ export class SubmitDraftUseCase {
         return failure(deleteResult.error);
       }
 
-      // Return success with a dummy draft (caller doesn't use the value)
-      const dummyDraft = VoteDraft.create(pollId, questionId, answerId, userId);
-
-      return dummyDraft;
+      return success({ kind: 'removed' });
     }
 
     // 6. If single choice, delete existing drafts for this question
-    if (isSingleChoice) {
+    if (selection.value === 'single-choice') {
       const deleteResult = await this.draftRepository.deleteDraftsByQuestion(
         pollId,
         questionId,
@@ -149,7 +187,13 @@ export class SubmitDraftUseCase {
     }
 
     // 7. Create and save draft
-    const draftResult = VoteDraft.create(pollId, questionId, answerId, userId);
+    const draftResult = VoteDraft.create(
+      pollId,
+      questionId,
+      answerId,
+      userId,
+      entityCreation(VoteDraftId, this.ids, this.clock)
+    );
 
     if (!draftResult.success) {
       return failure(draftResult.error);
@@ -157,6 +201,8 @@ export class SubmitDraftUseCase {
 
     const saveResult = await this.draftRepository.saveDraft(draftResult.value);
 
-    return saveResult;
+    return saveResult.success
+      ? success({ kind: 'saved', draft: saveResult.value })
+      : saveResult;
   }
 }

@@ -1,4 +1,4 @@
-import { randomBytes } from 'crypto';
+/** Validates nickname syntax without generating randomness inside the domain. */
 import { UserDomainCodes } from './UserDomainCodes';
 import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
@@ -13,7 +13,7 @@ export class Nickname {
     nickname: string,
     profanityChecker?: ProfanityChecker
   ): Nickname {
-    if (!nickname || nickname.length < NICKNAME_MIN_LENGTH) {
+    if (typeof nickname !== 'string' || nickname.length < NICKNAME_MIN_LENGTH) {
       throw new Error(UserDomainCodes.NICKNAME_INVALID);
     }
 
@@ -46,12 +46,6 @@ export class Nickname {
     }
 
     return new Nickname(nickname);
-  }
-
-  static generate(): Nickname {
-    const suffix = randomBytes(4).toString('hex');
-
-    return new Nickname(`user_${suffix}`);
   }
 
   getValue(): string {

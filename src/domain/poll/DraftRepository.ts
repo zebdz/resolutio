@@ -1,26 +1,35 @@
+/** Draft persistence keeps typed selection identities and explicit failure codes.
+ * Saving the same logical selection may replay its existing persisted identity. */
+import { PollId, QuestionId, AnswerId, UserId } from '../shared/EntityIds';
 import { VoteDraft } from './VoteDraft';
 import { Result } from '../shared/Result';
 
+export type DraftRepositoryFailure = 'common.errors.unexpected';
+
 export interface DraftRepository {
-  saveDraft(draft: VoteDraft): Promise<Result<VoteDraft, string>>;
+  saveDraft(
+    draft: VoteDraft
+  ): Promise<Result<VoteDraft, DraftRepositoryFailure>>;
   getUserDrafts(
-    pollId: string,
-    userId: string
-  ): Promise<Result<VoteDraft[], string>>;
+    pollId: PollId,
+    userId: UserId
+  ): Promise<Result<VoteDraft[], DraftRepositoryFailure>>;
   deleteUserDrafts(
-    pollId: string,
-    userId: string
-  ): Promise<Result<void, string>>;
-  deleteAllPollDrafts(pollId: string): Promise<Result<void, string>>;
+    pollId: PollId,
+    userId: UserId
+  ): Promise<Result<void, DraftRepositoryFailure>>;
+  deleteAllPollDrafts(
+    pollId: PollId
+  ): Promise<Result<void, DraftRepositoryFailure>>;
   deleteDraftsByQuestion(
-    pollId: string,
-    questionId: string,
-    userId: string
-  ): Promise<Result<void, string>>;
+    pollId: PollId,
+    questionId: QuestionId,
+    userId: UserId
+  ): Promise<Result<void, DraftRepositoryFailure>>;
   deleteDraftByAnswer(
-    pollId: string,
-    questionId: string,
-    answerId: string,
-    userId: string
-  ): Promise<Result<void, string>>;
+    pollId: PollId,
+    questionId: QuestionId,
+    answerId: AnswerId,
+    userId: UserId
+  ): Promise<Result<void, DraftRepositoryFailure>>;
 }

@@ -3,15 +3,18 @@
 import { Result } from '../shared/Result';
 import { PollSeal } from './PollSeal';
 import { PollId, Digest, FencingToken } from './SealValues';
+import { SealPersistenceFailureCode } from './SealPersistenceFailureCode';
 
 export interface PollSealRepository {
-  save(seal: PollSeal): Promise<Result<void, string>>;
-  findByPollId(pollId: PollId): Promise<Result<PollSeal | null, string>>;
+  save(seal: PollSeal): Promise<Result<void, SealPersistenceFailureCode>>;
+  findByPollId(
+    pollId: PollId
+  ): Promise<Result<PollSeal | null, SealPersistenceFailureCode>>;
   findByRootDigest(
     rootDigest: Digest
-  ): Promise<Result<PollSeal | null, string>>;
+  ): Promise<Result<PollSeal | null, SealPersistenceFailureCode>>;
   saveAnchors(
     seal: PollSeal,
     claimToken: FencingToken
-  ): Promise<Result<void, string>>;
+  ): Promise<Result<void, SealPersistenceFailureCode>>;
 }

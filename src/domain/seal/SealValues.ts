@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { requireSeal } from './SealDomainCodes';
 import { isoDate } from './Canonical';
+import { identifier } from '../shared/Identifier';
 
 function valueType<S extends z.ZodType>(schema: S) {
   return {
@@ -16,33 +17,71 @@ function valueType<S extends z.ZodType>(schema: S) {
   };
 }
 
-// IDs are opaque ASCII tokens; ':' is reserved by the HMAC message format.
-const id = z.string().regex(/^[A-Za-z0-9_-]{1,256}$/);
 const hex32 = z.string().regex(/^[0-9a-f]{64}$/);
+const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 
-export const QuestionId = valueType(id.brand<'QuestionId'>());
+// Separate v1 record units; brands do not change the canonical JSON representation.
+export const RecordOrder = valueType(count.brand<'SealRecordOrder'>());
+export type RecordOrder = z.output<typeof RecordOrder.schema>;
+export const RecordByteCount = valueType(count.brand<'SealRecordByteCount'>());
+export type RecordByteCount = z.output<typeof RecordByteCount.schema>;
+export const VoteCount = valueType(count.brand<'SealVoteCount'>());
+export type VoteCount = z.output<typeof VoteCount.schema>;
+export const ParticipantCount = valueType(
+  count.brand<'SealParticipantCount'>()
+);
+export type ParticipantCount = z.output<typeof ParticipantCount.schema>;
+export const LeafCount = valueType(count.brand<'SealLeafCount'>());
+export type LeafCount = z.output<typeof LeafCount.schema>;
+export const TotalWeight = valueType(
+  z
+    .string()
+    .regex(/^(0|[1-9][0-9]*)\.[0-9]{6}$/)
+    .brand<'SealTotalWeight'>()
+);
+export type TotalWeight = z.output<typeof TotalWeight.schema>;
+
+// Each v1 identity owns its opaque ASCII-token contract; ':' is reserved by HMAC.
+// These patterns preserve sealed bytes and stay independent of application identities.
+export const QuestionId = valueType(
+  identifier('QuestionId', /^[A-Za-z0-9_-]{1,256}$/)
+);
 export type QuestionId = z.output<typeof QuestionId.schema>;
-export const AnswerId = valueType(id.brand<'AnswerId'>());
+export const AnswerId = valueType(
+  identifier('AnswerId', /^[A-Za-z0-9_-]{1,256}$/)
+);
 export type AnswerId = z.output<typeof AnswerId.schema>;
 export const ReceiptSecret = valueType(hex32.brand<'ReceiptSecret'>());
 export type ReceiptSecret = z.output<typeof ReceiptSecret.schema>;
 export const VoteSalt = valueType(hex32.brand<'VoteSalt'>());
 export type VoteSalt = z.output<typeof VoteSalt.schema>;
-export const PollId = valueType(id.brand<'PollId'>());
+export const PollId = valueType(identifier('PollId', /^[A-Za-z0-9_-]{1,256}$/));
 export type PollId = z.output<typeof PollId.schema>;
-export const UserId = valueType(id.brand<'UserId'>());
+export const UserId = valueType(identifier('UserId', /^[A-Za-z0-9_-]{1,256}$/));
 export type UserId = z.output<typeof UserId.schema>;
-export const OrganizationId = valueType(id.brand<'OrganizationId'>());
+export const OrganizationId = valueType(
+  identifier('OrganizationId', /^[A-Za-z0-9_-]{1,256}$/)
+);
 export type OrganizationId = z.output<typeof OrganizationId.schema>;
-export const BoardId = valueType(id.brand<'BoardId'>());
+export const BoardId = valueType(
+  identifier('BoardId', /^[A-Za-z0-9_-]{1,256}$/)
+);
 export type BoardId = z.output<typeof BoardId.schema>;
-export const PropertyId = valueType(id.brand<'PropertyId'>());
+export const PropertyId = valueType(
+  identifier('PropertyId', /^[A-Za-z0-9_-]{1,256}$/)
+);
 export type PropertyId = z.output<typeof PropertyId.schema>;
-export const AssetId = valueType(id.brand<'AssetId'>());
+export const AssetId = valueType(
+  identifier('AssetId', /^[A-Za-z0-9_-]{1,256}$/)
+);
 export type AssetId = z.output<typeof AssetId.schema>;
-export const AttachmentId = valueType(id.brand<'AttachmentId'>());
+export const AttachmentId = valueType(
+  identifier('AttachmentId', /^[A-Za-z0-9_-]{1,256}$/)
+);
 export type AttachmentId = z.output<typeof AttachmentId.schema>;
-export const AnchorId = valueType(id.brand<'AnchorId'>());
+export const AnchorId = valueType(
+  identifier('AnchorId', /^[A-Za-z0-9_-]{1,256}$/)
+);
 export type AnchorId = z.output<typeof AnchorId.schema>;
 export const HoldingSize = valueType(
   z

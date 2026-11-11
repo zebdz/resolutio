@@ -1,5 +1,24 @@
 'use server';
 
+/** Board actions authenticate requests, decode inputs and serialize permitted DTOs.
+ * Composition supplies identity/time adapters to deterministic domain creation and archive. */
+
+import { BoardId, OrganizationId, UserId } from '@/domain/shared/EntityIds';
+import { BoardName } from '@/domain/board/BoardName';
+import { OrganizationName } from '@/domain/organization/OrganizationValues';
+import {
+  BoardMemberView,
+  type BoardDetailsView,
+  type BoardReferenceView,
+  type UserBoardView,
+  type HomeBoardsView,
+} from './BoardViews';
+import { serializeDirectoryUserSearch } from '../organization/serializeDirectory';
+import type { UserSearchView } from '../organization/DirectoryViews';
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
 import { getTranslations } from 'next-intl/server';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { CreateBoardUseCase } from '@/application/board/CreateBoardUseCase';
@@ -32,9 +51,13 @@ const boardRepository = new PrismaBoardRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 const notificationRepository = new PrismaNotificationRepository(prisma);
 const profanityChecker = LeoProfanityChecker.getInstance();
+const ids = new CryptoIdGenerator();
+const clock = new SystemClock();
 
 // Use cases
 const createBoardUseCase = new CreateBoardUseCase({
+  ids,
+  clock,
   boardRepository,
   organizationRepository,
   userRepository,
@@ -42,12 +65,15 @@ const createBoardUseCase = new CreateBoardUseCase({
 });
 
 const archiveBoardUseCase = new ArchiveBoardUseCase({
+  clock,
   boardRepository,
   organizationRepository,
   userRepository,
 });
 
 const removeBoardMemberUseCase = new RemoveBoardMemberUseCase({
+  ids: ids,
+  clock: clock,
   boardRepository,
   organizationRepository,
   userRepository,
@@ -55,6 +81,8 @@ const removeBoardMemberUseCase = new RemoveBoardMemberUseCase({
 });
 
 const leaveBoardUseCase = new LeaveBoardUseCase({
+  ids: ids,
+  clock: clock,
   boardRepository,
   organizationRepository,
   userRepository,
@@ -63,7 +91,7 @@ const leaveBoardUseCase = new LeaveBoardUseCase({
 
 export async function createBoardAction(
   formData: FormData
-): Promise<ActionResult<{ boardId: string }>> {
+): Promise<ActionResult<{ boardId: BoardId }>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -258,27 +286,9 @@ export async function removeBoardMemberAction(
   }
 }
 
-export async function getBoardDetailsAction(boardId: string): Promise<
-  ActionResult<{
-    board: {
-      id: string;
-      name: string;
-      organizationId: string;
-    };
-    members: Array<{
-      id: string;
-      firstName: string;
-      lastName: string;
-      middleName: string | null;
-    }>;
-    organizationMembers: Array<{
-      id: string;
-      firstName: string;
-      lastName: string;
-      middleName: string | null;
-    }>;
-  }>
-> {
+export async function getBoardDetailsAction(
+  boardId: string
+): Promise<ActionResult<BoardDetailsView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -298,7 +308,13 @@ export async function getBoardDetailsAction(boardId: string): Promise<
     }
 
     // Get board
-    const board = await boardRepository.findById(boardId);
+    const identity = BoardId.safeParse(boardId);
+
+    if (!identity.success) {
+      return { success: false, error: t('validationFailed') };
+    }
+
+    const board = await boardRepository.findById(identity.data);
 
     if (!board) {
       return {
@@ -344,7 +360,7 @@ export async function getBoardDetailsAction(boardId: string): Promise<
 
     // Get organization members including descendants (for adding new members)
     const descendantIds = await organizationRepository.getDescendantIds(
-      board.organizationId
+      OrganizationId.parse(board.organizationId)
     );
     const allOrgIds = [board.organizationId, ...descendantIds];
 
@@ -373,23 +389,10 @@ export async function getBoardDetailsAction(boardId: string): Promise<
           name: board.name,
           organizationId: board.organizationId,
         },
-        members: boardMembers.map((bm) => ({
-          id: bm.user.id,
-          firstName: bm.user.firstName,
-          lastName: bm.user.lastName,
-          middleName: bm.user.middleName,
-        })),
+        members: boardMembers.map((bm) => BoardMemberView.parse(bm.user)),
         organizationMembers: [
           ...new Map(
-            orgMembers.map((om) => [
-              om.user.id,
-              {
-                id: om.user.id,
-                firstName: om.user.firstName,
-                lastName: om.user.lastName,
-                middleName: om.user.middleName,
-              },
-            ])
+            orgMembers.map((om) => [om.user.id, BoardMemberView.parse(om.user)])
           ).values(),
         ],
       },
@@ -405,14 +408,7 @@ export async function getBoardDetailsAction(boardId: string): Promise<
 }
 
 export async function getUserBoardsAction(): Promise<
-  ActionResult<
-    Array<{
-      id: string;
-      name: string;
-      organizationId: string;
-      organizationName: string;
-    }>
-  >
+  ActionResult<UserBoardView[]>
 > {
   const rateLimited = await checkRateLimit();
 
@@ -456,10 +452,10 @@ export async function getUserBoardsAction(): Promise<
     });
 
     const boards = boardUsers.map((bu) => ({
-      id: bu.board.id,
-      name: bu.board.name,
-      organizationId: bu.board.organizationId,
-      organizationName: bu.board.organization.name,
+      id: BoardId.parse(bu.board.id),
+      name: BoardName.parse(bu.board.name),
+      organizationId: OrganizationId.parse(bu.board.organizationId),
+      organizationName: OrganizationName.parse(bu.board.organization.name),
     }));
 
     return {
@@ -479,17 +475,7 @@ export async function getUserBoardsAction(): Promise<
 export async function searchUsersForBoardAction(
   boardId: string,
   query: string
-): Promise<
-  ActionResult<
-    Array<{
-      id: string;
-      firstName: string;
-      lastName: string;
-      middleName?: string;
-      nickname: string;
-    }>
-  >
-> {
+): Promise<ActionResult<UserSearchView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -537,7 +523,7 @@ export async function searchUsersForBoardAction(
     const isSuperAdmin = await userRepository.isSuperAdmin(user.id);
     const isAdmin = await organizationRepository.isUserAdmin(
       user.id,
-      board.organizationId
+      OrganizationId.parse(board.organizationId)
     );
 
     if (!isAdmin && !isSuperAdmin) {
@@ -564,12 +550,12 @@ export async function searchUsersForBoardAction(
     });
 
     const boardMemberIdSet = new Set(
-      boardMemberIds.map((bm: { userId: string }) => bm.userId)
+      boardMemberIds.map((bm) => UserId.parse(bm.userId))
     );
 
     // Get organization member IDs (including descendants)
     const searchDescendantIds = await organizationRepository.getDescendantIds(
-      board.organizationId
+      OrganizationId.parse(board.organizationId)
     );
     const searchAllOrgIds = [board.organizationId, ...searchDescendantIds];
 
@@ -584,7 +570,7 @@ export async function searchUsersForBoardAction(
     });
 
     const orgMemberIdSet = new Set(
-      orgMemberIds.map((om: { userId: string }) => om.userId)
+      orgMemberIds.map((om) => UserId.parse(om.userId))
     );
 
     // Filter users:
@@ -593,17 +579,7 @@ export async function searchUsersForBoardAction(
     const filteredUsers = users
       .filter((u) => !boardMemberIdSet.has(u.id))
       .filter((u) => !orgMemberIdSet.has(u.id))
-      .map((u) => ({
-        id: u.id,
-        firstName: u.firstName,
-        lastName: u.lastName,
-        middleName: u.middleName,
-        nickname: u.nickname.getValue(),
-        address:
-          u.allowFindByAddress && u.address
-            ? { city: u.address.city, street: u.address.street }
-            : undefined,
-      }));
+      .map(serializeDirectoryUserSearch);
 
     return {
       success: true,
@@ -621,7 +597,7 @@ export async function searchUsersForBoardAction(
 
 export async function getBoardsByOrganizationAction(
   organizationId: string
-): Promise<ActionResult<Array<{ id: string; name: string }>>> {
+): Promise<ActionResult<BoardReferenceView[]>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -642,7 +618,7 @@ export async function getBoardsByOrganizationAction(
     if (!isSuperAdmin) {
       const isMember = await organizationRepository.isUserMember(
         user.id,
-        organizationId
+        OrganizationId.parse(organizationId)
       );
 
       if (!isMember) {
@@ -650,7 +626,13 @@ export async function getBoardsByOrganizationAction(
       }
     }
 
-    const boards = await boardRepository.findByOrganizationId(organizationId);
+    const identity = OrganizationId.safeParse(organizationId);
+
+    if (!identity.success) {
+      return { success: false, error: t('validationFailed') };
+    }
+
+    const boards = await boardRepository.findByOrganizationId(identity.data);
 
     return {
       success: true,
@@ -707,15 +689,7 @@ export async function leaveBoardAction(
 }
 
 export async function getUserBoardsForHomeAction(): Promise<
-  ActionResult<{
-    boardsByOrgId: Record<string, Array<{ id: string; name: string }>>;
-    externalBoards: Array<{
-      id: string;
-      name: string;
-      organizationId: string;
-      organizationName: string;
-    }>;
-  }>
+  ActionResult<HomeBoardsView>
 > {
   const rateLimited = await checkRateLimit();
 
@@ -732,17 +706,12 @@ export async function getUserBoardsForHomeAction(): Promise<
       return { success: false, error: t('unauthorized') };
     }
 
-    const boards = await boardRepository.findActiveBoardsByUserId(user.id);
+    const boards = await boardRepository.findActiveBoardsByUserId(
+      UserId.parse(user.id)
+    );
 
-    const boardsByOrgId: Record<
-      string,
-      Array<{ id: string; name: string }>
-    > = {};
-    const externalBoardCandidates: Array<{
-      id: string;
-      name: string;
-      organizationId: string;
-    }> = [];
+    const boardsByOrgId: HomeBoardsView['boardsByOrgId'] = {};
+    const externalBoardCandidates: typeof boards = [];
 
     for (const board of boards) {
       const isMember = await organizationRepository.isUserMember(
@@ -751,11 +720,8 @@ export async function getUserBoardsForHomeAction(): Promise<
       );
 
       if (isMember) {
-        if (!boardsByOrgId[board.organizationId]) {
-          boardsByOrgId[board.organizationId] = [];
-        }
-
-        boardsByOrgId[board.organizationId].push({
+        const group = (boardsByOrgId[board.organizationId] ??= []);
+        group.push({
           id: board.id,
           name: board.name,
         });
@@ -766,7 +732,9 @@ export async function getUserBoardsForHomeAction(): Promise<
 
     const externalBoards = await Promise.all(
       externalBoardCandidates.map(async (board) => {
-        const org = await organizationRepository.findById(board.organizationId);
+        const org = await organizationRepository.findById(
+          OrganizationId.parse(board.organizationId)
+        );
 
         return {
           id: board.id,

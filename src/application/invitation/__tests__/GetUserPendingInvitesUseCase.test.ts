@@ -1,3 +1,10 @@
+/** Invitation reads retain typed identity/time and explicit missing references,
+ * while resolving display names in batches for the requesting recipient. */
+import { BoardName } from '@/domain/board/BoardName';
+import { BoardId, OrganizationId } from '@/domain/shared/EntityIds';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { Instant } from '@/domain/shared/Instant';
+import { Nickname } from '@/domain/user/Nickname';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GetUserPendingInvitesUseCase } from '../GetUserPendingInvitesUseCase';
 import { InvitationRepository } from '../../../domain/invitation/InvitationRepository';
@@ -66,13 +73,17 @@ class MockOrganizationRepository implements OrganizationRepository {
   async findByParentId(): Promise<Organization[]> {
     return [];
   }
-  async getAncestorIds(): Promise<string[]> {
+  async getAncestorIds(): ReturnType<OrganizationRepository['getAncestorIds']> {
     return [];
   }
-  async getDescendantIds(): Promise<string[]> {
+  async getDescendantIds(): ReturnType<
+    OrganizationRepository['getDescendantIds']
+  > {
     return [];
   }
-  async getFullTreeOrgIds(): Promise<string[]> {
+  async getFullTreeOrgIds(): ReturnType<
+    OrganizationRepository['getFullTreeOrgIds']
+  > {
     return [];
   }
   async isUserMember(): Promise<boolean> {
@@ -96,7 +107,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   async update(org: Organization): Promise<Organization> {
     return org;
   }
-  async findAcceptedMemberUserIdsIncludingDescendants(): Promise<string[]> {
+  async findAcceptedMemberUserIdsIncludingDescendants(): ReturnType<
+    OrganizationRepository['findAcceptedMemberUserIdsIncludingDescendants']
+  > {
     return [];
   }
   async removeUserFromOrganization(): Promise<void> {}
@@ -112,16 +125,25 @@ class MockOrganizationRepository implements OrganizationRepository {
   async getHierarchyTree(): Promise<any> {
     return {
       ancestors: [],
-      tree: { id: '', name: '', memberCount: 0, children: [] },
+      tree: {
+        id: 'org-fixture',
+        name: 'Fixture organization',
+        memberCount: 0,
+        children: [],
+      },
     };
   }
-  async findAdminUserIds(): Promise<string[]> {
+  async findAdminUserIds(): ReturnType<
+    OrganizationRepository['findAdminUserIds']
+  > {
     return [];
   }
   async setParentId(): Promise<void> {}
   async addAdmin(): Promise<void> {}
   async removeAdmin(): Promise<void> {}
-  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+  async searchByNameFuzzy(): ReturnType<
+    OrganizationRepository['searchByNameFuzzy']
+  > {
     return [];
   }
   async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
@@ -129,7 +151,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
   async findUsersWithMultipleMembershipsInOrgs(
     _orgIds: string[]
-  ): Promise<string[]> {
+  ): ReturnType<
+    OrganizationRepository['findUsersWithMultipleMembershipsInOrgs']
+  > {
     return [];
   }
   async setAllowMultiTreeMembership(
@@ -139,6 +163,33 @@ class MockOrganizationRepository implements OrganizationRepository {
 
   addOrganization(org: Organization): void {
     this.organizations.set(org.id, org);
+  }
+
+  async isUserExactMember(
+    ..._args: Parameters<OrganizationRepository['isUserExactMember']>
+  ): ReturnType<OrganizationRepository['isUserExactMember']> {
+    throw new Error('Unexpected test repository call: isUserExactMember');
+  }
+  async getAdminUserIds(
+    ..._args: Parameters<OrganizationRepository['getAdminUserIds']>
+  ): ReturnType<OrganizationRepository['getAdminUserIds']> {
+    throw new Error('Unexpected test repository call: getAdminUserIds');
+  }
+  async findAcceptedMemberUserIdsForOrgs(
+    ..._args: Parameters<
+      OrganizationRepository['findAcceptedMemberUserIdsForOrgs']
+    >
+  ): ReturnType<OrganizationRepository['findAcceptedMemberUserIdsForOrgs']> {
+    throw new Error(
+      'Unexpected test repository call: findAcceptedMemberUserIdsForOrgs'
+    );
+  }
+  async removeMemberFromOrganization(
+    ..._args: Parameters<OrganizationRepository['removeMemberFromOrganization']>
+  ): ReturnType<OrganizationRepository['removeMemberFromOrganization']> {
+    throw new Error(
+      'Unexpected test repository call: removeMemberFromOrganization'
+    );
   }
 }
 
@@ -154,7 +205,7 @@ class MockBoardRepository implements BoardRepository {
   async findByOrganizationId(): Promise<Board[]> {
     return [];
   }
-  async findBoardMembers(): Promise<{ userId: string }[]> {
+  async findBoardMembers(): ReturnType<BoardRepository['findBoardMembers']> {
     return [];
   }
   async isUserMember(): Promise<boolean> {
@@ -168,7 +219,7 @@ class MockBoardRepository implements BoardRepository {
 
   async findActiveBoardsByUserId(
     _userId: string
-  ): Promise<Array<{ id: string; name: string; organizationId: string }>> {
+  ): ReturnType<BoardRepository['findActiveBoardsByUserId']> {
     return [];
   }
 
@@ -214,21 +265,17 @@ class MockUserRepository implements UserRepository {
   async isSuperAdmin(): Promise<boolean> {
     return false;
   }
-  async isUserBlocked(): Promise<boolean> {
-    return false;
-  }
-  async blockUser(): Promise<void> {}
-  async unblockUser(): Promise<void> {}
-  async getBlockStatus(): Promise<null> {
-    return null;
-  }
+
   async deleteAddress(): Promise<void> {}
-  async getBlockedUserIds(): Promise<string[]> {
-    return [];
-  }
 
   addUser(user: User): void {
     this.users.set(user.id, user);
+  }
+
+  async findByEmail(
+    ..._args: Parameters<UserRepository['findByEmail']>
+  ): ReturnType<UserRepository['findByEmail']> {
+    throw new Error('Unexpected test repository call: findByEmail');
   }
 }
 
@@ -246,14 +293,17 @@ function makeOrg(id: string, name: string): Organization {
 }
 
 function makeBoard(id: string, orgId: string, name: string): Board {
-  const result = Board.create(name, orgId);
+  const result = Board.create(
+    BoardName.parse(name),
+    OrganizationId.parse(orgId),
+    testCreation(BoardId, id)
+  );
 
   if (!result.success) {
     throw new Error('Failed to create board');
   }
 
   const board = result.value;
-  (board as any).props.id = id;
 
   return board;
 }
@@ -264,14 +314,19 @@ function makeUser(
   lastName: string,
   middleName?: string
 ): User {
-  const user = User.create({
-    firstName,
-    lastName,
-    middleName,
-    phoneNumber: PhoneNumber.create(`+1234567${id.replace(/\D/g, '0')}`),
-    password: 'password123',
+  const user = User.reconstitute({
+    ...{
+      firstName,
+      lastName,
+      middleName,
+      phoneNumber: PhoneNumber.create(`+1234567${id.replace(/\D/g, '0')}`),
+      password: 'password123',
+    },
+    id,
+    createdAt: new Date('2026-01-01'),
+    language: 'en',
+    nickname: Nickname.create('fixture_user'),
   });
-  (user as any).props.id = id;
 
   return user;
 }
@@ -362,6 +417,24 @@ describe('GetUserPendingInvitesUseCase', () => {
       expect(detail.boardId).toBeNull();
       expect(detail.inviterName).toBe('Petrov Ivan Sergeevich');
       expect(detail.inviteeId).toBe('user-2');
+      expect(detail.createdAt).toBe(inv.createdAt.toISOString());
+    }
+  });
+
+  it('represents unresolved names explicitly while retaining invitation identity', async () => {
+    invitationRepo.addInvitation(makePendingInvitation('inv-missing'));
+    const result = await useCase.execute({ actorUserId: 'user-2' });
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value[0]).toMatchObject({
+        id: 'inv-missing',
+        organizationId: 'org-1',
+        organizationName: null,
+        inviterName: null,
+        boardId: null,
+        boardName: null,
+      });
     }
   });
 

@@ -1,3 +1,7 @@
+/** Plain address-suggestion projections preserve validated provider registry references.
+ * Partial suggestion text remains raw until the user submits a complete domain address. */
+import type { HouseFiasId, FlatFiasId } from '@/domain/user/AddressValues';
+
 export interface AddressSuggestion {
   label: string; // display string
   oneLine: string; // durable anchor (DaData unrestricted_value)
@@ -7,11 +11,11 @@ export interface AddressSuggestion {
   street: string;
   building: string;
   postalCode: string;
-  houseFiasId?: string; // present only for DaData house-level hits
+  houseFiasId?: HouseFiasId; // present only for DaData house-level hits
   /** Flat number when the suggestion is flat-level; '' otherwise. */
   flat: string;
   /** ГАР id of the flat, when the suggestion is flat-level. */
-  flatFiasId?: string;
+  flatFiasId?: FlatFiasId;
   /**
    * The suggestion's label with any flat portion removed. This — never
    * `label` — is what flat lookups must be built from: appending " кв N" to a
@@ -25,7 +29,7 @@ export interface FlatSuggestion {
   label: string;
   flat: string;
   oneLine: string;
-  flatFiasId?: string;
+  flatFiasId?: FlatFiasId;
 }
 
 export interface AddressProvider {

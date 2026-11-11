@@ -1,5 +1,8 @@
 'use client';
 
+/** Shows authorized weight-history DTOs for the selected participant. */
+import type { WeightHistoryEntry } from '@/web/actions/organization/serializeWeightHistory';
+
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { getWeightHistoryAction } from '@/src/web/actions/organization/participant';
@@ -19,16 +22,6 @@ import {
   TableRow,
 } from '@/src/web/components/catalyst/table';
 
-interface WeightHistory {
-  id: string;
-  participantId: string;
-  oldWeight: number;
-  newWeight: number;
-  reason: string;
-  changedBy: string;
-  changedAt: string; // ISO date string
-}
-
 interface WeightHistoryDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -45,7 +38,7 @@ export default function WeightHistoryDialog({
   participantName,
 }: WeightHistoryDialogProps) {
   const t = useTranslations('poll.participants');
-  const [history, setHistory] = useState<WeightHistory[]>([]);
+  const [history, setHistory] = useState<WeightHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -59,7 +52,7 @@ export default function WeightHistoryDialog({
       if (result.success) {
         // Filter history for this participant
         const participantHistory = result.data.filter(
-          (h: any) => h.participantId === participantId
+          (h) => h.participantId === participantId
         );
         setHistory(participantHistory);
       } else {

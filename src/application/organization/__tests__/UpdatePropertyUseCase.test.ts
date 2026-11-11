@@ -1,3 +1,5 @@
+/** Property/claim boundary regressions exercise authorized flows with explicit
+ * creation inputs while keeping raw persistence fixtures distinct from domain values. */
 import { describe, it, expect } from 'vitest';
 import { UpdatePropertyUseCase } from '../UpdatePropertyUseCase';
 import { OrganizationProperty } from '../../../domain/organization/OrganizationProperty';
@@ -27,7 +29,10 @@ describe('UpdatePropertyUseCase', () => {
       } as any,
       organizationRepository: { isUserAdmin: async () => true } as any,
       userRepository: { isSuperAdmin: async () => false } as any,
-      profanityChecker: { containsProfanity: () => false },
+      profanityChecker: {
+        findProfaneWords: () => [],
+        containsProfanity: () => false,
+      },
     });
     const r = await uc.execute({
       propertyId: 'p-1',
@@ -47,7 +52,10 @@ describe('UpdatePropertyUseCase', () => {
       } as any,
       organizationRepository: {} as any,
       userRepository: {} as any,
-      profanityChecker: { containsProfanity: () => false },
+      profanityChecker: {
+        findProfaneWords: () => [],
+        containsProfanity: () => false,
+      },
     });
     const r = await uc.execute({
       propertyId: 'missing',
@@ -70,7 +78,10 @@ describe('UpdatePropertyUseCase', () => {
       } as any,
       organizationRepository: { isUserAdmin: async () => false } as any,
       userRepository: { isSuperAdmin: async () => false } as any,
-      profanityChecker: { containsProfanity: () => false },
+      profanityChecker: {
+        findProfaneWords: () => [],
+        containsProfanity: () => false,
+      },
     });
     const r = await uc.execute({
       propertyId: 'p-1',

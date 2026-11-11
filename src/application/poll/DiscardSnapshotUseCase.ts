@@ -1,11 +1,15 @@
+/** Poll application boundary validates requests, invokes domain behavior and
+ * preserves known failure codes across authorization and persistence ports. */
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
-import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
-import { VoteRepository } from '../../domain/poll/VoteRepository';
+import { PollSnapshotTransaction } from './PollSnapshotTransaction';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
-import { PollErrors } from './PollErrors';
+import { UserId } from '@/domain/shared/EntityIds';
+import { PollId } from '@/domain/poll/PollValues';
+import { PollDomainCodes } from '@/domain/poll/PollDomainCodes';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 
 interface DiscardSnapshotCommand {
   pollId: string;
@@ -13,14 +17,14 @@ interface DiscardSnapshotCommand {
 }
 
 /**
- * Discards a participant snapshot (READY → DRAFT).
- * Only allowed if no votes have been cast.
+ * Discards a participant snapshot (READY → SUBMITTED).
+ * Invokes domain behavior against locked, fresh inputs and explicitly persists
+ * the transition and participant removal in one transaction.
  */
 export class DiscardSnapshotUseCase {
   constructor(
     private pollRepository: PollRepository,
-    private participantRepository: ParticipantRepository,
-    private voteRepository: VoteRepository,
+    private snapshotTransaction: PollSnapshotTransaction,
     private organizationRepository: OrganizationRepository,
     private userRepository: UserRepository,
     private boardRepository: BoardRepository
@@ -28,8 +32,20 @@ export class DiscardSnapshotUseCase {
 
   async execute(
     command: DiscardSnapshotCommand
-  ): Promise<Result<void, string>> {
-    const pollResult = await this.pollRepository.getPollById(command.pollId);
+  ): Promise<Result<void, PollUseCaseFailure>> {
+    const pollId = PollId.safeParse(command.pollId);
+
+    if (!pollId.success) {
+      return failure(PollDomainCodes.POLL_INVALID_ID);
+    }
+
+    const actor = UserId.safeParse(command.userId);
+
+    if (!actor.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const pollResult = await this.pollRepository.getPollById(pollId.data);
 
     if (!pollResult.success) {
       return failure(pollResult.error);
@@ -42,11 +58,11 @@ export class DiscardSnapshotUseCase {
     }
 
     // Check authorization: superadmin or org admin
-    const isSuperAdmin = await this.userRepository.isSuperAdmin(command.userId);
+    const isSuperAdmin = await this.userRepository.isSuperAdmin(actor.data);
 
     if (!isSuperAdmin) {
       const isAdmin = await this.organizationRepository.isUserAdmin(
-        command.userId,
+        actor.data,
         poll.organizationId
       );
 
@@ -73,41 +89,24 @@ export class DiscardSnapshotUseCase {
       }
     }
 
-    // Check if poll has votes
-    const hasVotesResult = await this.voteRepository.pollHasVotes(
-      command.pollId
+    return this.snapshotTransaction.withLockedPoll(
+      pollId.data,
+      async (snapshot) => {
+        // Read vote presence under the same lock as the lifecycle transition.
+        const hasVotes = await snapshot.hasVotes();
+        // Discard snapshot (validates state and votes).
+        const discardResult = snapshot.poll.discardSnapshot(hasVotes);
+
+        if (!discardResult.success) {
+          return discardResult;
+        }
+
+        // Save the transition and discard its participant snapshot atomically.
+        await snapshot.savePoll();
+        await snapshot.removeParticipantSnapshot();
+
+        return success(undefined);
+      }
     );
-
-    if (!hasVotesResult.success) {
-      return failure(hasVotesResult.error);
-    }
-
-    const hasVotes = hasVotesResult.value;
-
-    // Discard snapshot (validates state and votes)
-    const discardResult = poll.discardSnapshot(hasVotes);
-
-    if (!discardResult.success) {
-      return failure(discardResult.error);
-    }
-
-    // Delete all participants for this poll
-    const deleteResult =
-      await this.participantRepository.deleteParticipantsByPollId(
-        command.pollId
-      );
-
-    if (!deleteResult.success) {
-      return failure(deleteResult.error);
-    }
-
-    // Update the poll
-    const updateResult = await this.pollRepository.updatePoll(poll);
-
-    if (!updateResult.success) {
-      return failure(updateResult.error);
-    }
-
-    return success(undefined);
   }
 }

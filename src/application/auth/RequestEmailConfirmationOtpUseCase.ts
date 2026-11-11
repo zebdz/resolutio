@@ -1,6 +1,22 @@
+/** Issues email-confirmation codes through injected persistence and delivery ports.
+ * Identity, time and OTP randomness are explicit application inputs. */
+import { AuthenticationError } from './AuthenticationError';
+import { UserId } from '@/domain/shared/EntityIds';
+
+import { Clock, IdGenerator } from '@/application/shared/EntityCreation';
+import { OtpCodeGenerator } from './OtpCodeGenerator';
+import { OtpVerificationId } from '@/domain/shared/EntityIds';
+import { OtpEmailDestination, OtpCount } from '@/domain/otp/OtpValues';
+import {
+  ClientIp,
+  Minutes,
+  Seconds,
+  afterSeconds,
+  secondsFromMinutes,
+} from '@/domain/auth/AuthValues';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { OtpPurposes, OtpVerification } from '@/domain/otp/OtpVerification';
-import { OtpCode } from '@/domain/otp/OtpCode';
+
 import { UserRepository } from '@/domain/user/UserRepository';
 import { UserDomainCodes } from '@/domain/user/UserDomainCodes';
 import { Result, success, failure } from '@/domain/shared/Result';
@@ -11,7 +27,7 @@ import { AuthErrors } from './AuthErrors';
 import { calculateThrottleDelay, readThrottle } from './OtpThrottleCalculator';
 
 export interface RequestEmailConfirmationOtpInput {
-  userId: string;
+  userId: UserId;
   clientIp: string;
 }
 
@@ -19,15 +35,18 @@ export interface RequestEmailConfirmationOtpResult {
   // Seconds until the throttle allows the next code; the account page counts
   // down from this. Nothing else is needed: confirming resolves the code
   // server-side from the user.
-  retryAfterSeconds: number;
+  retryAfterSeconds: Seconds;
 }
 
 interface Dependencies {
+  ids: IdGenerator;
+  otpCodeGenerator: OtpCodeGenerator;
+  clock: Clock;
   userRepository: UserRepository;
   otpRepository: OtpRepository;
-  deliveryChannel: OtpDeliveryChannel;
+  deliveryChannel: OtpDeliveryChannel<'email'>;
   otpCodeHasher: OtpCodeHasher;
-  expiryMinutes?: number;
+  expiryMinutes?: Minutes;
 }
 
 /**
@@ -36,23 +55,31 @@ interface Dependencies {
  * password-reset flow, there is nothing here to hide from them.
  */
 export class RequestEmailConfirmationOtpUseCase {
+  private readonly ids: IdGenerator;
+  private readonly otpCodeGenerator: OtpCodeGenerator;
+  private readonly clock: Clock;
   private readonly userRepository: UserRepository;
   private readonly otpRepository: OtpRepository;
-  private readonly deliveryChannel: OtpDeliveryChannel;
+  private readonly deliveryChannel: OtpDeliveryChannel<'email'>;
   private readonly otpCodeHasher: OtpCodeHasher;
-  private readonly expiryMinutes: number;
+  private readonly expiryMinutes: Minutes;
 
   constructor(deps: Dependencies) {
+    this.ids = deps.ids;
+    this.otpCodeGenerator = deps.otpCodeGenerator;
+    this.clock = deps.clock;
     this.userRepository = deps.userRepository;
     this.otpRepository = deps.otpRepository;
     this.deliveryChannel = deps.deliveryChannel;
     this.otpCodeHasher = deps.otpCodeHasher;
-    this.expiryMinutes = deps.expiryMinutes ?? 10;
+    this.expiryMinutes = deps.expiryMinutes ?? Minutes.parse(10);
   }
 
   async execute(
     input: RequestEmailConfirmationOtpInput
-  ): Promise<Result<RequestEmailConfirmationOtpResult, string>> {
+  ): Promise<Result<RequestEmailConfirmationOtpResult, AuthenticationError>> {
+    const now = this.clock.now();
+
     if (!input.clientIp) {
       return failure(AuthErrors.MISSING_IP);
     }
@@ -76,35 +103,50 @@ export class RequestEmailConfirmationOtpUseCase {
 
       const throttle = await readThrottle(
         this.otpRepository,
-        address,
-        this.deliveryChannel.channel,
-        OtpPurposes.EMAIL_CONFIRMATION
+        OtpEmailDestination.parse({
+          identifier: address,
+          channel: this.deliveryChannel.channel,
+        }),
+        OtpPurposes.EMAIL_CONFIRMATION,
+        now
       );
 
       if (throttle.retryAfterSeconds > 0) {
         return failure(OtpErrors.THROTTLED);
       }
 
-      const code = OtpCode.generate();
-      const expiresAt = new Date(Date.now() + this.expiryMinutes * 60 * 1000);
+      const code = this.otpCodeGenerator.generate();
+      const expiresAt = afterSeconds(
+        now,
+        secondsFromMinutes(this.expiryMinutes)
+      );
 
       await this.otpRepository.save(
-        OtpVerification.create({
-          identifier: address,
-          channel: this.deliveryChannel.channel,
-          purpose: OtpPurposes.EMAIL_CONFIRMATION,
-          code: this.otpCodeHasher.hash(code.getValue()),
-          clientIp: input.clientIp,
-          expiresAt,
-          userId: user.id,
-        })
+        OtpVerification.create(
+          {
+            ...OtpEmailDestination.parse({
+              identifier: address,
+              channel: this.deliveryChannel.channel,
+            }),
+
+            purpose: OtpPurposes.EMAIL_CONFIRMATION,
+            code: this.otpCodeHasher.hash(code.getValue()),
+            clientIp: ClientIp.parse(input.clientIp),
+            expiresAt,
+            userId: user.id,
+          },
+          { id: this.ids.generate(OtpVerificationId), now }
+        )
       );
 
       const deliveryResult = await this.deliveryChannel.send(
-        address,
+        OtpEmailDestination.parse({
+          channel: this.deliveryChannel.channel,
+          identifier: address,
+        }).identifier,
         code.getValue(),
         user.language,
-        input.clientIp,
+        ClientIp.parse(input.clientIp),
         OtpPurposes.EMAIL_CONFIRMATION
       );
 
@@ -113,12 +155,13 @@ export class RequestEmailConfirmationOtpUseCase {
       }
 
       return success({
-        retryAfterSeconds: calculateThrottleDelay(throttle.recentCount + 1),
+        retryAfterSeconds: calculateThrottleDelay(
+          OtpCount.parse(throttle.recentCount + 1)
+        ),
       });
     } catch (error) {
-      return failure(
-        error instanceof Error ? error.message : OtpErrors.SEND_FAILED
-      );
+      // Unexpected adapter failures use the stable, localized delivery code.
+      return failure(OtpErrors.SEND_FAILED);
     }
   }
 }

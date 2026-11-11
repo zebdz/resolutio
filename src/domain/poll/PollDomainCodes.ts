@@ -7,11 +7,13 @@ export const PollDomainCodes = {
   POLL_DESCRIPTION_EMPTY: 'domain.poll.descriptionEmpty',
   POLL_DESCRIPTION_TOO_LONG: 'domain.poll.descriptionTooLong',
   POLL_INVALID_DATES: 'domain.poll.invalidDates',
+  POLL_INVALID_ID: 'domain.poll.invalidId',
 
   // Poll state
   POLL_ALREADY_ACTIVE: 'domain.poll.alreadyActive',
   POLL_ALREADY_INACTIVE: 'domain.poll.alreadyInactive',
   POLL_FINISHED: 'domain.poll.pollFinished',
+  POLL_STALE: 'domain.poll.stale',
   POLL_ALREADY_FINISHED: 'domain.poll.alreadyFinished',
   POLL_ALREADY_ARCHIVED: 'domain.poll.alreadyArchived',
   POLL_NO_QUESTIONS: 'domain.poll.noQuestions',
@@ -39,6 +41,7 @@ export const PollDomainCodes = {
   QUESTION_NOT_FOUND: 'domain.poll.questionNotFound',
 
   // Question validation
+  QUESTION_INVALID_DATA: 'domain.poll.questionInvalidData',
   QUESTION_TEXT_EMPTY: 'domain.poll.questionTextEmpty',
   QUESTION_TEXT_TOO_LONG: 'domain.poll.questionTextTooLong',
   QUESTION_DETAILS_TOO_LONG: 'domain.poll.questionDetailsTooLong',
@@ -53,6 +56,7 @@ export const PollDomainCodes = {
   QUESTION_ANSWER_NOT_FOUND: 'domain.poll.questionAnswerNotFound',
 
   // Answer validation
+  ANSWER_INVALID_DATA: 'domain.poll.answerInvalidData',
   ANSWER_TEXT_EMPTY: 'domain.poll.answerTextEmpty',
   ANSWER_TEXT_TOO_LONG: 'domain.poll.answerTextTooLong',
   ANSWER_INVALID_ORDER: 'domain.poll.answerInvalidOrder',
@@ -60,6 +64,8 @@ export const PollDomainCodes = {
 
   // Vote validation
   INVALID_WEIGHT: 'domain.poll.invalidWeight',
+  INVALID_BALLOT: 'domain.poll.invalidBallot',
+  RECEIPT_SECRET_IMMUTABLE: 'domain.poll.receiptSecretImmutable',
   ALREADY_VOTED: 'domain.poll.alreadyVoted',
   SINGLE_CHOICE_MULTIPLE_ANSWERS: 'domain.poll.singleChoiceMultipleAnswers',
   NOT_PARTICIPANT: 'domain.poll.notParticipant',

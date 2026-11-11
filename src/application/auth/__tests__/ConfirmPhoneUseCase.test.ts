@@ -1,3 +1,9 @@
+/** Verifies Confirm Phone behavior through typed core ports.
+ * User persistence doubles exclude obsolete moderation methods; access uses the checked moderation port. */
+import { OtpCount, OtpDigits, OtpCodeHash } from '@/domain/otp/OtpValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
+import { authTestDependencies } from '@/application/auth/__tests__/authTestValues';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ConfirmPhoneUseCase } from '../ConfirmPhoneUseCase';
 import { OtpErrors } from '../OtpErrors';
@@ -49,7 +55,9 @@ class MockOtpRepository implements OtpRepository {
     }
 
     return matching.sort(
-      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+      (a, b) =>
+        Instant.toDate(b.createdAt).getTime() -
+        Instant.toDate(a.createdAt).getTime()
     )[0];
   }
 
@@ -59,16 +67,16 @@ class MockOtpRepository implements OtpRepository {
     return otp;
   }
 
-  async countRecentByClientIp(): Promise<number> {
-    return 0;
+  async countRecentByClientIp(): Promise<OtpCount> {
+    return OtpCount.parse(0);
   }
 
-  async countRecentByIdentifier(): Promise<number> {
-    return 0;
+  async countRecentByIdentifier(): Promise<OtpCount> {
+    return OtpCount.parse(0);
   }
 
-  async deleteAllForUser(): Promise<number> {
-    return 0;
+  async deleteAllForUser(): Promise<OtpCount> {
+    return OtpCount.parse(0);
   }
 
   async deleteExpired(): Promise<void> {}
@@ -76,8 +84,8 @@ class MockOtpRepository implements OtpRepository {
 
 // Mock OtpCodeHasher
 class MockOtpCodeHasher implements OtpCodeHasher {
-  hash(code: string): string {
-    return `hashed-${code}`;
+  hash(code: OtpDigits): OtpCodeHash {
+    return OtpCodeHash.parse(`hashed-${code}`);
   }
 
   verify(code: string, hash: string): boolean {
@@ -144,20 +152,7 @@ class MockUserRepository implements UserRepository {
     return false;
   }
 
-  async isUserBlocked(): Promise<boolean> {
-    return false;
-  }
-
-  async blockUser(): Promise<void> {}
-  async unblockUser(): Promise<void> {}
-
-  async getBlockStatus(): Promise<null> {
-    return null;
-  }
   async deleteAddress(): Promise<void> {}
-  async getBlockedUserIds(): Promise<string[]> {
-    return [];
-  }
 }
 
 function makeUser(overrides: { id?: string; confirmedAt?: Date } = {}): User {
@@ -218,6 +213,7 @@ describe('ConfirmPhoneUseCase', () => {
     userRepository = new MockUserRepository();
 
     useCase = new ConfirmPhoneUseCase({
+      ...authTestDependencies(),
       otpRepository,
       otpCodeHasher,
       userRepository,
@@ -225,10 +221,10 @@ describe('ConfirmPhoneUseCase', () => {
   });
 
   it('should fail when user not found', async () => {
-    otpRepository.addOtp(makeOtp({ userId: 'user-1' }));
+    otpRepository.addOtp(makeOtp({ userId: UserId.parse('user-1') }));
 
     const result = await useCase.execute({
-      userId: 'nonexistent',
+      userId: UserId.parse('nonexistent'),
       code: '123456',
     });
 
@@ -242,10 +238,10 @@ describe('ConfirmPhoneUseCase', () => {
   it('should fail when user already confirmed', async () => {
     const user = makeUser({ confirmedAt: new Date() });
     userRepository.addUser(user);
-    otpRepository.addOtp(makeOtp({ userId: 'user-1' }));
+    otpRepository.addOtp(makeOtp({ userId: UserId.parse('user-1') }));
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       code: '123456',
     });
 
@@ -261,7 +257,7 @@ describe('ConfirmPhoneUseCase', () => {
     userRepository.addUser(user);
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       code: '123456',
     });
 
@@ -277,13 +273,13 @@ describe('ConfirmPhoneUseCase', () => {
     userRepository.addUser(user);
     otpRepository.addOtp(
       makeOtp({
-        userId: 'user-1',
+        userId: UserId.parse('user-1'),
         expiresAt: new Date(Date.now() - 1000),
       })
     );
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       code: '123456',
     });
 
@@ -298,11 +294,11 @@ describe('ConfirmPhoneUseCase', () => {
     const user = makeUser();
     userRepository.addUser(user);
     otpRepository.addOtp(
-      makeOtp({ userId: 'user-1', attempts: 5, maxAttempts: 5 })
+      makeOtp({ userId: UserId.parse('user-1'), attempts: 5, maxAttempts: 5 })
     );
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       code: '123456',
     });
 
@@ -316,10 +312,12 @@ describe('ConfirmPhoneUseCase', () => {
   it('should fail when code is invalid', async () => {
     const user = makeUser();
     userRepository.addUser(user);
-    otpRepository.addOtp(makeOtp({ userId: 'user-1', code: 'hashed-999999' }));
+    otpRepository.addOtp(
+      makeOtp({ userId: UserId.parse('user-1'), code: 'hashed-999999' })
+    );
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       code: '123456',
     });
 
@@ -333,10 +331,12 @@ describe('ConfirmPhoneUseCase', () => {
   it('should confirm user on valid code', async () => {
     const user = makeUser();
     userRepository.addUser(user);
-    otpRepository.addOtp(makeOtp({ userId: 'user-1', code: 'hashed-123456' }));
+    otpRepository.addOtp(
+      makeOtp({ userId: UserId.parse('user-1'), code: 'hashed-123456' })
+    );
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       code: '123456',
     });
 
@@ -347,10 +347,12 @@ describe('ConfirmPhoneUseCase', () => {
   it('should mark OTP as verified on success', async () => {
     const user = makeUser();
     userRepository.addUser(user);
-    otpRepository.addOtp(makeOtp({ userId: 'user-1', code: 'hashed-123456' }));
+    otpRepository.addOtp(
+      makeOtp({ userId: UserId.parse('user-1'), code: 'hashed-123456' })
+    );
 
     await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       code: '123456',
     });
 
@@ -372,6 +374,7 @@ describe('ConfirmPhoneUseCase OTP binding', () => {
     userRepository.addUser(makeUser());
 
     useCase = new ConfirmPhoneUseCase({
+      ...authTestDependencies(),
       otpRepository,
       otpCodeHasher,
       userRepository,
@@ -379,10 +382,10 @@ describe('ConfirmPhoneUseCase OTP binding', () => {
   });
 
   it('rejects an OTP that belongs to a different user', async () => {
-    otpRepository.addOtp(makeOtp({ userId: 'someone-else' }));
+    otpRepository.addOtp(makeOtp({ userId: UserId.parse('someone-else') }));
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       code: '123456',
     });
 
@@ -401,7 +404,7 @@ describe('ConfirmPhoneUseCase OTP binding', () => {
     otpRepository.addOtp(makeOtp({ purpose: OtpPurposes.PASSWORD_RESET }));
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       code: '123456',
     });
 
@@ -429,6 +432,7 @@ describe('ConfirmPhoneUseCase code resolution', () => {
     userRepository.addUser(makeUser());
 
     useCase = new ConfirmPhoneUseCase({
+      ...authTestDependencies(),
       otpRepository,
       otpCodeHasher: new MockOtpCodeHasher(),
       userRepository,
@@ -445,7 +449,10 @@ describe('ConfirmPhoneUseCase code resolution', () => {
     );
     otpRepository.addOtp(makeOtp({ id: 'otp-new', code: 'hashed-123456' }));
 
-    const result = await useCase.execute({ userId: 'user-1', code: '123456' });
+    const result = await useCase.execute({
+      userId: UserId.parse('user-1'),
+      code: '123456',
+    });
 
     expect(result.success).toBe(true);
     expect(userRepository.confirmedUserIds).toContain('user-1');

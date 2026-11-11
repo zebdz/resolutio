@@ -1,3 +1,26 @@
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { VotingWeight } from '@/domain/poll/VotingWeight';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { BoardId, UserId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import { Nickname } from '@/domain/user/Nickname';
+import { participantFixtureData } from '@/application/poll/__tests__/pollFixtureCreation';
+import { Instant } from '@/domain/shared/Instant';
+import { pollFixtureCreation } from '@/application/poll/__tests__/pollFixtureCreation';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import {
+  QuestionId,
+  AnswerId,
+  ParticipantId,
+  VoteId,
+  PollId,
+} from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GetPollResultsUseCase } from '../GetPollResultsUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -37,86 +60,125 @@ describe('GetPollResultsUseCase', () => {
   beforeEach(() => {
     // Create a poll
     const pollResult = Poll.create(
-      'Test Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'user-1',
-      new Date('2026-01-15'),
-      new Date('2026-02-15')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(pollResult.success).toBe(true);
-    poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    poll = expectSuccess(pollResult);
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      id: 'poll-1',
+    });
     // Set state directly to FINISHED (questions added to props below)
-    (poll as any).props.state = PollState.FINISHED;
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      finishedAt: null,
+      state: PollState.FINISHED,
+    });
 
     // Create question
     const questionResult = Question.create(
-      'Test Question',
-      'poll-1',
-      1,
-      0,
+      QuestionText.parse('Test Question'),
+      PollId.parse('poll-1'),
+      pollFixtureCreation(QuestionId),
+      PageNumber.parse(1),
+      SortOrder.parse(0),
       'single-choice'
     );
     expect(questionResult.success).toBe(true);
-    question = questionResult.value;
-    (question as any).props.id = 'question-1';
-    (poll as any).props.questions = [question];
+    question = expectSuccess(questionResult);
+    question = Question.reconstitute({
+      ...question.toJSON(),
+      answers: question.answers,
+      id: 'question-1',
+    });
+    poll = Poll.reconstitute({ ...poll.toJSON(), questions: [question] });
 
     // Create answers
-    const answer1Result = Answer.create('Answer 1', 1, 'question-1');
+    const answer1Result = Answer.create(
+      AnswerText.parse('Answer 1'),
+      SortOrder.parse(1),
+      QuestionId.parse('question-1'),
+      pollFixtureCreation(AnswerId)
+    );
     expect(answer1Result.success).toBe(true);
-    answer1 = answer1Result.value;
-    (answer1 as any).props.id = 'answer-1';
+    answer1 = expectSuccess(answer1Result);
+    answer1 = Answer.reconstitute({ ...answer1.toJSON(), id: 'answer-1' });
 
-    const answer2Result = Answer.create('Answer 2', 2, 'question-1');
+    const answer2Result = Answer.create(
+      AnswerText.parse('Answer 2'),
+      SortOrder.parse(2),
+      QuestionId.parse('question-1'),
+      pollFixtureCreation(AnswerId)
+    );
     expect(answer2Result.success).toBe(true);
-    answer2 = answer2Result.value;
-    (answer2 as any).props.id = 'answer-2';
-    (question as any).props.answers = [answer1, answer2];
+    answer2 = expectSuccess(answer2Result);
+    answer2 = Answer.reconstitute({ ...answer2.toJSON(), id: 'answer-2' });
+
+    for (const answer of [answer1, answer2]) {
+      question.addAnswer(answer);
+    }
 
     // Create participants
     const participant1Result = PollParticipant.create(
-      'poll-1',
-      'user-1',
-      new Decimal(2.0).toNumber()
+      PollId.parse('poll-1'),
+      UserId.parse('user-1'),
+      pollFixtureCreation(ParticipantId),
+      VotingWeight.parse(new Decimal(2.0).toNumber())
     );
     expect(participant1Result.success).toBe(true);
-    participant1 = participant1Result.value;
-    (participant1 as any).props.id = 'participant-1';
+    participant1 = expectSuccess(participant1Result);
+    participant1 = PollParticipant.reconstitute({
+      ...participantFixtureData(participant1),
+      id: 'participant-1',
+    });
 
     const participant2Result = PollParticipant.create(
-      'poll-1',
-      'user-2',
-      new Decimal(3.0).toNumber()
+      PollId.parse('poll-1'),
+      UserId.parse('user-2'),
+      pollFixtureCreation(ParticipantId),
+      VotingWeight.parse(new Decimal(3.0).toNumber())
     );
     expect(participant2Result.success).toBe(true);
-    participant2 = participant2Result.value;
-    (participant2 as any).props.id = 'participant-2';
+    participant2 = expectSuccess(participant2Result);
+    participant2 = PollParticipant.reconstitute({
+      ...participantFixtureData(participant2),
+      id: 'participant-2',
+    });
 
     // Create votes
     const vote1Result = Vote.create(
-      'question-1',
-      'answer-1',
-      'user-1',
-      new Decimal(2.0).toNumber()
+      QuestionId.parse('question-1'),
+      AnswerId.parse('answer-1'),
+      UserId.parse('user-1'),
+      VotingWeight.parse(new Decimal(2.0).toNumber()),
+      pollFixtureCreation(VoteId, new Date())
     );
     expect(vote1Result.success).toBe(true);
-    vote1 = vote1Result.value;
+    vote1 = expectSuccess(vote1Result);
 
     const vote2Result = Vote.create(
-      'question-1',
-      'answer-2',
-      'user-2',
-      new Decimal(3.0).toNumber()
+      QuestionId.parse('question-1'),
+      AnswerId.parse('answer-2'),
+      UserId.parse('user-2'),
+      VotingWeight.parse(new Decimal(3.0).toNumber()),
+      pollFixtureCreation(VoteId, new Date())
     );
     expect(vote2Result.success).toBe(true);
-    vote2 = vote2Result.value;
+    vote2 = expectSuccess(vote2Result);
 
     // Mock repositories
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
     };
 
     participantRepository = {
@@ -140,6 +202,7 @@ describe('GetPollResultsUseCase', () => {
     userRepository = {
       findByIds: vi.fn().mockResolvedValue([
         User.reconstitute({
+          nickname: Nickname.create('user_1'),
           id: 'user-1',
           firstName: 'Alice',
           lastName: 'Smith',
@@ -149,6 +212,7 @@ describe('GetPollResultsUseCase', () => {
           createdAt: new Date(),
         }),
         User.reconstitute({
+          nickname: Nickname.create('user_2'),
           id: 'user-2',
           firstName: 'Bob',
           lastName: 'Johnson',
@@ -217,7 +281,12 @@ describe('GetPollResultsUseCase', () => {
 
   it('should allow admin to view results of active poll', async () => {
     // Make poll active but not finished
-    (poll as any).props.state = PollState.ACTIVE;
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      finishedAt: null,
+      state: PollState.ACTIVE,
+    });
 
     const result = await useCase.execute({
       pollId: 'poll-1',
@@ -229,8 +298,17 @@ describe('GetPollResultsUseCase', () => {
 
   it('should reject non-admin viewing results of an active anonymous poll', async () => {
     // Make poll active but not finished
-    (poll as any).props.state = PollState.ACTIVE;
-    (poll as any).props.anonymous = true;
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      finishedAt: null,
+      state: PollState.ACTIVE,
+    });
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      anonymous: true,
+    });
     organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
 
     const result = await useCase.execute({
@@ -246,7 +324,12 @@ describe('GetPollResultsUseCase', () => {
   });
 
   it('should allow a member to view results of an active named poll', async () => {
-    (poll as any).props.state = PollState.ACTIVE;
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      finishedAt: null,
+      state: PollState.ACTIVE,
+    });
     organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
 
     const result = await useCase.execute({
@@ -267,7 +350,12 @@ describe('GetPollResultsUseCase', () => {
 
   it('should allow superadmin to view results of active poll', async () => {
     // Make poll active but not finished
-    (poll as any).props.state = PollState.ACTIVE;
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      finishedAt: null,
+      state: PollState.ACTIVE,
+    });
     organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
     organizationRepository.isUserMember = vi.fn().mockResolvedValue(false);
 
@@ -293,7 +381,11 @@ describe('GetPollResultsUseCase', () => {
 
   it('SECURITY: should NOT allow non-creators to view voter breakdown of an anonymous poll', async () => {
     // Non-admin, non-creator user
-    (poll as any).props.anonymous = true;
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      anonymous: true,
+    });
     organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
     organizationRepository.isUserMember = vi.fn().mockResolvedValue(true);
 
@@ -310,7 +402,11 @@ describe('GetPollResultsUseCase', () => {
   });
 
   it('SECURITY: should NOT allow poll creator to view voter breakdown of an anonymous poll', async () => {
-    (poll as any).props.anonymous = true;
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      anonymous: true,
+    });
     organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
     organizationRepository.isUserMember = vi.fn().mockResolvedValue(true);
 
@@ -398,13 +494,17 @@ describe('GetPollResultsUseCase', () => {
   it('should handle zero weight correctly', async () => {
     // Create participant with zero weight
     const participant3Result = PollParticipant.create(
-      'poll-1',
-      'user-3',
-      new Decimal(0).toNumber()
+      PollId.parse('poll-1'),
+      UserId.parse('user-3'),
+      pollFixtureCreation(ParticipantId),
+      VotingWeight.parse(new Decimal(0).toNumber())
     );
     expect(participant3Result.success).toBe(true);
-    const participant3 = participant3Result.value;
-    (participant3 as any).props.id = 'participant-3';
+    let participant3 = expectSuccess(participant3Result);
+    participant3 = PollParticipant.reconstitute({
+      ...participantFixtureData(participant3),
+      id: 'participant-3',
+    });
 
     participantRepository.getParticipants = vi
       .fn()
@@ -447,17 +547,25 @@ describe('GetPollResultsUseCase', () => {
   it('should exclude archived questions from results', async () => {
     // Add archived question
     const archivedQuestionResult = Question.create(
-      'Archived Question',
-      'poll-1',
-      2,
-      0,
+      QuestionText.parse('Archived Question'),
+      PollId.parse('poll-1'),
+      pollFixtureCreation(QuestionId),
+      PageNumber.parse(2),
+      SortOrder.parse(0),
       'single-choice'
     );
     expect(archivedQuestionResult.success).toBe(true);
-    const archivedQuestion = archivedQuestionResult.value;
-    (archivedQuestion as any).props.id = 'question-2';
-    archivedQuestion.archive();
-    (poll as any).props.questions = [question, archivedQuestion];
+    let archivedQuestion = expectSuccess(archivedQuestionResult);
+    archivedQuestion = Question.reconstitute({
+      ...archivedQuestion.toJSON(),
+      answers: archivedQuestion.answers,
+      id: 'question-2',
+    });
+    archivedQuestion.archive(Instant.parse('2026-01-02T00:00:00.000Z'));
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: [question, archivedQuestion],
+    });
 
     const result = await useCase.execute({
       pollId: 'poll-1',
@@ -474,7 +582,7 @@ describe('GetPollResultsUseCase', () => {
 
   it('should exclude archived answers from results', async () => {
     // Archive answer2
-    answer2.archive();
+    answer2.archive(Instant.parse('2026-01-02T00:00:00.000Z'));
 
     const result = await useCase.execute({
       pollId: 'poll-1',
@@ -493,13 +601,14 @@ describe('GetPollResultsUseCase', () => {
   it('should handle multiple-choice questions', async () => {
     // Add another vote for the same user but different answer in multiple-choice scenario
     const vote3Result = Vote.create(
-      'question-1',
-      'answer-2',
-      'user-1',
-      new Decimal(2.0).toNumber()
+      QuestionId.parse('question-1'),
+      AnswerId.parse('answer-2'),
+      UserId.parse('user-1'),
+      VotingWeight.parse(new Decimal(2.0).toNumber()),
+      pollFixtureCreation(VoteId, new Date())
     );
     expect(vote3Result.success).toBe(true);
-    const vote3 = vote3Result.value;
+    const vote3 = expectSuccess(vote3Result);
     voteRepository.getVotesByPoll = vi
       .fn()
       .mockResolvedValue(success([vote1, vote2, vote3]));
@@ -537,16 +646,18 @@ describe('GetPollResultsUseCase', () => {
 
     userRepository.findByIds = vi.fn().mockResolvedValue([
       User.reconstitute({
+        nickname: Nickname.create('user_1'),
         id: 'user-1',
         firstName: 'Alice',
         lastName: 'Smith',
-        middleName: 'M.',
+        middleName: 'Mary',
         phoneNumber: PhoneNumber.create('+79001234567'),
         password: 'hashed',
         language: 'ru',
         createdAt: new Date(),
       }),
       User.reconstitute({
+        nickname: Nickname.create('user_2'),
         id: 'user-2',
         firstName: 'Bob',
         lastName: 'Johnson',
@@ -572,7 +683,7 @@ describe('GetPollResultsUseCase', () => {
       );
       expect(willing?.willingToSignProtocol).toBe(true);
       expect(willing?.firstName).toBe('Alice');
-      expect(willing?.middleName).toBe('M.');
+      expect(willing?.middleName).toBe('Mary');
 
       const notWilling = result.value.protocolSignWillingness.find(
         (p) => p.userId === 'user-2'
@@ -581,7 +692,7 @@ describe('GetPollResultsUseCase', () => {
       expect(notWilling?.middleName).toBeNull();
 
       // Consent is combined — willing means "sign AND share my phone".
-      expect(willing?.phoneNumber).toBe('+79001234567');
+      expect(willing?.phoneNumber?.getValue()).toBe('+79001234567');
       // Declining covers both halves, so no phone for the not-willing.
       expect(notWilling?.phoneNumber).toBeNull();
     }
@@ -646,22 +757,40 @@ describe('GetPollResultsUseCase', () => {
     let openPoll: Poll;
 
     beforeEach(() => {
-      openPoll = Poll.create(
-        'Open Poll',
-        'Everyone may vote',
-        'org-1',
-        null,
-        'user-1',
-        new Date('2026-01-15'),
-        new Date('2026-02-15'),
-        undefined,
-        'OPEN'
-      ).value;
-      (openPoll as any).props.id = 'poll-1';
-      (openPoll as any).props.state = PollState.FINISHED;
-      (openPoll as any).props.questions = [question];
+      openPoll = expectSuccess(
+        Poll.create(
+          PollTitle.parse('Open Poll'),
+          PollDescription.parse('Everyone may vote'),
+          OrganizationId.parse('org-1'),
+          null,
+          UserId.parse('user-1'),
+          expectSuccess(
+            PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+          ),
+          testCreation(PollId, 'poll-1'),
+          undefined,
+          'OPEN'
+        )
+      );
+      openPoll = Poll.reconstitute({
+        ...openPoll.toJSON(),
+        questions: openPoll.questions,
+        id: 'poll-1',
+      });
+      openPoll = Poll.reconstitute({
+        ...openPoll.toJSON(),
+        questions: openPoll.questions,
+        finishedAt: null,
+        state: PollState.FINISHED,
+      });
+      openPoll = Poll.reconstitute({
+        ...openPoll.toJSON(),
+        questions: [question],
+      });
 
-      pollRepository.getPollById = vi.fn().mockResolvedValue(success(openPoll));
+      pollRepository.getPollById = vi
+        .fn()
+        .mockImplementation(async () => success(openPoll));
       organizationRepository.isUserAdmin = vi.fn().mockResolvedValue(false);
       organizationRepository.isUserMember = vi.fn().mockResolvedValue(false);
     });
@@ -690,7 +819,9 @@ describe('GetPollResultsUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.POLL_RESULTS_NOT_ORG_MEMBER);
+      expect(expectFailure(result)).toBe(
+        PollDomainCodes.POLL_RESULTS_NOT_ORG_MEMBER
+      );
     });
 
     it('still lets org members read the results', async () => {
@@ -705,8 +836,17 @@ describe('GetPollResultsUseCase', () => {
     });
 
     it('does not open an ACTIVE anonymous poll to a voter who is not an admin', async () => {
-      (openPoll as any).props.state = PollState.ACTIVE;
-      (openPoll as any).props.anonymous = true;
+      openPoll = Poll.reconstitute({
+        ...openPoll.toJSON(),
+        questions: openPoll.questions,
+        finishedAt: null,
+        state: PollState.ACTIVE,
+      });
+      openPoll = Poll.reconstitute({
+        ...openPoll.toJSON(),
+        questions: openPoll.questions,
+        anonymous: true,
+      });
       participantRepository.getParticipantByUserAndPoll = vi
         .fn()
         .mockResolvedValue(success(participant1));
@@ -717,11 +857,18 @@ describe('GetPollResultsUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.POLL_RESULTS_ADMIN_ONLY);
+      expect(expectFailure(result)).toBe(
+        PollDomainCodes.POLL_RESULTS_ADMIN_ONLY
+      );
     });
 
     it('opens an ACTIVE named poll to a voter who took part in it', async () => {
-      (openPoll as any).props.state = PollState.ACTIVE;
+      openPoll = Poll.reconstitute({
+        ...openPoll.toJSON(),
+        questions: openPoll.questions,
+        finishedAt: null,
+        state: PollState.ACTIVE,
+      });
       participantRepository.getParticipantByUserAndPoll = vi
         .fn()
         .mockResolvedValue(success(participant1));

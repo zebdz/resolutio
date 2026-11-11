@@ -1,3 +1,6 @@
+/** Server report view resolves validated references and serializes only authorized content. */
+import { OrganizationId, UserId } from '@/domain/shared/EntityIds';
+import { PageSize } from '@/domain/shared/Pagination';
 import { getLocale, getTranslations } from 'next-intl/server';
 
 import { Link } from '@/src/i18n/routing';
@@ -71,7 +74,7 @@ export default async function EditReportPage({ params }: EditReportPageProps) {
   }
 
   const [isAdmin, isSuperAdmin] = await Promise.all([
-    orgRepo.isUserAdmin(user.id, report.organizationId),
+    orgRepo.isUserAdmin(user.id, OrganizationId.parse(report.organizationId)),
     userRepo.isSuperAdmin(user.id),
   ]);
 
@@ -90,9 +93,12 @@ export default async function EditReportPage({ params }: EditReportPageProps) {
   }
 
   const [boards, pollsResult] = await Promise.all([
-    boardRepo.findByOrganizationId(report.organizationId),
+    boardRepo.findByOrganizationId(OrganizationId.parse(report.organizationId)),
     pollRepo.searchPolls(
-      { organizationId: report.organizationId, pageSize: 200 },
+      {
+        organizationId: OrganizationId.parse(report.organizationId),
+        pageSize: PageSize.parse(200),
+      },
       user.id
     ),
   ]);
@@ -140,7 +146,7 @@ export default async function EditReportPage({ params }: EditReportPageProps) {
             id: report.id,
             title: report.title,
             body: report.body,
-            visibility: report.visibility as ReportVisibility,
+            visibility: report.visibility,
             boardIds: report.boardIds,
             pollIds: report.pollIds,
             attachments: attachmentsMeta,

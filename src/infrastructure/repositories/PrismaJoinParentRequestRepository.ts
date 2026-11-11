@@ -1,7 +1,13 @@
+/** Prisma parent-request adapter preserves domain identity and decodes raw
+ * status/decision columns through validated aggregate rehydration. */
+import {
+  JoinParentRequestId,
+  OrganizationId,
+} from '../../domain/shared/EntityIds';
 import { PrismaClient } from '@/generated/prisma/client';
 import {
   JoinParentRequest,
-  JoinParentRequestProps,
+  RawJoinParentRequestProps,
 } from '../../domain/organization/JoinParentRequest';
 import { JoinParentRequestRepository } from '../../domain/organization/JoinParentRequestRepository';
 
@@ -13,6 +19,7 @@ export class PrismaJoinParentRequestRepository implements JoinParentRequestRepos
 
     const created = await this.prisma.organizationJoinParentRequest.create({
       data: {
+        id: data.id,
         childOrgId: data.childOrgId,
         parentOrgId: data.parentOrgId,
         requestingAdminId: data.requestingAdminId,
@@ -28,7 +35,7 @@ export class PrismaJoinParentRequestRepository implements JoinParentRequestRepos
     return JoinParentRequest.reconstitute(this.toProps(created));
   }
 
-  async findById(id: string): Promise<JoinParentRequest | null> {
+  async findById(id: JoinParentRequestId): Promise<JoinParentRequest | null> {
     const record = await this.prisma.organizationJoinParentRequest.findUnique({
       where: { id },
     });
@@ -41,7 +48,7 @@ export class PrismaJoinParentRequestRepository implements JoinParentRequestRepos
   }
 
   async findPendingByChildOrgId(
-    childOrgId: string
+    childOrgId: OrganizationId
   ): Promise<JoinParentRequest | null> {
     const record = await this.prisma.organizationJoinParentRequest.findFirst({
       where: { childOrgId, status: 'pending' },
@@ -55,7 +62,7 @@ export class PrismaJoinParentRequestRepository implements JoinParentRequestRepos
   }
 
   async findPendingByParentOrgId(
-    parentOrgId: string
+    parentOrgId: OrganizationId
   ): Promise<JoinParentRequest[]> {
     const records = await this.prisma.organizationJoinParentRequest.findMany({
       where: { parentOrgId, status: 'pending' },
@@ -65,7 +72,9 @@ export class PrismaJoinParentRequestRepository implements JoinParentRequestRepos
     return records.map((r) => JoinParentRequest.reconstitute(this.toProps(r)));
   }
 
-  async findAllByChildOrgId(childOrgId: string): Promise<JoinParentRequest[]> {
+  async findAllByChildOrgId(
+    childOrgId: OrganizationId
+  ): Promise<JoinParentRequest[]> {
     const records = await this.prisma.organizationJoinParentRequest.findMany({
       where: { childOrgId },
       orderBy: { createdAt: 'desc' },
@@ -75,7 +84,7 @@ export class PrismaJoinParentRequestRepository implements JoinParentRequestRepos
   }
 
   async findAllByParentOrgId(
-    parentOrgId: string
+    parentOrgId: OrganizationId
   ): Promise<JoinParentRequest[]> {
     const records = await this.prisma.organizationJoinParentRequest.findMany({
       where: { parentOrgId },
@@ -101,7 +110,7 @@ export class PrismaJoinParentRequestRepository implements JoinParentRequestRepos
     return JoinParentRequest.reconstitute(this.toProps(updated));
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: JoinParentRequestId): Promise<void> {
     await this.prisma.organizationJoinParentRequest.delete({
       where: { id },
     });
@@ -118,7 +127,7 @@ export class PrismaJoinParentRequestRepository implements JoinParentRequestRepos
     rejectionReason: string | null;
     createdAt: Date;
     handledAt: Date | null;
-  }): JoinParentRequestProps {
+  }): RawJoinParentRequestProps {
     return {
       id: record.id,
       childOrgId: record.childOrgId,
@@ -126,7 +135,7 @@ export class PrismaJoinParentRequestRepository implements JoinParentRequestRepos
       requestingAdminId: record.requestingAdminId,
       handlingAdminId: record.handlingAdminId,
       message: record.message,
-      status: record.status as 'pending' | 'accepted' | 'rejected',
+      status: record.status,
       rejectionReason: record.rejectionReason,
       createdAt: record.createdAt,
       handledAt: record.handledAt,

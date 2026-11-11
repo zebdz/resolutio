@@ -1,5 +1,9 @@
+/** Maps validated user aggregates to Prisma records while preserving supplied identities.
+ * Persistence rows cross a validated boundary before entering the application core. */
+import { UserId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
 import type { UserRepository } from '@/domain/user/UserRepository';
-import { User, type Language } from '@/domain/user/User';
+import { User } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
 import { Nickname } from '@/domain/user/Nickname';
 import { Address } from '@/domain/user/Address';
@@ -85,7 +89,7 @@ export class PrismaUserRepository implements UserRepository {
     private readonly addressIntegrityLogger: AddressIntegrityLogger = new AddressIntegrityLogger()
   ) {}
 
-  async findById(id: string): Promise<User | null> {
+  async findById(id: UserId): Promise<User | null> {
     const user = await this.prisma.user.findUnique({
       where: { id },
       select: USER_SELECT,
@@ -98,7 +102,7 @@ export class PrismaUserRepository implements UserRepository {
     return this.toDomain(user);
   }
 
-  async findByIds(ids: string[]): Promise<User[]> {
+  async findByIds(ids: UserId[]): Promise<User[]> {
     const users = await this.prisma.user.findMany({
       where: { id: { in: ids } },
       select: USER_SELECT,
@@ -135,9 +139,9 @@ export class PrismaUserRepository implements UserRepository {
     return this.toDomain(user);
   }
 
-  async findByNickname(nickname: string): Promise<User | null> {
+  async findByNickname(nickname: Nickname): Promise<User | null> {
     const user = await this.prisma.user.findUnique({
-      where: { nickname },
+      where: { nickname: nickname.getValue() },
       select: USER_SELECT,
     });
 
@@ -148,9 +152,9 @@ export class PrismaUserRepository implements UserRepository {
     return this.toDomain(user);
   }
 
-  async isNicknameAvailable(nickname: string): Promise<boolean> {
+  async isNicknameAvailable(nickname: Nickname): Promise<boolean> {
     const count = await this.prisma.user.count({
-      where: { nickname },
+      where: { nickname: nickname.getValue() },
     });
 
     return count === 0;
@@ -158,27 +162,36 @@ export class PrismaUserRepository implements UserRepository {
 
   async save(user: User): Promise<User> {
     const savedUser = await this.prisma.user.upsert({
-      where: { id: user.id || 'new-user' }, // Use a non-existent ID for new users
+      where: { id: user.id },
       create: {
-        // Don't include id - let Prisma generate it
+        id: user.id,
         firstName: user.firstName,
         lastName: user.lastName,
         middleName: user.middleName,
         phoneNumber: user.phoneNumber.getValue(),
         password: user.password,
         language: user.language,
-        consentGivenAt: user.consentGivenAt,
-        createdAt: user.createdAt,
+        consentGivenAt:
+          user.consentGivenAt === undefined
+            ? undefined
+            : Instant.toDate(user.consentGivenAt),
+        createdAt: Instant.toDate(user.createdAt),
         nickname: user.nickname.getValue(),
         allowFindByName: user.allowFindByName,
         allowFindByPhone: user.allowFindByPhone,
         privacySetupCompleted: user.privacySetupCompleted,
-        confirmedAt: user.confirmedAt,
+        confirmedAt:
+          user.confirmedAt === undefined
+            ? undefined
+            : Instant.toDate(user.confirmedAt),
         // `?? null` for the same reason as the address fields below: Prisma
         // skips `undefined`, so removing an email would otherwise leave the
         // old address in place.
         email: user.email?.getValue() ?? null,
-        emailConfirmedAt: user.emailConfirmedAt ?? null,
+        emailConfirmedAt:
+          user.emailConfirmedAt === undefined
+            ? null
+            : Instant.toDate(user.emailConfirmedAt),
         ...(user.address
           ? {
               // Prisma treats `undefined` in a create/update payload as "skip
@@ -221,7 +234,10 @@ export class PrismaUserRepository implements UserRepository {
         language: user.language,
         nickname: user.nickname.getValue(),
         email: user.email?.getValue() ?? null,
-        emailConfirmedAt: user.emailConfirmedAt ?? null,
+        emailConfirmedAt:
+          user.emailConfirmedAt === undefined
+            ? null
+            : Instant.toDate(user.emailConfirmedAt),
         ...(user.address
           ? {
               address: {
@@ -297,7 +313,7 @@ export class PrismaUserRepository implements UserRepository {
     return count > 0;
   }
 
-  async deleteAddress(userId: string): Promise<void> {
+  async deleteAddress(userId: UserId): Promise<void> {
     await this.prisma.address.deleteMany({ where: { userId } });
   }
 
@@ -366,10 +382,10 @@ export class PrismaUserRepository implements UserRepository {
     return this.toDomainSkippingInvalid(users, 'searchUsers');
   }
 
-  async searchUserByPhone(phone: string): Promise<User | null> {
+  async searchUserByPhone(phone: PhoneNumber): Promise<User | null> {
     const user = await this.prisma.user.findFirst({
       where: {
-        phoneNumber: phone,
+        phoneNumber: phone.getValue(),
         allowFindByPhone: true,
       },
       select: USER_SELECT,
@@ -382,7 +398,7 @@ export class PrismaUserRepository implements UserRepository {
     return this.toDomain(user);
   }
 
-  async isSuperAdmin(userId: string): Promise<boolean> {
+  async isSuperAdmin(userId: UserId): Promise<boolean> {
     const superAdmin = await this.prisma.superAdmin.findUnique({
       where: { userId },
     });
@@ -390,75 +406,11 @@ export class PrismaUserRepository implements UserRepository {
     return superAdmin !== null;
   }
 
-  async confirmUser(userId: string): Promise<void> {
+  async confirmUser(userId: UserId, now: Instant): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
-      data: { confirmedAt: new Date() },
+      data: { confirmedAt: Instant.toDate(now) },
     });
-  }
-
-  async isUserBlocked(userId: string): Promise<boolean> {
-    const latest = await this.prisma.userBlockStatus.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      select: { status: true },
-    });
-
-    return latest?.status === 'blocked';
-  }
-
-  async blockUser(
-    userId: string,
-    superadminId: string,
-    reason: string
-  ): Promise<void> {
-    await this.prisma.userBlockStatus.create({
-      data: {
-        userId,
-        status: 'blocked',
-        statusChangedBySuperadminId: superadminId,
-        reason,
-      },
-    });
-  }
-
-  async unblockUser(
-    userId: string,
-    superadminId: string,
-    reason: string
-  ): Promise<void> {
-    await this.prisma.userBlockStatus.create({
-      data: {
-        userId,
-        status: 'unblocked',
-        statusChangedBySuperadminId: superadminId,
-        reason,
-      },
-    });
-  }
-
-  async getBlockStatus(
-    userId: string
-  ): Promise<{ blocked: boolean; reason?: string; blockedAt?: Date } | null> {
-    const latest = await this.prisma.userBlockStatus.findFirst({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      select: { status: true, reason: true, createdAt: true },
-    });
-
-    if (!latest) {
-      return null;
-    }
-
-    if (latest.status === 'blocked') {
-      return {
-        blocked: true,
-        reason: latest.reason ?? undefined,
-        blockedAt: latest.createdAt,
-      };
-    }
-
-    return { blocked: false };
   }
 
   private toDomain(user: UserRow): User {
@@ -473,7 +425,7 @@ export class PrismaUserRepository implements UserRepository {
       middleName: user.middleName ?? undefined,
       phoneNumber: phoneNumber,
       password: user.password,
-      language: (user.language as Language) || 'ru',
+      language: user.language,
       consentGivenAt: user.consentGivenAt ?? undefined,
       createdAt: user.createdAt,
       nickname: Nickname.create(user.nickname),
@@ -546,18 +498,5 @@ export class PrismaUserRepository implements UserRepository {
     }
 
     return result;
-  }
-
-  async getBlockedUserIds(): Promise<string[]> {
-    const result = await this.prisma.$queryRaw<{ user_id: string }[]>`
-      SELECT user_id FROM (
-        SELECT DISTINCT ON (user_id) user_id, status
-        FROM user_block_statuses
-        ORDER BY user_id, created_at DESC
-      ) latest
-      WHERE status = 'blocked'
-    `;
-
-    return result.map((r) => r.user_id);
   }
 }

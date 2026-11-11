@@ -1,3 +1,14 @@
+/** Verifies Request Confirmation Otp behavior through typed core ports.
+ * User persistence doubles exclude obsolete moderation methods; access uses the checked moderation port. */
+import {
+  OtpCount,
+  OtpDestination,
+  OtpDigits,
+  OtpCodeHash,
+} from '@/domain/otp/OtpValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
+import { authTestDependencies } from '@/application/auth/__tests__/authTestValues';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { RequestConfirmationOtpUseCase } from '../RequestConfirmationOtpUseCase';
 import { OtpErrors } from '../OtpErrors';
@@ -22,8 +33,7 @@ class MockOtpRepository implements OtpRepository {
   private nextId = 1;
 
   async save(otp: OtpVerification): Promise<OtpVerification> {
-    const id = `otp-${this.nextId++}`;
-    (otp as any).props.id = id;
+    const id = otp.id;
     this.otps.set(id, otp);
 
     return otp;
@@ -34,10 +44,10 @@ class MockOtpRepository implements OtpRepository {
   }
 
   async findLatestByIdentifier(
-    identifier: string,
-    channel: OtpChannel,
+    destination: OtpDestination,
     purpose: OtpPurpose
   ): Promise<OtpVerification | null> {
+    const { identifier, channel } = destination;
     const all = Array.from(this.otps.values()).filter(
       (o) =>
         o.identifier === identifier &&
@@ -49,7 +59,11 @@ class MockOtpRepository implements OtpRepository {
       return null;
     }
 
-    return all.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    return all.sort(
+      (a, b) =>
+        Instant.toDate(b.createdAt).getTime() -
+        Instant.toDate(a.createdAt).getTime()
+    )[0];
   }
 
   async findLatestByUserId(
@@ -64,7 +78,11 @@ class MockOtpRepository implements OtpRepository {
       return null;
     }
 
-    return all.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    return all.sort(
+      (a, b) =>
+        Instant.toDate(b.createdAt).getTime() -
+        Instant.toDate(a.createdAt).getTime()
+    )[0];
   }
 
   async update(otp: OtpVerification): Promise<OtpVerification> {
@@ -73,29 +91,31 @@ class MockOtpRepository implements OtpRepository {
     return otp;
   }
 
-  async countRecentByClientIp(): Promise<number> {
-    return 0;
+  async countRecentByClientIp(): Promise<OtpCount> {
+    return OtpCount.parse(0);
   }
 
   async countRecentByIdentifier(
-    identifier: string,
-    channel: OtpChannel,
+    destination: OtpDestination,
     purpose: OtpPurpose,
-    sinceHours: number
-  ): Promise<number> {
-    const since = new Date(Date.now() - sinceHours * 3600 * 1000);
+    cutoff: Instant
+  ): Promise<OtpCount> {
+    const { identifier, channel } = destination;
+    const since = Instant.toDate(cutoff);
 
-    return Array.from(this.otps.values()).filter(
-      (o) =>
-        o.identifier === identifier &&
-        o.channel === channel &&
-        o.purpose === purpose &&
-        o.createdAt >= since
-    ).length;
+    return OtpCount.parse(
+      Array.from(this.otps.values()).filter(
+        (o) =>
+          o.identifier === identifier &&
+          o.channel === channel &&
+          o.purpose === purpose &&
+          Instant.toDate(o.createdAt) >= since
+      ).length
+    );
   }
 
-  async deleteAllForUser(): Promise<number> {
-    return 0;
+  async deleteAllForUser(): Promise<OtpCount> {
+    return OtpCount.parse(0);
   }
 
   async deleteExpired(): Promise<void> {}
@@ -103,8 +123,8 @@ class MockOtpRepository implements OtpRepository {
 
 // Mock OtpCodeHasher
 class MockOtpCodeHasher implements OtpCodeHasher {
-  hash(code: string): string {
-    return `hashed-${code}`;
+  hash(code: OtpDigits): OtpCodeHash {
+    return OtpCodeHash.parse(`hashed-${code}`);
   }
 
   verify(code: string, hash: string): boolean {
@@ -113,8 +133,8 @@ class MockOtpCodeHasher implements OtpCodeHasher {
 }
 
 // Mock OtpDeliveryChannel
-class MockOtpDeliveryChannel implements OtpDeliveryChannel {
-  channel: OtpChannel = 'sms';
+class MockOtpDeliveryChannel implements OtpDeliveryChannel<'sms'> {
+  readonly channel = 'sms' as const;
   shouldSucceed = true;
   returnBackdoorCode = true;
   lastSentCode: string | null = null;
@@ -182,18 +202,8 @@ class MockUserRepository implements UserRepository {
   async isSuperAdmin(): Promise<boolean> {
     return false;
   }
-  async isUserBlocked(): Promise<boolean> {
-    return false;
-  }
-  async blockUser(): Promise<void> {}
-  async unblockUser(): Promise<void> {}
-  async getBlockStatus(): Promise<null> {
-    return null;
-  }
+
   async deleteAddress(): Promise<void> {}
-  async getBlockedUserIds(): Promise<string[]> {
-    return [];
-  }
 }
 
 function makeUser(overrides: { id?: string; confirmedAt?: Date } = {}): User {
@@ -224,6 +234,7 @@ describe('RequestConfirmationOtpUseCase', () => {
     userRepository = new MockUserRepository();
 
     useCase = new RequestConfirmationOtpUseCase({
+      ...authTestDependencies(),
       otpRepository,
       otpCodeHasher,
       deliveryChannel,
@@ -235,7 +246,7 @@ describe('RequestConfirmationOtpUseCase', () => {
     userRepository.addUser(makeUser());
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '',
     });
 
@@ -248,7 +259,7 @@ describe('RequestConfirmationOtpUseCase', () => {
 
   it('should fail when user not found', async () => {
     const result = await useCase.execute({
-      userId: 'nonexistent',
+      userId: UserId.parse('nonexistent'),
       clientIp: '127.0.0.1',
     });
 
@@ -263,7 +274,7 @@ describe('RequestConfirmationOtpUseCase', () => {
     userRepository.addUser(makeUser());
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '127.0.0.1',
     });
 
@@ -271,7 +282,7 @@ describe('RequestConfirmationOtpUseCase', () => {
 
     if (result.success) {
       expect(result.value.otpId).toBeTruthy();
-      expect(result.value.expiresAt).toBeInstanceOf(Date);
+      expect(Instant.safeParse(result.value.expiresAt).success).toBe(true);
       expect(result.value.backdoorCode).toBeTruthy();
     }
   });
@@ -281,7 +292,7 @@ describe('RequestConfirmationOtpUseCase', () => {
     deliveryChannel.returnBackdoorCode = false;
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '127.0.0.1',
     });
 
@@ -297,14 +308,14 @@ describe('RequestConfirmationOtpUseCase', () => {
 
     // First request succeeds
     const result1 = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '127.0.0.1',
     });
     expect(result1.success).toBe(true);
 
     // Second request should be throttled (per-phone, not per-IP)
     const result2 = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '1.2.3.4', // different IP
     });
     expect(result2.success).toBe(false);
@@ -319,7 +330,7 @@ describe('RequestConfirmationOtpUseCase', () => {
     deliveryChannel.shouldSucceed = false;
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '127.0.0.1',
     });
 
@@ -334,7 +345,7 @@ describe('RequestConfirmationOtpUseCase', () => {
     userRepository.addUser(makeUser());
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '127.0.0.1',
     });
 
@@ -350,7 +361,7 @@ describe('RequestConfirmationOtpUseCase', () => {
     userRepository.addUser(makeUser());
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '127.0.0.1',
     });
 
@@ -375,6 +386,7 @@ describe('RequestConfirmationOtpUseCase retryAfterSeconds', () => {
     userRepository.addUser(makeUser());
 
     useCase = new RequestConfirmationOtpUseCase({
+      ...authTestDependencies(),
       otpRepository,
       otpCodeHasher: new MockOtpCodeHasher(),
       deliveryChannel: new MockOtpDeliveryChannel(),
@@ -384,7 +396,7 @@ describe('RequestConfirmationOtpUseCase retryAfterSeconds', () => {
 
   it('tells how long until the next code may be requested', async () => {
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '127.0.0.1',
     });
 
@@ -400,7 +412,7 @@ describe('RequestConfirmationOtpUseCase retryAfterSeconds', () => {
     // one after it has to wait the third-tier delay.
     await otpRepository.save(
       OtpVerification.reconstitute({
-        id: '',
+        id: 'previous-otp',
         identifier: '+79161234567',
         channel: 'sms',
         purpose: OtpPurposes.PHONE_CONFIRMATION,
@@ -411,12 +423,12 @@ describe('RequestConfirmationOtpUseCase retryAfterSeconds', () => {
         expiresAt: new Date(Date.now() + 8 * 60 * 1000),
         verifiedAt: null,
         createdAt: new Date(Date.now() - 2 * 60 * 1000),
-        userId: 'user-1',
+        userId: UserId.parse('user-1'),
       })
     );
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '127.0.0.1',
     });
 

@@ -11,6 +11,7 @@ export const UserDomainCodes = {
   MIDDLE_NAME_INVALID: 'domain.user.middleNameInvalid',
   PHONE_NUMBER_INVALID: 'domain.user.phoneNumberInvalid',
   PASSWORD_REQUIRED: 'domain.user.passwordRequired',
+  LANGUAGE_INVALID: 'domain.user.languageInvalid',
   PASSWORD_TOO_SHORT: 'domain.user.passwordTooShort',
   CONSENT_REQUIRED: 'domain.user.consentRequired',
   PASSWORDS_MISMATCH: 'domain.user.passwordsMismatch',

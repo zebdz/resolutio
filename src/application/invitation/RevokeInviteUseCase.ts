@@ -1,9 +1,18 @@
+/** Decodes invitation request references before authorization and domain transitions. */
+import {
+  IdGenerator,
+  Clock,
+  entityCreation,
+} from '@/application/shared/EntityCreation';
+import { Instant } from '@/domain/shared/Instant';
+import { z } from 'zod';
+import { InvitationId, UserId, BoardId } from '@/domain/shared/EntityIds';
 import { InvitationRepository } from '../../domain/invitation/InvitationRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { InvitationErrors } from './InvitationErrors';
+import { InvitationErrors, InvitationUseCaseFailure } from './InvitationErrors';
 import { NotifyInviteRevokedUseCase } from '../notification/NotifyInviteRevokedUseCase';
 
 export interface RevokeInviteInput {
@@ -12,6 +21,8 @@ export interface RevokeInviteInput {
 }
 
 export interface RevokeInviteDependencies {
+  ids: IdGenerator;
+  clock: Clock;
   invitationRepository: InvitationRepository;
   organizationRepository: OrganizationRepository;
   userRepository: UserRepository;
@@ -21,7 +32,19 @@ export interface RevokeInviteDependencies {
 export class RevokeInviteUseCase {
   constructor(private deps: RevokeInviteDependencies) {}
 
-  async execute(input: RevokeInviteInput): Promise<Result<void, string>> {
+  async execute(
+    rawInput: RevokeInviteInput
+  ): Promise<Result<void, InvitationUseCaseFailure>> {
+    const parsed = z
+      .object({ invitationId: InvitationId, actorUserId: UserId })
+      .safeParse(rawInput);
+
+    if (!parsed.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawInput, ...parsed.data };
+
     const { invitationId, actorUserId } = input;
 
     // Find invitation
@@ -53,7 +76,7 @@ export class RevokeInviteUseCase {
     }
 
     // Revoke
-    invitation.revoke();
+    invitation.revoke(this.deps.clock.now());
     await this.deps.invitationRepository.update(invitation);
 
     // Get org name for notification
@@ -63,6 +86,8 @@ export class RevokeInviteUseCase {
 
     // Notify invitee (fire-and-forget)
     new NotifyInviteRevokedUseCase({
+      ids: this.deps.ids,
+      clock: this.deps.clock,
       notificationRepository: this.deps.notificationRepository,
     })
       .execute({
@@ -70,6 +95,14 @@ export class RevokeInviteUseCase {
         organizationId: invitation.organizationId,
         organizationName: organization?.name || '',
         inviteType: invitation.type,
+      })
+      .then((outcome) => {
+        if (!outcome.success) {
+          console.error(
+            'Notification delivery failed (NotifyInviteRevokedUseCase):',
+            outcome.error
+          );
+        }
       })
       .catch((err) => console.error('Failed to notify invite revoked:', err));
 

@@ -1,3 +1,5 @@
+import { Instant } from '@/domain/shared/Instant';
+import { SystemClock } from '@/infrastructure/shared/SystemEntityCreation';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { Heading } from '@/src/web/components/catalyst/heading';
@@ -22,6 +24,7 @@ import {
 } from '@/infrastructure/index';
 
 const emailStatusUseCase = new GetEmailConfirmationStatusUseCase({
+  clock: new SystemClock(),
   otpRepository: new PrismaOtpRepository(prisma),
   userRepository: new PrismaUserRepository(prisma),
   deliveryChannel: createEmailDeliveryChannelFromEnv(),
@@ -137,7 +140,7 @@ export default async function AccountPage() {
                 middleName: user.middleName,
                 phoneNumber: user.phoneNumber.toString(),
                 language: user.language,
-                createdAt: user.createdAt,
+                createdAt: Instant.toDate(user.createdAt),
                 nickname: user.nickname.getValue(),
                 allowFindByName: user.allowFindByName,
                 allowFindByPhone: user.allowFindByPhone,

@@ -1,3 +1,13 @@
+/** Application boundary validates raw requests before invoking property/claim
+ * behavior, and supplies explicit identity/time through injected dependencies. */
+import { OrganizationUseCaseFailure } from './OrganizationErrors';
+import {
+  OrganizationId,
+  PropertyId,
+  UserId,
+  AssetId,
+} from '../../domain/shared/EntityIds';
+import { AssetName } from '../../domain/organization/PropertyValues';
 import { PropertyAssetRepository } from '../../domain/organization/PropertyAssetRepository';
 import { OrganizationPropertyRepository } from '../../domain/organization/OrganizationPropertyRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
@@ -13,8 +23,8 @@ export interface ListClaimableAssetsInput {
 }
 
 export interface ClaimableAssetView {
-  id: string;
-  name: string;
+  id: AssetId;
+  name: AssetName;
 }
 
 export interface ListClaimableAssetsDependencies {
@@ -33,26 +43,44 @@ export class ListClaimableAssetsUseCase {
 
   async execute(
     input: ListClaimableAssetsInput
-  ): Promise<Result<ClaimableAssetView[], string>> {
+  ): Promise<Result<ClaimableAssetView[], OrganizationUseCaseFailure>> {
+    const organizationId = OrganizationId.safeParse(input.organizationId);
+
+    if (!organizationId.success) {
+      return failure(OrganizationDomainCodes.NOT_ORG_MEMBER);
+    }
+
+    const userId = UserId.safeParse(input.userId);
+
+    if (!userId.success) {
+      return failure(OrganizationDomainCodes.NOT_ORG_MEMBER);
+    }
+
+    const propertyId = PropertyId.safeParse(input.propertyId);
+
+    if (!propertyId.success) {
+      return failure(OrganizationDomainCodes.PROPERTY_NOT_FOUND);
+    }
+
     const [isMember, isSuper] = await Promise.all([
       this.deps.organizationRepository.isUserMember(
-        input.userId,
-        input.organizationId
+        userId.data,
+        organizationId.data
       ),
-      this.deps.userRepository.isSuperAdmin(input.userId),
+      this.deps.userRepository.isSuperAdmin(userId.data),
     ]);
 
     if (!(isMember || isSuper)) {
       return failure(OrganizationDomainCodes.NOT_ORG_MEMBER);
     }
 
-    const pRes = await this.deps.propertyRepository.findById(input.propertyId);
+    const pRes = await this.deps.propertyRepository.findById(propertyId.data);
 
     if (!pRes.success) {
       return failure(pRes.error);
     }
 
-    if (!pRes.value || pRes.value.organizationId !== input.organizationId) {
+    if (!pRes.value || pRes.value.organizationId !== organizationId.data) {
       return failure(OrganizationDomainCodes.PROPERTY_NOT_FOUND);
     }
 
@@ -61,7 +89,7 @@ export class ListClaimableAssetsUseCase {
     }
 
     const assets = await this.deps.assetRepository.findClaimableAssets(
-      input.propertyId
+      propertyId.data
     );
 
     if (!assets.success) {
@@ -72,8 +100,8 @@ export class ListClaimableAssetsUseCase {
     // The backend would reject a second submission with ALREADY_PENDING_FOR_ASSET;
     // hiding the asset from the picker prevents the dead-end click.
     const myClaimsRes = await this.deps.claimRepository.findMyClaimsForProperty(
-      input.userId,
-      input.propertyId
+      userId.data,
+      propertyId.data
     );
 
     if (!myClaimsRes.success) {

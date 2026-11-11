@@ -1,3 +1,10 @@
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { Minutes } from '@/domain/auth/AuthValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import {
+  authTestDependencies,
+  authTestNow,
+} from '@/application/auth/__tests__/authTestValues';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RequestEmailConfirmationOtpUseCase } from '../RequestEmailConfirmationOtpUseCase';
 import { OtpErrors } from '../OtpErrors';
@@ -16,7 +23,7 @@ describe('RequestEmailConfirmationOtpUseCase', () => {
   let useCase: RequestEmailConfirmationOtpUseCase;
   let userRepository: Partial<UserRepository>;
   let otpRepository: Partial<OtpRepository>;
-  let deliveryChannel: OtpDeliveryChannel;
+  let deliveryChannel: OtpDeliveryChannel<'email'>;
   let otpCodeHasher: OtpCodeHasher;
 
   function buildUser(email?: string, confirmed = false) {
@@ -35,7 +42,7 @@ describe('RequestEmailConfirmationOtpUseCase', () => {
       user = user.changeEmail(EmailAddress.create(email));
 
       if (confirmed) {
-        user = user.confirmEmail();
+        user = expectSuccess(user.confirmEmail(authTestNow()));
       }
     }
 
@@ -76,17 +83,18 @@ describe('RequestEmailConfirmationOtpUseCase', () => {
     };
 
     useCase = new RequestEmailConfirmationOtpUseCase({
+      ...authTestDependencies(),
       userRepository: userRepository as UserRepository,
       otpRepository: otpRepository as OtpRepository,
       deliveryChannel,
       otpCodeHasher,
-      expiryMinutes: 10,
+      expiryMinutes: Minutes.parse(10),
     });
   });
 
   it('issues an email_confirmation OTP to the address on file', async () => {
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '127.0.0.1',
     });
 
@@ -101,7 +109,10 @@ describe('RequestEmailConfirmationOtpUseCase', () => {
   });
 
   it('delivers the code to the address with the confirmation purpose', async () => {
-    await useCase.execute({ userId: 'user-1', clientIp: '127.0.0.1' });
+    await useCase.execute({
+      userId: UserId.parse('user-1'),
+      clientIp: '127.0.0.1',
+    });
 
     expect(deliveryChannel.send).toHaveBeenCalledWith(
       'ivan@mail.ru',
@@ -113,7 +124,10 @@ describe('RequestEmailConfirmationOtpUseCase', () => {
   });
 
   it('stores only the hash of the code', async () => {
-    await useCase.execute({ userId: 'user-1', clientIp: '127.0.0.1' });
+    await useCase.execute({
+      userId: UserId.parse('user-1'),
+      clientIp: '127.0.0.1',
+    });
 
     const saved = (otpRepository.save as ReturnType<typeof vi.fn>).mock
       .calls[0][0] as OtpVerification;
@@ -133,7 +147,7 @@ describe('RequestEmailConfirmationOtpUseCase', () => {
     );
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '127.0.0.1',
     });
 
@@ -152,7 +166,7 @@ describe('RequestEmailConfirmationOtpUseCase', () => {
     );
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '127.0.0.1',
     });
 
@@ -169,7 +183,7 @@ describe('RequestEmailConfirmationOtpUseCase', () => {
     );
 
     const result = await useCase.execute({
-      userId: 'missing',
+      userId: UserId.parse('missing'),
       clientIp: '127.0.0.1',
     });
 
@@ -183,13 +197,15 @@ describe('RequestEmailConfirmationOtpUseCase', () => {
   // Throttling is scoped per purpose so confirming an address cannot consume
   // the user's ability to reset their password minutes later.
   it('throttles on the email + email channel + confirmation purpose', async () => {
-    await useCase.execute({ userId: 'user-1', clientIp: '127.0.0.1' });
+    await useCase.execute({
+      userId: UserId.parse('user-1'),
+      clientIp: '127.0.0.1',
+    });
 
     expect(otpRepository.countRecentByIdentifier).toHaveBeenCalledWith(
-      'ivan@mail.ru',
-      'email',
+      { identifier: 'ivan@mail.ru', channel: 'email' },
       OtpPurposes.EMAIL_CONFIRMATION,
-      expect.any(Number)
+      expect.any(String)
     );
   });
 
@@ -212,12 +228,12 @@ describe('RequestEmailConfirmationOtpUseCase', () => {
         expiresAt: new Date(Date.now() + 600_000),
         verifiedAt: null,
         createdAt: new Date(),
-        userId: 'user-1',
+        userId: UserId.parse('user-1'),
       })
     );
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '127.0.0.1',
     });
 
@@ -236,7 +252,7 @@ describe('RequestEmailConfirmationOtpUseCase', () => {
     });
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '127.0.0.1',
     });
 
@@ -248,7 +264,10 @@ describe('RequestEmailConfirmationOtpUseCase', () => {
   });
 
   it('requires a client IP', async () => {
-    const result = await useCase.execute({ userId: 'user-1', clientIp: '' });
+    const result = await useCase.execute({
+      userId: UserId.parse('user-1'),
+      clientIp: '',
+    });
 
     expect(result.success).toBe(false);
     expect(otpRepository.save).not.toHaveBeenCalled();
@@ -257,7 +276,7 @@ describe('RequestEmailConfirmationOtpUseCase', () => {
   // The account page counts down from this; the delay escalates per address.
   it('reports when the next code may be requested', async () => {
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       clientIp: '127.0.0.1',
     });
 

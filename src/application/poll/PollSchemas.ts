@@ -1,4 +1,7 @@
+/** Request validation for poll editing. Validated positions retain domain units;
+ * the use cases enforce lifecycle, ownership and normalized-content invariants. */
 import { z } from 'zod';
+import { PageNumber, SortOrder } from '../../domain/poll/QuestionValues';
 import {
   POLL_TITLE_MAX_LENGTH,
   POLL_DESCRIPTION_MAX_LENGTH,
@@ -9,9 +12,42 @@ import {
 } from '../../domain/poll/Question';
 import { ANSWER_TEXT_MAX_LENGTH } from '../../domain/poll/Answer';
 import { QUESTION_TYPES } from '../../domain/poll/QuestionType';
-import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
+import {
+  PollDomainCodes,
+  PollDomainCode,
+} from '../../domain/poll/PollDomainCodes';
 import { SharedDomainCodes } from '../../domain/shared/SharedDomainCodes';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
+
+function positionInput<T>(schema: z.ZodType<T>, code: PollDomainCode) {
+  return z.unknown().transform((value, ctx) => {
+    // Numeric text is supported; booleans and missing/blank inputs are not positions.
+    const parsed = schema.safeParse(
+      typeof value === 'string' && value.trim() ? Number(value) : value
+    );
+
+    if (!parsed.success) {
+      ctx.addIssue({ code: 'custom', message: code });
+
+      return z.NEVER;
+    }
+
+    return parsed.data;
+  });
+}
+
+const questionPage = positionInput(
+  PageNumber,
+  PollDomainCodes.QUESTION_INVALID_PAGE
+);
+const questionOrder = positionInput(
+  SortOrder,
+  PollDomainCodes.QUESTION_INVALID_ORDER
+);
+const answerOrder = positionInput(
+  SortOrder,
+  PollDomainCodes.ANSWER_INVALID_ORDER
+);
 
 export const createPollSchema = (profanityChecker: ProfanityChecker) =>
   z
@@ -35,15 +71,19 @@ export const createPollSchema = (profanityChecker: ProfanityChecker) =>
         }),
       organizationId: z.string().min(1, 'Organization ID is required'),
       boardId: z.string().nullable().default(null),
-      startDate: z.coerce.date(),
-      endDate: z.coerce.date(),
+      startDate: z.coerce.date({ error: PollDomainCodes.POLL_INVALID_DATES }),
+      endDate: z.coerce.date({ error: PollDomainCodes.POLL_INVALID_DATES }),
       distributionType: z
         .enum(['EQUAL', 'OWNERSHIP_UNIT_COUNT', 'OWNERSHIP_SIZE_WEIGHTED'])
         .optional(),
       propertyAggregation: z
         .enum(['RAW_SUM', 'NORMALIZE_PER_PROPERTY'])
         .optional(),
-      propertyIds: z.array(z.string()).optional(),
+      propertyIds: z
+        .array(z.string({ error: PollDomainCodes.PROPERTY_NOT_IN_ORG }), {
+          error: PollDomainCodes.PROPERTY_NOT_IN_ORG,
+        })
+        .optional(),
       pollType: z.enum(['ORGANIZATION', 'OPEN']).optional(),
       // Named is the default. Deliberately absent from updatePollSchema: the
       // flag is set once at creation and never changes.
@@ -83,8 +123,8 @@ export const updatePollSchema = (profanityChecker: ProfanityChecker) =>
         .refine((val) => !profanityChecker.containsProfanity(val), {
           message: SharedDomainCodes.CONTAINS_PROFANITY,
         }),
-      startDate: z.coerce.date(),
-      endDate: z.coerce.date(),
+      startDate: z.coerce.date({ error: PollDomainCodes.POLL_INVALID_DATES }),
+      endDate: z.coerce.date({ error: PollDomainCodes.POLL_INVALID_DATES }),
     })
     .refine((data) => data.startDate < data.endDate, {
       message: 'Start date must be before end date',
@@ -104,7 +144,7 @@ export const addQuestionSchema = (profanityChecker: ProfanityChecker) =>
         message: SharedDomainCodes.CONTAINS_PROFANITY,
       }),
     details: z
-      .string()
+      .string({ error: PollDomainCodes.QUESTION_INVALID_DATA })
       .max(
         QUESTION_DETAILS_MAX_LENGTH,
         PollDomainCodes.QUESTION_DETAILS_TOO_LONG
@@ -113,8 +153,8 @@ export const addQuestionSchema = (profanityChecker: ProfanityChecker) =>
         message: SharedDomainCodes.CONTAINS_PROFANITY,
       })
       .optional(),
-    page: z.coerce.number().min(1, 'Page must be at least 1'),
-    order: z.coerce.number().min(0, 'Order must be non-negative'),
+    page: questionPage,
+    order: questionOrder,
     questionType: z.enum(QUESTION_TYPES),
     answers: z
       .array(
@@ -142,7 +182,7 @@ export const updateQuestionSchema = (profanityChecker: ProfanityChecker) =>
       })
       .optional(),
     details: z
-      .string()
+      .string({ error: PollDomainCodes.QUESTION_INVALID_DATA })
       .max(
         QUESTION_DETAILS_MAX_LENGTH,
         PollDomainCodes.QUESTION_DETAILS_TOO_LONG
@@ -169,8 +209,8 @@ export const UpdateQuestionOrderSchema = z.object({
     .array(
       z.object({
         questionId: z.string().min(1, 'Question ID is required'),
-        page: z.coerce.number().min(1, 'Page must be at least 1'),
-        order: z.coerce.number().min(0, 'Order must be non-negative'),
+        page: questionPage,
+        order: questionOrder,
       })
     )
     .min(1, 'At least one update is required'),
@@ -186,7 +226,7 @@ export const addAnswerSchema = (profanityChecker: ProfanityChecker) =>
       .refine((val) => !profanityChecker.containsProfanity(val), {
         message: SharedDomainCodes.CONTAINS_PROFANITY,
       }),
-    order: z.coerce.number().min(0, 'Order must be non-negative'),
+    order: answerOrder,
   });
 
 export type AddAnswerInput = z.input<ReturnType<typeof addAnswerSchema>>;
@@ -202,7 +242,7 @@ export const updateAnswerSchema = (profanityChecker: ProfanityChecker) =>
         message: SharedDomainCodes.CONTAINS_PROFANITY,
       })
       .optional(),
-    order: z.coerce.number().min(0, 'Order must be non-negative').optional(),
+    order: answerOrder.optional(),
   });
 
 export type UpdateAnswerInput = z.input<ReturnType<typeof updateAnswerSchema>>;

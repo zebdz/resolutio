@@ -1,10 +1,16 @@
+/** Poll application boundary validates requests, invokes domain behavior and
+ * preserves known failure codes across authorization and persistence ports. */
+import { Clock, IdGenerator } from '../shared/EntityCreation';
+import { Instant } from '../../domain/shared/Instant';
+import { z } from 'zod';
+import { PollId, UserId } from '../../domain/shared/EntityIds';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { NotifyPollReturnedToDraftUseCase } from '../notification/NotifyPollReturnedToDraftUseCase';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 
 interface ReturnPollToDraftCommand {
   pollId: string;
@@ -28,12 +34,24 @@ export class ReturnPollToDraftUseCase {
     private pollRepository: PollRepository,
     private organizationRepository: OrganizationRepository,
     private userRepository: UserRepository,
-    private notificationRepository: NotificationRepository
+    private notificationRepository: NotificationRepository,
+    private ids: IdGenerator,
+    private clock: Clock
   ) {}
 
   async execute(
-    command: ReturnPollToDraftCommand
-  ): Promise<Result<void, string>> {
+    rawRequest: ReturnPollToDraftCommand
+  ): Promise<Result<void, PollUseCaseFailure>> {
+    const decoded = z
+      .object({ pollId: PollId, userId: UserId })
+      .safeParse(rawRequest);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const command = { ...rawRequest, ...decoded.data };
+
     const pollResult = await this.pollRepository.getPollById(command.pollId);
 
     if (!pollResult.success) {
@@ -79,6 +97,8 @@ export class ReturnPollToDraftUseCase {
 
     const notifyUseCase = new NotifyPollReturnedToDraftUseCase({
       notificationRepository: this.notificationRepository,
+      ids: this.ids,
+      clock: this.clock,
     });
 
     await notifyUseCase
@@ -87,6 +107,14 @@ export class ReturnPollToDraftUseCase {
         pollTitle: poll.title,
         createdBy: poll.createdBy,
         returnedByUserId: command.userId,
+      })
+      .then((outcome) => {
+        if (!outcome.success) {
+          console.error(
+            'Notification delivery failed (NotifyPollReturnedToDraftUseCase):',
+            outcome.error
+          );
+        }
       })
       .catch((err) => {
         console.error('Failed to send poll returned notifications:', err);

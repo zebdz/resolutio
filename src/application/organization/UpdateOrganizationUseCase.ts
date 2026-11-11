@@ -1,10 +1,22 @@
+/** Organization application boundary validates external request identities/units
+ * before querying ports or invoking domain policies. */
+import { IdGenerator, Clock } from '../shared/EntityCreation';
+import {
+  parseOrganizationName,
+  parseOrganizationDescription,
+} from '../../domain/organization/OrganizationValues';
+
+import { OrganizationId, UserId } from '../../domain/shared/EntityIds';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
-import { OrganizationMembershipService } from '../../domain/organization/OrganizationMembershipService';
+import { OrganizationMembershipService } from './OrganizationMembershipService';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 import { NotifyMultiMembershipSettingChangedUseCase } from '../notification/NotifyMultiMembershipSettingChangedUseCase';
 import { NotifyOrgNameChangedUseCase } from '../notification/NotifyOrgNameChangedUseCase';
 
@@ -17,6 +29,8 @@ export interface UpdateOrganizationInput {
 }
 
 export interface UpdateOrganizationDependencies {
+  clock: Clock;
+  ids: IdGenerator;
   organizationRepository: OrganizationRepository;
   userRepository: UserRepository;
   notificationRepository: NotificationRepository;
@@ -24,21 +38,45 @@ export interface UpdateOrganizationDependencies {
 }
 
 export class UpdateOrganizationUseCase {
+  private clock: Clock;
+  private ids: IdGenerator;
   private organizationRepository: OrganizationRepository;
   private userRepository: UserRepository;
   private notificationRepository: NotificationRepository;
   private profanityChecker: ProfanityChecker;
 
   constructor(dependencies: UpdateOrganizationDependencies) {
+    this.clock = dependencies.clock;
+    this.ids = dependencies.ids;
     this.organizationRepository = dependencies.organizationRepository;
     this.userRepository = dependencies.userRepository;
     this.notificationRepository = dependencies.notificationRepository;
     this.profanityChecker = dependencies.profanityChecker;
   }
 
-  async execute(input: UpdateOrganizationInput): Promise<Result<void, string>> {
+  async execute(
+    input: UpdateOrganizationInput
+  ): Promise<Result<void, OrganizationUseCaseFailure>> {
+    const parsedOrganizationId = OrganizationId.safeParse(input.organizationId);
+
+    if (!parsedOrganizationId.success) {
+      return failure(OrganizationErrors.NOT_FOUND);
+    }
+
+    const parsedUserId = UserId.safeParse(input.userId);
+
+    if (!parsedUserId.success) {
+      return failure(OrganizationErrors.USER_NOT_FOUND);
+    }
+
+    const command = {
+      ...input,
+      organizationId: parsedOrganizationId.data,
+      userId: parsedUserId.data,
+    };
+
     const organization = await this.organizationRepository.findById(
-      input.organizationId
+      command.organizationId
     );
 
     if (!organization) {
@@ -50,37 +88,46 @@ export class UpdateOrganizationUseCase {
     }
 
     // Check authorization: org admin or superadmin
-    const isSuperAdmin = await this.userRepository.isSuperAdmin(input.userId);
+    const isSuperAdmin = await this.userRepository.isSuperAdmin(command.userId);
     const isOrgAdmin = await this.organizationRepository.isUserAdmin(
-      input.userId,
-      input.organizationId
+      command.userId,
+      command.organizationId
     );
 
     if (!isOrgAdmin && !isSuperAdmin) {
       return failure(OrganizationErrors.NOT_ADMIN);
     }
 
-    const oldName = organization.name;
-    const nameChanged = input.name.trim() !== organization.name;
+    const parsedDescription = parseOrganizationDescription(command.description);
 
-    // Check name uniqueness only if name changed
-    if (nameChanged) {
-      const existingOrg = await this.organizationRepository.findByName(
-        input.name.trim()
-      );
-
-      if (existingOrg && existingOrg.id !== organization.id) {
-        return failure(OrganizationErrors.NAME_EXISTS);
-      }
+    if (!parsedDescription.success) {
+      return parsedDescription;
     }
+
+    const oldName = organization.name;
+    const nameChanged = command.name.trim() !== organization.name;
 
     // Validate only a name the admin actually typed. Names stored before the
     // current rules existed may no longer satisfy them, and re-checking one
     // that did not change would make those organizations uneditable — the
     // admin could not even fix the description.
     if (nameChanged) {
+      const parsedName = parseOrganizationName(command.name);
+
+      if (!parsedName.success) {
+        return parsedName;
+      }
+
+      const existingOrg = await this.organizationRepository.findByName(
+        parsedName.value
+      );
+
+      if (existingOrg && existingOrg.id !== organization.id) {
+        return failure(OrganizationErrors.NAME_EXISTS);
+      }
+
       const nameResult = organization.updateName(
-        input.name,
+        parsedName.value,
         this.profanityChecker
       );
 
@@ -90,7 +137,7 @@ export class UpdateOrganizationUseCase {
     }
 
     const descResult = organization.updateDescription(
-      input.description,
+      parsedDescription.value,
       this.profanityChecker
     );
 
@@ -103,13 +150,23 @@ export class UpdateOrganizationUseCase {
     // Notify members if name changed (fire-and-forget)
     if (oldName !== organization.name) {
       new NotifyOrgNameChangedUseCase({
+        ids: this.ids,
+        clock: this.clock,
         organizationRepository: this.organizationRepository,
         notificationRepository: this.notificationRepository,
       })
         .execute({
-          organizationId: input.organizationId,
+          organizationId: command.organizationId,
           oldName,
           newName: organization.name,
+        })
+        .then((outcome) => {
+          if (!outcome.success) {
+            console.error(
+              'Notification delivery failed (NotifyOrgNameChangedUseCase):',
+              outcome.error
+            );
+          }
         })
         .catch((err) =>
           console.error('Failed to notify org name change:', err)
@@ -117,19 +174,19 @@ export class UpdateOrganizationUseCase {
     }
 
     // Handle allowMultiTreeMembership toggle (root orgs only)
-    if (input.allowMultiTreeMembership !== undefined) {
+    if (command.allowMultiTreeMembership !== undefined) {
       if (organization.parentId !== null) {
         return failure(OrganizationErrors.NOT_ROOT_ORG);
       }
 
       const currentValue = organization.allowMultiTreeMembership ?? false;
-      const newValue = input.allowMultiTreeMembership;
+      const newValue = command.allowMultiTreeMembership;
 
       if (currentValue !== newValue) {
         if (!newValue) {
           const conflictingUsers =
             await OrganizationMembershipService.findUsersWithMultipleTreeMemberships(
-              input.organizationId,
+              command.organizationId,
               this.organizationRepository
             );
 
@@ -139,18 +196,28 @@ export class UpdateOrganizationUseCase {
         }
 
         await this.organizationRepository.setAllowMultiTreeMembership(
-          input.organizationId,
+          command.organizationId,
           newValue
         );
 
         // Notify all tree members (fire-and-forget)
         new NotifyMultiMembershipSettingChangedUseCase({
+          ids: this.ids,
+          clock: this.clock,
           organizationRepository: this.organizationRepository,
           notificationRepository: this.notificationRepository,
         })
           .execute({
-            rootOrgId: input.organizationId,
+            rootOrgId: command.organizationId,
             allowed: newValue,
+          })
+          .then((outcome) => {
+            if (!outcome.success) {
+              console.error(
+                'Notification delivery failed (NotifyMultiMembershipSettingChangedUseCase):',
+                outcome.error
+              );
+            }
           })
           .catch((err) =>
             console.error(

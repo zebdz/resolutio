@@ -3,7 +3,7 @@
 **Created:** 2026-09-15  
 **Revised:** 2026-10-26
 
-**Status:** Phase 1 complete, including type review corrections; awaiting review. Phases 2–9 not started.
+**Status:** Phase 2 complete; awaiting review. Phases 3–9 not started.
 
 **Source of truth:** [approved design](../readmes/2026-09-11-poll-seal-and-anchor-design.md), committed as `8653fa9`.
 This revision replaces the earlier task list and its conflicting format refinements and golden vectors.
@@ -59,8 +59,8 @@ for parallel implementation.
 
 | Phase | Reviewable result                                         | Depends on      | Status                    |
 | ----- | --------------------------------------------------------- | --------------- | ------------------------- |
-| 1     | Canonical record, receipts and cryptographic domain       | Approved design | Complete; awaiting review |
-| 2     | Atomic voting cutoff and reproducible cast-time receipts  | 1               | Not started               |
+| 1     | Canonical record, receipts and cryptographic domain       | Approved design | Complete                  |
+| 2     | Atomic voting cutoff and reproducible cast-time receipts  | 1               | Complete; awaiting review |
 | 3     | Consistent immutable sealing and post-commit dispatch     | 1–2             | Not started               |
 | 4     | Real anchoring and durable recovery                       | 3               | Not started               |
 | 5     | Authorized exports and standalone verifier CLI            | 1, 3–4          | Not started               |
@@ -108,7 +108,7 @@ framework or network. Format correctness is settled before persistence and UI de
 changes its commitment; pure modules load in Node and a browser bundle without Node-only imports.
 Run focused domain tests and typecheck. Mark complete, record evidence, stop for review.
 
-**Completed 2026-10-26 — awaiting user review.**
+**Completed 2026-10-26 — accepted for Phase 2.**
 
 - Added the pure seal context, immutable record/receipt models, aggregate-owned anchor transitions,
   repository/provider ports, and English/Russian domain codes. No application or database wiring yet.
@@ -132,7 +132,7 @@ Run focused domain tests and typecheck. Mark complete, record evidence, stop for
 - No live OTS, database rollout, full Next.js build or interactive browser checks claimed. These
   require later phases. This phase preserves existing voting/results behavior.
 
-**Type review correction complete, 2026-10-26 — awaiting review.**
+**Type review correction complete, 2026-10-26 — accepted for Phase 2.**
 
 - Raw snapshot/receipt/record DTOs remain primitive at serialization boundaries. Parsed core
   values use distinct validated types; vote and register weights remain exact `RowWeight` values.
@@ -150,7 +150,7 @@ Run focused domain tests and typecheck. Mark complete, record evidence, stop for
   change or product decision. Future adapters must construct domain values through validated
   factories; branding does not establish authorization or cryptographic proof authenticity.
 
-## Phase 2 — Atomic voting and cast-time receipts — NOT STARTED
+## Phase 2 — Atomic voting and cast-time receipts — COMPLETE
 
 **Outcome:** a ballot either commits completely before finishing or is rejected. Its returned receipt
 can be reproduced without changing the secret, timestamps, original labels or leaf hashes.
@@ -162,31 +162,77 @@ construction/secret-generation ports; Prisma poll/participant/vote adapters, oth
 
 **Work and tests first:**
 
-- [ ] Add `finishedAt`, set-once receipt secrets and `PollFinished`. Reconstitution emits no new
+- [x] Add `finishedAt`, set-once receipt secrets and `PollFinished`. Reconstitution emits no new
       event. Test before implementation through the poll/participant APIs.
-- [ ] Establish an explicitly configured disposable PostgreSQL test database/schema and migration
+- [x] Establish an explicitly configured disposable PostgreSQL test database/schema and migration
       harness. Tests must not silently use an application's production connection or mutate its data.
-- [ ] Replace organization-poll split writes with transactional `castVotes`; extend open-poll
+- [x] Replace organization-poll split writes with transactional `castVotes`; extend open-poll
       `joinAndVote`. Lock the parent poll, re-read state and validate the complete accepted ballot
       inside the write boundary. Persist votes, exact `createdAt`, secret and willingness together.
-- [ ] Persist the cast-time receipt data needed for exact replay, including format version and
+- [x] Persist the cast-time receipt data needed for exact replay, including format version and
       labels; do not regenerate an original receipt from mutable live joins. Return it only after
       commit. Test repeat/concurrent requests, rollback, and replay after the poll has finished.
-- [ ] Make draft-cleanup failure unable to turn a committed ballot into a failed cast response.
+- [x] Make draft-cleanup failure unable to turn a committed ballot into a failed cast response.
       Prepare the same rule for receipt-email failure in Phase 6. No duplicate secret or vote on retry.
-- [ ] Give finish and every competing poll-state write the same lock/expected-state guard. Audit
+- [x] Give finish and every competing poll-state write the same lock/expected-state guard. Audit
       full-row `updatePoll`, activation, deactivation, return-to-draft and reconfiguration paths;
       no stale object may reopen or overwrite `FINISHED`.
-- [ ] Add the alternate-path vote-insert guard and vote update/delete immutability trigger. Test
+- [x] Add the alternate-path vote-insert guard and vote update/delete immutability trigger. Test
       actual concurrent vote/finish interleavings, direct late inserts, stale saves, rollback and the
       transaction-scoped operator bypass. Do not use timing sleeps as the concurrency assertion.
-- [ ] Backfill only missing secrets for voters in `ACTIVE` and paused `READY` polls. Test reruns,
+- [x] Backfill only missing secrets for voters in `ACTIVE` and paused `READY` polls. Test reruns,
       preservation of existing secrets and exclusion of existing `FINISHED` polls. Migrated voters
       have no original pre-deployment receipt; exports must make that distinction explicit.
 
 **Acceptance:** real database tests prove both vote/finish orderings, no partial ballots, stable
 receipt replay and exact timestamp round trips. Run affected poll/application tests, database tests,
 Prisma generation and typecheck. Mark complete, record evidence, stop for review.
+
+**Completed 2026-10-26 — awaiting user review.**
+
+- Organization and open ballots lock the poll, re-read eligibility, validate complete selections
+  through `BallotPolicy`, and commit votes, exact millisecond timestamps, willingness, a set-once
+  secret and a versioned cast snapshot together. Duplicate requests return the saved evidence.
+- The snapshot stores original labels and exact six-place weights. `VoteReceiptView` translates
+  it into seal v1 after commit, without live joins. Legacy ballots return `{ kind: 'legacy' }`.
+  A repeatable-read lookup prevents a concurrent commit being mistaken for a legacy ballot.
+- `Poll.finish(now)` records its timestamp and emits `PollFinished`; rehydration emits nothing.
+  Lifecycle saves and snapshot/configuration writers share the poll lock, checking the loaded
+  revision or reloading inside the transaction.
+  A database revision trigger covers narrow writers too. Discarding a snapshot uses an explicit
+  application transaction port: lock/load fresh inputs, invoke `Poll.discardSnapshot`, save and
+  remove participants atomically. Generic `updatePoll` only persists the poll; participant weights
+  lock against activation. Failed callback results and write errors roll back the transaction.
+- SQL guards reject late inserts, changed/deleted votes, replaced credentials/receipt data and
+  reopening finished polls. The deliberate `SET LOCAL` operator bypass expires at commit.
+- Draft cleanup failures cannot invalidate committed votes or finish, or suppress finish
+  notifications. The participant-list server action explicitly omits receipt secrets.
+- Restartable backfill covers missing secrets for ACTIVE/READY voters only, preserving existing
+  secrets and null original snapshots. It never fills legacy `finished_at` values.
+- **Passing:** 3,445 unit tests in 333 files; 22 PostgreSQL tests (15 ballot/cutoff/replay/backfill,
+  five snapshot-discard tests and two existing property constraints moved to the safe harness); repository and scoped
+  new-test typechecks; Prisma generation/validation; scoped ESLint/Prettier; `git diff --check`.
+  Checks use four workers and a 20 GiB memory cap. See [database test commands](../readmes/Testing.md#disposable-postgresql-tests).
+- Observed red → green for finish events/time, secret immutability, whole-ballot acceptance,
+  transaction rollback, concurrent open retries, stale saves, insert/mutation guards, backfill,
+  exact timestamp adapters, cleanup failures and receipt privacy. Vote/finish interleavings use
+  observed PostgreSQL lock barriers, not timing sleeps. The concurrent receipt-read regression
+  uses an explicit query barrier around a real commit. Snapshot-discard review regressions cover
+  generic saves without implicit removal, fresh state/votes after competing writers, and rollback.
+- **Implementation choices:** receipt persistence is a strict versioned poll-context snapshot;
+  the application translates it into the frozen seal v1 format. Poll and seal domain types remain
+  separate. Added a persisted revision beyond the design's state guard to reject stale saves
+  even after a state changes away and back. New policy/transaction/receipt contracts now use
+  validated IDs, instants, weights/revisions and closed alternatives; legacy inputs are decoded
+  at their boundaries. The [domain migration](archive/2026-10-26-domain-type-migration.md) completed
+  older API integration on 2026-11-10. Wire DTOs, labels, independent booleans and local counts stay primitive.
+- **Type review correction:** 3,457 unit tests passed before the broader migration foundations,
+  including ten poll and fifteen seal compile-rejection contracts; 22 PostgreSQL tests passed.
+  Production and scoped test typechecks passed. Added regressions for invalid finish identities/
+  times without mutation, malformed policy facts, weighted organization ballots and mapper guards.
+- **Limits:** no application database migration or production backfill run. This remains local
+  Phase 2 work; rollout must pause all old vote/finish writers as the design specifies. Sealing and
+  event dispatch are Phase 3; receipt email and receipt UI remain Phases 6–7. No Phase 3 work started.
 
 ## Phase 3 — Consistent immutable sealing — NOT STARTED
 
@@ -448,8 +494,8 @@ At each phase boundary, update this record:
 
 | Phase | Completed       | Failing test observed                                  | Passing checks/evidence                                                                                         | Review status        |
 | ----- | --------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | -------------------- |
-| 1     | Yes, 2026-10-26 | Yes; client usage, type contracts and regression tests | 99 domain / 3,430 total tests; 13 compile rejections; types, lint, format, browser bundle, independent fixtures | Awaiting user review |
-| 2     | No              | —                                                      | —                                                                                                               | Not started          |
+| 1     | Yes, 2026-10-26 | Yes; client usage, type contracts and regression tests | 99 domain / 3,430 total tests; 13 compile rejections; types, lint, format, browser bundle, independent fixtures | Accepted for Phase 2 |
+| 2     | Yes, 2026-10-26 | Yes; domain, SQL, concurrency and privacy regressions  | 3,445 unit + 22 PostgreSQL tests; types, Prisma, lint, format                                                   | Awaiting user review |
 | 3     | No              | —                                                      | —                                                                                                               | Not started          |
 | 4     | No              | —                                                      | —                                                                                                               | Not started          |
 | 5     | No              | —                                                      | —                                                                                                               | Not started          |
@@ -460,6 +506,6 @@ At each phase boundary, update this record:
 
 ## Unresolved questions
 
-None requiring a product decision before Phase 2. The four review decisions are settled in design
+None requiring a product decision before Phase 3. The four review decisions are settled in design
 §18. If implementation exposes a format or guarantee change, record it and resolve it before coding
 past that boundary; do not silently resurrect the superseded plan's choices.

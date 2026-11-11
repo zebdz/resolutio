@@ -1,3 +1,11 @@
+/** Repository boundary behavior for poll persistence and reconstitution.
+ * Invalid persisted choices cannot enter domain objects through unchecked casts. */
+import {
+  PollId,
+  BoardId,
+  OrganizationId,
+  UserId,
+} from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PrismaPollRepository } from '../PrismaPollRepository';
 import { Poll } from '../../../domain/poll/Poll';
@@ -6,14 +14,21 @@ import { PollState } from '../../../domain/poll/PollState';
 // --- Mock Prisma client ---
 
 function createMockPrisma() {
-  return {
+  const client = {
+    $queryRaw: vi.fn().mockResolvedValue([{ id: 'poll-1' }]),
+    $transaction: vi.fn(async (fn: any) => fn(client)),
     poll: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      findUniqueOrThrow: vi
+        .fn()
+        .mockResolvedValue({ revision: 0, state: 'DRAFT' }),
       findMany: vi.fn(),
       update: vi.fn(),
     },
   };
+
+  return client;
 }
 
 // --- Helpers: build typical Prisma result objects ---
@@ -62,6 +77,9 @@ function buildPrismaPoll(overrides: Record<string, any> = {}) {
     startDate,
     endDate,
     state: 'DRAFT' as const,
+    distributionType: 'EQUAL',
+    propertyAggregation: 'RAW_SUM',
+    anonymous: false,
     weightCriteria: null,
     createdAt: now,
     archivedAt: null,
@@ -86,6 +104,7 @@ function buildDomainPoll(state: PollState = PollState.DRAFT): Poll {
     distributionType: 'EQUAL',
     propertyAggregation: 'RAW_SUM',
     propertyIds: [],
+    anonymous: false,
     createdAt: now,
     archivedAt: null,
     questions: [],
@@ -112,7 +131,7 @@ describe('PrismaPollRepository', () => {
         })
       );
 
-      const result = await repo.getPollById('poll-1');
+      const result = await repo.getPollById(PollId.parse('poll-1'));
 
       expect(result.success).toBe(true);
 
@@ -126,7 +145,7 @@ describe('PrismaPollRepository', () => {
     it('should default to an empty array when the relation is absent', async () => {
       mockPrisma.poll.findUnique.mockResolvedValue(buildPrismaPoll());
 
-      const result = await repo.getPollById('poll-1');
+      const result = await repo.getPollById(PollId.parse('poll-1'));
 
       expect(result.success).toBe(true);
 
@@ -143,7 +162,7 @@ describe('PrismaPollRepository', () => {
     it('should request attachment ids without their bytes', async () => {
       mockPrisma.poll.findUnique.mockResolvedValue(buildPrismaPoll());
 
-      await repo.getPollById('poll-1');
+      await repo.getPollById(PollId.parse('poll-1'));
 
       const include = mockPrisma.poll.findUnique.mock.calls[0][0].include;
 
@@ -154,11 +173,26 @@ describe('PrismaPollRepository', () => {
   });
 
   describe('reconstitution via getPollById', () => {
+    it('rejects an unknown persisted question type', async () => {
+      mockPrisma.poll.findUnique.mockResolvedValue(
+        buildPrismaPoll({
+          questions: [buildPrismaQuestion({ questionType: 'ranked-choice' })],
+        })
+      );
+
+      const result = await repo.getPollById(PollId.parse('poll-1'));
+
+      expect(result).toEqual({
+        success: false,
+        error: 'common.errors.unexpected',
+      });
+    });
+
     it('should reconstitute a Poll with nested questions and answers', async () => {
       const prismaData = buildPrismaPoll();
       mockPrisma.poll.findUnique.mockResolvedValue(prismaData);
 
-      const result = await repo.getPollById('poll-1');
+      const result = await repo.getPollById(PollId.parse('poll-1'));
 
       expect(result.success).toBe(true);
 
@@ -232,7 +266,7 @@ describe('PrismaPollRepository', () => {
       });
       mockPrisma.poll.findUnique.mockResolvedValue(prismaData);
 
-      const result = await repo.getPollById('poll-1');
+      const result = await repo.getPollById(PollId.parse('poll-1'));
       expect(result.success).toBe(true);
 
       if (!result.success) {
@@ -250,7 +284,7 @@ describe('PrismaPollRepository', () => {
       const prismaData = buildPrismaPoll({ questions: [] });
       mockPrisma.poll.findUnique.mockResolvedValue(prismaData);
 
-      const result = await repo.getPollById('poll-1');
+      const result = await repo.getPollById(PollId.parse('poll-1'));
       expect(result.success).toBe(true);
 
       if (!result.success) {
@@ -266,7 +300,7 @@ describe('PrismaPollRepository', () => {
       });
       mockPrisma.poll.findUnique.mockResolvedValue(prismaData);
 
-      const result = await repo.getPollById('poll-1');
+      const result = await repo.getPollById(PollId.parse('poll-1'));
       expect(result.success).toBe(true);
 
       if (!result.success) {
@@ -280,7 +314,7 @@ describe('PrismaPollRepository', () => {
       const prismaData = buildPrismaPoll({ weightCriteria: 'shares' });
       mockPrisma.poll.findUnique.mockResolvedValue(prismaData);
 
-      const result = await repo.getPollById('poll-1');
+      const result = await repo.getPollById(PollId.parse('poll-1'));
       expect(result.success).toBe(true);
 
       if (!result.success) {
@@ -294,7 +328,7 @@ describe('PrismaPollRepository', () => {
       const prismaData = buildPrismaPoll({ weightCriteria: '' });
       mockPrisma.poll.findUnique.mockResolvedValue(prismaData);
 
-      const result = await repo.getPollById('poll-1');
+      const result = await repo.getPollById(PollId.parse('poll-1'));
       expect(result.success).toBe(true);
 
       if (!result.success) {
@@ -323,7 +357,7 @@ describe('PrismaPollRepository', () => {
         const prismaData = buildPrismaPoll({ state: prismaState });
         mockPrisma.poll.findUnique.mockResolvedValue(prismaData);
 
-        const result = await repo.getPollById('poll-1');
+        const result = await repo.getPollById(PollId.parse('poll-1'));
         expect(result.success).toBe(true);
 
         if (!result.success) {
@@ -386,6 +420,9 @@ describe('PrismaPollRepository', () => {
 
       expect(mockPrisma.poll.create).toHaveBeenCalledWith({
         data: {
+          id: 'poll-1',
+          createdAt: now,
+          anonymous: false,
           title: 'Test Poll',
           description: 'A test poll description',
           organizationId: 'org-1',
@@ -447,7 +484,7 @@ describe('PrismaPollRepository', () => {
     it('should query with correct where clause and include', async () => {
       mockPrisma.poll.findUnique.mockResolvedValue(buildPrismaPoll());
 
-      await repo.getPollById('poll-1');
+      await repo.getPollById(PollId.parse('poll-1'));
 
       expect(mockPrisma.poll.findUnique).toHaveBeenCalledWith({
         where: { id: 'poll-1' },
@@ -471,7 +508,7 @@ describe('PrismaPollRepository', () => {
     it('should return null when poll not found', async () => {
       mockPrisma.poll.findUnique.mockResolvedValue(null);
 
-      const result = await repo.getPollById('nonexistent');
+      const result = await repo.getPollById(PollId.parse('nonexistent'));
 
       expect(result.success).toBe(true);
 
@@ -485,7 +522,7 @@ describe('PrismaPollRepository', () => {
     it('should return failure on error', async () => {
       mockPrisma.poll.findUnique.mockRejectedValue(new Error('DB down'));
 
-      const result = await repo.getPollById('poll-1');
+      const result = await repo.getPollById(PollId.parse('poll-1'));
 
       expect(result.success).toBe(false);
 
@@ -504,7 +541,7 @@ describe('PrismaPollRepository', () => {
     it('should filter by boardId and archivedAt null', async () => {
       mockPrisma.poll.findMany.mockResolvedValue([buildPrismaPoll()]);
 
-      const result = await repo.getPollsByBoardId('board-1');
+      const result = await repo.getPollsByBoardId(BoardId.parse('board-1'));
 
       expect(mockPrisma.poll.findMany).toHaveBeenCalledWith({
         where: {
@@ -541,7 +578,7 @@ describe('PrismaPollRepository', () => {
     it('should return empty array when no polls found', async () => {
       mockPrisma.poll.findMany.mockResolvedValue([]);
 
-      const result = await repo.getPollsByBoardId('board-1');
+      const result = await repo.getPollsByBoardId(BoardId.parse('board-1'));
 
       expect(result.success).toBe(true);
 
@@ -555,10 +592,14 @@ describe('PrismaPollRepository', () => {
     it('should reconstitute multiple polls', async () => {
       mockPrisma.poll.findMany.mockResolvedValue([
         buildPrismaPoll({ id: 'poll-1' }),
-        buildPrismaPoll({ id: 'poll-2', title: 'Second poll' }),
+        buildPrismaPoll({
+          id: 'poll-2',
+          title: 'Second poll',
+          questions: [buildPrismaQuestion({ pollId: 'poll-2' })],
+        }),
       ]);
 
-      const result = await repo.getPollsByBoardId('board-1');
+      const result = await repo.getPollsByBoardId(BoardId.parse('board-1'));
 
       expect(result.success).toBe(true);
 
@@ -575,7 +616,7 @@ describe('PrismaPollRepository', () => {
     it('should return failure on error', async () => {
       mockPrisma.poll.findMany.mockRejectedValue(new Error('DB error'));
 
-      const result = await repo.getPollsByBoardId('board-1');
+      const result = await repo.getPollsByBoardId(BoardId.parse('board-1'));
 
       expect(result.success).toBe(false);
 
@@ -594,7 +635,9 @@ describe('PrismaPollRepository', () => {
     it('should filter by organizationId and archivedAt null', async () => {
       mockPrisma.poll.findMany.mockResolvedValue([buildPrismaPoll()]);
 
-      const result = await repo.getPollsByOrganizationId('org-1');
+      const result = await repo.getPollsByOrganizationId(
+        OrganizationId.parse('org-1')
+      );
 
       expect(mockPrisma.poll.findMany).toHaveBeenCalledWith({
         where: {
@@ -630,7 +673,9 @@ describe('PrismaPollRepository', () => {
     it('should return failure on error', async () => {
       mockPrisma.poll.findMany.mockRejectedValue(new Error('DB error'));
 
-      const result = await repo.getPollsByOrganizationId('org-1');
+      const result = await repo.getPollsByOrganizationId(
+        OrganizationId.parse('org-1')
+      );
 
       expect(result.success).toBe(false);
 
@@ -649,7 +694,7 @@ describe('PrismaPollRepository', () => {
     it('should filter by org membership, board membership, or participant', async () => {
       mockPrisma.poll.findMany.mockResolvedValue([buildPrismaPoll()]);
 
-      const result = await repo.getPollsByUserId('user-1');
+      const result = await repo.getPollsByUserId(UserId.parse('user-1'));
 
       expect(mockPrisma.poll.findMany).toHaveBeenCalledWith({
         where: {
@@ -713,7 +758,7 @@ describe('PrismaPollRepository', () => {
     it('should return failure on error', async () => {
       mockPrisma.poll.findMany.mockRejectedValue(new Error('DB error'));
 
-      const result = await repo.getPollsByUserId('user-1');
+      const result = await repo.getPollsByUserId(UserId.parse('user-1'));
 
       expect(result.success).toBe(false);
 
@@ -729,6 +774,20 @@ describe('PrismaPollRepository', () => {
   // updatePoll
   // -------------------------------------------------------------------
   describe('updatePoll', () => {
+    it('rejects an unknown persisted poll type before it can be edited', async () => {
+      mockPrisma.poll.findUnique.mockResolvedValue(
+        buildPrismaPoll({ pollType: 'UNKNOWN' })
+      );
+
+      const result = await repo.getPollById(PollId.parse('poll-1'));
+
+      expect(result).toEqual({
+        success: false,
+        error: 'common.errors.unexpected',
+      });
+      expect(mockPrisma.poll.update).not.toHaveBeenCalled();
+    });
+
     it('should pass correct fields to prisma update', async () => {
       const domainPoll = buildDomainPoll();
       mockPrisma.poll.update.mockResolvedValue(undefined);
@@ -738,12 +797,14 @@ describe('PrismaPollRepository', () => {
       expect(mockPrisma.poll.update).toHaveBeenCalledWith({
         where: { id: 'poll-1' },
         data: {
+          anonymous: false,
           title: 'Test Poll',
           description: 'A test poll description',
           startDate,
           endDate,
           pollType: 'ORGANIZATION',
           state: 'DRAFT',
+          finishedAt: null,
           weightCriteria: null,
           distributionType: 'EQUAL',
           propertyAggregation: 'RAW_SUM',
@@ -771,6 +832,7 @@ describe('PrismaPollRepository', () => {
         distributionType: 'EQUAL',
         propertyAggregation: 'RAW_SUM',
         propertyIds: [],
+        anonymous: false,
         createdAt: now,
         archivedAt,
         questions: [],
@@ -811,7 +873,7 @@ describe('PrismaPollRepository', () => {
     it('should set archivedAt via update', async () => {
       mockPrisma.poll.update.mockResolvedValue(undefined);
 
-      const result = await repo.deletePoll('poll-1');
+      const result = await repo.deletePoll(PollId.parse('poll-1'));
 
       expect(mockPrisma.poll.update).toHaveBeenCalledWith({
         where: { id: 'poll-1' },
@@ -824,7 +886,7 @@ describe('PrismaPollRepository', () => {
     it('should return failure on error', async () => {
       mockPrisma.poll.update.mockRejectedValue(new Error('DB error'));
 
-      const result = await repo.deletePoll('poll-1');
+      const result = await repo.deletePoll(PollId.parse('poll-1'));
 
       expect(result.success).toBe(false);
 
@@ -841,11 +903,10 @@ describe('PrismaPollRepository', () => {
   // -------------------------------------------------------------------
   describe('reconstitution edge cases', () => {
     it('should handle missing questions array (undefined)', async () => {
-      const prismaData = buildPrismaPoll();
-      delete prismaData.questions;
+      const prismaData = buildPrismaPoll({ questions: undefined });
       mockPrisma.poll.findUnique.mockResolvedValue(prismaData);
 
-      const result = await repo.getPollById('poll-1');
+      const result = await repo.getPollById(PollId.parse('poll-1'));
 
       expect(result.success).toBe(true);
 
@@ -862,7 +923,7 @@ describe('PrismaPollRepository', () => {
       const prismaData = buildPrismaPoll({ questions: [question] });
       mockPrisma.poll.findUnique.mockResolvedValue(prismaData);
 
-      const result = await repo.getPollById('poll-1');
+      const result = await repo.getPollById(PollId.parse('poll-1'));
 
       expect(result.success).toBe(true);
 
@@ -881,7 +942,7 @@ describe('PrismaPollRepository', () => {
       });
       mockPrisma.poll.findUnique.mockResolvedValue(prismaData);
 
-      const result = await repo.getPollById('poll-1');
+      const result = await repo.getPollById(PollId.parse('poll-1'));
       expect(result.success).toBe(true);
 
       if (!result.success) {
@@ -904,7 +965,7 @@ describe('PrismaPollRepository', () => {
       });
       mockPrisma.poll.findUnique.mockResolvedValue(prismaData);
 
-      const result = await repo.getPollById('poll-1');
+      const result = await repo.getPollById(PollId.parse('poll-1'));
       expect(result.success).toBe(true);
 
       if (!result.success) {
@@ -922,7 +983,7 @@ describe('PrismaPollRepository', () => {
       });
       mockPrisma.poll.findUnique.mockResolvedValue(prismaData);
 
-      const result = await repo.getPollById('poll-1');
+      const result = await repo.getPollById(PollId.parse('poll-1'));
       expect(result.success).toBe(true);
 
       if (!result.success) {

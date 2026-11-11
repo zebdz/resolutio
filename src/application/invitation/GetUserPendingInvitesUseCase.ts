@@ -1,10 +1,15 @@
+/** Loads a recipient's pending invitations and batch-resolves typed references.
+ * The projection retains target variants and explicit missing related names. */
+import { InvitationUseCaseFailure } from './InvitationErrors';
+import { z } from 'zod';
+import { UserId, BoardId } from '@/domain/shared/EntityIds';
 import { InvitationRepository } from '../../domain/invitation/InvitationRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { User } from '../../domain/user/User';
-import { Result, success } from '../../domain/shared/Result';
-import { InviteDetails } from './GetInviteDetailsUseCase';
+import { Result, success, failure } from '../../domain/shared/Result';
+import { InviteDetails, invitationDetails } from './InviteDetails';
 
 export interface GetUserPendingInvitesDependencies {
   invitationRepository: InvitationRepository;
@@ -16,9 +21,17 @@ export interface GetUserPendingInvitesDependencies {
 export class GetUserPendingInvitesUseCase {
   constructor(private deps: GetUserPendingInvitesDependencies) {}
 
-  async execute(input: {
+  async execute(rawInput: {
     actorUserId: string;
-  }): Promise<Result<InviteDetails[], string>> {
+  }): Promise<Result<InviteDetails[], InvitationUseCaseFailure>> {
+    const parsed = z.object({ actorUserId: UserId }).safeParse(rawInput);
+
+    if (!parsed.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawInput, ...parsed.data };
+
     const invitations =
       await this.deps.invitationRepository.findPendingByInviteeId(
         input.actorUserId
@@ -35,7 +48,7 @@ export class GetUserPendingInvitesUseCase {
       ...new Set(
         invitations
           .map((inv) => inv.boardId)
-          .filter((id): id is string => id !== null)
+          .filter((id): id is BoardId => id !== null)
       ),
     ];
 
@@ -66,24 +79,17 @@ export class GetUserPendingInvitesUseCase {
       const inviter = inviterMap.get(inv.inviterId);
       const board = inv.boardId ? boardMap.get(inv.boardId) : null;
 
-      return {
-        id: inv.id,
-        type: inv.type,
-        status: inv.status,
-        organizationName: org?.name || '',
-        organizationId: inv.organizationId,
-        boardName: board?.name || null,
-        boardId: inv.boardId,
-        inviterName: inviter
+      return invitationDetails(inv, {
+        organization: org?.name ?? null,
+        board: board?.name ?? null,
+        inviter: inviter
           ? User.formatFullName(
               inviter.firstName,
               inviter.lastName,
               inviter.middleName
             )
-          : '',
-        inviteeId: inv.inviteeId,
-        createdAt: inv.createdAt,
-      };
+          : null,
+      });
     });
 
     return success(details);

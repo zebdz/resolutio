@@ -25,7 +25,7 @@ const CreateOrganizationSchema = createOrganizationSchema(noopProfanityChecker);
 function getFieldError(
   result: {
     success: false;
-    error: { issues: Array<{ path: (string | number)[]; message: string }> };
+    error: { issues: Array<{ path: PropertyKey[]; message: string }> };
   },
   field: string
 ): string | undefined {

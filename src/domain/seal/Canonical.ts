@@ -89,8 +89,9 @@ function visit(
   }
 }
 
-export function prepareNfc<T>(value: T): T {
-  return visit(value, true) as T;
+/** Normalization may change strings and object keys. Decode domain values afterwards. */
+export function prepareNfc(value: unknown): Json {
+  return visit(value, true);
 }
 
 function serialize(value: Json): string {
@@ -121,13 +122,13 @@ export function parseCanonical(bytes: string | Uint8Array): Json {
         : new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(
             bytes
           );
-    const value: unknown = JSON.parse(source);
+    const value = visit(JSON.parse(source), false);
     requireSeal(
-      canonical(value) === source && canonical(prepareNfc(value)) === source,
+      serialize(value) === source && serialize(prepareNfc(value)) === source,
       invalid
     );
 
-    return value as Json;
+    return value;
   } catch {
     throw new SealError(invalid);
   }

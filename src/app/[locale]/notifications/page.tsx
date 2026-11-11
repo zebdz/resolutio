@@ -1,3 +1,5 @@
+/** Recipient inbox page preserves typed successful reads and displays localized failures.
+ * An unavailable read is distinct from a successful empty notification list. */
 import { getTranslations } from 'next-intl/server';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
@@ -10,19 +12,19 @@ export default async function NotificationsPage() {
 
   const result = await getNotificationsAction(NOTIFICATIONS_PAGE_SIZE);
 
-  const notifications = result.success ? result.data.notifications : [];
-  const unreadCount = result.success ? result.data.unreadCount : 0;
-  const totalCount = result.success ? result.data.totalCount : 0;
-
   return (
     <AuthenticatedLayout>
       <div className="space-y-6">
         <Heading className="text-3xl font-bold">{t('title')}</Heading>
-        <NotificationsList
-          initialNotifications={notifications}
-          initialUnreadCount={unreadCount}
-          initialTotalCount={totalCount}
-        />
+        {result.success ? (
+          <NotificationsList
+            initialNotifications={result.data.notifications}
+            initialUnreadCount={result.data.unreadCount}
+            initialTotalCount={result.data.totalCount}
+          />
+        ) : (
+          <div role="alert">{result.error}</div>
+        )}
       </div>
     </AuthenticatedLayout>
   );

@@ -1,3 +1,21 @@
+/** Application client regressions exercise typed question/answer creation and editing.
+ * Raw requests remain transport values; fixtures supply deterministic identity/time. */
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { BoardId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { PollId } from '@/domain/shared/EntityIds';
+import { QuestionId, AnswerId } from '@/domain/shared/EntityIds';
+import { questionClock } from './questionTestValues';
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DeleteAnswerUseCase } from '../DeleteAnswerUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -24,33 +42,43 @@ describe('DeleteAnswerUseCase', () => {
 
   beforeEach(() => {
     const pollResult = Poll.create(
-      'Test Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'user-1',
-      new Date('2026-01-15'),
-      new Date('2026-02-15')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
-    poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    poll = expectSuccess(pollResult);
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      id: 'poll-1',
+    });
 
     const questionResult = Question.create(
-      'Test Question',
-      'poll-1',
-      1,
-      0,
+      QuestionText.parse('Test Question'),
+      PollId.parse('poll-1'),
+      testCreation(QuestionId, 'question-1'),
+      PageNumber.parse(1),
+      SortOrder.parse(0),
       'single-choice'
     );
-    question = questionResult.value;
-    (question as any).props.id = 'question-1';
+    question = expectSuccess(questionResult);
 
-    const answerResult = Answer.create('Test Answer', 0, 'question-1');
-    answer = answerResult.value;
-    (answer as any).props.id = 'answer-1';
+    const answerResult = Answer.create(
+      AnswerText.parse('Test Answer'),
+      SortOrder.parse(0),
+      QuestionId.parse('question-1'),
+      testCreation(AnswerId, 'answer-1')
+    );
+    answer = expectSuccess(answerResult);
 
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
     };
 
     questionRepository = {
@@ -59,7 +87,7 @@ describe('DeleteAnswerUseCase', () => {
 
     answerRepository = {
       getAnswerById: vi.fn().mockResolvedValue(success(answer)),
-      deleteAnswer: vi.fn().mockResolvedValue(success(undefined)),
+      updateAnswer: vi.fn().mockResolvedValue(success(undefined)),
     };
 
     voteRepository = {
@@ -75,7 +103,8 @@ describe('DeleteAnswerUseCase', () => {
       questionRepository as QuestionRepository,
       answerRepository as AnswerRepository,
       voteRepository as VoteRepository,
-      userRepository as UserRepository
+      userRepository as UserRepository,
+      questionClock
     );
   });
 
@@ -89,7 +118,7 @@ describe('DeleteAnswerUseCase', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(answerRepository.deleteAnswer).toHaveBeenCalledWith('answer-1');
+      expect(answerRepository.updateAnswer).toHaveBeenCalledWith(answer);
     });
 
     it('should reject non-creator non-superadmin', async () => {
@@ -99,7 +128,7 @@ describe('DeleteAnswerUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollErrors.NOT_POLL_CREATOR);
+      expect(expectFailure(result)).toBe(PollErrors.NOT_POLL_CREATOR);
     });
 
     it('should allow creator (not superadmin) to delete answer', async () => {

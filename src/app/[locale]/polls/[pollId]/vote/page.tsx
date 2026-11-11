@@ -1,3 +1,4 @@
+/** Loads an authorized plain voting view; public previews and eligibility remain separately gated. */
 import { getLocale, getTranslations } from 'next-intl/server';
 
 import {
@@ -82,7 +83,7 @@ export default async function VotePage({ params }: VotePageProps) {
       <AuthenticatedLayout>
         <div className="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20">
           <p className="text-sm text-yellow-800 dark:text-yellow-200">
-            {votingT(canVoteResult.data.reasonCode as any)}
+            {votingT(canVoteResult.data.reasonCode)}
           </p>
         </div>
         <div className="mt-4">
@@ -120,43 +121,9 @@ export default async function VotePage({ params }: VotePageProps) {
     );
   }
 
-  const { poll, drafts } = progressResult.data;
-
-  // Serialize poll data to plain objects for client component
-  const serializedPoll = {
-    id: poll.id,
-    title: poll.title,
-    description: poll.description,
-    // Ids only — the renderer needs them to refuse refs to other polls'
-    // files. Attachment bytes never cross to the client.
-    attachmentIds: poll.attachmentIds ?? [],
-    pollType: poll.pollType,
-    anonymous: !!poll.anonymous,
-    // The notice has to warn about the property listing too, and only an
-    // ownership-weighted poll puts holdings in the named protocol.
-    isPropertyBased:
-      poll.distributionType === 'OWNERSHIP_UNIT_COUNT' ||
-      poll.distributionType === 'OWNERSHIP_SIZE_WEIGHTED',
-    questions: poll.questions.map((q: any) => ({
-      id: q.id,
-      text: q.text,
-      details: q.details,
-      page: q.page,
-      order: q.order,
-      questionType: q.questionType,
-      answers: q.answers.map((a: any) => ({
-        id: a.id,
-        text: a.text,
-        order: a.order,
-      })),
-    })),
-  };
-
-  const serializedDrafts = drafts.map((d: any) => ({
-    id: d.id,
-    questionId: d.questionId,
-    answerId: d.answerId,
-  }));
+  // The action authorizes and explicitly serializes every nested domain entity.
+  const { poll: serializedPoll, drafts: serializedDrafts } =
+    progressResult.data;
 
   return (
     <AuthenticatedLayout>

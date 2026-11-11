@@ -1,27 +1,25 @@
+/** Validates immutable six-digit codes independently of cryptographic generation.
+ * Randomness belongs to the application generator port and its infrastructure adapter. */
+/** Six-digit code value; entropy is supplied by an application generator port. */
+import { OtpDigits } from './OtpValues';
 import { ValidationError } from '../shared/errors';
 import { OtpDomainCodes } from './OtpDomainCodes';
 
 // Value Object: OTP Code
 export class OtpCode {
-  private constructor(private readonly value: string) {}
-
-  static generate(): OtpCode {
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-    return new OtpCode(code);
-  }
+  private constructor(private readonly value: OtpDigits) {}
 
   static fromString(code: string): OtpCode {
-    const otpRegex = /^\d{6}$/;
+    const parsed = OtpDigits.safeParse(code);
 
-    if (!otpRegex.test(code)) {
+    if (!parsed.success) {
       throw new ValidationError(OtpDomainCodes.INVALID_CODE_FORMAT);
     }
 
-    return new OtpCode(code);
+    return new OtpCode(parsed.data);
   }
 
-  getValue(): string {
+  getValue(): OtpDigits {
     return this.value;
   }
 

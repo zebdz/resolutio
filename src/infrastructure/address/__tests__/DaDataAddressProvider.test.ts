@@ -1,3 +1,4 @@
+/** DaData labels, house/flat details and failure paths stay validated at the provider boundary. */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { DaDataAddressProvider } from '../DaDataAddressProvider';
 
@@ -39,7 +40,7 @@ const BLOCK_PAYLOAD = {
         block: '3',
         block_type: 'стр',
         postal_code: '344011',
-        house_fias_id: 'block-uuid',
+        house_fias_id: 'c1bfc52f-e9a7-4d67-a1bd-b418f495d3f6',
         flat: null,
       },
     },
@@ -64,10 +65,10 @@ const FLAT_LEVEL_PICK_PAYLOAD = {
         block: '3',
         block_type: 'стр',
         postal_code: '344011',
-        house_fias_id: 'block-uuid',
+        house_fias_id: 'c1bfc52f-e9a7-4d67-a1bd-b418f495d3f6',
         flat: '738',
         flat_type: 'кв',
-        flat_fias_id: 'flat-uuid',
+        flat_fias_id: '9d9d7e0a-e49f-4ebf-a962-00cfa892b1ee',
       },
     },
   ],
@@ -88,7 +89,7 @@ const MISMATCHED_SUFFIX_PAYLOAD = {
         block_type: 'стр',
         flat: '738',
         flat_type: 'кв',
-        flat_fias_id: 'flat-uuid',
+        flat_fias_id: '9d9d7e0a-e49f-4ebf-a962-00cfa892b1ee',
       },
     },
   ],
@@ -105,7 +106,11 @@ const FLAT_PAYLOAD = {
     {
       value: 'г Ростов-на-Дону, Гвардейский пер, д 13, кв 2',
       unrestricted_value: '344011, …, д 13, кв 2',
-      data: { flat: '2', flat_type: 'кв', flat_fias_id: 'flat-uuid-2' },
+      data: {
+        flat: '2',
+        flat_type: 'кв',
+        flat_fias_id: '9d9d7e0a-e49f-4ebf-a962-00cfa892b1ef',
+      },
     },
   ],
 };
@@ -118,6 +123,42 @@ function mockFetchOnce(payload: unknown) {
 }
 
 describe('DaDataAddressProvider', () => {
+  it.each([
+    {
+      suggestions: [
+        { ...HOUSE_PAYLOAD.suggestions[0], unrestricted_value: 42 },
+      ],
+    },
+    {
+      suggestions: [
+        { ...HOUSE_PAYLOAD.suggestions[0], data: { city: 42, flat: 2 } },
+      ],
+    },
+    { suggestions: {} },
+    {
+      suggestions: [
+        {
+          ...HOUSE_PAYLOAD.suggestions[0],
+          data: { house_fias_id: 'invalid-id' },
+        },
+      ],
+    },
+    {
+      suggestions: [
+        {
+          ...FLAT_LEVEL_PICK_PAYLOAD.suggestions[0],
+          data: { flat: '2', flat_fias_id: 'invalid-id' },
+        },
+      ],
+    },
+  ])(
+    'rejects malformed suggestions before mapping houses or flats',
+    async (payload) => {
+      const provider = new DaDataAddressProvider(mockFetchOnce(payload));
+      expect(await provider.suggestAddress('дом')).toEqual([]);
+      expect(await provider.suggestFlats('дом', '2')).toEqual([]);
+    }
+  );
   beforeEach(() => {
     process.env.DADATA_API_KEY = 'test-key';
   });
@@ -163,7 +204,7 @@ describe('DaDataAddressProvider', () => {
     );
 
     expect(suggestion.flat).toBe('738');
-    expect(suggestion.flatFiasId).toBe('flat-uuid');
+    expect(suggestion.flatFiasId).toBe('9d9d7e0a-e49f-4ebf-a962-00cfa892b1ee');
     expect(suggestion.houseLabel).toBe(
       'г Ростов-на-Дону, Гвардейский пер, д 13 стр 3'
     );
@@ -214,7 +255,7 @@ describe('DaDataAddressProvider', () => {
 
     expect(flats).toHaveLength(1);
     expect(flats[0].flat).toBe('2');
-    expect(flats[0].flatFiasId).toBe('flat-uuid-2');
+    expect(flats[0].flatFiasId).toBe('9d9d7e0a-e49f-4ebf-a962-00cfa892b1ef');
   });
 
   it('builds the flat query by appending the fragment to the house label', async () => {

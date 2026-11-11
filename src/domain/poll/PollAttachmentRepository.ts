@@ -1,18 +1,28 @@
+/** Typed attachment persistence projections. Metadata never contains content bytes;
+ * adapters validate stored scalar values before they cross the port. */
+import { Instant } from '../shared/Instant';
+import { PollAttachmentId, PollId } from '../shared/EntityIds';
+import {
+  AttachmentFileName,
+  AttachmentByteCount,
+  AttachmentCount,
+} from '../shared/attachments/AttachmentValues';
+import { PollAttachmentMimeType } from './PollAttachment';
 import { PollAttachment } from './PollAttachment';
 import { Result } from '../shared/Result';
 
 export interface PollAttachmentMetadata {
-  id: string;
-  pollId: string;
-  fileName: string;
-  mimeType: string;
-  sizeBytes: number;
-  createdAt: Date;
+  id: PollAttachmentId;
+  pollId: PollId;
+  fileName: AttachmentFileName;
+  mimeType: PollAttachmentMimeType;
+  sizeBytes: AttachmentByteCount;
+  createdAt: Instant;
 }
 
 export interface PollAttachmentBytes {
-  fileName: string;
-  mimeType: string;
+  fileName: AttachmentFileName;
+  mimeType: PollAttachmentMimeType;
   bytes: Buffer;
 }
 
@@ -20,14 +30,20 @@ export interface PollAttachmentRepository {
   save(
     attachment: PollAttachment,
     bytes: Buffer
-  ): Promise<Result<PollAttachmentMetadata, string>>;
+  ): Promise<Result<PollAttachmentMetadata, 'common.errors.unexpected'>>;
   findByPollId(
-    pollId: string
-  ): Promise<Result<PollAttachmentMetadata[], string>>;
+    pollId: PollId
+  ): Promise<Result<PollAttachmentMetadata[], 'common.errors.unexpected'>>;
   findBytesById(
-    id: string
-  ): Promise<Result<PollAttachmentBytes | null, string>>;
-  findById(id: string): Promise<Result<PollAttachmentMetadata | null, string>>;
-  countByPollId(pollId: string): Promise<Result<number, string>>;
-  deleteById(id: string): Promise<Result<void, string>>;
+    id: PollAttachmentId
+  ): Promise<Result<PollAttachmentBytes | null, 'common.errors.unexpected'>>;
+  findById(
+    id: PollAttachmentId
+  ): Promise<Result<PollAttachmentMetadata | null, 'common.errors.unexpected'>>;
+  countByPollId(
+    pollId: PollId
+  ): Promise<Result<AttachmentCount, 'common.errors.unexpected'>>;
+  deleteById(
+    id: PollAttachmentId
+  ): Promise<Result<void, 'common.errors.unexpected'>>;
 }

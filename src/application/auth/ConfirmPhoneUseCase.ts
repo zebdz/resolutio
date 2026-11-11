@@ -1,28 +1,38 @@
+/** Confirms the session user with a purpose-scoped OTP and an injected clock.
+ * Malformed codes still consume an attempt before credential verification. */
+import { AuthenticationError } from './AuthenticationError';
+import { UserId } from '@/domain/shared/EntityIds';
+
+import { Clock } from '@/application/shared/EntityCreation';
+
 import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { OtpPurposes } from '@/domain/otp/OtpVerification';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { Result, success, failure } from '@/domain/shared/Result';
-import { OtpCodeHasher } from './OtpCodeHasher';
+import { OtpCodeHasher, verifyEnteredOtpCode } from './OtpCodeHasher';
 import { OtpErrors } from './OtpErrors';
 import { AuthErrors } from './AuthErrors';
 
 export interface ConfirmPhoneInput {
-  userId: string;
+  userId: UserId;
   code: string;
 }
 
 interface Dependencies {
+  clock: Clock;
   otpRepository: OtpRepository;
   otpCodeHasher: OtpCodeHasher;
   userRepository: UserRepository;
 }
 
 export class ConfirmPhoneUseCase {
+  private readonly clock: Clock;
   private readonly otpRepository: OtpRepository;
   private readonly otpCodeHasher: OtpCodeHasher;
   private readonly userRepository: UserRepository;
 
   constructor(deps: Dependencies) {
+    this.clock = deps.clock;
     this.otpRepository = deps.otpRepository;
     this.otpCodeHasher = deps.otpCodeHasher;
     this.userRepository = deps.userRepository;
@@ -30,7 +40,8 @@ export class ConfirmPhoneUseCase {
 
   async execute(
     input: ConfirmPhoneInput
-  ): Promise<Result<{ confirmed: true }, string>> {
+  ): Promise<Result<{ confirmed: true }, AuthenticationError>> {
+    const now = this.clock.now();
     // 1. Find user
     const user = await this.userRepository.findById(input.userId);
 
@@ -59,7 +70,7 @@ export class ConfirmPhoneUseCase {
     }
 
     // 4. Check not expired
-    if (otp.isExpired()) {
+    if (otp.isExpired(now)) {
       return failure(OtpErrors.EXPIRED);
     }
 
@@ -73,18 +84,22 @@ export class ConfirmPhoneUseCase {
     await this.otpRepository.update(incremented);
 
     // 7. Verify code hash
-    const codeValid = this.otpCodeHasher.verify(input.code, otp.code);
+    const codeValid = verifyEnteredOtpCode(
+      this.otpCodeHasher,
+      input.code,
+      otp.code
+    );
 
     if (!codeValid) {
       return failure(OtpErrors.INVALID);
     }
 
     // 8. Mark OTP verified
-    const verified = incremented.markVerified();
+    const verified = incremented.markVerified(now);
     await this.otpRepository.update(verified);
 
     // 9. Confirm user
-    await this.userRepository.confirmUser(input.userId);
+    await this.userRepository.confirmUser(input.userId, now);
 
     return success({ confirmed: true });
   }

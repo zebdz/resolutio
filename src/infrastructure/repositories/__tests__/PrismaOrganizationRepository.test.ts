@@ -1,3 +1,8 @@
+import { createOrganization } from '../../../domain/organization/__tests__/organizationTestValues';
+import { PageNumber, PageSize } from '../../../domain/shared/Pagination';
+import { OrganizationId } from '../../../domain/shared/EntityIds';
+import { UserId } from '../../../domain/shared/EntityIds';
+import { OrganizationName } from '../../../domain/organization/OrganizationValues';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { PrismaOrganizationRepository } from '../PrismaOrganizationRepository';
 import { Organization } from '../../../domain/organization/Organization';
@@ -64,6 +69,29 @@ describe('PrismaOrganizationRepository', () => {
     repo = new PrismaOrganizationRepository(mockPrisma as any);
   });
 
+  it('preserves the caller-supplied organization identity on save', async () => {
+    mockPrisma.organization.create.mockImplementation(
+      async ({ data }: any) => ({
+        ...makeOrgRow(),
+        id: 'database-generated',
+        ...data,
+      })
+    );
+    mockPrisma.organizationAdminUser.create.mockResolvedValue({});
+    const org = Organization.reconstitute(makeOrgRow({ id: 'caller-created' }));
+    const saved = await repo.save(org);
+    expect(saved.id).toBe('caller-created');
+  });
+
+  it('rejects a missing hierarchy root instead of manufacturing an unnamed organization', async () => {
+    mockPrisma.organization.findUnique.mockResolvedValue(null);
+    mockPrisma.organizationUser.count.mockResolvedValue(0);
+    mockPrisma.organization.findMany.mockResolvedValue([]);
+    await expect(
+      repo.getHierarchyTree(OrganizationId.parse('missing-org'))
+    ).rejects.toThrow();
+  });
+
   // ─── getAncestorIds ──────────────────────────────────────────────
 
   describe('getAncestorIds', () => {
@@ -72,7 +100,9 @@ describe('PrismaOrganizationRepository', () => {
         parentId: null,
       });
 
-      const result = await repo.getAncestorIds('root-org');
+      const result = await repo.getAncestorIds(
+        OrganizationId.parse('root-org')
+      );
 
       expect(result).toEqual([]);
       expect(mockPrisma.organization.findUnique).toHaveBeenCalledWith({
@@ -87,7 +117,7 @@ describe('PrismaOrganizationRepository', () => {
         .mockResolvedValueOnce({ parentId: 'parent-1' }) // child lookup
         .mockResolvedValueOnce({ parentId: null }); // parent lookup (root)
 
-      const result = await repo.getAncestorIds('child-1');
+      const result = await repo.getAncestorIds(OrganizationId.parse('child-1'));
 
       expect(result).toEqual(['parent-1']);
     });
@@ -99,7 +129,9 @@ describe('PrismaOrganizationRepository', () => {
         .mockResolvedValueOnce({ parentId: 'parent-1' }) // child lookup
         .mockResolvedValueOnce({ parentId: null }); // parent lookup (root)
 
-      const result = await repo.getAncestorIds('grandchild-1');
+      const result = await repo.getAncestorIds(
+        OrganizationId.parse('grandchild-1')
+      );
 
       expect(result).toEqual(['child-1', 'parent-1']);
     });
@@ -107,7 +139,9 @@ describe('PrismaOrganizationRepository', () => {
     it('returns empty when org not found', async () => {
       mockPrisma.organization.findUnique.mockResolvedValueOnce(null);
 
-      const result = await repo.getAncestorIds('nonexistent');
+      const result = await repo.getAncestorIds(
+        OrganizationId.parse('nonexistent')
+      );
 
       expect(result).toEqual([]);
     });
@@ -119,7 +153,7 @@ describe('PrismaOrganizationRepository', () => {
     it('returns empty array when no children', async () => {
       mockPrisma.organization.findMany.mockResolvedValueOnce([]);
 
-      const result = await repo.getDescendantIds('org-1');
+      const result = await repo.getDescendantIds(OrganizationId.parse('org-1'));
 
       expect(result).toEqual([]);
       expect(mockPrisma.organization.findMany).toHaveBeenCalledWith({
@@ -133,7 +167,7 @@ describe('PrismaOrganizationRepository', () => {
         .mockResolvedValueOnce([{ id: 'child-1' }]) // children of org-1
         .mockResolvedValueOnce([]); // children of child-1
 
-      const result = await repo.getDescendantIds('org-1');
+      const result = await repo.getDescendantIds(OrganizationId.parse('org-1'));
 
       expect(result).toEqual(['child-1']);
     });
@@ -149,7 +183,7 @@ describe('PrismaOrganizationRepository', () => {
         .mockResolvedValueOnce([]) // children of child-2
         .mockResolvedValueOnce([]); // children of grandchild-1
 
-      const result = await repo.getDescendantIds('org-1');
+      const result = await repo.getDescendantIds(OrganizationId.parse('org-1'));
 
       expect(result).toEqual(['child-1', 'child-2', 'grandchild-1']);
     });
@@ -168,7 +202,10 @@ describe('PrismaOrganizationRepository', () => {
         status: 'accepted',
       });
 
-      const result = await repo.isUserMember('user-1', 'org-1');
+      const result = await repo.isUserMember(
+        UserId.parse('user-1'),
+        OrganizationId.parse('org-1')
+      );
 
       expect(result).toBe(true);
       expect(mockPrisma.organizationUser.findFirst).toHaveBeenCalledWith({
@@ -192,7 +229,10 @@ describe('PrismaOrganizationRepository', () => {
         status: 'accepted',
       });
 
-      const result = await repo.isUserMember('user-1', 'org-1');
+      const result = await repo.isUserMember(
+        UserId.parse('user-1'),
+        OrganizationId.parse('org-1')
+      );
 
       expect(result).toBe(true);
       expect(mockPrisma.organizationUser.findFirst).toHaveBeenCalledWith({
@@ -208,7 +248,10 @@ describe('PrismaOrganizationRepository', () => {
       mockPrisma.organization.findMany.mockResolvedValueOnce([]);
       mockPrisma.organizationUser.findFirst.mockResolvedValueOnce(null);
 
-      const result = await repo.isUserMember('user-1', 'org-1');
+      const result = await repo.isUserMember(
+        UserId.parse('user-1'),
+        OrganizationId.parse('org-1')
+      );
 
       expect(result).toBe(false);
     });
@@ -222,7 +265,10 @@ describe('PrismaOrganizationRepository', () => {
         id: 'ou-1',
       });
 
-      const result = await repo.isUserExactMember('user-1', 'org-1');
+      const result = await repo.isUserExactMember(
+        UserId.parse('user-1'),
+        OrganizationId.parse('org-1')
+      );
 
       expect(result).toBe(true);
       expect(mockPrisma.organizationUser.findFirst).toHaveBeenCalledWith({
@@ -238,7 +284,10 @@ describe('PrismaOrganizationRepository', () => {
     it('returns false when no accepted membership in that exact org', async () => {
       mockPrisma.organizationUser.findFirst.mockResolvedValueOnce(null);
 
-      const result = await repo.isUserExactMember('user-1', 'org-1');
+      const result = await repo.isUserExactMember(
+        UserId.parse('user-1'),
+        OrganizationId.parse('org-1')
+      );
 
       expect(result).toBe(false);
     });
@@ -258,8 +307,9 @@ describe('PrismaOrganizationRepository', () => {
         { userId: 'user-2' },
       ]);
 
-      const result =
-        await repo.findAcceptedMemberUserIdsIncludingDescendants('org-1');
+      const result = await repo.findAcceptedMemberUserIdsIncludingDescendants(
+        OrganizationId.parse('org-1')
+      );
 
       expect(result).toEqual(['user-1', 'user-2']);
       expect(mockPrisma.organizationUser.findMany).toHaveBeenCalledWith({
@@ -283,8 +333,9 @@ describe('PrismaOrganizationRepository', () => {
         { userId: 'user-2' },
       ]);
 
-      const result =
-        await repo.findAcceptedMemberUserIdsIncludingDescendants('org-1');
+      const result = await repo.findAcceptedMemberUserIdsIncludingDescendants(
+        OrganizationId.parse('org-1')
+      );
 
       expect(result).toEqual(['user-1', 'user-2']);
     });
@@ -293,8 +344,9 @@ describe('PrismaOrganizationRepository', () => {
       mockPrisma.organization.findMany.mockResolvedValueOnce([]);
       mockPrisma.organizationUser.findMany.mockResolvedValueOnce([]);
 
-      const result =
-        await repo.findAcceptedMemberUserIdsIncludingDescendants('org-1');
+      const result = await repo.findAcceptedMemberUserIdsIncludingDescendants(
+        OrganizationId.parse('org-1')
+      );
 
       expect(result).toEqual([]);
     });
@@ -316,8 +368,8 @@ describe('PrismaOrganizationRepository', () => {
       ]);
 
       const result = await repo.findAcceptedMemberUserIdsForOrgs([
-        'org-1',
-        'org-2',
+        OrganizationId.parse('org-1'),
+        OrganizationId.parse('org-2'),
       ]);
 
       expect(result).toEqual(['u1', 'u2']);
@@ -338,7 +390,10 @@ describe('PrismaOrganizationRepository', () => {
     it('deletes the OrganizationUser row', async () => {
       mockPrisma.organizationUser.delete.mockResolvedValueOnce({});
 
-      await repo.removeUserFromOrganization('user-1', 'org-1');
+      await repo.removeUserFromOrganization(
+        UserId.parse('user-1'),
+        OrganizationId.parse('org-1')
+      );
 
       expect(mockPrisma.organizationUser.delete).toHaveBeenCalledWith({
         where: {
@@ -360,7 +415,9 @@ describe('PrismaOrganizationRepository', () => {
         { organization: orgRow },
       ]);
 
-      const result = await repo.findPendingRequestsByUserId('user-1');
+      const result = await repo.findPendingRequestsByUserId(
+        UserId.parse('user-1')
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0]).toBeInstanceOf(Organization);
@@ -375,7 +432,9 @@ describe('PrismaOrganizationRepository', () => {
     it('returns empty array when no pending requests', async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValueOnce([]);
 
-      const result = await repo.findPendingRequestsByUserId('user-1');
+      const result = await repo.findPendingRequestsByUserId(
+        UserId.parse('user-1')
+      );
 
       expect(result).toEqual([]);
     });
@@ -385,7 +444,7 @@ describe('PrismaOrganizationRepository', () => {
 
   describe('save', () => {
     it('creates org + admin relationship, returns reconstituted Organization', async () => {
-      const input = Organization.create('New Org', 'Description', 'user-1');
+      const input = createOrganization('New Org', 'Description', 'user-1');
 
       if (!input.success) {
         throw new Error('create failed');
@@ -426,7 +485,7 @@ describe('PrismaOrganizationRepository', () => {
       const orgRow = makeOrgRow({ id: 'org-1' });
       mockPrisma.organization.findUnique.mockResolvedValueOnce(orgRow);
 
-      const result = await repo.findById('org-1');
+      const result = await repo.findById(OrganizationId.parse('org-1'));
 
       expect(result).toBeInstanceOf(Organization);
       expect(result!.id).toBe('org-1');
@@ -438,7 +497,7 @@ describe('PrismaOrganizationRepository', () => {
     it('returns null when not found', async () => {
       mockPrisma.organization.findUnique.mockResolvedValueOnce(null);
 
-      const result = await repo.findById('nonexistent');
+      const result = await repo.findById(OrganizationId.parse('nonexistent'));
 
       expect(result).toBeNull();
     });
@@ -451,7 +510,7 @@ describe('PrismaOrganizationRepository', () => {
       const orgRow = makeOrgRow({ name: 'My Org' });
       mockPrisma.organization.findUnique.mockResolvedValueOnce(orgRow);
 
-      const result = await repo.findByName('My Org');
+      const result = await repo.findByName(OrganizationName.parse('My Org'));
 
       expect(result).toBeInstanceOf(Organization);
       expect(result!.name).toBe('My Org');
@@ -463,7 +522,9 @@ describe('PrismaOrganizationRepository', () => {
     it('returns null when not found', async () => {
       mockPrisma.organization.findUnique.mockResolvedValueOnce(null);
 
-      const result = await repo.findByName('nonexistent');
+      const result = await repo.findByName(
+        OrganizationName.parse('nonexistent')
+      );
 
       expect(result).toBeNull();
     });
@@ -479,7 +540,12 @@ describe('PrismaOrganizationRepository', () => {
           _count: { members: 5 },
           admins: [
             {
-              user: { id: 'admin-1', firstName: 'John', lastName: 'Doe' },
+              user: {
+                id: 'admin-1',
+                firstName: 'John',
+                lastName: 'Doe',
+                middleName: null,
+              },
             },
           ],
         },
@@ -495,6 +561,7 @@ describe('PrismaOrganizationRepository', () => {
         id: 'admin-1',
         firstName: 'John',
         lastName: 'Doe',
+        middleName: null,
       });
     });
 
@@ -517,7 +584,7 @@ describe('PrismaOrganizationRepository', () => {
     it('applies exclusion filter when userId provided', async () => {
       mockPrisma.organization.findMany.mockResolvedValueOnce([]);
 
-      await repo.findAllWithStats('user-exclude');
+      await repo.findAllWithStats(UserId.parse('user-exclude'));
 
       const callArgs = mockPrisma.organization.findMany.mock.calls[0][0];
       expect(callArgs.where).toEqual({
@@ -550,7 +617,16 @@ describe('PrismaOrganizationRepository', () => {
     const orgRow = (id: string, name: string, parentName?: string) => ({
       ...makeOrgRow({ id, name }),
       _count: { members: 3 },
-      admins: [{ user: { id: 'admin-1', firstName: 'John', lastName: 'Doe' } }],
+      admins: [
+        {
+          user: {
+            id: 'admin-1',
+            firstName: 'John',
+            lastName: 'Doe',
+            middleName: null,
+          },
+        },
+      ],
       parent: parentName ? { id: `parent-of-${id}`, name: parentName } : null,
     });
 
@@ -572,7 +648,10 @@ describe('PrismaOrganizationRepository', () => {
       mockPrisma.organization.findMany.mockResolvedValueOnce([]);
       mockPrisma.organization.count.mockResolvedValueOnce(10);
 
-      await repo.searchOrganizationsWithStats({ page: 2, pageSize: 5 });
+      await repo.searchOrganizationsWithStats({
+        page: PageNumber.parse(2),
+        pageSize: PageSize.parse(5),
+      });
 
       const callArgs = mockPrisma.organization.findMany.mock.calls[0][0];
       expect(callArgs.skip).toBe(5);
@@ -599,7 +678,7 @@ describe('PrismaOrganizationRepository', () => {
       mockPrisma.organization.findMany.mockResolvedValueOnce([]);
       mockPrisma.organization.count.mockResolvedValueOnce(0);
 
-      await repo.searchOrganizationsWithStats({}, 'user-1');
+      await repo.searchOrganizationsWithStats({}, UserId.parse('user-1'));
 
       const callArgs = mockPrisma.organization.findMany.mock.calls[0][0];
       expect(callArgs.where.NOT).toEqual({
@@ -617,8 +696,12 @@ describe('PrismaOrganizationRepository', () => {
       mockPrisma.organization.count.mockResolvedValueOnce(0);
 
       await repo.searchOrganizationsWithStats(
-        { search: 'test', page: 1, pageSize: 10 },
-        'user-1'
+        {
+          search: 'test',
+          page: PageNumber.parse(1),
+          pageSize: PageSize.parse(10),
+        },
+        UserId.parse('user-1')
       );
 
       const findManyWhere =
@@ -649,7 +732,7 @@ describe('PrismaOrganizationRepository', () => {
         makeOrgRow({ id: 'org-2', createdById: 'user-1' }),
       ]);
 
-      const result = await repo.findByCreatorId('user-1');
+      const result = await repo.findByCreatorId(UserId.parse('user-1'));
 
       expect(result).toHaveLength(2);
       expect(result[0]).toBeInstanceOf(Organization);
@@ -665,7 +748,9 @@ describe('PrismaOrganizationRepository', () => {
         makeOrgRow({ id: 'child-1', parentId: 'parent-1' }),
       ]);
 
-      const result = await repo.findByParentId('parent-1');
+      const result = await repo.findByParentId(
+        OrganizationId.parse('parent-1')
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0].parentId).toBe('parent-1');
@@ -681,7 +766,10 @@ describe('PrismaOrganizationRepository', () => {
         userId: 'user-1',
       });
 
-      const result = await repo.isUserAdmin('user-1', 'org-1');
+      const result = await repo.isUserAdmin(
+        UserId.parse('user-1'),
+        OrganizationId.parse('org-1')
+      );
 
       expect(result).toBe(true);
       expect(mockPrisma.organizationAdminUser.findUnique).toHaveBeenCalledWith({
@@ -697,7 +785,10 @@ describe('PrismaOrganizationRepository', () => {
     it('returns false when no admin record', async () => {
       mockPrisma.organizationAdminUser.findUnique.mockResolvedValueOnce(null);
 
-      const result = await repo.isUserAdmin('user-1', 'org-1');
+      const result = await repo.isUserAdmin(
+        UserId.parse('user-1'),
+        OrganizationId.parse('org-1')
+      );
 
       expect(result).toBe(false);
     });
@@ -712,7 +803,7 @@ describe('PrismaOrganizationRepository', () => {
         { organization: orgRow },
       ]);
 
-      const result = await repo.findMembershipsByUserId('user-1');
+      const result = await repo.findMembershipsByUserId(UserId.parse('user-1'));
 
       expect(result).toHaveLength(1);
       expect(result[0]).toBeInstanceOf(Organization);
@@ -733,7 +824,9 @@ describe('PrismaOrganizationRepository', () => {
         { organization: orgRow },
       ]);
 
-      const result = await repo.findAdminOrganizationsByUserId('user-1');
+      const result = await repo.findAdminOrganizationsByUserId(
+        UserId.parse('user-1')
+      );
 
       expect(result).toHaveLength(1);
       expect(result[0]).toBeInstanceOf(Organization);
@@ -752,7 +845,7 @@ describe('PrismaOrganizationRepository', () => {
         parentId: null,
       });
 
-      const result = await repo.getAncestors('root-org');
+      const result = await repo.getAncestors(OrganizationId.parse('root-org'));
 
       expect(result).toEqual([]);
     });
@@ -778,7 +871,7 @@ describe('PrismaOrganizationRepository', () => {
         parentId: null,
       });
 
-      const result = await repo.getAncestors('child-1');
+      const result = await repo.getAncestors(OrganizationId.parse('child-1'));
 
       expect(result).toEqual([
         { id: 'parent-1', name: 'Parent Org', memberCount: 2 },
@@ -821,7 +914,9 @@ describe('PrismaOrganizationRepository', () => {
         parentId: null,
       });
 
-      const result = await repo.getAncestors('grandchild-1');
+      const result = await repo.getAncestors(
+        OrganizationId.parse('grandchild-1')
+      );
 
       expect(result).toEqual([
         { id: 'child-1', name: 'Child Org', memberCount: 1 },
@@ -836,7 +931,9 @@ describe('PrismaOrganizationRepository', () => {
     it('returns empty array when no children', async () => {
       mockPrisma.organization.findMany.mockResolvedValueOnce([]);
 
-      const result = await repo.getChildrenWithStats('org-1');
+      const result = await repo.getChildrenWithStats(
+        OrganizationId.parse('org-1')
+      );
 
       expect(result).toEqual([]);
     });
@@ -855,7 +952,9 @@ describe('PrismaOrganizationRepository', () => {
         },
       ]);
 
-      const result = await repo.getChildrenWithStats('org-1');
+      const result = await repo.getChildrenWithStats(
+        OrganizationId.parse('org-1')
+      );
 
       expect(result).toEqual([
         { id: 'child-1', name: 'Child 1', memberCount: 5 },
@@ -892,7 +991,9 @@ describe('PrismaOrganizationRepository', () => {
       // no children
       mockPrisma.organization.findMany.mockResolvedValueOnce([]);
 
-      const result = await repo.getHierarchyTree('root-1');
+      const result = await repo.getHierarchyTree(
+        OrganizationId.parse('root-1')
+      );
 
       expect(result.ancestors).toEqual([]);
       expect(result.tree).toEqual({
@@ -969,7 +1070,9 @@ describe('PrismaOrganizationRepository', () => {
       // grandchild-1 children: []
       mockPrisma.organization.findMany.mockResolvedValueOnce([]);
 
-      const result = await repo.getHierarchyTree('grandchild-1');
+      const result = await repo.getHierarchyTree(
+        OrganizationId.parse('grandchild-1')
+      );
 
       expect(result.ancestors).toEqual([
         { id: 'child-1', name: 'Child', memberCount: 1 },

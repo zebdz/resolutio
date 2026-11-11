@@ -1,3 +1,5 @@
+/** Hashing adapter behavior preserves password bytes and salted-hash verification. */
+import { PasswordHash, PlaintextPassword } from '@/domain/user/UserValues';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Argon2PasswordVerifier } from '../Argon2PasswordVerifier';
 import { Argon2PasswordHasher } from '../Argon2PasswordHasher';
@@ -12,7 +14,7 @@ describe('Argon2PasswordVerifier', () => {
   });
 
   it('should verify correct password', async () => {
-    const password = 'CorrectPassword123!';
+    const password = PlaintextPassword.parse('CorrectPassword123!');
     const hashed = await hasher.hash(password);
 
     const isValid = await verifier.verify(password, hashed);
@@ -21,8 +23,8 @@ describe('Argon2PasswordVerifier', () => {
   });
 
   it('should reject incorrect password', async () => {
-    const password = 'CorrectPassword123!';
-    const wrongPassword = 'WrongPassword123!';
+    const password = PlaintextPassword.parse('CorrectPassword123!');
+    const wrongPassword = PlaintextPassword.parse('WrongPassword123!');
     const hashed = await hasher.hash(password);
 
     const isValid = await verifier.verify(wrongPassword, hashed);
@@ -31,8 +33,8 @@ describe('Argon2PasswordVerifier', () => {
   });
 
   it('should reject password with different case', async () => {
-    const password = 'Password123!';
-    const wrongCase = 'password123!';
+    const password = PlaintextPassword.parse('Password123!');
+    const wrongCase = PlaintextPassword.parse('password123!');
     const hashed = await hasher.hash(password);
 
     const isValid = await verifier.verify(wrongCase, hashed);
@@ -41,16 +43,16 @@ describe('Argon2PasswordVerifier', () => {
   });
 
   it('should reject empty password when hash is not empty', async () => {
-    const password = 'Password123!';
+    const password = PlaintextPassword.parse('Password123!');
     const hashed = await hasher.hash(password);
 
-    const isValid = await verifier.verify('', hashed);
+    const isValid = await verifier.verify(PlaintextPassword.parse(''), hashed);
 
     expect(isValid).toBe(false);
   });
 
   it('should verify empty password correctly', async () => {
-    const password = '';
+    const password = PlaintextPassword.parse('');
     const hashed = await hasher.hash(password);
 
     const isValid = await verifier.verify(password, hashed);
@@ -59,8 +61,8 @@ describe('Argon2PasswordVerifier', () => {
   });
 
   it('should handle invalid hash format gracefully', async () => {
-    const invalidHash = 'not-a-valid-argon2-hash';
-    const password = 'SomePassword123!';
+    const invalidHash = PasswordHash.parse('not-a-valid-argon2-hash');
+    const password = PlaintextPassword.parse('SomePassword123!');
 
     const isValid = await verifier.verify(password, invalidHash);
 
@@ -68,7 +70,7 @@ describe('Argon2PasswordVerifier', () => {
   });
 
   it('should verify password with special characters', async () => {
-    const password = '!@#$%^&*()_+{}|:"<>?[];,./`~';
+    const password = PlaintextPassword.parse('!@#$%^&*()_+{}|:"<>?[];,./`~');
     const hashed = await hasher.hash(password);
 
     const isValid = await verifier.verify(password, hashed);
@@ -77,7 +79,7 @@ describe('Argon2PasswordVerifier', () => {
   });
 
   it('should verify very long password', async () => {
-    const password = 'a'.repeat(500);
+    const password = PlaintextPassword.parse('a'.repeat(500));
     const hashed = await hasher.hash(password);
 
     const isValid = await verifier.verify(password, hashed);

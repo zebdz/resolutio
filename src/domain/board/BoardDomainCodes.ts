@@ -4,6 +4,7 @@ export const BoardDomainCodes = {
   // Board validation
   BOARD_NAME_EMPTY: 'domain.board.boardNameEmpty',
   BOARD_NAME_TOO_LONG: 'domain.board.boardNameTooLong',
+  BOARD_INVALID_DATA: 'domain.board.boardInvalidData',
   BOARD_ALREADY_ARCHIVED: 'domain.board.boardAlreadyArchived',
 } as const;
 

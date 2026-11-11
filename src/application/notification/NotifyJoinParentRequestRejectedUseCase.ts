@@ -1,20 +1,32 @@
+/** Builds join parent request rejected notifications with explicit creation identity/time.
+ * Construction and storage failures return Results; an empty audience succeeds. */
+import { success, collectResults, type Result } from '@/domain/shared/Result';
+import type { NotificationDeliveryFailure } from './NotificationErrors';
+import { NotificationId, OrganizationId } from '@/domain/shared/EntityIds';
+import {
+  IdGenerator,
+  Clock,
+  entityCreation,
+} from '@/application/shared/EntityCreation';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { Notification } from '../../domain/notification/Notification';
 
 export interface NotifyJoinParentRequestRejectedDependencies {
+  ids: IdGenerator;
+  clock: Clock;
   organizationRepository: OrganizationRepository;
-  notificationRepository: NotificationRepository;
+  notificationRepository: Pick<NotificationRepository, 'save' | 'saveBatch'>;
 }
 
 export class NotifyJoinParentRequestRejectedUseCase {
   constructor(private deps: NotifyJoinParentRequestRejectedDependencies) {}
 
   async execute(input: {
-    childOrgId: string;
-    parentOrgId: string;
+    childOrgId: OrganizationId;
+    parentOrgId: OrganizationId;
     rejectionReason: string;
-  }): Promise<void> {
+  }): Promise<Result<void, NotificationDeliveryFailure>> {
     const { childOrgId, parentOrgId, rejectionReason } = input;
 
     const [childOrg, parentOrg] = await Promise.all([
@@ -23,7 +35,7 @@ export class NotifyJoinParentRequestRejectedUseCase {
     ]);
 
     if (!childOrg || !parentOrg) {
-      return;
+      return success(undefined);
     }
 
     const [memberUserIds, adminUserIds] = await Promise.all([
@@ -36,32 +48,38 @@ export class NotifyJoinParentRequestRejectedUseCase {
     const recipientIds = [...new Set([...memberUserIds, ...adminUserIds])];
 
     if (recipientIds.length === 0) {
-      return;
+      return success(undefined);
     }
 
     const bodyKey = rejectionReason
       ? 'notification.types.joinParentRequestRejected.bodyWithReason'
       : 'notification.types.joinParentRequestRejected.body';
 
-    const notifications = recipientIds
-      .map((userId) =>
-        Notification.create({
-          userId,
-          type: 'join_parent_request_rejected',
-          title: 'notification.types.joinParentRequestRejected.title',
-          body: bodyKey,
-          data: {
-            childOrgId,
-            parentOrgId,
-            childOrgName: childOrg.name,
-            parentOrgName: parentOrg.name,
-            rejectionReason,
+    const notifications = collectResults(
+      recipientIds.map((userId) =>
+        Notification.create(
+          {
+            userId,
+            type: 'join_parent_request_rejected',
+            title: 'notification.types.joinParentRequestRejected.title',
+            body: bodyKey,
+            data: {
+              childOrgId,
+              parentOrgId,
+              childOrgName: childOrg.name,
+              parentOrgName: parentOrg.name,
+              rejectionReason,
+            },
           },
-        })
+          entityCreation(NotificationId, this.deps.ids, this.deps.clock)
+        )
       )
-      .filter((r) => r.success)
-      .map((r) => (r as { success: true; value: Notification }).value);
+    );
 
-    await this.deps.notificationRepository.saveBatch(notifications);
+    if (!notifications.success) {
+      return notifications;
+    }
+
+    return this.deps.notificationRepository.saveBatch(notifications.value);
   }
 }

@@ -1,3 +1,7 @@
+/** Decodes DaData transport rows before deriving house/flat suggestions.
+ * Response validation preserves fallback behavior and prevents malformed stored address fields. */
+import { z } from 'zod';
+import { HouseFiasId, FlatFiasId } from '@/domain/user/AddressValues';
 import type {
   AddressProvider,
   AddressSuggestion,
@@ -12,11 +16,27 @@ const SUGGEST_URL =
 const HOUSE_COUNT = 7;
 const FLAT_COUNT = 10;
 
-interface DaDataRow {
-  value: string;
-  unrestricted_value: string;
-  data: Record<string, string | null>;
-}
+const optionalText = z.string().nullish();
+const rowSchema = z.object({
+  value: z.string(),
+  unrestricted_value: z.string(),
+  data: z.object({
+    country: optionalText,
+    region_with_type: optionalText,
+    city: optionalText,
+    street_with_type: optionalText,
+    house: optionalText,
+    block: optionalText,
+    block_type: optionalText,
+    postal_code: optionalText,
+    house_fias_id: HouseFiasId.nullish(),
+    flat: optionalText,
+    flat_type: optionalText,
+    flat_fias_id: FlatFiasId.nullish(),
+  }),
+});
+const responseSchema = z.object({ suggestions: z.array(rowSchema).optional() });
+type DaDataRow = z.infer<typeof rowSchema>;
 
 type Fetch = typeof fetch;
 type Route = 'suggest' | 'flats';
@@ -82,9 +102,9 @@ export class DaDataAddressProvider implements AddressProvider {
         return [];
       }
 
-      const json = (await res.json()) as { suggestions?: DaDataRow[] };
+      const parsed = responseSchema.safeParse(await res.json());
 
-      return json.suggestions ?? [];
+      return parsed.success ? (parsed.data.suggestions ?? []) : [];
     } catch {
       // Caller falls back to Nominatim
       return [];
@@ -147,13 +167,21 @@ export class DaDataAddressProvider implements AddressProvider {
       'flats'
     );
 
-    return rows
-      .filter((row) => row.data.flat)
-      .map((row) => ({
-        label: row.value,
-        flat: row.data.flat as string,
-        oneLine: row.unrestricted_value,
-        flatFiasId: row.data.flat_fias_id ?? undefined,
-      }));
+    return rows.flatMap((row) => {
+      const flat = row.data.flat;
+
+      if (!flat) {
+        return [];
+      }
+
+      return [
+        {
+          label: row.value,
+          flat,
+          oneLine: row.unrestricted_value,
+          flatFiasId: row.data.flat_fias_id ?? undefined,
+        },
+      ];
+    });
   }
 }

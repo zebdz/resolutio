@@ -1,16 +1,21 @@
+/** Resolves evidence access from validated viewer and aggregate identities. */
+import { UserId, OrganizationId, BoardId } from '../../domain/shared/EntityIds';
 import { Poll } from '../../domain/poll/Poll';
 
 export interface OrgRepoForPollVisibility {
-  isUserMember(userId: string, organizationId: string): Promise<boolean>;
-  isUserAdmin(userId: string, organizationId: string): Promise<boolean>;
+  isUserMember(
+    userId: UserId,
+    organizationId: OrganizationId
+  ): Promise<boolean>;
+  isUserAdmin(userId: UserId, organizationId: OrganizationId): Promise<boolean>;
 }
 
 export interface BoardRepoForPollVisibility {
-  isUserMember(userId: string, boardId: string): Promise<boolean>;
+  isUserMember(userId: UserId, boardId: BoardId): Promise<boolean>;
 }
 
 export interface UserRepoForPollVisibility {
-  isSuperAdmin(userId: string): Promise<boolean>;
+  isSuperAdmin(userId: UserId): Promise<boolean>;
 }
 
 /**
@@ -35,7 +40,7 @@ export class ResolvePollAttachmentVisibilityService {
     private users: UserRepoForPollVisibility
   ) {}
 
-  async canRead(poll: Poll, viewerId: string | null): Promise<boolean> {
+  async canRead(poll: Poll, viewerId: UserId | null): Promise<boolean> {
     // Overrides, logged-in only: creator, superadmin, and org admin always
     // read, including drafts and archived polls.
     if (viewerId) {

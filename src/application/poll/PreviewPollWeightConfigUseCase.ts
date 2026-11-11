@@ -1,3 +1,17 @@
+/** Poll application boundary validates requests, invokes domain behavior and
+ * preserves known failure codes across authorization and persistence ports. */
+import { VotingWeight } from '../../domain/poll/VotingWeight';
+import {
+  TotalVotingWeight,
+  sumVotingWeights,
+} from '../../domain/poll/ResultTallies';
+import { z } from 'zod';
+import {
+  PollId,
+  UserId,
+  PropertyId,
+  ParticipantId,
+} from '../../domain/shared/EntityIds';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
@@ -15,8 +29,11 @@ import {
   parsePropertyAggregation,
 } from '../../domain/poll/PropertyAggregation';
 import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
-import { PollErrors } from './PollErrors';
-import { PollWeightCalculator } from './PollWeightCalculator';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
+import {
+  PollWeightCalculator,
+  PollWeightCalculationFailure,
+} from './PollWeightCalculator';
 
 export interface PreviewPollWeightConfigInput {
   pollId: string;
@@ -32,16 +49,16 @@ export interface PreviewPollWeightConfigOutput {
   effectiveConfig: {
     distributionType: DistributionType;
     propertyAggregation: PropertyAggregation;
-    propertyIds: string[];
+    propertyIds: PropertyId[];
   };
-  addedParticipants: Array<{ userId: string; newWeight: number }>;
-  removedParticipants: Array<{ userId: string }>;
+  addedParticipants: Array<{ userId: UserId; newWeight: VotingWeight }>;
+  removedParticipants: Array<{ userId: UserId }>;
   reweightedParticipants: Array<{
-    userId: string;
-    oldWeight: number;
-    newWeight: number;
+    userId: UserId;
+    oldWeight: VotingWeight;
+    newWeight: VotingWeight;
   }>;
-  totalWeight: number;
+  totalWeight: TotalVotingWeight;
 }
 
 export class PreviewPollWeightConfigUseCase {
@@ -56,8 +73,23 @@ export class PreviewPollWeightConfigUseCase {
   ) {}
 
   async execute(
-    input: PreviewPollWeightConfigInput
-  ): Promise<Result<PreviewPollWeightConfigOutput, string>> {
+    rawRequest: PreviewPollWeightConfigInput
+  ): Promise<
+    Result<
+      PreviewPollWeightConfigOutput,
+      PollUseCaseFailure | PollWeightCalculationFailure
+    >
+  > {
+    const decoded = z
+      .object({ pollId: PollId, actingUserId: UserId })
+      .safeParse(rawRequest);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawRequest, ...decoded.data };
+
     const pollR = await this.pollRepository.getPollById(input.pollId);
 
     if (!pollR.success) {
@@ -111,7 +143,15 @@ export class PreviewPollWeightConfigUseCase {
     const dtStr = input.newConfig.distributionType ?? poll.distributionType;
     const paStr =
       input.newConfig.propertyAggregation ?? poll.propertyAggregation;
-    const propIds = input.newConfig.propertyIds ?? poll.propertyIds;
+    const decodedProperties = z
+      .array(PropertyId)
+      .safeParse(input.newConfig.propertyIds ?? poll.propertyIds);
+
+    if (!decodedProperties.success) {
+      return failure(PollDomainCodes.PROPERTY_NOT_IN_ORG);
+    }
+
+    const propIds = decodedProperties.data;
 
     const dtR = parseDistributionType(dtStr);
 
@@ -173,12 +213,12 @@ export class PreviewPollWeightConfigUseCase {
       currentR.value.map((p) => [p.userId, p] as const)
     );
 
-    const added: Array<{ userId: string; newWeight: number }> = [];
-    const removed: Array<{ userId: string }> = [];
+    const added: Array<{ userId: UserId; newWeight: VotingWeight }> = [];
+    const removed: Array<{ userId: UserId }> = [];
     const reweighted: Array<{
-      userId: string;
-      oldWeight: number;
-      newWeight: number;
+      userId: UserId;
+      oldWeight: VotingWeight;
+      newWeight: VotingWeight;
     }> = [];
 
     for (const userId of candidates) {
@@ -198,7 +238,7 @@ export class PreviewPollWeightConfigUseCase {
       }
     }
 
-    const totalWeight = [...newWeights.values()].reduce((s, v) => s + v, 0);
+    const totalWeight = sumVotingWeights([...newWeights.values()]);
 
     return success({
       effectiveConfig: {

@@ -1,3 +1,5 @@
+import { PollDomainCodes } from '@/domain/poll/PollDomainCodes';
+import { OrganizationId, UserId, PropertyId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PollWeightCalculator } from '../PollWeightCalculator';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
@@ -27,11 +29,11 @@ describe('PollWeightCalculator', () => {
 
   it('EQUAL with no scope: skips DB and returns weight 1 per candidate', async () => {
     const r = await calculator.compute({
-      organizationId: 'org-1',
+      organizationId: OrganizationId.parse('org-1'),
       distributionType: DistributionType.EQUAL,
       propertyAggregation: PropertyAggregation.RAW_SUM,
       propertyIds: [],
-      candidates: ['a', 'b', 'c'],
+      candidates: [UserId.parse('a'), UserId.parse('b'), UserId.parse('c')],
     });
 
     expect(r.success).toBe(true);
@@ -40,9 +42,9 @@ describe('PollWeightCalculator', () => {
       return;
     }
 
-    expect(r.value.get('a')).toBe(1);
-    expect(r.value.get('b')).toBe(1);
-    expect(r.value.get('c')).toBe(1);
+    expect(r.value.get(UserId.parse('a'))).toBe(1);
+    expect(r.value.get(UserId.parse('b'))).toBe(1);
+    expect(r.value.get(UserId.parse('c'))).toBe(1);
     expect(propertyAssetRepository.findAssetsInScope).not.toHaveBeenCalled();
     expect(propertyAssetRepository.findCurrentOwnership).not.toHaveBeenCalled();
   });
@@ -63,11 +65,11 @@ describe('PollWeightCalculator', () => {
     );
 
     const r = await calculator.compute({
-      organizationId: 'org-1',
+      organizationId: OrganizationId.parse('org-1'),
       distributionType: DistributionType.EQUAL,
       propertyAggregation: PropertyAggregation.RAW_SUM,
-      propertyIds: ['P'],
-      candidates: ['a', 'b'],
+      propertyIds: [PropertyId.parse('P')],
+      candidates: [UserId.parse('a'), UserId.parse('b')],
     });
 
     expect(r.success).toBe(true);
@@ -76,8 +78,8 @@ describe('PollWeightCalculator', () => {
       return;
     }
 
-    expect(r.value.get('a')).toBe(1);
-    expect(r.value.has('b')).toBe(false);
+    expect(r.value.get(UserId.parse('a'))).toBe(1);
+    expect(r.value.has(UserId.parse('b'))).toBe(false);
   });
 
   // The reason this service exists: deriving the asset list from ownership
@@ -114,11 +116,11 @@ describe('PollWeightCalculator', () => {
     );
 
     const r = await calculator.compute({
-      organizationId: 'org-1',
+      organizationId: OrganizationId.parse('org-1'),
       distributionType: DistributionType.OWNERSHIP_SIZE_WEIGHTED,
       propertyAggregation: PropertyAggregation.NORMALIZE_PER_PROPERTY,
       propertyIds: [],
-      candidates: ['alice', 'bob'],
+      candidates: [UserId.parse('alice'), UserId.parse('bob')],
     });
 
     expect(r.success).toBe(true);
@@ -129,8 +131,8 @@ describe('PollWeightCalculator', () => {
 
     // Alice: (0.5 × 80 + 1 × 20) / 200 = 60/200 = 0.30
     // Bob:   (0.5 × 80) / 200 = 40/200 = 0.20
-    expect(r.value.get('alice')).toBeCloseTo(0.3, 6);
-    expect(r.value.get('bob')).toBeCloseTo(0.2, 6);
+    expect(r.value.get(UserId.parse('alice'))).toBeCloseTo(0.3, 6);
+    expect(r.value.get(UserId.parse('bob'))).toBeCloseTo(0.2, 6);
   });
 
   it('walks descendants to build treeOrgIds before querying', async () => {
@@ -139,10 +141,10 @@ describe('PollWeightCalculator', () => {
       .mockResolvedValue(['child-1', 'child-2']);
 
     await calculator.compute({
-      organizationId: 'root',
+      organizationId: OrganizationId.parse('root'),
       distributionType: DistributionType.OWNERSHIP_UNIT_COUNT,
       propertyAggregation: PropertyAggregation.RAW_SUM,
-      propertyIds: ['P'],
+      propertyIds: [PropertyId.parse('P')],
       candidates: [],
     });
 
@@ -172,11 +174,11 @@ describe('PollWeightCalculator', () => {
     );
 
     const r = await calculator.compute({
-      organizationId: 'org-1',
+      organizationId: OrganizationId.parse('org-1'),
       distributionType: DistributionType.OWNERSHIP_UNIT_COUNT,
       propertyAggregation: PropertyAggregation.RAW_SUM,
       propertyIds: [],
-      candidates: ['alice'],
+      candidates: [UserId.parse('alice')],
     });
 
     expect(r.success).toBe(true);
@@ -191,6 +193,36 @@ describe('PollWeightCalculator', () => {
   });
 
   describe('computeBuildingTotal — theoretical-max denominator for "% of building"', () => {
+    it('returns no building denominator for EQUAL without loading ownership data', async () => {
+      expect(
+        await calculator.computeBuildingTotal({
+          organizationId: OrganizationId.parse('org-1'),
+          distributionType: DistributionType.EQUAL,
+          propertyAggregation: PropertyAggregation.RAW_SUM,
+          propertyIds: [],
+        })
+      ).toEqual(success(null));
+      expect(organizationRepository.getDescendantIds).not.toHaveBeenCalled();
+      expect(propertyAssetRepository.findAssetsInScope).not.toHaveBeenCalled();
+    });
+
+    it('rejects an overflowed total instead of exposing Infinity', async () => {
+      propertyAssetRepository.findAssetsInScope = vi.fn().mockResolvedValue(
+        success([
+          { id: 'a', propertyId: 'P', size: Number.MAX_VALUE },
+          { id: 'b', propertyId: 'P', size: Number.MAX_VALUE },
+        ])
+      );
+      expect(
+        await calculator.computeBuildingTotal({
+          organizationId: OrganizationId.parse('org-1'),
+          distributionType: DistributionType.OWNERSHIP_SIZE_WEIGHTED,
+          propertyAggregation: PropertyAggregation.RAW_SUM,
+          propertyIds: [],
+        })
+      ).toEqual(failure(PollDomainCodes.INVALID_WEIGHT));
+    });
+
     // Reflects the spec's "Building total voting power" — what Σ weights would
     // be if every existing owner row were a registered user AND every asset
     // were fully owned. Unregistered owners and ownerless assets contribute
@@ -205,7 +237,7 @@ describe('PollWeightCalculator', () => {
       );
 
       const r = await calculator.computeBuildingTotal({
-        organizationId: 'org-1',
+        organizationId: OrganizationId.parse('org-1'),
         distributionType: DistributionType.OWNERSHIP_SIZE_WEIGHTED,
         propertyAggregation: PropertyAggregation.RAW_SUM,
         propertyIds: [],
@@ -230,7 +262,7 @@ describe('PollWeightCalculator', () => {
       );
 
       const r = await calculator.computeBuildingTotal({
-        organizationId: 'org-1',
+        organizationId: OrganizationId.parse('org-1'),
         distributionType: DistributionType.OWNERSHIP_UNIT_COUNT,
         propertyAggregation: PropertyAggregation.RAW_SUM,
         propertyIds: [],
@@ -256,7 +288,7 @@ describe('PollWeightCalculator', () => {
       );
 
       const r = await calculator.computeBuildingTotal({
-        organizationId: 'org-1',
+        organizationId: OrganizationId.parse('org-1'),
         distributionType: DistributionType.OWNERSHIP_SIZE_WEIGHTED,
         propertyAggregation: PropertyAggregation.NORMALIZE_PER_PROPERTY,
         propertyIds: [],
@@ -275,14 +307,14 @@ describe('PollWeightCalculator', () => {
   it('propagates findAssetsInScope failure', async () => {
     propertyAssetRepository.findAssetsInScope = vi
       .fn()
-      .mockResolvedValue(failure('DB asset error'));
+      .mockResolvedValue(failure('common.errors.unexpected'));
 
     const r = await calculator.compute({
-      organizationId: 'org-1',
+      organizationId: OrganizationId.parse('org-1'),
       distributionType: DistributionType.OWNERSHIP_UNIT_COUNT,
       propertyAggregation: PropertyAggregation.RAW_SUM,
       propertyIds: [],
-      candidates: ['alice'],
+      candidates: [UserId.parse('alice')],
     });
 
     expect(r.success).toBe(false);
@@ -291,6 +323,6 @@ describe('PollWeightCalculator', () => {
       return;
     }
 
-    expect(r.error).toBe('DB asset error');
+    expect(r.error).toBe('common.errors.unexpected');
   });
 });

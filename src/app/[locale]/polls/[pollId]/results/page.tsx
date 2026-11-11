@@ -1,4 +1,6 @@
+/** Loads the permission-filtered action view and renders results with related reports. */
 import { getLocale, getTranslations } from 'next-intl/server';
+import { UserId } from '@/domain/shared/EntityIds';
 import { getCurrentUser } from '@/web/lib/session';
 import { getPollResultsAction } from '@/src/web/actions/poll/vote';
 import { getPollByIdAction } from '@/src/web/actions/poll/poll';
@@ -7,11 +9,6 @@ import PollResults from '@/src/web/components/polls/results/PollResults';
 import { WeightConfigLabel } from '@/src/web/components/polls/results/WeightConfigLabel';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import ReportCard from '@/web/components/report/ReportCard';
-import {
-  AnswerResult,
-  QuestionResult,
-  ProtocolSignWillingnessEntry,
-} from '@/src/application/poll/GetPollResultsUseCase';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { User } from '@/domain/user/User';
 import {
@@ -22,8 +19,6 @@ import {
   PrismaUserRepository,
 } from '@/infrastructure/index';
 import { PollWeightCalculator } from '@/application/poll/PollWeightCalculator';
-import { DistributionType } from '@/domain/poll/DistributionType';
-import { PropertyAggregation } from '@/domain/poll/PropertyAggregation';
 import { MarkdownRenderer } from '@/web/components/markdown/MarkdownRenderer';
 import { POLL_ATTACHMENT_API_PREFIX } from '@/domain/poll/PollAttachment';
 import { redirectLocalized } from '@/web/lib/redirectLocalized';
@@ -68,14 +63,14 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
       propertyRepository.findByOrganization(poll.organizationId),
       pollWeightCalculator.computeBuildingTotal({
         organizationId: poll.organizationId,
-        distributionType: poll.distributionType as DistributionType,
-        propertyAggregation: poll.propertyAggregation as PropertyAggregation,
+        distributionType: poll.distributionType,
+        propertyAggregation: poll.propertyAggregation,
         propertyIds: poll.propertyIds,
       }),
     ]);
-  // 0 for EQUAL polls; the UI hides the building stat in that case.
+  // Preserve the UI payload: absent EQUAL denominator becomes 0 to hide the building stat.
   const buildingTotal = buildingTotalResult.success
-    ? buildingTotalResult.value
+    ? (buildingTotalResult.value ?? 0)
     : 0;
 
   const allProperties = propertiesResult.success
@@ -130,90 +125,20 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
     ? attachedReportsResult.data.reports
     : [];
   const attachedReportAuthorIds = [
-    ...new Set(attachedReports.map((r) => r.createdById)),
+    ...new Set(attachedReports.map((r) => UserId.parse(r.createdById))),
   ];
   const attachedReportAuthors =
     attachedReportAuthorIds.length > 0
       ? await userRepository.findByIds(attachedReportAuthorIds)
       : [];
-  const attachedReportAuthorMap = new Map(
+  const attachedReportAuthorMap = new Map<string, User>(
     attachedReportAuthors.map((a) => [a.id, a])
   );
 
-  // IMPORTANT: Only send voter data to client if user has permission to view it
-  // This prevents unauthorized access to sensitive voting data via browser console.
-  // Two independent gates: voter names open up to members on a named poll,
-  // while sign-willingness carries phone numbers under a separate consent and
-  // stays admin-only in every case.
+  // The action filters identities and signing contacts before returning its plain view.
   const canViewVoters = results.canViewVoterNames;
   const canViewSignWillingness = results.canViewSignWillingness;
-
-  // Serialize results data for client component
-  const serializedResults = {
-    pollId: results.poll.id,
-    totalParticipants: results.totalParticipants,
-    totalWeight: results.totalParticipantWeight,
-    votedParticipants: results.results.reduce(
-      (count: number, question: QuestionResult) => {
-        const uniqueVoters = new Set(
-          question.answers.flatMap((a: AnswerResult) =>
-            a.voters.map((v) => v.userId)
-          )
-        );
-
-        return Math.max(count, uniqueVoters.size);
-      },
-      0
-    ),
-    questions: results.results.map((q: any) => ({
-      questionId: q.questionId,
-      questionText: q.questionText,
-      questionType: q.questionType,
-      totalVotes: q.totalVotes,
-      // Σ answer weights (double-counts multi-choice voters); used for
-      // displaying answer-share percentages where each tick is a separate row.
-      totalWeight: q.answers.reduce(
-        (sum: number, a: any) => sum + a.totalWeight,
-        0
-      ),
-      // Σ unique voters' weights — the right denominator for "% of building"
-      // since participation is per voter, not per tick.
-      participantWeight: q.participantWeight,
-      answers: q.answers.map((a: any) => ({
-        answerId: a.answerId,
-        answerText: a.answerText,
-        voteCount: a.voteCount,
-        weightedVotes: a.totalWeight,
-        percentage: a.percentage,
-        // SECURITY: Only include voter details if user has permission
-        voters: canViewVoters
-          ? a.voters.map((v: any) => ({
-              userId: v.userId,
-              userName: User.formatFullName(
-                v.userName.firstName,
-                v.userName.lastName,
-                v.userName.middleName
-              ),
-              weight:
-                typeof v.weight === 'object' ? Number(v.weight) : v.weight,
-            }))
-          : [], // Empty array if user doesn't have permission
-      })),
-    })),
-    // SECURITY: Only include protocol sign willingness if user has admin permission
-    protocolSignWillingness: canViewSignWillingness
-      ? results.protocolSignWillingness.map(
-          (entry: ProtocolSignWillingnessEntry) => ({
-            userId: entry.userId,
-            firstName: entry.firstName,
-            lastName: entry.lastName,
-            middleName: entry.middleName,
-            willingToSignProtocol: entry.willingToSignProtocol,
-            phoneNumber: entry.phoneNumber,
-          })
-        )
-      : [],
-  };
+  const serializedResults = results.results;
 
   return (
     <AuthenticatedLayout>

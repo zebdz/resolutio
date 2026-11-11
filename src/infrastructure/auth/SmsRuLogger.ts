@@ -1,3 +1,5 @@
+/** Serializes provider log DTOs to JSON lines. Unknown quotes remain explicit null;
+ * logging primitives are transport fields, not domain or provider validation inputs. */
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -7,7 +9,7 @@ export interface SmsRuSuccessLogEntry {
   statusCode: number;
   smsId: string;
   balance: number;
-  cost: number;
+  cost: number | null;
   testMode: boolean;
   clientIp: string;
   message: string;
@@ -28,7 +30,7 @@ export interface SmsRuCostExceededLogEntry {
   phone: string;
   locale: string;
   statusCode: number;
-  cost: number;
+  cost: number | null;
   maxCost: number;
   testMode: boolean;
   clientIp: string;

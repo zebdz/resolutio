@@ -1,8 +1,16 @@
+/** Phone clients receive a validated scalar; coercible arrays/objects cannot become contact values. */
 import { describe, it, expect } from 'vitest';
 import { PhoneNumber } from '../PhoneNumber';
+import { UserDomainCodes } from '../UserDomainCodes';
 
 describe('PhoneNumber', () => {
   describe('create', () => {
+    it('rejects a non-string instead of retaining a coercible object', () => {
+      // @ts-expect-error Exercise untyped boundary input, not a validated string.
+      expect(() => PhoneNumber.create(['+79161234567'])).toThrow(
+        UserDomainCodes.PHONE_NUMBER_INVALID
+      );
+    });
     it('should create a valid phone number', () => {
       const phone = PhoneNumber.create('+79161234567');
       expect(phone.getValue()).toBe('+79161234567');
@@ -15,31 +23,31 @@ describe('PhoneNumber', () => {
 
     it('should throw error for invalid format without plus', () => {
       expect(() => PhoneNumber.create('79161234567')).toThrow(
-        'Invalid phone number format'
+        UserDomainCodes.PHONE_NUMBER_INVALID
       );
     });
 
     it('should throw error for invalid format with spaces', () => {
       expect(() => PhoneNumber.create('+7 916 123 45 67')).toThrow(
-        'Invalid phone number format'
+        UserDomainCodes.PHONE_NUMBER_INVALID
       );
     });
 
     it('should throw error for invalid format with dashes', () => {
       expect(() => PhoneNumber.create('+7-916-123-45-67')).toThrow(
-        'Invalid phone number format'
+        UserDomainCodes.PHONE_NUMBER_INVALID
       );
     });
 
     it('should throw error for phone number starting with 0', () => {
       expect(() => PhoneNumber.create('+09161234567')).toThrow(
-        'Invalid phone number format'
+        UserDomainCodes.PHONE_NUMBER_INVALID
       );
     });
 
     it('should throw error for empty string', () => {
       expect(() => PhoneNumber.create('')).toThrow(
-        'Invalid phone number format'
+        UserDomainCodes.PHONE_NUMBER_INVALID
       );
     });
   });

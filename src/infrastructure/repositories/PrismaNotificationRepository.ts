@@ -1,12 +1,11 @@
+/** Producer persistence appends supplied identities/time and returns explicit storage outcomes.
+ * Query catches only wrap Prisma I/O; checked restoration happens outside the throwing boundary. */
+import { success, failure } from '@/domain/shared/Result';
 import {
   PrismaClient,
-  Prisma,
   Notification as PrismaNotification,
 } from '@/generated/prisma';
-import {
-  NotificationRepository,
-  FindByUserIdOptions,
-} from '../../domain/notification/NotificationRepository';
+import type { NotificationRepository } from '@/domain/notification/NotificationRepository';
 import {
   Notification,
   NotificationProps,
@@ -19,7 +18,7 @@ function toProps(row: PrismaNotification): NotificationProps {
     type: row.type,
     title: row.title,
     body: row.body,
-    data: row.data as Record<string, unknown> | null,
+    data: row.data,
     readAt: row.readAt,
     createdAt: row.createdAt,
   };
@@ -28,98 +27,61 @@ function toProps(row: PrismaNotification): NotificationProps {
 export class PrismaNotificationRepository implements NotificationRepository {
   constructor(private prisma: PrismaClient) {}
 
-  async save(notification: Notification): Promise<Notification> {
+  async save(
+    notification: Notification
+  ): ReturnType<NotificationRepository['save']> {
     const json = notification.toJSON();
-    const row = await this.prisma.notification.create({
-      data: {
+    const data = {
+      id: json.id,
+      createdAt: json.createdAt,
+      userId: json.userId,
+      type: json.type,
+      title: json.title,
+      body: json.body,
+      data: json.data,
+      readAt: json.readAt,
+    };
+    let row;
+
+    try {
+      row = await this.prisma.notification.create({ data });
+    } catch {
+      return failure('common.errors.unexpected');
+    }
+
+    const restored = Notification.restore(toProps(row));
+
+    return restored.success ? restored : failure('common.errors.unexpected');
+  }
+
+  async saveBatch(
+    notifications: Notification[]
+  ): ReturnType<NotificationRepository['saveBatch']> {
+    if (notifications.length === 0) {
+      return success(undefined);
+    }
+
+    const data = notifications.map((n) => {
+      const json = n.toJSON();
+
+      return {
+        id: json.id,
+        createdAt: json.createdAt,
         userId: json.userId,
         type: json.type,
         title: json.title,
         body: json.body,
-        data: (json.data as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+        data: json.data,
         readAt: json.readAt,
-      },
+      };
     });
 
-    return Notification.reconstitute(toProps(row));
-  }
-
-  async saveBatch(notifications: Notification[]): Promise<void> {
-    if (notifications.length === 0) {
-      return;
+    try {
+      await this.prisma.notification.createMany({ data });
+    } catch {
+      return failure('common.errors.unexpected');
     }
 
-    await this.prisma.notification.createMany({
-      data: notifications.map((n) => {
-        const json = n.toJSON();
-
-        return {
-          userId: json.userId,
-          type: json.type,
-          title: json.title,
-          body: json.body,
-          data: (json.data as Prisma.InputJsonValue) ?? Prisma.JsonNull,
-          readAt: json.readAt,
-        };
-      }),
-    });
-  }
-
-  async findById(id: string): Promise<Notification | null> {
-    const row = await this.prisma.notification.findUnique({ where: { id } });
-
-    return row ? Notification.reconstitute(toProps(row)) : null;
-  }
-
-  async findByUserId(
-    userId: string,
-    options?: FindByUserIdOptions
-  ): Promise<Notification[]> {
-    const rows = await this.prisma.notification.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: options?.limit,
-      skip: options?.offset,
-    });
-
-    return rows.map((row) => Notification.reconstitute(toProps(row)));
-  }
-
-  async getUnreadCount(userId: string): Promise<number> {
-    return this.prisma.notification.count({
-      where: { userId, readAt: null },
-    });
-  }
-
-  async markAsRead(id: string): Promise<void> {
-    await this.prisma.notification.update({
-      where: { id },
-      data: { readAt: new Date() },
-    });
-  }
-
-  async markAllAsRead(userId: string): Promise<void> {
-    await this.prisma.notification.updateMany({
-      where: { userId, readAt: null },
-      data: { readAt: new Date() },
-    });
-  }
-
-  async findByIds(ids: string[]): Promise<Notification[]> {
-    const rows = await this.prisma.notification.findMany({
-      where: { id: { in: ids } },
-    });
-
-    return rows.map((row) => Notification.reconstitute(toProps(row)));
-  }
-
-  async deleteByIds(ids: string[]): Promise<void> {
-    await this.prisma.notification.deleteMany({
-      where: { id: { in: ids } },
-    });
-  }
-
-  async getCountByUserId(userId: string): Promise<number> {
-    return this.prisma.notification.count({ where: { userId } });
+    return success(undefined);
   }
 }

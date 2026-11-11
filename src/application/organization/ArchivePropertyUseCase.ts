@@ -1,9 +1,21 @@
+/** Application boundary validates raw requests before invoking property/claim
+ * behavior, and supplies explicit identity/time through injected dependencies. */
+import {
+  OrganizationId,
+  PropertyId,
+  UserId,
+} from '../../domain/shared/EntityIds';
+import { ClaimDenialReason } from '../../domain/organization/PropertyValues';
+import { Clock } from '../shared/EntityCreation';
 import { OrganizationPropertyRepository } from '../../domain/organization/OrganizationPropertyRepository';
 import { PropertyAssetRepository } from '../../domain/organization/PropertyAssetRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 import { OrganizationDomainCodes } from '../../domain/organization/OrganizationDomainCodes';
 import { AutoDenyPendingClaimsOnArchiveUseCase } from './AutoDenyPendingClaimsOnArchiveUseCase';
 
@@ -13,6 +25,7 @@ export interface ArchivePropertyInput {
 }
 
 export interface ArchivePropertyDependencies {
+  clock: Clock;
   propertyRepository: OrganizationPropertyRepository;
   assetRepository: PropertyAssetRepository;
   organizationRepository: OrganizationRepository;
@@ -23,8 +36,22 @@ export interface ArchivePropertyDependencies {
 export class ArchivePropertyUseCase {
   constructor(private deps: ArchivePropertyDependencies) {}
 
-  async execute(input: ArchivePropertyInput): Promise<Result<void, string>> {
-    const found = await this.deps.propertyRepository.findById(input.propertyId);
+  async execute(
+    input: ArchivePropertyInput
+  ): Promise<Result<void, OrganizationUseCaseFailure>> {
+    const propertyId = PropertyId.safeParse(input.propertyId);
+
+    if (!propertyId.success) {
+      return failure(OrganizationDomainCodes.PROPERTY_NOT_FOUND);
+    }
+
+    const adminUserId = UserId.safeParse(input.adminUserId);
+
+    if (!adminUserId.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
+    }
+
+    const found = await this.deps.propertyRepository.findById(propertyId.data);
 
     if (!found.success) {
       return failure(found.error);
@@ -36,11 +63,12 @@ export class ArchivePropertyUseCase {
 
     const property = found.value;
 
-    if (!(await this.authorize(input.adminUserId, property.organizationId))) {
+    if (!(await this.authorize(adminUserId.data, property.organizationId))) {
       return failure(OrganizationErrors.NOT_ADMIN);
     }
 
-    const arch = property.archive();
+    const at = this.deps.clock.now();
+    const arch = property.archive(at);
 
     if (!arch.success) {
       return failure(arch.error);
@@ -60,7 +88,7 @@ export class ArchivePropertyUseCase {
 
     if (assets.success) {
       for (const a of assets.value) {
-        const r = a.archive();
+        const r = a.archive(at);
 
         if (r.success) {
           await this.deps.assetRepository.updateAsset(a);
@@ -69,15 +97,22 @@ export class ArchivePropertyUseCase {
     }
 
     // Auto-deny any pending claims on assets in this property.
-    await this.deps.autoDenyClaims.executeForProperty({
+    const denied = await this.deps.autoDenyClaims.executeForProperty({
       propertyId: property.id,
-      systemReason: 'property archived',
+      systemReason: ClaimDenialReason.parse('property archived'),
     });
+
+    if (!denied.success) {
+      return denied;
+    }
 
     return success(undefined);
   }
 
-  private async authorize(userId: string, orgId: string): Promise<boolean> {
+  private async authorize(
+    userId: UserId,
+    orgId: OrganizationId
+  ): Promise<boolean> {
     if (await this.deps.userRepository.isSuperAdmin(userId)) {
       return true;
     }

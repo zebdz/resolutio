@@ -1,3 +1,11 @@
+/** Loads organization details and membership flags through typed core ports.
+ * Public directory projections contain validated names and identities only. */
+import {
+  DirectoryPerson,
+  OrganizationDirectory,
+} from './OrganizationDirectory';
+import { MemberCount } from '../../domain/organization/OrganizationValues';
+import { OrganizationId, UserId } from '../../domain/shared/EntityIds';
 import {
   OrganizationRepository,
   OrganizationAncestor,
@@ -8,23 +16,21 @@ import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { Organization } from '../../domain/organization/Organization';
 import { Board } from '../../domain/board/Board';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 
 export interface GetOrganizationDetailsInput {
   organizationId: string;
   userId?: string; // Optional - for checking membership status
 }
 
-export interface BoardMember {
-  id: string;
-  firstName: string;
-  lastName: string;
-  middleName: string | null;
-}
+export type BoardMember = DirectoryPerson;
 
 export interface BoardWithMemberCount {
   board: Board;
-  memberCount: number;
+  memberCount: MemberCount;
   members: BoardMember[];
   isUserMember: boolean;
 }
@@ -34,12 +40,7 @@ export interface OrganizationDetailsResult {
   boards: BoardWithMemberCount[];
   isUserMember: boolean;
   isUserAdmin: boolean;
-  firstAdmin: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    middleName: string | null;
-  } | null;
+  firstAdmin: DirectoryPerson | null;
   ancestors: OrganizationAncestor[];
   hierarchyTree: OrganizationTreeNode;
 }
@@ -48,7 +49,7 @@ export interface GetOrganizationDetailsDependencies {
   organizationRepository: OrganizationRepository;
   boardRepository: BoardRepository;
   userRepository: UserRepository;
-  prisma: any; // For custom queries
+  directory: Pick<OrganizationDirectory, 'boardMembers' | 'firstAdmin'>;
 }
 
 export class GetOrganizationDetailsUseCase {
@@ -56,8 +57,26 @@ export class GetOrganizationDetailsUseCase {
 
   async execute(
     input: GetOrganizationDetailsInput
-  ): Promise<Result<OrganizationDetailsResult, string>> {
-    const { organizationId, userId } = input;
+  ): Promise<Result<OrganizationDetailsResult, OrganizationUseCaseFailure>> {
+    const parsedOrganizationId = OrganizationId.safeParse(input.organizationId);
+
+    if (!parsedOrganizationId.success) {
+      return failure(OrganizationErrors.NOT_FOUND);
+    }
+
+    const parsedUserId = UserId.optional().safeParse(input.userId);
+
+    if (!parsedUserId.success) {
+      return failure(OrganizationErrors.USER_NOT_FOUND);
+    }
+
+    const command = {
+      ...input,
+      organizationId: parsedOrganizationId.data,
+      userId: parsedUserId.data,
+    };
+
+    const { organizationId, userId } = command;
 
     // Fetch organization
     const organization =
@@ -77,55 +96,40 @@ export class GetOrganizationDetailsUseCase {
       await this.deps.boardRepository.findByOrganizationId(organizationId);
 
     // Get member counts and user membership for each board
-    const boardsWithDetails = await Promise.all(
+    const boardResults = await Promise.all(
       boards
         .filter((board) => !board.isArchived())
         .map(async (board) => {
-          const boardUsers = await this.deps.prisma.boardUser.findMany({
-            where: {
-              boardId: board.id,
-              removedAt: null,
-            },
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  firstName: true,
-                  lastName: true,
-                  middleName: true,
-                },
-              },
-            },
-          });
+          const result = await this.deps.directory.boardMembers(board.id);
 
-          const members: BoardMember[] = boardUsers.map(
-            (bu: {
-              user: {
-                id: string;
-                firstName: string;
-                lastName: string;
-                middleName: string | null;
-              };
-            }) => ({
-              id: bu.user.id,
-              firstName: bu.user.firstName,
-              lastName: bu.user.lastName,
-              middleName: bu.user.middleName,
-            })
-          );
+          if (!result.success) {
+            return result;
+          }
+
+          const members = result.value;
 
           const isUserMember = userId
             ? await this.deps.boardRepository.isUserMember(userId, board.id)
             : false;
 
-          return {
+          return success({
             board,
-            memberCount: members.length,
+            memberCount: MemberCount.parse(members.length),
             members,
             isUserMember,
-          };
+          });
         })
     );
+
+    const boardsWithDetails: BoardWithMemberCount[] = [];
+
+    for (const result of boardResults) {
+      if (!result.success) {
+        return result;
+      }
+
+      boardsWithDetails.push(result.value);
+    }
 
     // Check if user is member or admin of organization
     let isUserMember = false;
@@ -151,34 +155,18 @@ export class GetOrganizationDetailsUseCase {
       await this.deps.organizationRepository.getHierarchyTree(organizationId);
 
     // Get first admin
-    const firstAdmin = await this.deps.prisma.organizationAdminUser.findFirst({
-      where: { organizationId },
-      orderBy: { createdAt: 'asc' },
-      include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            middleName: true,
-          },
-        },
-      },
-    });
+    const firstAdmin = await this.deps.directory.firstAdmin(organizationId);
+
+    if (!firstAdmin.success) {
+      return firstAdmin;
+    }
 
     return success({
       organization,
       boards: boardsWithDetails,
       isUserMember,
       isUserAdmin,
-      firstAdmin: firstAdmin
-        ? {
-            id: firstAdmin.user.id,
-            firstName: firstAdmin.user.firstName,
-            lastName: firstAdmin.user.lastName,
-            middleName: firstAdmin.user.middleName,
-          }
-        : null,
+      firstAdmin: firstAdmin.value,
       ancestors: hierarchy.ancestors,
       hierarchyTree: hierarchy.tree,
     });

@@ -1,9 +1,15 @@
+/** Parent-link request application boundary validates external identities before
+ * invoking domain decisions and typed authorization/persistence ports. */
+import { JoinParentRequestId, UserId } from '../../domain/shared/EntityIds';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { JoinParentRequestRepository } from '../../domain/organization/JoinParentRequestRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { CancelJoinParentRequestInput } from './CancelJoinParentRequestSchema';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 
 export interface CancelJoinParentRequestDependencies {
   joinParentRequestRepository: JoinParentRequestRepository;
@@ -16,8 +22,26 @@ export class CancelJoinParentRequestUseCase {
 
   async execute(
     input: CancelJoinParentRequestInput
-  ): Promise<Result<void, string>> {
-    const { requestId, adminUserId } = input;
+  ): Promise<Result<void, OrganizationUseCaseFailure>> {
+    const parsedRequestId = JoinParentRequestId.safeParse(input.requestId);
+
+    if (!parsedRequestId.success) {
+      return failure(OrganizationErrors.PARENT_REQUEST_NOT_FOUND);
+    }
+
+    const parsedAdminUserId = UserId.safeParse(input.adminUserId);
+
+    if (!parsedAdminUserId.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
+    }
+
+    const command = {
+      ...input,
+      requestId: parsedRequestId.data,
+      adminUserId: parsedAdminUserId.data,
+    };
+
+    const { requestId, adminUserId } = command;
 
     // 1. Find the request
     const request =

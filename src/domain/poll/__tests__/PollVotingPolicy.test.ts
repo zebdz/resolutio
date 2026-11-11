@@ -1,29 +1,95 @@
+/** Poll read and voting eligibility rules using persisted polls and real lifecycle transitions. */
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { PollInstant } from '@/domain/poll/PollValues';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import { expectFailure } from '@/domain/shared/__tests__/resultAssertions';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { PollId, QuestionId, AnswerId } from '@/domain/shared/EntityIds';
 import { describe, it, expect } from 'vitest';
 import { Poll } from '../Poll';
 import { Question } from '../Question';
 import { Answer } from '../Answer';
 import { PollVotingPolicy } from '../PollVotingPolicy';
+import { PollReadPolicy } from '../PollReadPolicy';
 import { PollDomainCodes } from '../PollDomainCodes';
 
 function makeDraftPoll(pollType: 'ORGANIZATION' | 'OPEN'): Poll {
-  const poll = Poll.create(
-    'Title',
-    'Description',
-    'org-1',
-    null,
-    'user-admin',
-    new Date('2026-01-01'),
-    new Date('2026-02-01'),
-    undefined,
-    pollType
-  ).value;
+  const created = expectSuccess(
+    Poll.create(
+      PollTitle.parse('Title'),
+      PollDescription.parse('Description'),
+      OrganizationId.parse('org-1'),
+      null,
+      UserId.parse('user-admin'),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-01'), new Date('2026-02-01'))
+      ),
+      testCreation(PollId, 'poll-1'),
+      undefined,
+      pollType
+    )
+  );
+  const poll = Poll.reconstitute({
+    ...created.toJSON(),
+    id: 'poll-1',
+    questions: created.questions,
+  });
 
-  const question = Question.create('Q1', 'poll-1', 1, 0, 'single-choice').value;
-  question.addAnswer(Answer.create('A1', 1, 'question-1').value);
+  const question = expectSuccess(
+    Question.create(
+      QuestionText.parse('Q1'),
+      PollId.parse('poll-1'),
+      testCreation(QuestionId, 'question-1'),
+      PageNumber.parse(1),
+      SortOrder.parse(0),
+      'single-choice'
+    )
+  );
+  question.addAnswer(
+    expectSuccess(
+      Answer.create(
+        AnswerText.parse('A1'),
+        SortOrder.parse(1),
+        QuestionId.parse('question-1'),
+        testCreation(AnswerId, 'answer-1')
+      )
+    )
+  );
   poll.addQuestion(question);
 
   return poll;
 }
+
+describe('PollReadPolicy', () => {
+  it.each([
+    [false, false, false],
+    [true, false, true],
+    [false, true, true],
+  ])(
+    'uses existing organization access: admin=%s member=%s',
+    (isAdmin, isOrgMember, allowed) => {
+      expect(
+        PollReadPolicy.canViewPoll(makeDraftPoll('ORGANIZATION'), {
+          isAdmin,
+          isOrgMember,
+        })
+      ).toBe(allowed);
+    }
+  );
+  it('lets an authenticated link holder read an open poll', () => {
+    expect(
+      PollReadPolicy.canViewPoll(makeDraftPoll('OPEN'), {
+        isAdmin: false,
+        isOrgMember: false,
+      })
+    ).toBe(true);
+  });
+});
 
 function makeActivePoll(pollType: 'ORGANIZATION' | 'OPEN'): Poll {
   const poll = makeDraftPoll(pollType);
@@ -59,7 +125,7 @@ describe('PollVotingPolicy.canVote', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.NOT_PARTICIPANT);
+      expect(expectFailure(result)).toBe(PollDomainCodes.NOT_PARTICIPANT);
     });
 
     it('rejects a participant who already finished voting', () => {
@@ -70,7 +136,7 @@ describe('PollVotingPolicy.canVote', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.ALREADY_VOTED);
+      expect(expectFailure(result)).toBe(PollDomainCodes.ALREADY_VOTED);
     });
   });
 
@@ -88,7 +154,7 @@ describe('PollVotingPolicy.canVote', () => {
       const result = PollVotingPolicy.canVote(makeActivePoll('OPEN'), noFacts);
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.USER_NOT_CONFIRMED);
+      expect(expectFailure(result)).toBe(PollDomainCodes.USER_NOT_CONFIRMED);
     });
 
     it('rejects a user who already finished voting', () => {
@@ -99,7 +165,7 @@ describe('PollVotingPolicy.canVote', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.ALREADY_VOTED);
+      expect(expectFailure(result)).toBe(PollDomainCodes.ALREADY_VOTED);
     });
   });
 
@@ -112,7 +178,7 @@ describe('PollVotingPolicy.canVote', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.POLL_NOT_ACTIVE);
+      expect(expectFailure(result)).toBe(PollDomainCodes.POLL_NOT_ACTIVE);
     });
 
     it('rejects a READY poll with POLL_NOT_ACTIVE', () => {
@@ -126,12 +192,14 @@ describe('PollVotingPolicy.canVote', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.POLL_NOT_ACTIVE);
+      expect(expectFailure(result)).toBe(PollDomainCodes.POLL_NOT_ACTIVE);
     });
 
     it('rejects a FINISHED poll with POLL_FINISHED', () => {
       const poll = makeActivePoll('OPEN');
-      poll.finish();
+      expect(
+        poll.finish(PollInstant.parse(new Date().toISOString())).success
+      ).toBe(true);
 
       const result = PollVotingPolicy.canVote(poll, {
         ...noFacts,
@@ -139,7 +207,7 @@ describe('PollVotingPolicy.canVote', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.POLL_FINISHED);
+      expect(expectFailure(result)).toBe(PollDomainCodes.POLL_FINISHED);
     });
   });
 });

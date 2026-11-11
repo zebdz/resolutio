@@ -1,5 +1,10 @@
+/** Closed size-unit vocabulary shared by property validation and selectors.
+ * Public choices are immutable so reading them cannot redefine valid units. */
 import { Result, success, failure } from '../shared/Result';
-import { OrganizationDomainCodes } from './OrganizationDomainCodes';
+import {
+  OrganizationDomainCode,
+  OrganizationDomainCodes,
+} from './OrganizationDomainCodes';
 
 export type SizeUnitValue =
   | 'SQUARE_METERS'
@@ -11,7 +16,7 @@ export type SizeUnitValue =
   | 'UNIT_COUNT'
   | 'SHARES';
 
-const VALUES: SizeUnitValue[] = [
+const VALUES: readonly SizeUnitValue[] = Object.freeze([
   'SQUARE_METERS',
   'SQUARE_FEET',
   'HECTARES',
@@ -20,26 +25,34 @@ const VALUES: SizeUnitValue[] = [
   'LINEAR_METERS',
   'UNIT_COUNT',
   'SHARES',
-];
+]);
 
-function toCamel(v: SizeUnitValue): string {
-  const [head, ...rest] = v.toLowerCase().split('_');
-
-  return head + rest.map((w) => w[0].toUpperCase() + w.slice(1)).join('');
-}
+const TRANSLATION_KEYS = {
+  SQUARE_METERS: 'propertyAdmin.sizeUnit.squareMeters',
+  SQUARE_FEET: 'propertyAdmin.sizeUnit.squareFeet',
+  HECTARES: 'propertyAdmin.sizeUnit.hectares',
+  ACRES: 'propertyAdmin.sizeUnit.acres',
+  CUBIC_METERS: 'propertyAdmin.sizeUnit.cubicMeters',
+  LINEAR_METERS: 'propertyAdmin.sizeUnit.linearMeters',
+  UNIT_COUNT: 'propertyAdmin.sizeUnit.unitCount',
+  SHARES: 'propertyAdmin.sizeUnit.shares',
+} as const satisfies Record<SizeUnitValue, string>;
+export type SizeUnitTranslationKey = (typeof TRANSLATION_KEYS)[SizeUnitValue];
 
 export const SizeUnit = {
   values: VALUES,
 
-  parse(value: string): Result<SizeUnitValue, string> {
-    if (VALUES.includes(value as SizeUnitValue)) {
-      return success(value as SizeUnitValue);
+  parse(value: unknown): Result<SizeUnitValue, OrganizationDomainCode> {
+    const unit = VALUES.find((candidate) => candidate === value);
+
+    if (unit !== undefined) {
+      return success(unit);
     }
 
     return failure(OrganizationDomainCodes.SIZE_UNIT_INVALID);
   },
 
-  translationKey(value: SizeUnitValue): string {
-    return `propertyAdmin.sizeUnit.${toCamel(value)}`;
+  translationKey(value: SizeUnitValue): SizeUnitTranslationKey {
+    return TRANSLATION_KEYS[value];
   },
 };

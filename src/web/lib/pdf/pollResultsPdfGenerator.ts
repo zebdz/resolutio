@@ -1,3 +1,5 @@
+/** Builds a printable poll-results protocol from authorized plain DTOs.
+ * Question kinds retain domain vocabulary; translated labels remain display text. */
 import type { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
 import type { QuestionType } from '@/src/domain/poll/QuestionType';
 
@@ -44,7 +46,7 @@ export interface PdfTranslations {
   totalWeight: string;
   weightOfVoted: string;
   questionNumber: string;
-  questionType: QuestionType;
+  questionType: string;
   questionDetails: string;
   votedOnQuestion: string;
   weightOfVotedOnQuestion: string;
@@ -68,7 +70,7 @@ export interface PdfTranslations {
 
 function determineWinner(
   answers: PdfAnswerData[],
-  questionType: string
+  questionType: QuestionType
 ): PdfAnswerData | null {
   if (questionType !== 'single-choice') {
     return null;

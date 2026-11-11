@@ -1,3 +1,15 @@
+/** Poll application boundary validates requests, invokes domain behavior and
+ * preserves known failure codes across authorization and persistence ports. */
+import { VotingWeight } from '@/domain/poll/VotingWeight';
+import { z } from 'zod';
+import {
+  PollEligibleMemberId,
+  ParticipantId,
+  ParticipantWeightHistoryId,
+  PollId,
+  UserId,
+} from '../../domain/shared/EntityIds';
+import { Clock, IdGenerator } from '../shared/EntityCreation';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
@@ -6,12 +18,15 @@ import { OrganizationRepository } from '../../domain/organization/OrganizationRe
 import { UserRepository } from '../../domain/user/UserRepository';
 import { PollParticipant } from '../../domain/poll/PollParticipant';
 import { ParticipantWeightHistory } from '../../domain/poll/ParticipantWeightHistory';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 import { PollEligibleMember } from '../../domain/poll/PollEligibleMember';
 import { PollEligibleMemberRepository } from '../../domain/poll/PollEligibleMemberRepository';
 import { DistributionType } from '../../domain/poll/DistributionType';
 import { PropertyAggregation } from '../../domain/poll/PropertyAggregation';
-import { PollWeightCalculator } from './PollWeightCalculator';
+import {
+  PollWeightCalculator,
+  PollWeightCalculationFailure,
+} from './PollWeightCalculator';
 
 interface TakeSnapshotCommand {
   pollId: string;
@@ -31,10 +46,24 @@ export class TakeSnapshotUseCase {
     private organizationRepository: OrganizationRepository,
     private userRepository: UserRepository,
     private eligibleMemberRepository: PollEligibleMemberRepository,
-    private pollWeightCalculator: PollWeightCalculator
+    private pollWeightCalculator: PollWeightCalculator,
+    private ids: IdGenerator,
+    private clock: Clock
   ) {}
 
-  async execute(command: TakeSnapshotCommand): Promise<Result<void, string>> {
+  async execute(
+    rawRequest: TakeSnapshotCommand
+  ): Promise<Result<void, PollUseCaseFailure | PollWeightCalculationFailure>> {
+    const decoded = z
+      .object({ pollId: PollId, userId: UserId })
+      .safeParse(rawRequest);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const command = { ...rawRequest, ...decoded.data };
+
     const pollResult = await this.pollRepository.getPollById(command.pollId);
 
     if (!pollResult.success) {
@@ -100,7 +129,7 @@ export class TakeSnapshotUseCase {
     }
 
     // Get member user IDs based on poll type
-    let memberUserIds: string[];
+    let memberUserIds: UserId[];
 
     if (poll.boardId) {
       // Board-specific poll: use board members
@@ -117,11 +146,14 @@ export class TakeSnapshotUseCase {
     }
 
     // Record snapshot timestamp
-    const snapshotAt = new Date();
+    const snapshotAt = this.clock.now();
 
     // Persist eligible members for every candidate (full candidate set)
     const eligibleMembers = memberUserIds.map((userId) =>
-      PollEligibleMember.create(poll.id, userId, snapshotAt)
+      PollEligibleMember.create(poll.id, userId, {
+        id: this.ids.generate(PollEligibleMemberId),
+        now: snapshotAt,
+      })
     );
 
     const eligibleResult =
@@ -133,8 +165,8 @@ export class TakeSnapshotUseCase {
 
     const weightResult = await this.pollWeightCalculator.compute({
       organizationId: poll.organizationId,
-      distributionType: poll.distributionType as DistributionType,
-      propertyAggregation: poll.propertyAggregation as PropertyAggregation,
+      distributionType: poll.distributionType,
+      propertyAggregation: poll.propertyAggregation,
       propertyIds: poll.propertyIds,
       candidates: memberUserIds,
     });
@@ -150,7 +182,12 @@ export class TakeSnapshotUseCase {
     const historyRecords: ParticipantWeightHistory[] = [];
 
     for (const [userId, weight] of weightMap) {
-      const participantResult = PollParticipant.create(poll.id, userId, weight);
+      const participantResult = PollParticipant.create(
+        poll.id,
+        userId,
+        { id: this.ids.generate(ParticipantId), now: snapshotAt },
+        weight
+      );
 
       if (!participantResult.success) {
         return failure(participantResult.error);
@@ -158,20 +195,23 @@ export class TakeSnapshotUseCase {
 
       participants.push(participantResult.value);
 
-      // Pre-create history record (participantId will be assigned in transaction)
+      // The participant identity already exists, so audit references are independent of insertion order.
       const historyResult = ParticipantWeightHistory.create(
-        '', // participantId assigned in transaction
+        participantResult.value.id,
         poll.id,
         userId,
-        0, // oldWeight (initial)
+        VotingWeight.parse(0), // oldWeight (initial)
         weight, // newWeight
         command.userId, // changedBy (admin)
+        { id: this.ids.generate(ParticipantWeightHistoryId), now: snapshotAt },
         'Initial snapshot on poll preparation'
       );
 
-      if (historyResult.success) {
-        historyRecords.push(historyResult.value);
+      if (!historyResult.success) {
+        return failure(historyResult.error);
       }
+
+      historyRecords.push(historyResult.value);
     }
 
     // Execute in a single transaction

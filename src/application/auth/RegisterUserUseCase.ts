@@ -1,25 +1,49 @@
+/** Coordinates registration with injected identity, time and nickname sources.
+ * Persisted credentials and names are validated before constructing the aggregate. */
+import { SessionTokenGenerator } from './SessionTokenGenerator';
+import { UserAgent } from '@/domain/user/Session';
+import { OtpCodeGenerator } from './OtpCodeGenerator';
+import { OtpVerificationId } from '@/domain/shared/EntityIds';
+import { OtpSmsDestination, OtpEmailDestination } from '@/domain/otp/OtpValues';
+import {
+  ClientIp,
+  Minutes,
+  Seconds,
+  afterSeconds,
+  secondsFromMinutes,
+} from '@/domain/auth/AuthValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
+import { Clock, IdGenerator } from '@/application/shared/EntityCreation';
+import { NicknameGenerator } from './NicknameGenerator';
+import {
+  FirstName,
+  LastName,
+  MiddleName,
+  PasswordHash,
+  PlaintextPassword,
+} from '@/domain/user/UserValues';
 import { User } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
-import { Nickname } from '@/domain/user/Nickname';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { SessionRepository, Session } from '@/domain/user/SessionRepository';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { OtpPurposes, OtpVerification } from '@/domain/otp/OtpVerification';
-import { OtpCode } from '@/domain/otp/OtpCode';
+
 import { EmailAddress } from '@/domain/user/EmailAddress';
-import { UserDomainCodes } from '@/domain/user/UserDomainCodes';
+import { UserDomainCodes, UserDomainCode } from '@/domain/user/UserDomainCodes';
 import { Result, success, failure } from '@/domain/shared/Result';
 import { ProfanityChecker } from '@/domain/shared/profanity/ProfanityChecker';
 import { OtpCodeHasher } from './OtpCodeHasher';
 import { OtpDeliveryChannel } from './OtpDeliveryChannel';
-import { OtpErrors } from './OtpErrors';
-import { AuthErrors } from './AuthErrors';
+import { OtpErrors, OtpError } from './OtpErrors';
+import { AuthErrors, AuthError } from './AuthErrors';
 import { readOtpStatus, shouldIssueCode } from './OtpStatus';
-import { SESSION_TTL_MS } from './LoginUserUseCase';
+import { SESSION_TTL_SECONDS } from './LoginUserUseCase';
 import type { Language } from '@/domain/user/User';
 
 export interface PasswordHasher {
-  hash(password: string): Promise<string>;
+  hash(password: PlaintextPassword): Promise<PasswordHash>;
 }
 
 export interface RegisterUserInput {
@@ -41,35 +65,50 @@ export interface RegisterResult {
   session: Session;
   // Lifetime for the session cookie. Distinct from the OTP window: copying
   // that into the cookie once logged registrants out ten minutes in.
-  sessionExpiresInSeconds: number;
+  sessionExpiresInSeconds: Seconds;
 }
 
 interface Dependencies {
+  sessionTokenGenerator: SessionTokenGenerator;
+  otpCodeGenerator: OtpCodeGenerator;
+  ids: IdGenerator;
+  clock: Clock;
+  nicknameGenerator: NicknameGenerator;
   userRepository: UserRepository;
   passwordHasher: PasswordHasher;
   otpRepository: OtpRepository;
   sessionRepository: SessionRepository;
   otpCodeHasher: OtpCodeHasher;
-  deliveryChannel: OtpDeliveryChannel;
+  deliveryChannel: OtpDeliveryChannel<'sms'>;
   /** Optional: when absent, an email supplied at registration is stored but no
    * confirmation code goes out. The user can request one from the account page. */
-  emailDeliveryChannel?: OtpDeliveryChannel;
+  emailDeliveryChannel?: OtpDeliveryChannel<'email'>;
   profanityChecker?: ProfanityChecker;
-  expiryMinutes?: number;
+  expiryMinutes?: Minutes;
 }
 
 export class RegisterUserUseCase {
+  private readonly sessionTokenGenerator: SessionTokenGenerator;
+  private readonly otpCodeGenerator: OtpCodeGenerator;
+  private readonly ids: IdGenerator;
+  private readonly clock: Clock;
+  private readonly nicknameGenerator: NicknameGenerator;
   private readonly userRepository: UserRepository;
   private readonly passwordHasher: PasswordHasher;
   private readonly otpRepository: OtpRepository;
   private readonly sessionRepository: SessionRepository;
   private readonly otpCodeHasher: OtpCodeHasher;
-  private readonly deliveryChannel: OtpDeliveryChannel;
-  private readonly emailDeliveryChannel?: OtpDeliveryChannel;
+  private readonly deliveryChannel: OtpDeliveryChannel<'sms'>;
+  private readonly emailDeliveryChannel?: OtpDeliveryChannel<'email'>;
   private readonly profanityChecker?: ProfanityChecker;
-  private readonly expiryMinutes: number;
+  private readonly expiryMinutes: Minutes;
 
   constructor(deps: Dependencies) {
+    this.sessionTokenGenerator = deps.sessionTokenGenerator;
+    this.otpCodeGenerator = deps.otpCodeGenerator;
+    this.ids = deps.ids;
+    this.clock = deps.clock;
+    this.nicknameGenerator = deps.nicknameGenerator;
     this.userRepository = deps.userRepository;
     this.passwordHasher = deps.passwordHasher;
     this.otpRepository = deps.otpRepository;
@@ -78,12 +117,12 @@ export class RegisterUserUseCase {
     this.deliveryChannel = deps.deliveryChannel;
     this.emailDeliveryChannel = deps.emailDeliveryChannel;
     this.profanityChecker = deps.profanityChecker;
-    this.expiryMinutes = deps.expiryMinutes ?? 10;
+    this.expiryMinutes = deps.expiryMinutes ?? Minutes.parse(10);
   }
 
   async execute(
     input: RegisterUserInput
-  ): Promise<Result<RegisterResult, string>> {
+  ): Promise<Result<RegisterResult, AuthError | UserDomainCode | OtpError>> {
     // 1. Validate IP
     if (!input.clientIp) {
       return failure(AuthErrors.MISSING_IP);
@@ -98,7 +137,10 @@ export class RegisterUserUseCase {
     const phoneNumber = PhoneNumber.create(input.phoneNumber);
 
     // 3. Hash password
-    const hashedPassword = await this.passwordHasher.hash(input.password);
+    const hashedPassword = PasswordHash.parse(
+      await this.passwordHasher.hash(PlaintextPassword.parse(input.password))
+    );
+    const now = this.clock.now();
 
     // 4. Check existing user
     const existingUser =
@@ -132,58 +174,55 @@ export class RegisterUserUseCase {
       // Re-registration of unconfirmed user: invalidate sessions, update data
       await this.sessionRepository.deleteAllForUser(existingUser.id);
 
-      // Update user data in-place via save (upsert)
-      const updatedUser = User.reconstitute({
-        id: existingUser.id,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        middleName: input.middleName,
-        phoneNumber,
-        password: hashedPassword,
-        language: input.language || 'ru',
-        createdAt: existingUser.createdAt,
-        consentGivenAt: new Date(),
-        nickname: existingUser.nickname,
-        allowFindByName: existingUser.allowFindByName,
-        allowFindByPhone: existingUser.allowFindByPhone,
-        privacySetupCompleted: existingUser.privacySetupCompleted,
-        // no confirmedAt — stays unconfirmed
-        // A re-registration may supply a new address; it starts unconfirmed
-        // either way. Omitting it keeps whatever was there before.
-        email: email ?? existingUser.email,
-        emailConfirmedAt: undefined,
-      });
+      // Change registration details through domain behavior, retaining privacy/address state.
+      const updatedUser = existingUser.updateRegistrationDetails(
+        {
+          firstName: FirstName.parse(input.firstName),
+          lastName: LastName.parse(input.lastName),
+          middleName: input.middleName
+            ? MiddleName.parse(input.middleName)
+            : undefined,
+          phoneNumber,
+          password: hashedPassword,
+          language: input.language ?? 'ru',
+          email,
+        },
+        now,
+        this.profanityChecker
+      );
 
       savedUser = await this.userRepository.save(updatedUser);
     } else {
       // New user
-      let nickname = Nickname.generate();
+      let nickname = this.nicknameGenerator.generate();
       const MAX_NICKNAME_RETRIES = 5;
 
       for (let i = 0; i < MAX_NICKNAME_RETRIES; i++) {
-        const available = await this.userRepository.isNicknameAvailable(
-          nickname.getValue()
-        );
+        const available =
+          await this.userRepository.isNicknameAvailable(nickname);
 
         if (available) {
           break;
         }
 
-        nickname = Nickname.generate();
+        nickname = this.nicknameGenerator.generate();
       }
 
       const user = User.create(
         {
-          firstName: input.firstName,
-          lastName: input.lastName,
-          middleName: input.middleName,
+          firstName: FirstName.parse(input.firstName),
+          lastName: LastName.parse(input.lastName),
+          middleName: input.middleName
+            ? MiddleName.parse(input.middleName)
+            : undefined,
           phoneNumber,
           password: hashedPassword,
           language: input.language || 'ru',
-          consentGivenAt: new Date(),
+          consentGivenAt: now,
           nickname,
           email,
         },
+        { id: this.ids.generate(UserId), now },
         this.profanityChecker
       );
 
@@ -191,47 +230,77 @@ export class RegisterUserUseCase {
     }
 
     // 5. Create session
-    const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
-    const session = await this.sessionRepository.create(
-      savedUser.id,
-      expiresAt,
-      input.ipAddress,
-      input.userAgent
+    const expiresAt = afterSeconds(now, SESSION_TTL_SECONDS);
+    const session = await this.sessionRepository.save(
+      Session.create(
+        {
+          userId: savedUser.id,
+          expiresAt,
+          ipAddress:
+            input.ipAddress === undefined
+              ? null
+              : ClientIp.parse(input.ipAddress),
+          userAgent:
+            input.userAgent === undefined
+              ? null
+              : UserAgent.parse(input.userAgent),
+        },
+        { id: this.sessionTokenGenerator.generate(), now }
+      )
     );
 
     // 6. Send a code, unless one is pending or the throttle says wait: the
     // same rule as login, so re-registering an unconfirmed phone cannot pump
     // SMS. A brand-new account has no code yet, so its first one always goes
     // out. Either way the confirm-phone page shows what applies.
-    const otpExpiresAt = new Date(Date.now() + this.expiryMinutes * 60 * 1000);
+    const otpExpiresAt = afterSeconds(
+      now,
+      secondsFromMinutes(this.expiryMinutes)
+    );
 
-    const status = await readOtpStatus(this.otpRepository, {
-      userId: savedUser.id,
-      identifier: phoneNumber.getValue(),
-      channel: this.deliveryChannel.channel,
-      purpose: OtpPurposes.PHONE_CONFIRMATION,
-    });
-
-    if (shouldIssueCode(status)) {
-      const code = OtpCode.generate();
-
-      await this.otpRepository.save(
-        OtpVerification.create({
+    const status = await readOtpStatus(
+      this.otpRepository,
+      {
+        destination: OtpSmsDestination.parse({
           identifier: phoneNumber.getValue(),
           channel: this.deliveryChannel.channel,
-          purpose: OtpPurposes.PHONE_CONFIRMATION,
-          code: this.otpCodeHasher.hash(code.getValue()),
-          clientIp: input.clientIp,
-          expiresAt: otpExpiresAt,
-          userId: savedUser.id,
-        })
+        }),
+        userId: savedUser.id,
+
+        purpose: OtpPurposes.PHONE_CONFIRMATION,
+      },
+      now
+    );
+
+    if (shouldIssueCode(status)) {
+      const code = this.otpCodeGenerator.generate();
+
+      await this.otpRepository.save(
+        OtpVerification.create(
+          {
+            ...OtpSmsDestination.parse({
+              identifier: phoneNumber.getValue(),
+              channel: this.deliveryChannel.channel,
+            }),
+
+            purpose: OtpPurposes.PHONE_CONFIRMATION,
+            code: this.otpCodeHasher.hash(code.getValue()),
+            clientIp: ClientIp.parse(input.clientIp),
+            expiresAt: otpExpiresAt,
+            userId: savedUser.id,
+          },
+          { id: this.ids.generate(OtpVerificationId), now }
+        )
       );
 
       const deliveryResult = await this.deliveryChannel.send(
-        phoneNumber.getValue(),
+        OtpSmsDestination.parse({
+          channel: this.deliveryChannel.channel,
+          identifier: phoneNumber.getValue(),
+        }).identifier,
         code.getValue(),
         savedUser.language,
-        input.clientIp,
+        ClientIp.parse(input.clientIp),
         OtpPurposes.PHONE_CONFIRMATION
       );
 
@@ -247,13 +316,14 @@ export class RegisterUserUseCase {
       email,
       savedUser,
       input.clientIp,
-      otpExpiresAt
+      otpExpiresAt,
+      now
     );
 
     return success({
       user: savedUser,
       session,
-      sessionExpiresInSeconds: Math.floor(SESSION_TTL_MS / 1000),
+      sessionExpiresInSeconds: SESSION_TTL_SECONDS,
     });
   }
 
@@ -266,32 +336,42 @@ export class RegisterUserUseCase {
     email: EmailAddress | undefined,
     savedUser: User,
     clientIp: string,
-    expiresAt: Date
+    expiresAt: Instant,
+    now: Instant
   ): Promise<void> {
     if (!email || !this.emailDeliveryChannel) {
       return;
     }
 
     try {
-      const emailCode = OtpCode.generate();
+      const emailCode = this.otpCodeGenerator.generate();
 
       await this.otpRepository.save(
-        OtpVerification.create({
-          identifier: email.getValue(),
-          channel: this.emailDeliveryChannel.channel,
-          purpose: OtpPurposes.EMAIL_CONFIRMATION,
-          code: this.otpCodeHasher.hash(emailCode.getValue()),
-          clientIp,
-          expiresAt,
-          userId: savedUser.id,
-        })
+        OtpVerification.create(
+          {
+            ...OtpEmailDestination.parse({
+              identifier: email.getValue(),
+              channel: this.emailDeliveryChannel.channel,
+            }),
+
+            purpose: OtpPurposes.EMAIL_CONFIRMATION,
+            code: this.otpCodeHasher.hash(emailCode.getValue()),
+            clientIp: ClientIp.parse(clientIp),
+            expiresAt,
+            userId: savedUser.id,
+          },
+          { id: this.ids.generate(OtpVerificationId), now }
+        )
       );
 
       await this.emailDeliveryChannel.send(
-        email.getValue(),
+        OtpEmailDestination.parse({
+          channel: this.emailDeliveryChannel.channel,
+          identifier: email.getValue(),
+        }).identifier,
         emailCode.getValue(),
         savedUser.language,
-        clientIp,
+        ClientIp.parse(clientIp),
         OtpPurposes.EMAIL_CONFIRMATION
       );
     } catch (error) {

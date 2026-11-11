@@ -1,34 +1,49 @@
+/** Organization persistence/query port carries validated identities and names.
+ * Query text stays plain; pagination inputs and result totals use distinct units. */
+import { FirstName, LastName, MiddleName } from '../user/UserValues';
+import { OrganizationId, UserId } from '../shared/EntityIds';
+import {
+  PageNumber,
+  PageSize,
+  ResultCount,
+  ResultLimit,
+} from '../shared/Pagination';
+import {
+  OrganizationName,
+  MemberRemovalReason,
+  MemberCount,
+} from './OrganizationValues';
 import { Organization } from './Organization';
 
 export interface OrganizationSearchFilters {
   search?: string;
-  page?: number;
-  pageSize?: number;
+  page?: PageNumber;
+  pageSize?: PageSize;
   includeArchived?: boolean;
 }
 
 export interface OrganizationWithStats {
   organization: Organization;
-  memberCount: number;
+  memberCount: MemberCount;
   firstAdmin: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    middleName: string | null;
+    id: UserId;
+    firstName: FirstName;
+    lastName: LastName;
+    middleName: MiddleName | null;
   } | null;
-  parentOrg: { id: string; name: string } | null;
+  parentOrg: { id: OrganizationId; name: OrganizationName } | null;
 }
 
 export interface OrganizationAncestor {
-  id: string;
-  name: string;
-  memberCount: number;
+  id: OrganizationId;
+  name: OrganizationName;
+  memberCount: MemberCount;
 }
 
 export interface OrganizationTreeNode {
-  id: string;
-  name: string;
-  memberCount: number;
+  id: OrganizationId;
+  name: OrganizationName;
+  memberCount: MemberCount;
   children: OrganizationTreeNode[];
 }
 
@@ -41,44 +56,47 @@ export interface OrganizationRepository {
   /**
    * Finds an organization by its ID
    */
-  findById(id: string): Promise<Organization | null>;
+  findById(id: OrganizationId): Promise<Organization | null>;
 
   /**
    * Finds an organization by its name
    */
-  findByName(name: string): Promise<Organization | null>;
+  findByName(name: OrganizationName): Promise<Organization | null>;
 
   /**
    * Finds all organizations where the user is a creator
    */
-  findByCreatorId(creatorId: string): Promise<Organization[]>;
+  findByCreatorId(creatorId: UserId): Promise<Organization[]>;
 
   /**
    * Finds all child organizations of a parent organization
    */
-  findByParentId(parentId: string): Promise<Organization[]>;
+  findByParentId(parentId: OrganizationId): Promise<Organization[]>;
 
   /**
    * Gets all ancestor organization IDs (parent, grandparent, etc.) for a given organization
    * Used to enforce the rule that a user cannot belong to multiple orgs in the same hierarchy
    */
-  getAncestorIds(organizationId: string): Promise<string[]>;
+  getAncestorIds(organizationId: OrganizationId): Promise<OrganizationId[]>;
 
   /**
    * Gets all descendant organization IDs (children, grandchildren, etc.) for a given organization
    */
-  getDescendantIds(organizationId: string): Promise<string[]>;
+  getDescendantIds(organizationId: OrganizationId): Promise<OrganizationId[]>;
 
   /**
    * Gets all organization IDs in the same hierarchy tree (root + all descendants),
    * excluding the given organization. Used to enforce single-membership-per-tree rule.
    */
-  getFullTreeOrgIds(organizationId: string): Promise<string[]>;
+  getFullTreeOrgIds(organizationId: OrganizationId): Promise<OrganizationId[]>;
 
   /**
    * Checks if a user is a member of an organization (accepted status)
    */
-  isUserMember(userId: string, organizationId: string): Promise<boolean>;
+  isUserMember(
+    userId: UserId,
+    organizationId: OrganizationId
+  ): Promise<boolean>;
 
   /**
    * Exact membership check — does NOT walk descendant orgs. Used by the
@@ -86,35 +104,38 @@ export interface OrganizationRepository {
    * "member of orgX" must not silently include members of orgX's
    * descendant orgs.
    */
-  isUserExactMember(userId: string, organizationId: string): Promise<boolean>;
+  isUserExactMember(
+    userId: UserId,
+    organizationId: OrganizationId
+  ): Promise<boolean>;
 
   /**
    * Checks if a user is an admin of an organization
    */
-  isUserAdmin(userId: string, organizationId: string): Promise<boolean>;
+  isUserAdmin(userId: UserId, organizationId: OrganizationId): Promise<boolean>;
 
   /**
    * Ids of every admin of an organization, for notifying the people who can
    * act on something addressed to "the admins".
    */
-  getAdminUserIds(organizationId: string): Promise<string[]>;
+  getAdminUserIds(organizationId: OrganizationId): Promise<UserId[]>;
 
   /**
    * Gets all organizations where user is an accepted member
    */
-  findMembershipsByUserId(userId: string): Promise<Organization[]>;
+  findMembershipsByUserId(userId: UserId): Promise<Organization[]>;
 
   /**
    * Gets all organizations where user is an admin
    */
-  findAdminOrganizationsByUserId(userId: string): Promise<Organization[]>;
+  findAdminOrganizationsByUserId(userId: UserId): Promise<Organization[]>;
 
   /**
    * Gets all organizations available to join (with member count and first admin)
    * @param excludeUserMemberships - Optional userId to exclude organizations where user is already member or has pending request
    */
   findAllWithStats(
-    excludeUserMemberships?: string
+    excludeUserMemberships?: UserId
   ): Promise<OrganizationWithStats[]>;
 
   /**
@@ -123,10 +144,10 @@ export interface OrganizationRepository {
    */
   searchOrganizationsWithStats(
     filters: OrganizationSearchFilters,
-    excludeUserMemberships?: string
+    excludeUserMemberships?: UserId
   ): Promise<{
     organizations: OrganizationWithStats[];
-    totalCount: number;
+    totalCount: ResultCount;
   }>;
 
   /**
@@ -139,22 +160,22 @@ export interface OrganizationRepository {
    * Used for org-wide poll snapshots. Returns deduplicated user IDs.
    */
   findAcceptedMemberUserIdsIncludingDescendants(
-    organizationId: string
-  ): Promise<string[]>;
+    organizationId: OrganizationId
+  ): Promise<UserId[]>;
 
   /**
    * Returns deduplicated user IDs of accepted members across the EXACT
    * org IDs given (no hierarchy walk). Used by NotifyReportPublishedUseCase
    * to fan out notifications to a precise audience set.
    */
-  findAcceptedMemberUserIdsForOrgs(orgIds: string[]): Promise<string[]>;
+  findAcceptedMemberUserIdsForOrgs(orgIds: OrganizationId[]): Promise<UserId[]>;
 
   /**
    * Removes a user's membership from an organization (deletes OrganizationUser row)
    */
   removeUserFromOrganization(
-    userId: string,
-    organizationId: string
+    userId: UserId,
+    organizationId: OrganizationId
   ): Promise<void>;
 
   /**
@@ -162,32 +183,34 @@ export interface OrganizationRepository {
    * row and writes an OrganizationMemberRemoval audit row, in one transaction.
    */
   removeMemberFromOrganization(
-    organizationId: string,
-    userId: string,
-    removedByUserId: string,
-    reason: string
+    organizationId: OrganizationId,
+    userId: UserId,
+    removedByUserId: UserId,
+    reason: MemberRemovalReason
   ): Promise<void>;
 
   /**
    * Finds organizations where user has a pending join request
    */
-  findPendingRequestsByUserId(userId: string): Promise<Organization[]>;
+  findPendingRequestsByUserId(userId: UserId): Promise<Organization[]>;
 
   /**
    * Gets ancestors with name + member count, ordered [parent, grandparent, ...]
    */
-  getAncestors(organizationId: string): Promise<OrganizationAncestor[]>;
+  getAncestors(organizationId: OrganizationId): Promise<OrganizationAncestor[]>;
 
   /**
    * Gets direct children with name + member count (excludes archived)
    */
-  getChildrenWithStats(organizationId: string): Promise<OrganizationAncestor[]>;
+  getChildrenWithStats(
+    organizationId: OrganizationId
+  ): Promise<OrganizationAncestor[]>;
 
   /**
    * Gets full hierarchy tree: ancestors list + recursive subtree from root.
    * Excludes archived orgs. Max recursion depth: 100.
    */
-  getHierarchyTree(organizationId: string): Promise<{
+  getHierarchyTree(organizationId: OrganizationId): Promise<{
     ancestors: OrganizationAncestor[];
     tree: OrganizationTreeNode;
   }>;
@@ -195,12 +218,15 @@ export interface OrganizationRepository {
   /**
    * Gets all admin user IDs for an organization
    */
-  findAdminUserIds(organizationId: string): Promise<string[]>;
+  findAdminUserIds(organizationId: OrganizationId): Promise<UserId[]>;
 
   /**
    * Sets the parentId of an organization (used for join parent request acceptance)
    */
-  setParentId(organizationId: string, parentId: string | null): Promise<void>;
+  setParentId(
+    organizationId: OrganizationId,
+    parentId: OrganizationId | null
+  ): Promise<void>;
 
   /**
    * Fuzzy (subsequence) search for organizations by name.
@@ -209,39 +235,43 @@ export interface OrganizationRepository {
    */
   searchByNameFuzzy(
     query: string,
-    excludeIds: string[],
-    limit: number
-  ): Promise<Array<{ id: string; name: string }>>;
+    excludeIds: OrganizationId[],
+    limit: ResultLimit
+  ): Promise<Array<{ id: OrganizationId; name: OrganizationName }>>;
 
   /**
    * Adds a user as an admin of an organization
    */
-  addAdmin(organizationId: string, userId: string): Promise<void>;
+  addAdmin(organizationId: OrganizationId, userId: UserId): Promise<void>;
 
   /**
    * Removes a user as admin of an organization.
    * Must guarantee at least 1 admin remains (transactional).
    * Throws if this is the last admin.
    */
-  removeAdmin(organizationId: string, userId: string): Promise<void>;
+  removeAdmin(organizationId: OrganizationId, userId: UserId): Promise<void>;
 
   /**
    * Walks up the hierarchy to the root org and returns its allowMultiTreeMembership value.
    * Returns false if root's value is NULL (data corruption fallback).
    */
-  getRootAllowMultiTreeMembership(organizationId: string): Promise<boolean>;
+  getRootAllowMultiTreeMembership(
+    organizationId: OrganizationId
+  ): Promise<boolean>;
 
   /**
    * Returns userIds that hold accepted memberships in 2+ of the given org IDs.
    * Includes memberships in archived orgs.
    */
-  findUsersWithMultipleMembershipsInOrgs(orgIds: string[]): Promise<string[]>;
+  findUsersWithMultipleMembershipsInOrgs(
+    orgIds: OrganizationId[]
+  ): Promise<UserId[]>;
 
   /**
    * Updates the allowMultiTreeMembership setting for an organization.
    */
   setAllowMultiTreeMembership(
-    organizationId: string,
+    organizationId: OrganizationId,
     value: boolean | null
   ): Promise<void>;
 }

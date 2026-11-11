@@ -3,26 +3,37 @@
  * Calculations retain Weight values; output totals serialize to exact decimal strings. */
 import { PollSection, RegisterEntry, TalliesSection } from './RecordFormat';
 import { VoteSelection } from './VoteLeaf';
-import { QuestionId, AnswerId, PropertyId, AssetId } from './SealValues';
+import {
+  QuestionId,
+  AnswerId,
+  PropertyId,
+  AssetId,
+  RecordOrder,
+  VoteCount,
+  ParticipantCount,
+  TotalWeight,
+} from './SealValues';
 import { compareText } from './Validation';
 import { Weight } from './Weight';
 
-export const byOrder = (
-  a: { order: number; id: string },
-  b: { order: number; id: string }
+const byOrder = (
+  a: { order: RecordOrder; id: QuestionId | AnswerId },
+  b: { order: RecordOrder; id: QuestionId | AnswerId }
 ) => a.order - b.order || compareText(a.id, b.id);
 export const byHolding = (
   a: { propertyId: PropertyId; assetId: AssetId },
   b: { propertyId: PropertyId; assetId: AssetId }
 ) =>
   compareText(a.propertyId, b.propertyId) || compareText(a.assetId, b.assetId);
-const sum = (weights: Weight[]) =>
-  weights
-    .reduce(
-      (total, weight) => total.add(weight),
-      Weight.fromDecimalString('0.000000')
-    )
-    .toDecimalString();
+const sum = (weights: Weight[]): TotalWeight =>
+  TotalWeight.parse(
+    weights
+      .reduce(
+        (total, weight) => total.add(weight),
+        Weight.fromDecimalString('0.000000')
+      )
+      .toDecimalString()
+  );
 
 export function orderPoll(poll: PollSection): PollSection {
   return {
@@ -49,7 +60,7 @@ export function tally(
   }
 
   return {
-    totalParticipants: participants.length,
+    totalParticipants: ParticipantCount.parse(participants.length),
     totalParticipantWeight: sum(participants.map((p) => p.weight)),
     questions: poll.questions
       .filter((q) => q.archivedAt === null)
@@ -70,7 +81,7 @@ export function tally(
 
             return {
               answerId: a.id,
-              voteCount: selected.length,
+              voteCount: VoteCount.parse(selected.length),
               totalWeight: sum(selected.map((v) => v.weight)),
             };
           });
@@ -78,7 +89,7 @@ export function tally(
         return {
           questionId: q.id,
           answers,
-          totalVotes: questionVotes.length,
+          totalVotes: VoteCount.parse(questionVotes.length),
           totalWeight: sum(questionVotes.map((v) => v.weight)),
           participantWeight: sum([
             ...new Map(questionVotes.map((v) => [v.userId, v.weight])).values(),

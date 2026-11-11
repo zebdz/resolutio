@@ -1,3 +1,11 @@
+/** Cancellation clients may remove only pending membership links.
+ * Tests exercise typed status reads and domain lifecycle failures. */
+import { PrismaMembershipStore } from '@/infrastructure/repositories/PrismaMembershipStore';
+import { MemberCount } from '@/domain/organization/OrganizationValues';
+import { ResultCount } from '@/domain/shared/Pagination';
+import { UserId } from '../../../domain/shared/EntityIds';
+import { OrganizationName } from '../../../domain/organization/OrganizationValues';
+import { OrganizationId } from '../../../domain/shared/EntityIds';
 import { PrismaClient } from '@/generated/prisma/client';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CancelJoinRequestUseCase } from '../CancelJoinRequestUseCase';
@@ -16,70 +24,85 @@ class MockPrismaClient {
 class MockOrganizationRepository implements OrganizationRepository {
   private removedMemberships: Array<{ userId: string; orgId: string }> = [];
 
-  async save(_org: Organization): Promise<Organization> {
+  async save(_org: Organization): ReturnType<OrganizationRepository['save']> {
     return _org;
   }
-  async findById(_id: string): Promise<Organization | null> {
+  async findById(_id: string): ReturnType<OrganizationRepository['findById']> {
     return null;
   }
-  async findByName(_name: string): Promise<Organization | null> {
+  async findByName(
+    _name: string
+  ): ReturnType<OrganizationRepository['findByName']> {
     return null;
   }
-  async findByCreatorId(_creatorId: string): Promise<Organization[]> {
+  async findByCreatorId(
+    _creatorId: string
+  ): ReturnType<OrganizationRepository['findByCreatorId']> {
     return [];
   }
-  async findByParentId(_parentId: string): Promise<Organization[]> {
+  async findByParentId(
+    _parentId: string
+  ): ReturnType<OrganizationRepository['findByParentId']> {
     return [];
   }
-  async getAncestorIds(_orgId: string): Promise<string[]> {
-    return [];
+  async getAncestorIds(
+    _orgId: string
+  ): ReturnType<OrganizationRepository['getAncestorIds']> {
+    return OrganizationId.array().parse([]);
   }
-  async getDescendantIds(_orgId: string): Promise<string[]> {
-    return [];
+  async getDescendantIds(
+    _orgId: string
+  ): ReturnType<OrganizationRepository['getDescendantIds']> {
+    return OrganizationId.array().parse([]);
   }
-  async isUserMember(_userId: string, _orgId: string): Promise<boolean> {
+  async isUserMember(
+    _userId: string,
+    _orgId: string
+  ): ReturnType<OrganizationRepository['isUserMember']> {
     return false;
   }
-  async isUserAdmin(_userId: string, _orgId: string): Promise<boolean> {
+  async isUserAdmin(
+    _userId: string,
+    _orgId: string
+  ): ReturnType<OrganizationRepository['isUserAdmin']> {
     return false;
   }
-  async findMembershipsByUserId(_userId: string): Promise<Organization[]> {
+  async findMembershipsByUserId(
+    _userId: string
+  ): ReturnType<OrganizationRepository['findMembershipsByUserId']> {
     return [];
   }
   async findAdminOrganizationsByUserId(
     _userId: string
-  ): Promise<Organization[]> {
+  ): ReturnType<OrganizationRepository['findAdminOrganizationsByUserId']> {
     return [];
   }
-  async findAllWithStats(): Promise<
-    Array<{
-      organization: Organization;
-      memberCount: number;
-      firstAdmin: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        middleName: string | null;
-      } | null;
-    }>
+  async findAllWithStats(): ReturnType<
+    OrganizationRepository['findAllWithStats']
   > {
     return [];
   }
-  async update(org: Organization): Promise<Organization> {
+  async update(
+    org: Organization
+  ): ReturnType<OrganizationRepository['update']> {
     return org;
   }
   async findAcceptedMemberUserIdsIncludingDescendants(
     _orgId: string
-  ): Promise<string[]> {
-    return [];
+  ): ReturnType<
+    OrganizationRepository['findAcceptedMemberUserIdsIncludingDescendants']
+  > {
+    return UserId.array().parse([]);
   }
   async removeUserFromOrganization(
     userId: string,
     organizationId: string
-  ): Promise<void> {
+  ): ReturnType<OrganizationRepository['removeUserFromOrganization']> {
     this.removedMemberships.push({ userId, orgId: organizationId });
   }
-  async findPendingRequestsByUserId(_userId: string): Promise<Organization[]> {
+  async findPendingRequestsByUserId(
+    _userId: string
+  ): ReturnType<OrganizationRepository['findPendingRequestsByUserId']> {
     return [];
   }
 
@@ -88,61 +111,98 @@ class MockOrganizationRepository implements OrganizationRepository {
     return this.removedMemberships;
   }
 
-  async getAncestors(): Promise<
-    { id: string; name: string; memberCount: number }[]
+  async getAncestors(): ReturnType<OrganizationRepository['getAncestors']> {
+    return [];
+  }
+
+  async getChildrenWithStats(): ReturnType<
+    OrganizationRepository['getChildrenWithStats']
   > {
     return [];
   }
 
-  async getChildrenWithStats(): Promise<
-    { id: string; name: string; memberCount: number }[]
+  async getHierarchyTree(): ReturnType<
+    OrganizationRepository['getHierarchyTree']
   > {
-    return [];
-  }
-
-  async getHierarchyTree(): Promise<{
-    ancestors: { id: string; name: string; memberCount: number }[];
-    tree: { id: string; name: string; memberCount: number; children: any[] };
-  }> {
     return {
       ancestors: [],
-      tree: { id: '', name: '', memberCount: 0, children: [] },
+      tree: {
+        id: OrganizationId.parse('org-fixture'),
+        name: OrganizationName.parse('Fixture organization'),
+        memberCount: MemberCount.parse(0),
+        children: [],
+      },
     };
   }
-  async searchOrganizationsWithStats(): Promise<{
-    organizations: any[];
-    totalCount: number;
-  }> {
-    return { organizations: [], totalCount: 0 };
+  async searchOrganizationsWithStats(): ReturnType<
+    OrganizationRepository['searchOrganizationsWithStats']
+  > {
+    return { organizations: [], totalCount: ResultCount.parse(0) };
   }
   async setParentId(
     organizationId: string,
     parentId: string | null
-  ): Promise<void> {}
-  async findAdminUserIds(): Promise<string[]> {
-    return [];
+  ): ReturnType<OrganizationRepository['setParentId']> {}
+  async findAdminUserIds(): ReturnType<
+    OrganizationRepository['findAdminUserIds']
+  > {
+    return UserId.array().parse([]);
   }
 
-  async addAdmin(): Promise<void> {}
-  async removeAdmin(): Promise<void> {}
-  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+  async addAdmin(): ReturnType<OrganizationRepository['addAdmin']> {}
+  async removeAdmin(): ReturnType<OrganizationRepository['removeAdmin']> {}
+  async searchByNameFuzzy(): ReturnType<
+    OrganizationRepository['searchByNameFuzzy']
+  > {
     return [];
   }
-  async getFullTreeOrgIds(): Promise<string[]> {
-    return [];
+  async getFullTreeOrgIds(): ReturnType<
+    OrganizationRepository['getFullTreeOrgIds']
+  > {
+    return OrganizationId.array().parse([]);
   }
-  async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
+  async getRootAllowMultiTreeMembership(
+    _orgId: string
+  ): ReturnType<OrganizationRepository['getRootAllowMultiTreeMembership']> {
     return false;
   }
   async findUsersWithMultipleMembershipsInOrgs(
     _orgIds: string[]
-  ): Promise<string[]> {
-    return [];
+  ): ReturnType<
+    OrganizationRepository['findUsersWithMultipleMembershipsInOrgs']
+  > {
+    return UserId.array().parse([]);
   }
   async setAllowMultiTreeMembership(
     _organizationId: string,
     _value: boolean | null
-  ): Promise<void> {}
+  ): ReturnType<OrganizationRepository['setAllowMultiTreeMembership']> {}
+
+  async isUserExactMember(
+    ..._args: Parameters<OrganizationRepository['isUserExactMember']>
+  ): ReturnType<OrganizationRepository['isUserExactMember']> {
+    throw new Error('Unexpected isUserExactMember in this test');
+  }
+
+  async getAdminUserIds(
+    ..._args: Parameters<OrganizationRepository['getAdminUserIds']>
+  ): ReturnType<OrganizationRepository['getAdminUserIds']> {
+    throw new Error('Unexpected getAdminUserIds in this test');
+  }
+
+  async findAcceptedMemberUserIdsForOrgs(
+    ..._args: Parameters<
+      OrganizationRepository['findAcceptedMemberUserIdsForOrgs']
+    >
+  ): ReturnType<OrganizationRepository['findAcceptedMemberUserIdsForOrgs']> {
+    throw new Error('Unexpected findAcceptedMemberUserIdsForOrgs in this test');
+  }
+
+  async removeMemberFromOrganization(
+    ..._args: Parameters<OrganizationRepository['removeMemberFromOrganization']>
+  ): ReturnType<OrganizationRepository['removeMemberFromOrganization']> {
+    throw new Error('Unexpected removeMemberFromOrganization in this test');
+  }
 }
 
 describe('CancelJoinRequestUseCase', () => {
@@ -154,7 +214,7 @@ describe('CancelJoinRequestUseCase', () => {
     prisma = new MockPrismaClient();
     organizationRepository = new MockOrganizationRepository();
     useCase = new CancelJoinRequestUseCase({
-      prisma: prisma as unknown as PrismaClient,
+      memberships: new PrismaMembershipStore(prisma as unknown as PrismaClient),
       organizationRepository,
     });
   });

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GetReportForViewerUseCase } from '../GetReportForViewerUseCase';
 import { ResolveReportVisibilityService } from '../ResolveReportVisibilityService';
-import { Report, ReportProps } from '../../../domain/report/Report';
+import { Report, ReportData } from '../../../domain/report/Report';
 import { ReportVisibility } from '../../../domain/report/ReportVisibility';
 import { ReportErrors } from '../ReportErrors';
 import { success } from '../../../domain/shared/Result';
@@ -10,7 +10,7 @@ import { success } from '../../../domain/shared/Result';
 // Fakes
 // ---------------------------------------------------------------------------
 
-const baseProps = (overrides: Partial<ReportProps> = {}): ReportProps => ({
+const baseProps = (overrides: Partial<ReportData> = {}): ReportData => ({
   id: 'r1',
   organizationId: 'org-1',
   createdById: 'author-1',
@@ -28,6 +28,9 @@ const baseProps = (overrides: Partial<ReportProps> = {}): ReportProps => ({
   pollIds: [],
   attachmentIds: ['att-1'],
   ...overrides,
+  ...(overrides.state === 'DRAFT'
+    ? { publishedById: null, notifyAudience: false }
+    : {}),
 });
 
 class FakeReportRepo {

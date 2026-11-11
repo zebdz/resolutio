@@ -1,9 +1,18 @@
+/** Poll application boundary validates requests, invokes domain behavior and
+ * preserves known failure codes across authorization and persistence ports. */
+import { z } from 'zod';
+import {
+  parsePollTitle,
+  parsePollDescription,
+} from '../../domain/poll/PollContent';
+import { PollId, UserId } from '../../domain/shared/EntityIds';
+import { PollPeriod } from '../../domain/poll/PollPeriod';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 
 export interface UpdatePollInput {
   pollId: string;
@@ -22,7 +31,19 @@ export class UpdatePollUseCase {
     private profanityChecker?: ProfanityChecker
   ) {}
 
-  async execute(input: UpdatePollInput): Promise<Result<void, string>> {
+  async execute(
+    rawRequest: UpdatePollInput
+  ): Promise<Result<void, PollUseCaseFailure>> {
+    const decoded = z
+      .object({ pollId: PollId, userId: UserId })
+      .safeParse(rawRequest);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawRequest, ...decoded.data };
+
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(input.pollId);
 
@@ -73,14 +94,32 @@ export class UpdatePollUseCase {
     }
 
     // 4. Update poll properties
-    const titleResult = poll.updateTitle(input.title, this.profanityChecker);
+    const editable = poll.canEditContent();
+
+    if (!editable.success) {
+      return editable;
+    }
+
+    const title = parsePollTitle(input.title);
+
+    if (!title.success) {
+      return title;
+    }
+
+    const titleResult = poll.updateTitle(title.value, this.profanityChecker);
 
     if (!titleResult.success) {
       return failure(titleResult.error);
     }
 
+    const description = parsePollDescription(input.description);
+
+    if (!description.success) {
+      return description;
+    }
+
     const descriptionResult = poll.updateDescription(
-      input.description,
+      description.value,
       this.profanityChecker
     );
 
@@ -88,7 +127,13 @@ export class UpdatePollUseCase {
       return failure(descriptionResult.error);
     }
 
-    const datesResult = poll.updateDates(input.startDate, input.endDate);
+    const period = PollPeriod.create(input.startDate, input.endDate);
+
+    if (!period.success) {
+      return period;
+    }
+
+    const datesResult = poll.updateDates(period.value);
 
     if (!datesResult.success) {
       return failure(datesResult.error);

@@ -34,24 +34,27 @@ export class SealedRecordBuilder {
         voted: voters.has(p.userId),
         holdings: [...p.holdings].sort(byHolding),
       }));
-      const signers: SignerEntry[] = participants.flatMap((p) => {
-        const decision = p.willingToSignProtocol;
+      const signers: SignerEntry[] = participants.flatMap(
+        (p): SignerEntry[] => {
+          const decision = p.willingToSignProtocol;
 
-        if (!voters.has(p.userId) || decision === null) {
-          return [];
+          if (!voters.has(p.userId) || decision === null) {
+            return [];
+          }
+
+          return [
+            {
+              userId: p.userId,
+              lastName: p.lastName,
+              firstName: p.firstName,
+              middleName: p.middleName,
+              ...(decision
+                ? { willingToSignProtocol: true, phoneNumber: p.phoneNumber }
+                : { willingToSignProtocol: false, phoneNumber: null }),
+            },
+          ];
         }
-
-        return [
-          {
-            userId: p.userId,
-            lastName: p.lastName,
-            firstName: p.firstName,
-            middleName: p.middleName,
-            willingToSignProtocol: decision,
-            phoneNumber: decision ? p.phoneNumber : null,
-          },
-        ];
-      });
+      );
       const tallies = tally(poll, participants, selections);
       const votes = source.votes
         .map(({ selection: v, receiptSecret }) => {

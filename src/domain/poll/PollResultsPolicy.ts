@@ -1,6 +1,6 @@
 import { Result, success, failure } from '../shared/Result';
 import { Poll } from './Poll';
-import { PollDomainCodes } from './PollDomainCodes';
+import { PollDomainCodes, PollDomainCode } from './PollDomainCodes';
 
 export interface ResultsViewerFacts {
   // Org admin or platform superadmin.
@@ -25,7 +25,7 @@ export interface ResultsViewerFacts {
 function canViewResults(
   poll: Poll,
   facts: ResultsViewerFacts
-): Result<void, string> {
+): Result<void, PollDomainCode> {
   if (facts.isAdmin) {
     return success(undefined);
   }
@@ -68,7 +68,7 @@ function canViewSignWillingness(facts: ResultsViewerFacts): boolean {
 function canExportProtocol(
   poll: Poll,
   facts: ResultsViewerFacts
-): Result<void, string> {
+): Result<void, PollDomainCode> {
   const readable = canViewResults(poll, facts);
 
   if (!readable.success) {
@@ -89,7 +89,7 @@ function canExportProtocol(
 function canExportNamedProtocol(
   poll: Poll,
   facts: ResultsViewerFacts
-): Result<void, string> {
+): Result<void, PollDomainCode> {
   if (poll.isAnonymous()) {
     return failure(PollDomainCodes.POLL_IS_ANONYMOUS);
   }

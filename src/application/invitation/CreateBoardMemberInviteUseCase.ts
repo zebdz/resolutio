@@ -1,3 +1,12 @@
+/** Decodes invitation request references before authorization and domain transitions. */
+import {
+  IdGenerator,
+  Clock,
+  entityCreation,
+} from '@/application/shared/EntityCreation';
+import { Instant } from '@/domain/shared/Instant';
+import { z } from 'zod';
+import { BoardId, UserId, InvitationId } from '@/domain/shared/EntityIds';
 import { InvitationRepository } from '../../domain/invitation/InvitationRepository';
 import { Invitation } from '../../domain/invitation/Invitation';
 import { BoardRepository } from '../../domain/board/BoardRepository';
@@ -5,7 +14,7 @@ import { OrganizationRepository } from '../../domain/organization/OrganizationRe
 import { UserRepository } from '../../domain/user/UserRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { InvitationErrors } from './InvitationErrors';
+import { InvitationErrors, InvitationUseCaseFailure } from './InvitationErrors';
 import { User } from '../../domain/user/User';
 import { NotifyBoardMemberInviteReceivedUseCase } from '../notification/NotifyBoardMemberInviteReceivedUseCase';
 
@@ -16,6 +25,8 @@ export interface CreateBoardMemberInviteInput {
 }
 
 export interface CreateBoardMemberInviteDependencies {
+  ids: IdGenerator;
+  clock: Clock;
   invitationRepository: InvitationRepository;
   boardRepository: BoardRepository;
   organizationRepository: OrganizationRepository;
@@ -27,8 +38,18 @@ export class CreateBoardMemberInviteUseCase {
   constructor(private deps: CreateBoardMemberInviteDependencies) {}
 
   async execute(
-    input: CreateBoardMemberInviteInput
-  ): Promise<Result<Invitation, string>> {
+    rawInput: CreateBoardMemberInviteInput
+  ): Promise<Result<Invitation, InvitationUseCaseFailure>> {
+    const parsed = z
+      .object({ boardId: BoardId, inviteeId: UserId, actorUserId: UserId })
+      .safeParse(rawInput);
+
+    if (!parsed.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawInput, ...parsed.data };
+
     const { boardId, inviteeId, actorUserId } = input;
 
     // Check board exists and not archived
@@ -103,8 +124,8 @@ export class CreateBoardMemberInviteUseCase {
       board.organizationId,
       actorUserId,
       inviteeId,
-      'board_member_invite',
-      boardId
+      { type: 'board_member_invite', boardId: boardId },
+      entityCreation(InvitationId, this.deps.ids, this.deps.clock)
     );
 
     const saved = await this.deps.invitationRepository.save(invitation);
@@ -121,6 +142,8 @@ export class CreateBoardMemberInviteUseCase {
 
     // Notify invitee (fire-and-forget)
     new NotifyBoardMemberInviteReceivedUseCase({
+      ids: this.deps.ids,
+      clock: this.deps.clock,
       notificationRepository: this.deps.notificationRepository,
     })
       .execute({
@@ -131,6 +154,14 @@ export class CreateBoardMemberInviteUseCase {
         inviterName,
         organizationName: organization.name,
         boardName: board.name,
+      })
+      .then((outcome) => {
+        if (!outcome.success) {
+          console.error(
+            'Notification delivery failed (NotifyBoardMemberInviteReceivedUseCase):',
+            outcome.error
+          );
+        }
       })
       .catch((err) =>
         console.error('Failed to notify board member invite received:', err)

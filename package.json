@@ -14,6 +14,8 @@
     "lf": "yarn run lint:fix && yarn run format",
     "typecheck": "tsc --noEmit -p tsconfig.build.json",
     "test": "vitest run",
+    "test:poll-db": "vitest run --config vitest.poll-db.config.ts",
+    "db:backfill-receipts": "npx tsx prisma/backfill-receipt-secrets.ts",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",

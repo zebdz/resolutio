@@ -1,3 +1,6 @@
+/** Server report view resolves validated references and serializes only authorized content. */
+import { OrganizationId, UserId } from '@/domain/shared/EntityIds';
+import { PageSize } from '@/domain/shared/Pagination';
 import { getTranslations } from 'next-intl/server';
 import { Link } from '@/src/i18n/routing';
 import { Heading } from '@/web/components/catalyst/heading';
@@ -28,7 +31,9 @@ export async function ReportsSection({
   const reports = result.success ? result.data.reports : [];
 
   const uniqueAuthorIds = [...new Set(reports.map((r) => r.createdById))];
-  const authors = await userRepo.findByIds(uniqueAuthorIds);
+  const authors = await userRepo.findByIds(
+    uniqueAuthorIds.map((id) => UserId.parse(id))
+  );
   const authorMap = new Map(authors.map((a) => [a.id, a]));
 
   return (
@@ -59,7 +64,7 @@ export async function ReportsSection({
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {reports.map((report) => {
-            const author = authorMap.get(report.createdById);
+            const author = authorMap.get(UserId.parse(report.createdById));
             const authorInfo = author
               ? {
                   firstName: author.firstName,
@@ -75,7 +80,7 @@ export async function ReportsSection({
                   id: report.id,
                   title: report.title,
                   body: report.body,
-                  state: report.state as 'DRAFT' | 'PUBLISHED',
+                  state: report.state,
                   visibility: report.visibility,
                   lastPublishedAt: report.lastPublishedAt,
                   createdAt: report.createdAt,

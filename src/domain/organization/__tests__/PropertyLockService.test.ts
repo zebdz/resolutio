@@ -1,3 +1,4 @@
+import { PropertyId } from '../../shared/EntityIds';
 import { describe, it, expect } from 'vitest';
 import { PropertyLockService, LockSnapshotFact } from '../PropertyLockService';
 
@@ -11,18 +12,18 @@ describe('PropertyLockService', () => {
 
   it('returns false when no snapshot facts involve the property', () => {
     const facts: LockSnapshotFact[] = [];
-    expect(svc.isLocked('prop-a', facts)).toBe(false);
+    expect(svc.isLocked(PropertyId.parse('prop-a'), facts)).toBe(false);
   });
 
   it('locks when a poll with explicit scope on property has snapshots (ownership mode)', () => {
     const facts: LockSnapshotFact[] = [
       {
-        explicitScopePropertyIds: ['prop-a'],
+        explicitScopePropertyIds: [PropertyId.parse('prop-a')],
         distributionType: 'OWNERSHIP_SIZE_WEIGHTED',
       },
     ];
-    expect(svc.isLocked('prop-a', facts)).toBe(true);
-    expect(svc.isLocked('prop-b', facts)).toBe(false);
+    expect(svc.isLocked(PropertyId.parse('prop-a'), facts)).toBe(true);
+    expect(svc.isLocked(PropertyId.parse('prop-b'), facts)).toBe(false);
   });
 
   it('locks every property when ownership poll has empty scope (all properties)', () => {
@@ -32,18 +33,18 @@ describe('PropertyLockService', () => {
         distributionType: 'OWNERSHIP_UNIT_COUNT',
       },
     ];
-    expect(svc.isLocked('prop-a', facts)).toBe(true);
-    expect(svc.isLocked('prop-zzz', facts)).toBe(true);
+    expect(svc.isLocked(PropertyId.parse('prop-a'), facts)).toBe(true);
+    expect(svc.isLocked(PropertyId.parse('prop-zzz'), facts)).toBe(true);
   });
 
   it('locks property when EQUAL poll with explicit scope includes it', () => {
     const facts: LockSnapshotFact[] = [
       {
-        explicitScopePropertyIds: ['prop-a'],
+        explicitScopePropertyIds: [PropertyId.parse('prop-a')],
         distributionType: 'EQUAL',
       },
     ];
-    expect(svc.isLocked('prop-a', facts)).toBe(true);
+    expect(svc.isLocked(PropertyId.parse('prop-a'), facts)).toBe(true);
   });
 
   it('does NOT lock properties when an EQUAL poll has empty scope', () => {
@@ -53,7 +54,7 @@ describe('PropertyLockService', () => {
         distributionType: 'EQUAL',
       },
     ];
-    expect(svc.isLocked('prop-a', facts)).toBe(false);
+    expect(svc.isLocked(PropertyId.parse('prop-a'), facts)).toBe(false);
   });
 
   it('combines multiple facts (any matching fact locks)', () => {
@@ -63,11 +64,11 @@ describe('PropertyLockService', () => {
         distributionType: 'EQUAL',
       },
       {
-        explicitScopePropertyIds: ['prop-a'],
+        explicitScopePropertyIds: [PropertyId.parse('prop-a')],
         distributionType: 'OWNERSHIP_SIZE_WEIGHTED',
       },
     ];
-    expect(svc.isLocked('prop-a', facts)).toBe(true);
-    expect(svc.isLocked('prop-b', facts)).toBe(false);
+    expect(svc.isLocked(PropertyId.parse('prop-a'), facts)).toBe(true);
+    expect(svc.isLocked(PropertyId.parse('prop-b'), facts)).toBe(false);
   });
 });

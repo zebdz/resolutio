@@ -1,3 +1,13 @@
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import { testClock, testIds } from '@/domain/report/__tests__/reportTestValues';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { PollId, QuestionId, AnswerId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, vi } from 'vitest';
 import { AddPollAttachmentUseCase } from '../AddPollAttachmentUseCase';
 import { PollErrors } from '../PollErrors';
@@ -12,13 +22,25 @@ const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const CREATOR = 'creator-1';
 
 function questionWithAnswer(pollId: string): Question {
-  const q = Question.create('Q?', pollId, 1, 0, 'single-choice');
+  const q = Question.create(
+    QuestionText.parse('Q?'),
+    PollId.parse(pollId),
+    testCreation(QuestionId, 'question-1'),
+    PageNumber.parse(1),
+    SortOrder.parse(0),
+    'single-choice'
+  );
 
   if (!q.success) {
     throw new Error('fixture question failed: ' + q.error);
   }
 
-  const a = Answer.create('A', 1, q.value.id);
+  const a = Answer.create(
+    AnswerText.parse('A'),
+    SortOrder.parse(1),
+    q.value.id,
+    testCreation(AnswerId, 'answer-1')
+  );
 
   if (!a.success) {
     throw new Error('fixture answer failed: ' + a.error);
@@ -31,13 +53,15 @@ function questionWithAnswer(pollId: string): Question {
 
 function draftPoll(): Poll {
   const r = Poll.create(
-    'Fence dispute',
-    'The fence was moved.',
-    'org-1',
+    PollTitle.parse('Fence dispute'),
+    PollDescription.parse('The fence was moved.'),
+    OrganizationId.parse('org-1'),
     null,
-    CREATOR,
-    new Date('2030-01-01'),
-    new Date('2030-02-01')
+    UserId.parse(CREATOR),
+    expectSuccess(
+      PollPeriod.create(new Date('2030-01-01'), new Date('2030-02-01'))
+    ),
+    testCreation(PollId, 'poll-1')
   );
 
   if (!r.success) {
@@ -100,7 +124,9 @@ function buildDeps(
       polls as never,
       orgs,
       users,
-      attachments as never
+      attachments as never,
+      testIds,
+      testClock
     ),
   };
 }

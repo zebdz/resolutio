@@ -2,7 +2,13 @@
  * digest, and verify Bitcoin evidence before constructing these assertions.
  * Domain checks consistency of the assertions; it does not parse OTS or trust status labels. */
 import { Result } from '../shared/Result';
-import { AnchorProof, BitcoinHeight, Digest, UtcTimestamp } from './SealValues';
+import {
+  AnchorFailureCode,
+  AnchorProof,
+  BitcoinHeight,
+  Digest,
+  UtcTimestamp,
+} from './SealValues';
 
 export type AnchorProviderName = 'opentimestamps' | 'stub';
 export type PendingAnchorEvidence = {
@@ -20,9 +26,11 @@ export type BitcoinAnchorEvidence = {
 export type AnchorEvidence = PendingAnchorEvidence | BitcoinAnchorEvidence;
 export interface AnchorProvider {
   readonly name: AnchorProviderName;
-  submit(rootDigest: Digest): Promise<Result<PendingAnchorEvidence, string>>;
+  submit(
+    rootDigest: Digest
+  ): Promise<Result<PendingAnchorEvidence, AnchorFailureCode>>;
   upgrade(
     rootDigest: Digest,
     proof: AnchorProof
-  ): Promise<Result<AnchorEvidence, string>>;
+  ): Promise<Result<AnchorEvidence, AnchorFailureCode>>;
 }

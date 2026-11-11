@@ -1,5 +1,19 @@
 'use client';
 
+/** Displays typed membership/board projections and keeps dialog selections explicit.
+ * Closed dialogs retain their last selection for exit transitions without inventing empty identities. */
+import type {
+  UserOrganizationsView,
+  AdminOrganizationsView,
+  OrganizationReferenceView,
+} from '@/web/actions/organization/DirectoryViews';
+import type {
+  HomeBoardsView,
+  BoardReferenceView,
+  UserBoardView,
+} from '@/web/actions/board/BoardViews';
+import type { OrganizationId } from '@/domain/shared/EntityIds';
+
 import { useState, useEffect, useMemo } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Badge } from '@/src/web/components/catalyst/badge';
@@ -20,35 +34,24 @@ import {
   sortExternalBoards,
 } from './sortOrganizations';
 
-interface UserOrganization {
-  id: string;
-  name: string;
-  description: string;
-  joinedAt?: Date;
-  archivedAt?: Date | null;
-  parentOrg?: { id: string; name: string } | null;
-  hasProperties?: boolean;
-}
-
-interface AdminOrganization {
-  id: string;
-  name: string;
-  description: string;
-  archivedAt?: Date | null;
-  parentOrg?: { id: string; name: string } | null;
-}
-
-interface BoardInfo {
-  id: string;
-  name: string;
-}
-
-interface ExternalBoard {
-  id: string;
-  name: string;
-  organizationId: string;
-  organizationName: string;
-}
+type UserOrganization = UserOrganizationsView['member'][number];
+type AdminOrganization = AdminOrganizationsView['organizations'][number];
+type BoardInfo = BoardReferenceView;
+type ExternalBoard = UserBoardView;
+type LeaveBoardState =
+  | { isOpen: false; board: BoardInfo | null }
+  | { isOpen: true; board: BoardInfo };
+type LeaveOrganizationState =
+  | {
+      isOpen: false;
+      organization: OrganizationReferenceView | null;
+      boards: BoardInfo[];
+    }
+  | {
+      isOpen: true;
+      organization: OrganizationReferenceView;
+      boards: BoardInfo[];
+    };
 
 interface UserOrganizationsListProps {
   adminOrganizations: AdminOrganization[];
@@ -83,21 +86,22 @@ export function UserOrganizationsList({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [boardsByOrgId, setBoardsByOrgId] = useState<
-    Record<string, BoardInfo[]>
+    HomeBoardsView['boardsByOrgId']
   >({});
   const [externalBoards, setExternalBoards] = useState<ExternalBoard[]>([]);
-  const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set());
+  const [expandedOrgs, setExpandedOrgs] = useState<Set<OrganizationId>>(
+    new Set()
+  );
 
-  const [leaveBoardDialog, setLeaveBoardDialog] = useState<{
-    isOpen: boolean;
-    board: BoardInfo;
-  }>({ isOpen: false, board: { id: '', name: '' } });
-
-  const [leaveOrgDialog, setLeaveOrgDialog] = useState<{
-    isOpen: boolean;
-    organization: { id: string; name: string };
-    boards: BoardInfo[];
-  }>({ isOpen: false, organization: { id: '', name: '' }, boards: [] });
+  const [leaveBoardDialog, setLeaveBoardDialog] = useState<LeaveBoardState>({
+    isOpen: false,
+    board: null,
+  });
+  const [leaveOrgDialog, setLeaveOrgDialog] = useState<LeaveOrganizationState>({
+    isOpen: false,
+    organization: null,
+    boards: [],
+  });
 
   useEffect(() => {
     const loadData = async () => {
@@ -134,7 +138,7 @@ export function UserOrganizationsList({
     loadData();
   }, [adminOrganizations]);
 
-  const toggleExpanded = (orgId: string) => {
+  const toggleExpanded = (orgId: OrganizationId) => {
     setExpandedOrgs((prev) => {
       const next = new Set(prev);
 
@@ -473,25 +477,25 @@ export function UserOrganizationsList({
       )}
 
       {/* Dialogs */}
-      <LeaveBoardDialog
-        isOpen={leaveBoardDialog.isOpen}
-        onClose={() =>
-          setLeaveBoardDialog({ isOpen: false, board: { id: '', name: '' } })
-        }
-        board={leaveBoardDialog.board}
-      />
-      <LeaveOrganizationDialog
-        isOpen={leaveOrgDialog.isOpen}
-        onClose={() =>
-          setLeaveOrgDialog({
-            isOpen: false,
-            organization: { id: '', name: '' },
-            boards: [],
-          })
-        }
-        organization={leaveOrgDialog.organization}
-        boards={leaveOrgDialog.boards}
-      />
+      {leaveBoardDialog.board && (
+        <LeaveBoardDialog
+          isOpen={leaveBoardDialog.isOpen}
+          onClose={() =>
+            setLeaveBoardDialog((previous) => ({ ...previous, isOpen: false }))
+          }
+          board={leaveBoardDialog.board}
+        />
+      )}
+      {leaveOrgDialog.organization && (
+        <LeaveOrganizationDialog
+          isOpen={leaveOrgDialog.isOpen}
+          onClose={() =>
+            setLeaveOrgDialog((previous) => ({ ...previous, isOpen: false }))
+          }
+          organization={leaveOrgDialog.organization}
+          boards={leaveOrgDialog.boards}
+        />
+      )}
     </div>
   );
 }

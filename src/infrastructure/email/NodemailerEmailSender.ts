@@ -1,3 +1,4 @@
+/** SMTP adapter serializes validated recipients and never returns live message bodies. */
 import nodemailer, { type Transporter } from 'nodemailer';
 import type {
   EmailMessage,
@@ -32,7 +33,7 @@ export class NodemailerEmailSender implements EmailSender {
     try {
       await this.transporter.sendMail({
         from: this.from,
-        to: message.to,
+        to: message.to.getValue(),
         subject: message.subject,
         text: message.text,
         html: message.html,

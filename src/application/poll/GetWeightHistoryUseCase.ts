@@ -1,10 +1,15 @@
+/** Reads authorized weight audit entries and explicit user display projections.
+ * User lookup stays behind a core port, keeping ORM and private profile fields out. */
+import { PollId, UserId } from '@/domain/shared/EntityIds';
+import { PollDomainCodes } from '@/domain/poll/PollDomainCodes';
+import { PollUserDisplay, pollUserDisplay } from './PollUserDisplay';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { ParticipantWeightHistory } from '../../domain/poll/ParticipantWeightHistory';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 import { OrganizationErrors } from '../organization/OrganizationErrors';
 
 export interface GetWeightHistoryInput {
@@ -14,18 +19,8 @@ export interface GetWeightHistoryInput {
 
 export interface WeightHistoryWithUser {
   history: ParticipantWeightHistory;
-  changedByUser: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    middleName: string | null;
-  };
-  participantUser: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    middleName: string | null;
-  };
+  changedByUser: PollUserDisplay;
+  participantUser: PollUserDisplay;
 }
 
 export interface GetWeightHistoryResult {
@@ -37,14 +32,26 @@ export class GetWeightHistoryUseCase {
     private pollRepository: PollRepository,
     private participantRepository: ParticipantRepository,
     private organizationRepository: OrganizationRepository,
-    private userRepository: UserRepository,
-    private prisma: any
+    private userRepository: UserRepository
   ) {}
 
   async execute(
     input: GetWeightHistoryInput
-  ): Promise<Result<GetWeightHistoryResult, string>> {
-    const { pollId, adminUserId } = input;
+  ): Promise<
+    Result<
+      GetWeightHistoryResult,
+      PollUseCaseFailure | typeof OrganizationErrors.NOT_ADMIN
+    >
+  > {
+    const pollResultId = PollId.safeParse(input.pollId);
+    const adminResultId = UserId.safeParse(input.adminUserId);
+
+    if (!pollResultId.success || !adminResultId.success) {
+      return failure(PollDomainCodes.INVALID_BALLOT);
+    }
+
+    const pollId = pollResultId.data;
+    const adminUserId = adminResultId.data;
 
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(pollId);
@@ -87,31 +94,16 @@ export class GetWeightHistoryUseCase {
     const historyWithUsers: WeightHistoryWithUser[] = [];
 
     for (const record of history) {
-      const changedByUser = await this.prisma.user.findUnique({
-        where: { id: record.changedBy },
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          middleName: true,
-        },
-      });
-
-      const participantUser = await this.prisma.user.findUnique({
-        where: { id: record.userId },
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          middleName: true,
-        },
-      });
+      const changedByUser = await this.userRepository.findById(
+        record.changedBy
+      );
+      const participantUser = await this.userRepository.findById(record.userId);
 
       if (changedByUser && participantUser) {
         historyWithUsers.push({
           history: record,
-          changedByUser,
-          participantUser,
+          changedByUser: pollUserDisplay(changedByUser),
+          participantUser: pollUserDisplay(participantUser),
         });
       }
     }

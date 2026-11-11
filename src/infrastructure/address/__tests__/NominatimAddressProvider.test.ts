@@ -1,3 +1,4 @@
+/** Provider responses are decoded before becoming address suggestions; invalid data triggers fallback. */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { NominatimAddressProvider } from '../NominatimAddressProvider';
 
@@ -45,6 +46,20 @@ describe('NominatimAddressProvider', () => {
     expect(suggestion.building).toBe('1');
     expect(suggestion.postalCode).toBe('10178');
   });
+
+  it.each([
+    { ...ALEXANDERPLATZ_ROW, display_name: 42 },
+    {
+      ...ALEXANDERPLATZ_ROW,
+      address: { ...ALEXANDERPLATZ_ROW.address, city: 42 },
+    },
+  ])(
+    'rejects malformed suggestion fields instead of trusting the provider cast',
+    async (row) => {
+      const provider = new NominatimAddressProvider(mockFetchOnce([row]));
+      expect(await provider.suggestAddress('Alexanderplatz')).toEqual([]);
+    }
+  );
 
   it('returns houseFiasId as undefined, never an empty string — the UI reads its presence as "apartment suggestions are possible"', async () => {
     const fetchMock = mockFetchOnce([ALEXANDERPLATZ_ROW]);

@@ -1,8 +1,15 @@
+/** Organization application boundary validates external request identities/units
+ * before querying ports or invoking domain policies. */
+import { IdGenerator, Clock } from '../shared/EntityCreation';
+import { OrganizationId, UserId } from '../../domain/shared/EntityIds';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 import { OrganizationDomainCodes } from '../../domain/organization/OrganizationDomainCodes';
 import { OrganizationAdminPolicy } from '../../domain/organization/OrganizationAdminPolicy';
 import { LastAdminError } from '../../domain/organization/LastAdminError';
@@ -16,25 +23,58 @@ export interface RemoveOrgAdminInput {
 }
 
 export interface RemoveOrgAdminDependencies {
+  clock: Clock;
+  ids: IdGenerator;
   organizationRepository: OrganizationRepository;
   userRepository: UserRepository;
   notificationRepository: NotificationRepository;
 }
 
 export class RemoveOrgAdminUseCase {
+  private clock: Clock;
+  private ids: IdGenerator;
   private organizationRepository: OrganizationRepository;
   private userRepository: UserRepository;
   private notificationRepository: NotificationRepository;
 
   constructor(dependencies: RemoveOrgAdminDependencies) {
+    this.clock = dependencies.clock;
+    this.ids = dependencies.ids;
     this.organizationRepository = dependencies.organizationRepository;
     this.userRepository = dependencies.userRepository;
     this.notificationRepository = dependencies.notificationRepository;
   }
 
-  async execute(input: RemoveOrgAdminInput): Promise<Result<void, string>> {
+  async execute(
+    input: RemoveOrgAdminInput
+  ): Promise<Result<void, OrganizationUseCaseFailure>> {
+    const parsedOrganizationId = OrganizationId.safeParse(input.organizationId);
+
+    if (!parsedOrganizationId.success) {
+      return failure(OrganizationErrors.NOT_FOUND);
+    }
+
+    const parsedTargetUserId = UserId.safeParse(input.targetUserId);
+
+    if (!parsedTargetUserId.success) {
+      return failure(OrganizationErrors.USER_NOT_FOUND);
+    }
+
+    const parsedActorUserId = UserId.safeParse(input.actorUserId);
+
+    if (!parsedActorUserId.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
+    }
+
+    const command = {
+      ...input,
+      organizationId: parsedOrganizationId.data,
+      targetUserId: parsedTargetUserId.data,
+      actorUserId: parsedActorUserId.data,
+    };
+
     const organization = await this.organizationRepository.findById(
-      input.organizationId
+      command.organizationId
     );
 
     if (!organization) {
@@ -47,11 +87,11 @@ export class RemoveOrgAdminUseCase {
 
     // Check authorization
     const isSuperAdmin = await this.userRepository.isSuperAdmin(
-      input.actorUserId
+      command.actorUserId
     );
     const isOrgAdmin = await this.organizationRepository.isUserAdmin(
-      input.actorUserId,
-      input.organizationId
+      command.actorUserId,
+      command.organizationId
     );
 
     if (!isOrgAdmin && !isSuperAdmin) {
@@ -59,14 +99,14 @@ export class RemoveOrgAdminUseCase {
     }
 
     // Cannot remove self
-    if (input.actorUserId === input.targetUserId) {
+    if (command.actorUserId === command.targetUserId) {
       return failure(OrganizationErrors.CANNOT_REMOVE_SELF);
     }
 
     // Check target is an admin
     const isTargetAdmin = await this.organizationRepository.isUserAdmin(
-      input.targetUserId,
-      input.organizationId
+      command.targetUserId,
+      command.organizationId
     );
 
     if (!isTargetAdmin) {
@@ -75,11 +115,11 @@ export class RemoveOrgAdminUseCase {
 
     // Enforce the "≥1 admin must remain" invariant in the domain before mutating.
     const currentAdminIds = await this.organizationRepository.findAdminUserIds(
-      input.organizationId
+      command.organizationId
     );
     const canRemove = OrganizationAdminPolicy.ensureCanRemoveAdmin(
       currentAdminIds,
-      input.targetUserId
+      command.targetUserId
     );
 
     if (!canRemove.success) {
@@ -89,8 +129,8 @@ export class RemoveOrgAdminUseCase {
     // The repository re-checks the invariant atomically as a concurrency net.
     try {
       await this.organizationRepository.removeAdmin(
-        input.organizationId,
-        input.targetUserId
+        command.organizationId,
+        command.targetUserId
       );
     } catch (error) {
       if (error instanceof LastAdminError) {
@@ -101,19 +141,26 @@ export class RemoveOrgAdminUseCase {
     }
 
     // Notify removed admin (fire-and-forget)
-    const actor = await this.userRepository.findById(input.actorUserId);
+    const actor = await this.userRepository.findById(command.actorUserId);
     const actorName = actor
       ? User.formatFullName(actor.firstName, actor.lastName, actor.middleName)
       : '';
 
     new NotifyAdminRemovedUseCase({
+      ids: this.ids,
+      clock: this.clock,
       notificationRepository: this.notificationRepository,
     })
       .execute({
-        removedUserId: input.targetUserId,
-        organizationId: input.organizationId,
+        removedUserId: command.targetUserId,
+        organizationId: command.organizationId,
         organizationName: organization.name,
         actorName,
+      })
+      .then((result) => {
+        if (!result.success) {
+          console.error('Failed to notify admin removed:', result.error);
+        }
       })
       .catch((err) => console.error('Failed to notify admin removed:', err));
 

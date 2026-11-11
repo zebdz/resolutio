@@ -16,7 +16,7 @@ A service (web app) that would allow people to unite in organizations, vote, and
 ## Git
 
 - git add is allowed
-- NEVER git commit
+- NEVER commit on master branch
 
 ## Security
 

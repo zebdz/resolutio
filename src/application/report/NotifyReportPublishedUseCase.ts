@@ -1,62 +1,78 @@
+/** Resolves typed report recipients and creates notifications with explicit identity/time. */
+import {
+  NotificationId,
+  UserId,
+  OrganizationId,
+  BoardId,
+} from '../../domain/shared/EntityIds';
+import { Clock, IdGenerator, entityCreation } from '../shared/EntityCreation';
 import { Report } from '../../domain/report/Report';
 import { ReportVisibility } from '../../domain/report/ReportVisibility';
 import { Notification } from '../../domain/notification/Notification';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
+import { collectResults, success, type Result } from '@/domain/shared/Result';
+import type { NotificationDeliveryFailure } from '@/application/notification/NotificationErrors';
 
 export interface OrgRepoForNotify {
-  getAncestorIds(orgId: string): Promise<string[]>;
-  getDescendantIds(orgId: string): Promise<string[]>;
-  getFullTreeOrgIds(orgId: string): Promise<string[]>;
-  findAcceptedMemberUserIdsForOrgs(orgIds: string[]): Promise<string[]>;
+  getAncestorIds(orgId: OrganizationId): Promise<OrganizationId[]>;
+  getDescendantIds(orgId: OrganizationId): Promise<OrganizationId[]>;
+  getFullTreeOrgIds(orgId: OrganizationId): Promise<OrganizationId[]>;
+  findAcceptedMemberUserIdsForOrgs(orgIds: OrganizationId[]): Promise<UserId[]>;
 }
 
 export interface BoardRepoForNotify {
-  findBoardMembers(boardId: string): Promise<{ userId: string }[]>;
+  findBoardMembers(boardId: BoardId): Promise<{ userId: UserId }[]>;
 }
 
 export class NotifyReportPublishedUseCase {
   constructor(
     private deps: {
+      ids: IdGenerator;
+      clock: Clock;
       orgRepo: OrgRepoForNotify;
       boardRepo: BoardRepoForNotify;
-      notificationRepository: NotificationRepository;
+      notificationRepository: Pick<NotificationRepository, 'saveBatch'>;
     }
   ) {}
 
-  async notifyPublished(report: Report): Promise<void> {
+  async notifyPublished(
+    report: Report
+  ): Promise<Result<void, NotificationDeliveryFailure>> {
     const audience = await this.resolveAudience(report);
     // Skip the author — they already know.
     const recipients = audience.filter((id) => id !== report.createdById);
 
     if (recipients.length === 0) {
-      return;
+      return success(undefined);
     }
 
-    const notifications = recipients.map((userId) => {
-      const result = Notification.create({
-        userId,
-        type: 'report_published',
-        title: 'notification.types.reportPublished.title',
-        body: 'notification.types.reportPublished.body',
-        data: {
-          reportId: report.id,
-          organizationId: report.organizationId,
-          title: report.title,
-        },
-      });
+    const notifications = collectResults(
+      recipients.map((userId) =>
+        Notification.create(
+          {
+            userId,
+            type: 'report_published',
+            title: 'notification.types.reportPublished.title',
+            body: 'notification.types.reportPublished.body',
+            data: {
+              reportId: report.id,
+              organizationId: report.organizationId,
+              title: report.title,
+            },
+          },
+          entityCreation(NotificationId, this.deps.ids, this.deps.clock)
+        )
+      )
+    );
 
-      // Notification.create always returns success in current impl.
-      if (!result.success) {
-        throw new Error(`Notification.create failed: ${result.error}`);
-      }
+    if (!notifications.success) {
+      return notifications;
+    }
 
-      return result.value;
-    });
-
-    await this.deps.notificationRepository.saveBatch(notifications);
+    return this.deps.notificationRepository.saveBatch(notifications.value);
   }
 
-  private async resolveAudience(report: Report): Promise<string[]> {
+  private async resolveAudience(report: Report): Promise<UserId[]> {
     switch (report.visibility) {
       case ReportVisibility.PUBLIC_ANON:
       case ReportVisibility.PUBLIC_AUTH:
@@ -100,7 +116,7 @@ export class NotifyReportPublishedUseCase {
       }
 
       case ReportVisibility.WITHIN_BOARDS: {
-        const seen = new Set<string>();
+        const seen = new Set<UserId>();
 
         for (const boardId of report.boardIds) {
           const members = await this.deps.boardRepo.findBoardMembers(boardId);

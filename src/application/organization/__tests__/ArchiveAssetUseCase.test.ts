@@ -1,3 +1,6 @@
+/** Application boundary tests exercise authorization and domain constraints
+ * with deterministic creation dependencies and repository port doubles. */
+import { Instant } from '../../../domain/shared/Instant';
 import { describe, it, expect } from 'vitest';
 import { ArchiveAssetUseCase } from '../ArchiveAssetUseCase';
 import { OrganizationProperty } from '../../../domain/organization/OrganizationProperty';
@@ -25,6 +28,7 @@ describe('ArchiveAssetUseCase', () => {
     });
     let autoDenyCalledFor = '';
     const uc = new ArchiveAssetUseCase({
+      clock: { now: () => Instant.parse('2026-01-01T00:00:00.000Z') },
       assetRepository: {
         findAssetById: async () => success(asset),
         updateAsset: async () => success(undefined),
@@ -35,12 +39,15 @@ describe('ArchiveAssetUseCase', () => {
       autoDenyClaims: {
         executeForAsset: async (input: { assetId: string }) => {
           autoDenyCalledFor = input.assetId;
+
+          return success(undefined);
         },
       } as any,
     });
     const r = await uc.execute({ assetId: 'a-1', adminUserId: 'admin' });
     expect(r.success).toBe(true);
     expect(asset.isArchived()).toBe(true);
+    expect(asset.archivedAt).toEqual(new Date('2026-01-01T00:00:00.000Z'));
     expect(autoDenyCalledFor).toBe('a-1');
   });
 });

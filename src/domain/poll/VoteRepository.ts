@@ -1,14 +1,24 @@
+/** Accepted-selection persistence uses typed identities and explicit adapter failures.
+ * The whole-ballot acceptance transaction remains the authoritative write boundary. */
+import { PollId, UserId } from '../shared/EntityIds';
 import { Vote } from './Vote';
 import { Result } from '../shared/Result';
 
+export type VoteRepositoryFailure = 'common.errors.unexpected';
+
 export interface VoteRepository {
-  createVote(vote: Vote): Promise<Result<Vote, string>>;
-  createVotes(votes: Vote[]): Promise<Result<void, string>>;
-  getUserVotes(pollId: string, userId: string): Promise<Result<Vote[], string>>;
+  createVote(vote: Vote): Promise<Result<Vote, VoteRepositoryFailure>>;
+  createVotes(votes: Vote[]): Promise<Result<void, VoteRepositoryFailure>>;
+  getUserVotes(
+    pollId: PollId,
+    userId: UserId
+  ): Promise<Result<Vote[], VoteRepositoryFailure>>;
   hasUserFinishedVoting(
-    pollId: string,
-    userId: string
-  ): Promise<Result<boolean, string>>;
-  getVotesByPoll(pollId: string): Promise<Result<Vote[], string>>;
-  pollHasVotes(pollId: string): Promise<Result<boolean, string>>;
+    pollId: PollId,
+    userId: UserId
+  ): Promise<Result<boolean, VoteRepositoryFailure>>;
+  getVotesByPoll(
+    pollId: PollId
+  ): Promise<Result<Vote[], VoteRepositoryFailure>>;
+  pollHasVotes(pollId: PollId): Promise<Result<boolean, VoteRepositoryFailure>>;
 }

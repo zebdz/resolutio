@@ -1,3 +1,5 @@
+/** Resolves authorized organization views and serializes user details for the client. */
+import { UserId } from '@/domain/shared/EntityIds';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { getBoardDetailsAction } from '@/src/web/actions/board/board';
@@ -48,8 +50,10 @@ export default async function ManageSingleBoardPage({ params }: PageProps) {
 
   const inviteeIds = rawInvites.map((inv) => inv.inviteeId);
   const inviteeUserDomains =
-    inviteeIds.length > 0 ? await userRepository.findByIds(inviteeIds) : [];
-  const inviteeMap = new Map(
+    inviteeIds.length > 0
+      ? await userRepository.findByIds(inviteeIds.map((id) => UserId.parse(id)))
+      : [];
+  const inviteeMap = new Map<string, string>(
     inviteeUserDomains.map((u) => [
       u.id,
       User.formatFullName(u.firstName, u.lastName, u.middleName),

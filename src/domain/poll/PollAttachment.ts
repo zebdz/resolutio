@@ -1,36 +1,57 @@
+/** Validated poll evidence metadata with caller-assigned identity/time.
+ * Content bytes remain separate, so metadata never leaks file content across boundaries. */
+import { z } from 'zod';
+import { EntityCreation } from '../shared/EntityCreation';
+import { PollAttachmentId, PollId } from '../shared/EntityIds';
+import { Instant } from '../shared/Instant';
+import {
+  AttachmentFileName,
+  AttachmentByteCount,
+  AttachmentCount,
+} from '../shared/attachments/AttachmentValues';
+import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 import { Result, success, failure } from '../shared/Result';
-import { PollDomainCodes } from './PollDomainCodes';
+import { PollDomainCodes, PollDomainCode } from './PollDomainCodes';
 
 // Path prefix for inline description refs and the download route.
-export const POLL_ATTACHMENT_API_PREFIX = '/api/poll-attachments';
+export { POLL_ATTACHMENT_API_PREFIX } from '../shared/attachments/AttachmentReferenceScope';
 
 // 5 MB cap for images — guards against RAW/uncompressed uploads.
-export const POLL_ATTACHMENT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+export const POLL_ATTACHMENT_IMAGE_MAX_BYTES = AttachmentByteCount.parse(
+  5 * 1024 * 1024
+);
 
 // 10 MB cap for PDFs — scanned evidence with embedded fonts can be large.
-export const POLL_ATTACHMENT_PDF_MAX_BYTES = 10 * 1024 * 1024;
+export const POLL_ATTACHMENT_PDF_MAX_BYTES = AttachmentByteCount.parse(
+  10 * 1024 * 1024
+);
 
 // Per-poll attachment cap. Enforced in the use case, not in this entity.
-export const POLL_ATTACHMENT_COUNT_LIMIT = 20;
+export const POLL_ATTACHMENT_COUNT_LIMIT = AttachmentCount.parse(20);
 
 // Deliberately narrower than the report whitelist: a poll description takes
 // evidence (photos, scanned documents), not office files. Adding a type here
 // is intentional; do not loosen without a security review.
-export const POLL_ATTACHMENT_ALLOWED_MIME_TYPES = [
+export const POLL_ATTACHMENT_ALLOWED_MIME_TYPES = Object.freeze([
   'image/png',
   'image/jpeg',
   'image/webp',
   'application/pdf',
-] as const;
+] as const);
 
 export type PollAttachmentMimeType =
   (typeof POLL_ATTACHMENT_ALLOWED_MIME_TYPES)[number];
 
 // The WebP check needs offset 0..3 plus 8..11; everything else checks
 // offset 0 only.
+export const PollAttachmentMime = z.enum(POLL_ATTACHMENT_ALLOWED_MIME_TYPES);
+export type PollAttachmentFailure =
+  | PollDomainCode
+  | typeof SharedDomainCodes.INVALID_ATTACHMENT_METADATA;
+
 const MAGIC_HEADER_PREFIX_BYTES = 12;
 
-function maxBytesFor(mimeType: string): number {
+function maxBytesFor(mimeType: PollAttachmentMimeType): AttachmentByteCount {
   return mimeType === 'application/pdf'
     ? POLL_ATTACHMENT_PDF_MAX_BYTES
     : POLL_ATTACHMENT_IMAGE_MAX_BYTES;
@@ -41,7 +62,7 @@ function maxBytesFor(mimeType: string): number {
 // rename-and-lie attack (.exe → .pdf, declared as application/pdf).
 // Polyglots are mitigated downstream by the auth-gated download route and
 // the renderer's per-poll allowlist rather than at upload time.
-function magicMatches(mimeType: string, head: Buffer): boolean {
+function magicMatches(mimeType: PollAttachmentMimeType, head: Buffer): boolean {
   switch (mimeType) {
     case 'image/png':
       // 89 50 4E 47 0D 0A 1A 0A — fixed 8-byte PNG signature.
@@ -84,16 +105,16 @@ function magicMatches(mimeType: string, head: Buffer): boolean {
 }
 
 interface CreateInput {
-  pollId: string;
-  fileName: string;
-  mimeType: string;
-  sizeBytes: number;
+  pollId: PollId;
+  fileName: AttachmentFileName;
+  mimeType: PollAttachmentMimeType;
+  sizeBytes: AttachmentByteCount;
 }
 
 interface CreateWithBytesInput {
-  pollId: string;
-  fileName: string;
-  mimeType: string;
+  pollId: PollId;
+  fileName: AttachmentFileName;
+  mimeType: PollAttachmentMimeType;
   bytes: Buffer;
 }
 
@@ -106,43 +127,87 @@ interface ReconstituteInput {
   createdAt: Date;
 }
 
+/** Decodes raw upload metadata with this context's established error order.
+ * Factories consume validated values and still enforce byte signatures and parent identity. */
+export function parsePollAttachmentMetadata(input: {
+  fileName: unknown;
+  mimeType: unknown;
+  sizeBytes: unknown;
+}): Result<Omit<CreateInput, 'pollId'>, PollAttachmentFailure> {
+  const fileName = AttachmentFileName.safeParse(input.fileName);
+
+  if (!fileName.success) {
+    return failure(PollDomainCodes.POLL_ATTACHMENT_FILENAME_EMPTY);
+  }
+
+  const mime = PollAttachmentMime.safeParse(input.mimeType);
+
+  if (!mime.success) {
+    return failure(PollDomainCodes.POLL_ATTACHMENT_TYPE_NOT_ALLOWED);
+  }
+
+  if (
+    typeof input.sizeBytes === 'number' &&
+    input.sizeBytes > maxBytesFor(mime.data)
+  ) {
+    return failure(PollDomainCodes.POLL_ATTACHMENT_TOO_LARGE);
+  }
+
+  const bytes = AttachmentByteCount.safeParse(input.sizeBytes);
+
+  if (!bytes.success) {
+    return failure(SharedDomainCodes.INVALID_ATTACHMENT_METADATA);
+  }
+
+  return success({
+    fileName: AttachmentFileName.parse(fileName.data.trim()),
+    mimeType: mime.data,
+    sizeBytes: bytes.data,
+  });
+}
+
 export class PollAttachment {
   private constructor(
-    public readonly id: string | null,
-    public readonly pollId: string,
-    public readonly fileName: string,
-    public readonly mimeType: string,
-    public readonly sizeBytes: number,
-    public readonly createdAt: Date | null
-  ) {}
+    public readonly id: PollAttachmentId,
+    public readonly pollId: PollId,
+    public readonly fileName: AttachmentFileName,
+    public readonly mimeType: PollAttachmentMimeType,
+    public readonly sizeBytes: AttachmentByteCount,
+    private readonly created: Instant
+  ) {
+    Object.freeze(this);
+  }
 
-  static create(input: CreateInput): Result<PollAttachment, string> {
-    const trimmed = input.fileName.trim();
+  get createdAt(): Date {
+    return Instant.toDate(this.created);
+  }
 
-    if (trimmed.length === 0) {
-      return failure(PollDomainCodes.POLL_ATTACHMENT_FILENAME_EMPTY);
+  static create(
+    input: CreateInput,
+    creation: EntityCreation<PollAttachmentId>
+  ): Result<PollAttachment, PollAttachmentFailure> {
+    const metadata = parsePollAttachmentMetadata(input);
+
+    if (!metadata.success) {
+      return metadata;
     }
 
-    if (
-      !(POLL_ATTACHMENT_ALLOWED_MIME_TYPES as readonly string[]).includes(
-        input.mimeType
-      )
-    ) {
-      return failure(PollDomainCodes.POLL_ATTACHMENT_TYPE_NOT_ALLOWED);
-    }
+    const identity = PollAttachmentId.safeParse(creation?.id);
+    const parent = PollId.safeParse(input.pollId);
+    const time = Instant.safeParse(creation?.now);
 
-    if (input.sizeBytes > maxBytesFor(input.mimeType)) {
-      return failure(PollDomainCodes.POLL_ATTACHMENT_TOO_LARGE);
+    if (!identity.success || !parent.success || !time.success) {
+      return failure(SharedDomainCodes.INVALID_ATTACHMENT_METADATA);
     }
 
     return success(
       new PollAttachment(
-        null,
-        input.pollId,
-        trimmed,
-        input.mimeType,
-        input.sizeBytes,
-        null
+        identity.data,
+        parent.data,
+        metadata.value.fileName,
+        metadata.value.mimeType,
+        metadata.value.sizeBytes,
+        time.data
       )
     );
   }
@@ -153,14 +218,18 @@ export class PollAttachment {
   // type → size → magic, so obviously oversized uploads fail without
   // inspecting their contents.
   static createWithBytes(
-    input: CreateWithBytesInput
-  ): Result<PollAttachment, string> {
-    const meta = PollAttachment.create({
-      pollId: input.pollId,
-      fileName: input.fileName,
-      mimeType: input.mimeType,
-      sizeBytes: input.bytes.length,
-    });
+    input: CreateWithBytesInput,
+    creation: EntityCreation<PollAttachmentId>
+  ): Result<PollAttachment, PollAttachmentFailure> {
+    const meta = PollAttachment.create(
+      {
+        pollId: input.pollId,
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        sizeBytes: AttachmentByteCount.parse(input.bytes.length),
+      },
+      creation
+    );
 
     if (!meta.success) {
       return meta;
@@ -168,7 +237,7 @@ export class PollAttachment {
 
     const head = input.bytes.subarray(0, MAGIC_HEADER_PREFIX_BYTES);
 
-    if (!magicMatches(input.mimeType, head)) {
+    if (!magicMatches(meta.value.mimeType, head)) {
       return failure(PollDomainCodes.POLL_ATTACHMENT_MAGIC_MISMATCH);
     }
 
@@ -176,13 +245,29 @@ export class PollAttachment {
   }
 
   static reconstitute(input: ReconstituteInput): PollAttachment {
-    return new PollAttachment(
-      input.id,
-      input.pollId,
-      input.fileName,
-      input.mimeType,
-      input.sizeBytes,
-      input.createdAt
+    const metadata = parsePollAttachmentMetadata(input);
+
+    if (!metadata.success) {
+      throw new Error(metadata.error);
+    }
+
+    const result = PollAttachment.create(
+      {
+        pollId: PollId.parse(input.pollId),
+        fileName: metadata.value.fileName,
+        mimeType: metadata.value.mimeType,
+        sizeBytes: metadata.value.sizeBytes,
+      },
+      {
+        id: PollAttachmentId.parse(input.id),
+        now: Instant.fromDate(input.createdAt),
+      }
     );
+
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+
+    return result.value;
   }
 }

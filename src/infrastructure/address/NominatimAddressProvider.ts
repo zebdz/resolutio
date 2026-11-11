@@ -1,11 +1,26 @@
+/** Decodes Nominatim transport rows before mapping plain autocomplete suggestions.
+ * Malformed responses use the same empty-result fallback as network failures. */
+import { z } from 'zod';
 import type { AddressProvider, AddressSuggestion } from './types';
 
 const SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
 
-interface NominatimRow {
-  display_name: string;
-  address: Record<string, string | undefined>;
-}
+const optionalText = z.string().nullish();
+const responseSchema = z.array(
+  z.object({
+    display_name: z.string(),
+    address: z.object({
+      country: optionalText,
+      state: optionalText,
+      city: optionalText,
+      town: optionalText,
+      village: optionalText,
+      road: optionalText,
+      house_number: optionalText,
+      postcode: optionalText,
+    }),
+  })
+);
 
 type Fetch = typeof fetch;
 
@@ -38,7 +53,13 @@ export class NominatimAddressProvider implements AddressProvider {
         return [];
       }
 
-      const rows = (await res.json()) as NominatimRow[];
+      const parsed = responseSchema.safeParse(await res.json());
+
+      if (!parsed.success) {
+        return [];
+      }
+
+      const rows = parsed.data;
 
       return rows.map((row) => ({
         label: row.display_name,

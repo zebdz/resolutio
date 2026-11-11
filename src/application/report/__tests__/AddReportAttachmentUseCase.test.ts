@@ -1,6 +1,7 @@
+import { testClock, testIds } from '@/domain/report/__tests__/reportTestValues';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { AddReportAttachmentUseCase } from '../AddReportAttachmentUseCase';
-import { Report, ReportProps } from '../../../domain/report/Report';
+import { Report, ReportData } from '../../../domain/report/Report';
 import { ReportVisibility } from '../../../domain/report/ReportVisibility';
 import { ReportErrors } from '../ReportErrors';
 import { ReportDomainCodes } from '../../../domain/report/ReportDomainCodes';
@@ -15,7 +16,7 @@ function unwrap<T>(
   return r.value;
 }
 
-const makeReport = (overrides: Partial<ReportProps> = {}) =>
+const makeReport = (overrides: Partial<ReportData> = {}) =>
   Report.reconstitute({
     id: 'r1',
     organizationId: 'org-1',
@@ -34,6 +35,12 @@ const makeReport = (overrides: Partial<ReportProps> = {}) =>
     pollIds: [],
     attachmentIds: [],
     ...overrides,
+    ...(overrides.state === 'PUBLISHED'
+      ? {
+          publishedById: overrides.publishedById ?? 'admin-1',
+          lastPublishedAt: overrides.lastPublishedAt ?? new Date('2026-01-01'),
+        }
+      : {}),
   });
 
 // Minimal valid PNG bytes (8-byte magic)
@@ -118,7 +125,9 @@ describe('AddReportAttachmentUseCase', () => {
       reports as any,
       orgs as any,
       users as any,
-      attachments as any
+      attachments as any,
+      testIds,
+      testClock
     );
     reports.store.set('r1', makeReport());
   });

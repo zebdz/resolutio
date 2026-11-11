@@ -1,3 +1,13 @@
+/** Board application behavior tests cover authorization, validated request identities
+ * and explicit creation/lifecycle inputs through repository contracts. */
+import { MemberCount } from '@/domain/organization/OrganizationValues';
+import { ResultCount } from '@/domain/shared/Pagination';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import { OrganizationName } from '@/domain/organization/OrganizationValues';
+import { createOrganization } from '@/domain/organization/__tests__/organizationTestValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { BoardSummary } from '@/domain/board/BoardRepository';
+import { boardCreation, createBoardIds, boardClock } from './boardTestValues';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CreateBoardUseCase } from '../CreateBoardUseCase';
 import { Board } from '../../../domain/board/Board';
@@ -11,12 +21,9 @@ import { PhoneNumber } from '../../../domain/user/PhoneNumber';
 // Mock BoardRepository
 class MockBoardRepository implements BoardRepository {
   private boards: Map<string, Board> = new Map();
-  private nextId = 1;
 
   async save(board: Board): Promise<Board> {
-    const id = `board-${this.nextId++}`;
-    (board as any).props.id = id;
-    this.boards.set(id, board);
+    this.boards.set(board.id, board);
 
     return board;
   }
@@ -31,7 +38,7 @@ class MockBoardRepository implements BoardRepository {
     );
   }
 
-  async findBoardMembers(boardId: string): Promise<{ userId: string }[]> {
+  async findBoardMembers(boardId: string): Promise<{ userId: UserId }[]> {
     return [];
   }
 
@@ -58,21 +65,41 @@ class MockBoardRepository implements BoardRepository {
     return board;
   }
 
-  async findActiveBoardsByUserId(
-    _userId: string
-  ): Promise<Array<{ id: string; name: string; organizationId: string }>> {
+  async findActiveBoardsByUserId(_userId: string): Promise<BoardSummary[]> {
     return [];
   }
 
   // Helper for testing
   clear(): void {
     this.boards.clear();
-    this.nextId = 1;
   }
 }
 
 // Mock OrganizationRepository
 class MockOrganizationRepository implements OrganizationRepository {
+  async isUserExactMember(): Promise<boolean> {
+    return false;
+  }
+  async getAdminUserIds(): ReturnType<
+    OrganizationRepository['getAdminUserIds']
+  > {
+    return [];
+  }
+  async findAcceptedMemberUserIdsIncludingDescendants(): ReturnType<
+    OrganizationRepository['findAcceptedMemberUserIdsIncludingDescendants']
+  > {
+    return [];
+  }
+  async findAcceptedMemberUserIdsForOrgs(): ReturnType<
+    OrganizationRepository['findAcceptedMemberUserIdsForOrgs']
+  > {
+    return [];
+  }
+  async removeUserFromOrganization(): Promise<void> {}
+  async removeMemberFromOrganization(): Promise<void> {}
+  async findPendingRequestsByUserId(): Promise<Organization[]> {
+    return [];
+  }
   private organizations: Map<string, Organization> = new Map();
   private admins: Map<string, Set<string>> = new Map(); // orgId -> Set of admin userIds
 
@@ -105,11 +132,15 @@ class MockOrganizationRepository implements OrganizationRepository {
     );
   }
 
-  async getAncestorIds(organizationId: string): Promise<string[]> {
+  async getAncestorIds(
+    organizationId: string
+  ): ReturnType<OrganizationRepository['getAncestorIds']> {
     return [];
   }
 
-  async getDescendantIds(organizationId: string): Promise<string[]> {
+  async getDescendantIds(
+    organizationId: string
+  ): ReturnType<OrganizationRepository['getDescendantIds']> {
     return [];
   }
 
@@ -167,44 +198,51 @@ class MockOrganizationRepository implements OrganizationRepository {
     this.admins.clear();
   }
 
-  async getAncestors(): Promise<
-    { id: string; name: string; memberCount: number }[]
+  async getAncestors(): ReturnType<OrganizationRepository['getAncestors']> {
+    return [];
+  }
+
+  async getChildrenWithStats(): ReturnType<
+    OrganizationRepository['getChildrenWithStats']
   > {
     return [];
   }
 
-  async getChildrenWithStats(): Promise<
-    { id: string; name: string; memberCount: number }[]
+  async getHierarchyTree(): ReturnType<
+    OrganizationRepository['getHierarchyTree']
   > {
-    return [];
-  }
-
-  async getHierarchyTree(): Promise<{
-    ancestors: { id: string; name: string; memberCount: number }[];
-    tree: { id: string; name: string; memberCount: number; children: any[] };
-  }> {
     return {
       ancestors: [],
-      tree: { id: '', name: '', memberCount: 0, children: [] },
+      tree: {
+        id: OrganizationId.parse('org-fixture'),
+        name: OrganizationName.parse('Fixture organization'),
+        memberCount: MemberCount.parse(0),
+        children: [],
+      },
     };
   }
-  async searchOrganizationsWithStats(): Promise<{
-    organizations: any[];
-    totalCount: number;
-  }> {
-    return { organizations: [], totalCount: 0 };
+  async searchOrganizationsWithStats(): ReturnType<
+    OrganizationRepository['searchOrganizationsWithStats']
+  > {
+    return { organizations: [], totalCount: ResultCount.parse(0) };
   }
   async setParentId(
     organizationId: string,
     parentId: string | null
   ): Promise<void> {}
-  async findAdminUserIds(): Promise<string[]> {
+  async findAdminUserIds(): ReturnType<
+    OrganizationRepository['findAdminUserIds']
+  > {
     return [];
   }
-  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+  async searchByNameFuzzy(): ReturnType<
+    OrganizationRepository['searchByNameFuzzy']
+  > {
     return [];
   }
-  async getFullTreeOrgIds(): Promise<string[]> {
+  async getFullTreeOrgIds(): ReturnType<
+    OrganizationRepository['getFullTreeOrgIds']
+  > {
     return [];
   }
   async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
@@ -212,7 +250,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
   async findUsersWithMultipleMembershipsInOrgs(
     _orgIds: string[]
-  ): Promise<string[]> {
+  ): ReturnType<
+    OrganizationRepository['findUsersWithMultipleMembershipsInOrgs']
+  > {
     return [];
   }
   async setAllowMultiTreeMembership(
@@ -223,6 +263,9 @@ class MockOrganizationRepository implements OrganizationRepository {
 
 // Mock UserRepository
 class MockUserRepository implements UserRepository {
+  async findByEmail(): Promise<User | null> {
+    return null;
+  }
   private superAdmins: Set<string> = new Set();
 
   async findById(id: string): Promise<User | null> {
@@ -249,7 +292,7 @@ class MockUserRepository implements UserRepository {
     return [];
   }
 
-  async searchUserByPhone(_phone: string): Promise<User | null> {
+  async searchUserByPhone(_phone: PhoneNumber): Promise<User | null> {
     return null;
   }
 
@@ -275,19 +318,10 @@ class MockUserRepository implements UserRepository {
   }
 
   async updatePrivacySettings(): Promise<void> {}
-  async isUserBlocked(): Promise<boolean> {
-    return false;
-  }
-  async blockUser(): Promise<void> {}
-  async unblockUser(): Promise<void> {}
+
   async confirmUser(): Promise<void> {}
-  async getBlockStatus(): Promise<null> {
-    return null;
-  }
+
   async deleteAddress(): Promise<void> {}
-  async getBlockedUserIds(): Promise<string[]> {
-    return [];
-  }
 }
 
 describe('CreateBoardUseCase', () => {
@@ -301,6 +335,8 @@ describe('CreateBoardUseCase', () => {
     organizationRepository = new MockOrganizationRepository();
     userRepository = new MockUserRepository();
     useCase = new CreateBoardUseCase({
+      ids: createBoardIds(),
+      clock: boardClock,
       boardRepository,
       organizationRepository,
       userRepository,
@@ -325,15 +361,17 @@ describe('CreateBoardUseCase', () => {
 
   describe('when user is not an admin', () => {
     beforeEach(() => {
-      const orgResult = Organization.create(
+      const orgResult = createOrganization(
         'Test Organization',
         'Test Desc',
         'creator-1'
       );
 
       if (orgResult.success) {
-        const org = orgResult.value;
-        (org as any).props.id = 'org-1';
+        const org = Organization.reconstitute({
+          ...orgResult.value.toJSON(),
+          id: 'org-1',
+        });
         organizationRepository.addOrganization(org);
       }
     });
@@ -355,15 +393,17 @@ describe('CreateBoardUseCase', () => {
 
   describe('when user is an admin', () => {
     beforeEach(() => {
-      const orgResult = Organization.create(
+      const orgResult = createOrganization(
         'Test Organization',
         'Test Desc',
         'creator-1'
       );
 
       if (orgResult.success) {
-        const org = orgResult.value;
-        (org as any).props.id = 'org-1';
+        const org = Organization.reconstitute({
+          ...orgResult.value.toJSON(),
+          id: 'org-1',
+        });
         organizationRepository.addOrganization(org);
         organizationRepository.addAdmin('org-1', 'admin-1');
       }
@@ -381,7 +421,8 @@ describe('CreateBoardUseCase', () => {
       if (result.success) {
         expect(result.value.board.name).toBe('Test Board');
         expect(result.value.board.organizationId).toBe('org-1');
-        expect(result.value.board.id).toBeTruthy();
+        expect(result.value.board.id).toBe(boardCreation.id);
+        expect(result.value.board.createdAt).toBe(boardCreation.now);
       }
     });
 
@@ -438,15 +479,17 @@ describe('CreateBoardUseCase', () => {
 
   describe('when user is a superadmin', () => {
     beforeEach(() => {
-      const orgResult = Organization.create(
+      const orgResult = createOrganization(
         'Test Organization',
         'Test Desc',
         'creator-1'
       );
 
       if (orgResult.success) {
-        const org = orgResult.value;
-        (org as any).props.id = 'org-1';
+        const org = Organization.reconstitute({
+          ...orgResult.value.toJSON(),
+          id: 'org-1',
+        });
         organizationRepository.addOrganization(org);
       }
 

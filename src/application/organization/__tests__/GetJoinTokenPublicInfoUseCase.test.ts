@@ -1,3 +1,12 @@
+/** Join-link public reads enforce link availability and decode member totals.
+ * Storage is simulated behind the real directory adapter; no database I/O occurs. */
+import { PrismaClient } from '@/generated/prisma/client';
+import { PrismaOrganizationDirectory } from '@/infrastructure/repositories/PrismaOrganizationDirectory';
+import { MemberCount } from '@/domain/organization/OrganizationValues';
+import { ResultCount } from '@/domain/shared/Pagination';
+import { UserId } from '../../../domain/shared/EntityIds';
+import { OrganizationName } from '../../../domain/organization/OrganizationValues';
+import { OrganizationId } from '../../../domain/shared/EntityIds';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GetJoinTokenPublicInfoUseCase } from '../GetJoinTokenPublicInfoUseCase';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
@@ -24,88 +33,155 @@ class MockOrganizationRepository implements OrganizationRepository {
     this.organizations.set(org.id, org);
   }
 
-  async findById(id: string): Promise<Organization | null> {
+  async findById(id: string): ReturnType<OrganizationRepository['findById']> {
     return this.organizations.get(id) || null;
   }
 
   // Unused stubs
-  async isUserAdmin() {
+  async isUserAdmin(): ReturnType<OrganizationRepository['isUserAdmin']> {
     return false;
   }
-  async addAdmin() {}
-  async save(org: Organization) {
+  async addAdmin(): ReturnType<OrganizationRepository['addAdmin']> {}
+  async save(org: Organization): ReturnType<OrganizationRepository['save']> {
     return org;
   }
-  async findByName() {
+  async findByName(): ReturnType<OrganizationRepository['findByName']> {
     return null;
   }
-  async findByCreatorId() {
+  async findByCreatorId(): ReturnType<
+    OrganizationRepository['findByCreatorId']
+  > {
     return [];
   }
-  async findByParentId() {
+  async findByParentId(): ReturnType<OrganizationRepository['findByParentId']> {
     return [];
   }
-  async getAncestorIds() {
-    return [];
+  async getAncestorIds(): ReturnType<OrganizationRepository['getAncestorIds']> {
+    return OrganizationId.array().parse([]);
   }
-  async getDescendantIds() {
-    return [];
+  async getDescendantIds(): ReturnType<
+    OrganizationRepository['getDescendantIds']
+  > {
+    return OrganizationId.array().parse([]);
   }
-  async getFullTreeOrgIds() {
-    return [];
+  async getFullTreeOrgIds(): ReturnType<
+    OrganizationRepository['getFullTreeOrgIds']
+  > {
+    return OrganizationId.array().parse([]);
   }
-  async isUserMember() {
+  async isUserMember(): ReturnType<OrganizationRepository['isUserMember']> {
     return false;
   }
-  async findMembershipsByUserId() {
+  async findMembershipsByUserId(): ReturnType<
+    OrganizationRepository['findMembershipsByUserId']
+  > {
     return [];
   }
-  async findAdminOrganizationsByUserId() {
+  async findAdminOrganizationsByUserId(): ReturnType<
+    OrganizationRepository['findAdminOrganizationsByUserId']
+  > {
     return [];
   }
-  async findAllWithStats() {
+  async findAllWithStats(): ReturnType<
+    OrganizationRepository['findAllWithStats']
+  > {
     return [];
   }
-  async searchOrganizationsWithStats() {
-    return { organizations: [], totalCount: 0 };
+  async searchOrganizationsWithStats(): ReturnType<
+    OrganizationRepository['searchOrganizationsWithStats']
+  > {
+    return { organizations: [], totalCount: ResultCount.parse(0) };
   }
-  async update(org: Organization) {
+  async update(
+    org: Organization
+  ): ReturnType<OrganizationRepository['update']> {
     return org;
   }
-  async findAcceptedMemberUserIdsIncludingDescendants() {
+  async findAcceptedMemberUserIdsIncludingDescendants(): ReturnType<
+    OrganizationRepository['findAcceptedMemberUserIdsIncludingDescendants']
+  > {
+    return UserId.array().parse([]);
+  }
+  async removeUserFromOrganization(): ReturnType<
+    OrganizationRepository['removeUserFromOrganization']
+  > {}
+  async findPendingRequestsByUserId(): ReturnType<
+    OrganizationRepository['findPendingRequestsByUserId']
+  > {
     return [];
   }
-  async removeUserFromOrganization() {}
-  async findPendingRequestsByUserId() {
+  async getAncestors(): ReturnType<OrganizationRepository['getAncestors']> {
     return [];
   }
-  async getAncestors() {
+  async getChildrenWithStats(): ReturnType<
+    OrganizationRepository['getChildrenWithStats']
+  > {
     return [];
   }
-  async getChildrenWithStats() {
-    return [];
-  }
-  async getHierarchyTree() {
+  async getHierarchyTree(): ReturnType<
+    OrganizationRepository['getHierarchyTree']
+  > {
     return {
       ancestors: [],
-      tree: { id: '', name: '', memberCount: 0, children: [] },
+      tree: {
+        id: OrganizationId.parse('org-fixture'),
+        name: OrganizationName.parse('Fixture organization'),
+        memberCount: MemberCount.parse(0),
+        children: [],
+      },
     };
   }
-  async setParentId() {}
-  async findAdminUserIds() {
+  async setParentId(): ReturnType<OrganizationRepository['setParentId']> {}
+  async findAdminUserIds(): ReturnType<
+    OrganizationRepository['findAdminUserIds']
+  > {
+    return UserId.array().parse([]);
+  }
+  async removeAdmin(): ReturnType<OrganizationRepository['removeAdmin']> {}
+  async searchByNameFuzzy(): ReturnType<
+    OrganizationRepository['searchByNameFuzzy']
+  > {
     return [];
   }
-  async removeAdmin() {}
-  async searchByNameFuzzy() {
-    return [];
-  }
-  async getRootAllowMultiTreeMembership() {
+  async getRootAllowMultiTreeMembership(): ReturnType<
+    OrganizationRepository['getRootAllowMultiTreeMembership']
+  > {
     return false;
   }
-  async findUsersWithMultipleMembershipsInOrgs() {
-    return [];
+  async findUsersWithMultipleMembershipsInOrgs(): ReturnType<
+    OrganizationRepository['findUsersWithMultipleMembershipsInOrgs']
+  > {
+    return UserId.array().parse([]);
   }
-  async setAllowMultiTreeMembership() {}
+  async setAllowMultiTreeMembership(): ReturnType<
+    OrganizationRepository['setAllowMultiTreeMembership']
+  > {}
+
+  async isUserExactMember(
+    ..._args: Parameters<OrganizationRepository['isUserExactMember']>
+  ): ReturnType<OrganizationRepository['isUserExactMember']> {
+    throw new Error('Unexpected isUserExactMember in this test');
+  }
+
+  async getAdminUserIds(
+    ..._args: Parameters<OrganizationRepository['getAdminUserIds']>
+  ): ReturnType<OrganizationRepository['getAdminUserIds']> {
+    throw new Error('Unexpected getAdminUserIds in this test');
+  }
+
+  async findAcceptedMemberUserIdsForOrgs(
+    ..._args: Parameters<
+      OrganizationRepository['findAcceptedMemberUserIdsForOrgs']
+    >
+  ): ReturnType<OrganizationRepository['findAcceptedMemberUserIdsForOrgs']> {
+    throw new Error('Unexpected findAcceptedMemberUserIdsForOrgs in this test');
+  }
+
+  async removeMemberFromOrganization(
+    ..._args: Parameters<OrganizationRepository['removeMemberFromOrganization']>
+  ): ReturnType<OrganizationRepository['removeMemberFromOrganization']> {
+    throw new Error('Unexpected removeMemberFromOrganization in this test');
+  }
 }
 
 // Mock JoinTokenRepository
@@ -116,31 +192,39 @@ class MockJoinTokenRepository implements JoinTokenRepository {
     this.tokensByValue.set(token.token, token);
   }
 
-  async findByToken(tokenValue: string): Promise<JoinToken | null> {
+  async findByToken(
+    tokenValue: string
+  ): ReturnType<JoinTokenRepository['findByToken']> {
     return this.tokensByValue.get(tokenValue) || null;
   }
 
   // Unused stubs
-  async save(joinToken: JoinToken) {
+  async save(joinToken: JoinToken): ReturnType<JoinTokenRepository['save']> {
     return joinToken;
   }
-  async update(joinToken: JoinToken) {
+  async update(
+    joinToken: JoinToken
+  ): ReturnType<JoinTokenRepository['update']> {
     return joinToken;
   }
-  async findById() {
+  async findById(): ReturnType<JoinTokenRepository['findById']> {
     return null;
   }
-  async findByOrganizationId() {
-    return { tokens: [], totalCount: 0 };
+  async findByOrganizationId(): ReturnType<
+    JoinTokenRepository['findByOrganizationId']
+  > {
+    return { tokens: [], totalCount: ResultCount.parse(0) };
   }
-  async tryIncrementUseCount() {
+  async tryIncrementUseCount(): ReturnType<
+    JoinTokenRepository['tryIncrementUseCount']
+  > {
     return false;
   }
 }
 
 function createActiveToken(
   organizationId: string,
-  tokenValue: string = 'abc123test'
+  tokenValue: string = 'abc234test'
 ): JoinToken {
   return JoinToken.reconstitute({
     id: 'jt-1',
@@ -157,7 +241,7 @@ function createActiveToken(
 
 function createExpiredToken(
   organizationId: string,
-  tokenValue: string = 'abc123test'
+  tokenValue: string = 'abc234test'
 ): JoinToken {
   return JoinToken.reconstitute({
     id: 'jt-1',
@@ -174,7 +258,7 @@ function createExpiredToken(
 
 function createExhaustedToken(
   organizationId: string,
-  tokenValue: string = 'abc123test'
+  tokenValue: string = 'abc234test'
 ): JoinToken {
   return JoinToken.reconstitute({
     id: 'jt-1',
@@ -232,7 +316,9 @@ describe('GetJoinTokenPublicInfoUseCase', () => {
     useCase = new GetJoinTokenPublicInfoUseCase({
       joinTokenRepository: tokenRepo,
       organizationRepository: orgRepo,
-      prisma: prisma as any,
+      directory: new PrismaOrganizationDirectory(
+        prisma as unknown as PrismaClient
+      ),
     });
   });
 
@@ -240,12 +326,12 @@ describe('GetJoinTokenPublicInfoUseCase', () => {
     const org = createOrg('org-1', 'My Organization', 'A great org');
     orgRepo.addOrganization(org);
 
-    const token = createActiveToken('org-1', 'valid-token');
+    const token = createActiveToken('org-1', 'abc234defg');
     tokenRepo.addTokenByValue(token);
 
     prisma.organizationUser.count = async () => 42;
 
-    const result = await useCase.execute('valid-token');
+    const result = await useCase.execute('abc234defg');
 
     expect(result.success).toBe(true);
 
@@ -256,6 +342,22 @@ describe('GetJoinTokenPublicInfoUseCase', () => {
       expect(result.value.memberCount).toBe(42);
     }
   });
+
+  it.each([-1, 0.5, Infinity])(
+    'rejects invalid stored member count %s',
+    async (count) => {
+      orgRepo.addOrganization(
+        createOrg('org-1', 'My Organization', 'A great org')
+      );
+      tokenRepo.addTokenByValue(createActiveToken('org-1', 'abc234defg'));
+      prisma.organizationUser.count = async () => count;
+
+      expect(await useCase.execute('abc234defg')).toEqual({
+        success: false,
+        error: 'common.errors.unexpected',
+      });
+    }
+  );
 
   it('fails when token not found', async () => {
     const result = await useCase.execute('nonexistent');
@@ -268,10 +370,10 @@ describe('GetJoinTokenPublicInfoUseCase', () => {
   });
 
   it('fails when token expired', async () => {
-    const token = createExpiredToken('org-1', 'expired-token');
+    const token = createExpiredToken('org-1', 'abc234defh');
     tokenRepo.addTokenByValue(token);
 
-    const result = await useCase.execute('expired-token');
+    const result = await useCase.execute('abc234defh');
 
     expect(result.success).toBe(false);
 
@@ -281,10 +383,10 @@ describe('GetJoinTokenPublicInfoUseCase', () => {
   });
 
   it('fails when token exhausted (useCount >= maxUses)', async () => {
-    const token = createExhaustedToken('org-1', 'exhausted-token');
+    const token = createExhaustedToken('org-1', 'abc234defj');
     tokenRepo.addTokenByValue(token);
 
-    const result = await useCase.execute('exhausted-token');
+    const result = await useCase.execute('abc234defj');
 
     expect(result.success).toBe(false);
 
@@ -297,10 +399,10 @@ describe('GetJoinTokenPublicInfoUseCase', () => {
     const org = createArchivedOrg('org-1', 'Archived Org');
     orgRepo.addOrganization(org);
 
-    const token = createActiveToken('org-1', 'active-token');
+    const token = createActiveToken('org-1', 'abc234defk');
     tokenRepo.addTokenByValue(token);
 
-    const result = await useCase.execute('active-token');
+    const result = await useCase.execute('abc234defk');
 
     expect(result.success).toBe(false);
 

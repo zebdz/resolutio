@@ -64,6 +64,8 @@ describe('CreateOrganizationSchema', () => {
   it('should reject name with profanity', () => {
     const profaneChecker: ProfanityChecker = {
       containsProfanity: (text: string) => text.includes('badword'),
+      findProfaneWords: (text: string) =>
+        text.includes('badword') ? ['badword'] : [],
     };
     const schema = createOrganizationSchema(profaneChecker);
     const result = schema.safeParse({

@@ -1,11 +1,18 @@
+/** Join-link application boundary validates external values before invoking
+ * domain behavior and typed authorization/persistence ports. */
+import { Clock } from '../shared/EntityCreation';
+
+import { JoinTokenId } from '../../domain/shared/EntityIds';
+import { UserId } from '../../domain/shared/EntityIds';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { JoinTokenRepository } from '../../domain/organization/JoinTokenRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { JoinTokenErrors } from './JoinTokenErrors';
+import { JoinTokenErrors, JoinTokenUseCaseFailure } from './JoinTokenErrors';
 import { OrganizationErrors } from './OrganizationErrors';
 
 export interface ExpireJoinTokenDependencies {
+  clock: Clock;
   joinTokenRepository: JoinTokenRepository;
   organizationRepository: OrganizationRepository;
   userRepository: UserRepository;
@@ -15,9 +22,24 @@ export class ExpireJoinTokenUseCase {
   constructor(private deps: ExpireJoinTokenDependencies) {}
 
   async execute(
-    tokenId: string,
-    actorUserId: string
-  ): Promise<Result<void, string>> {
+    rawTokenId: string,
+    rawActorUserId: string
+  ): Promise<Result<void, JoinTokenUseCaseFailure>> {
+    const parsedTokenId = JoinTokenId.safeParse(rawTokenId);
+
+    if (!parsedTokenId.success) {
+      return failure(JoinTokenErrors.NOT_FOUND);
+    }
+
+    const tokenId = parsedTokenId.data;
+    const parsedActorUserId = UserId.safeParse(rawActorUserId);
+
+    if (!parsedActorUserId.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
+    }
+
+    const actorUserId = parsedActorUserId.data;
+
     // 1. Find token
     const token = await this.deps.joinTokenRepository.findById(tokenId);
 
@@ -41,7 +63,7 @@ export class ExpireJoinTokenUseCase {
     }
 
     // 3. Expire
-    const expireResult = token.expire();
+    const expireResult = token.expire(this.deps.clock.now());
 
     if (!expireResult.success) {
       return failure(expireResult.error);

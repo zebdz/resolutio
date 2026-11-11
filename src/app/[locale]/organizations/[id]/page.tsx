@@ -1,3 +1,5 @@
+/** Loads an organization and its authorized member, poll and property views. */
+import type { PollSearchView } from '@/web/actions/poll/PollQueryViews';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { Heading } from '@/src/web/components/catalyst/heading';
@@ -61,7 +63,7 @@ export default async function OrganizationDetailPage({
   } = result.data;
 
   // Fetch user data
-  let pollsData: { polls: any[]; totalCount: number } | null = null;
+  let pollsData: PollSearchView | null = null;
   let adminOrgIds: string[] = [];
   let isSuperAdmin = false;
   let userMemberOrgIds: string[] = [];

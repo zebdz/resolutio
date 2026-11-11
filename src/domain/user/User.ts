@@ -1,43 +1,91 @@
+/** User identity, credentials and privacy transitions remain deterministic.
+ * Construction validates retained values for both rehydration and immutable updates. */
 import { PhoneNumber } from './PhoneNumber';
+import { z } from 'zod';
+import { UserId } from '../shared/EntityIds';
+import { EntityCreation } from '../shared/EntityCreation';
+import { Instant } from '../shared/Instant';
+import { Result, success, failure } from '../shared/Result';
+import { UserEmail, restoreUserEmail } from './UserEmail';
+import {
+  FirstName,
+  LastName,
+  MiddleName,
+  PasswordHash,
+  Language,
+} from './UserValues';
 import { Nickname } from './Nickname';
 import { Address } from './Address';
 import { EmailAddress } from './EmailAddress';
 import { UserDomainCodes } from './UserDomainCodes';
 import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
-import {
-  Locale,
-  defaultLocale,
-  isValidLocale,
-  locales,
-} from '../../i18n/locales';
 
-export type Language = Locale;
-
-export const PASSWORD_MIN_LENGTH = 8;
-export const NAME_MIN_LENGTH = 2;
-export const NAME_MAX_LENGTH = 50;
-export const NAME_REGEX = /^[A-ZА-ЯЁ][a-zA-Zа-яёА-ЯЁ'\u2019\-]+$/;
+export {
+  NAME_MIN_LENGTH,
+  NAME_MAX_LENGTH,
+  NAME_REGEX,
+  PASSWORD_MIN_LENGTH,
+} from './UserValues';
+export type { Language } from './UserValues';
 
 export interface UserProps {
+  readonly id: UserId;
+  readonly firstName: FirstName;
+  readonly lastName: LastName;
+  readonly middleName?: MiddleName;
+  readonly phoneNumber: PhoneNumber;
+  readonly password: PasswordHash;
+  readonly language: Language;
+  readonly createdAt: Instant;
+  readonly consentGivenAt?: Instant;
+  readonly nickname: Nickname;
+  readonly allowFindByName: boolean;
+  readonly allowFindByPhone: boolean;
+  readonly allowFindByAddress: boolean;
+  readonly address?: Address;
+  readonly privacySetupCompleted: boolean;
+  readonly confirmedAt?: Instant;
+  readonly emailState: UserEmail;
+}
+
+export interface CreateUserProps {
+  readonly firstName: FirstName;
+  readonly lastName: LastName;
+  readonly middleName?: MiddleName;
+  readonly phoneNumber: PhoneNumber;
+  readonly password: PasswordHash;
+  readonly language?: Language;
+  readonly consentGivenAt?: Instant;
+  readonly nickname: Nickname;
+  readonly email?: EmailAddress;
+}
+
+/** Raw persistence boundary; only this input accepts unbranded stored scalars.
+ * Existing databases require nickname, so absent nicknames are corrupt records. */
+export interface RawUserProps {
   id: string;
   firstName: string;
   lastName: string;
   middleName?: string;
   phoneNumber: PhoneNumber;
   password: string;
-  language: Language;
-  createdAt: Date;
-  consentGivenAt?: Date;
+  language: string;
+  createdAt: string | Date;
+  consentGivenAt?: string | Date;
   nickname: Nickname;
-  allowFindByName: boolean;
-  allowFindByPhone: boolean;
-  allowFindByAddress: boolean;
+  allowFindByName?: boolean;
+  allowFindByPhone?: boolean;
+  allowFindByAddress?: boolean;
   address?: Address;
-  privacySetupCompleted: boolean;
-  confirmedAt?: Date;
+  privacySetupCompleted?: boolean;
+  confirmedAt?: string | Date;
   email?: EmailAddress;
-  emailConfirmedAt?: Date;
+  emailConfirmedAt?: string | Date;
+}
+
+function storedInstant(value: string | Date): Instant {
+  return value instanceof Date ? Instant.fromDate(value) : Instant.parse(value);
 }
 
 export interface PersonalInfoForPasswordCheck {
@@ -111,150 +159,145 @@ export function passwordMatchesPersonalInfo(
 }
 
 export class User {
-  private constructor(private readonly props: UserProps) {}
+  private readonly props: Readonly<UserProps>;
+
+  private constructor(props: UserProps) {
+    if (!(props.phoneNumber instanceof PhoneNumber)) {
+      throw new Error(UserDomainCodes.PHONE_NUMBER_INVALID);
+    }
+
+    if (!(props.nickname instanceof Nickname)) {
+      throw new Error(UserDomainCodes.NICKNAME_INVALID);
+    }
+
+    if (props.address !== undefined && !(props.address instanceof Address)) {
+      throw new Error('common.errors.validationFailed');
+    }
+
+    this.props = Object.freeze({
+      ...props,
+      allowFindByName: z.boolean().parse(props.allowFindByName),
+      allowFindByPhone: z.boolean().parse(props.allowFindByPhone),
+      allowFindByAddress: z.boolean().parse(props.allowFindByAddress),
+      privacySetupCompleted: z.boolean().parse(props.privacySetupCompleted),
+      emailState: UserEmail.parse(props.emailState),
+    });
+  }
 
   static create(
-    props: Omit<
-      UserProps,
-      | 'id'
-      | 'createdAt'
-      | 'language'
-      | 'nickname'
-      | 'allowFindByName'
-      | 'allowFindByPhone'
-      | 'allowFindByAddress'
-      | 'address'
-      | 'privacySetupCompleted'
-      | 'email'
-      | 'emailConfirmedAt'
-    > & {
-      language?: Language;
-      consentGivenAt?: Date;
-      nickname?: Nickname;
-      email?: EmailAddress;
-    },
+    props: CreateUserProps,
+    creation: EntityCreation<UserId>,
     profanityChecker?: ProfanityChecker
   ): User {
-    // Validate required fields
-    if (!props.firstName?.trim()) {
-      throw new Error('First name is required');
-    }
+    User.checkNames(props, profanityChecker);
 
-    if (
-      props.firstName.length > NAME_MAX_LENGTH ||
-      !NAME_REGEX.test(props.firstName)
-    ) {
-      throw new Error(UserDomainCodes.FIRST_NAME_INVALID);
-    }
-
-    if (!props.lastName?.trim()) {
-      throw new Error('Last name is required');
-    }
-
-    if (
-      props.lastName.length > NAME_MAX_LENGTH ||
-      !NAME_REGEX.test(props.lastName)
-    ) {
-      throw new Error(UserDomainCodes.LAST_NAME_INVALID);
-    }
-
-    if (
-      props.middleName &&
-      (props.middleName.length > NAME_MAX_LENGTH ||
-        !NAME_REGEX.test(props.middleName))
-    ) {
-      throw new Error(UserDomainCodes.MIDDLE_NAME_INVALID);
-    }
-
-    if (profanityChecker?.containsProfanity(props.firstName)) {
-      throw new Error(SharedDomainCodes.CONTAINS_PROFANITY);
-    }
-
-    if (profanityChecker?.containsProfanity(props.lastName)) {
-      throw new Error(SharedDomainCodes.CONTAINS_PROFANITY);
-    }
-
-    if (
-      props.middleName &&
-      profanityChecker?.containsProfanity(props.middleName)
-    ) {
-      throw new Error(SharedDomainCodes.CONTAINS_PROFANITY);
-    }
-
-    if (!props.password?.trim()) {
-      throw new Error('Password is required');
-    }
-
-    // Set default language if not provided (Russian is default per routing config)
-    const language = props.language || defaultLocale;
-
-    // Validate language
-    if (!isValidLocale(language)) {
-      throw new Error(`Language must be one of: ${locales.join(', ')}`);
-    }
-
-    return new User({
-      ...props,
-      language,
-      nickname: props.nickname || Nickname.generate(),
-      id: '', // Will be generated by infrastructure layer
-      createdAt: new Date(),
+    return User.reconstitute({
+      firstName: props.firstName,
+      lastName: props.lastName,
+      middleName: props.middleName,
+      phoneNumber: props.phoneNumber,
+      password: props.password,
+      nickname: props.nickname,
+      email: props.email,
       consentGivenAt: props.consentGivenAt,
+      id: creation.id,
+      createdAt: creation.now,
+      // Russian remains the default registration language.
+      language: props.language ?? 'ru',
       allowFindByName: false,
       allowFindByPhone: false,
       allowFindByAddress: false,
       privacySetupCompleted: false,
-      email: props.email,
-      emailConfirmedAt: undefined,
     });
   }
 
-  static reconstitute(
-    props: Omit<
-      UserProps,
-      | 'nickname'
-      | 'allowFindByName'
-      | 'allowFindByPhone'
-      | 'allowFindByAddress'
-      | 'address'
-      | 'privacySetupCompleted'
-    > &
-      Partial<
-        Pick<
-          UserProps,
-          | 'nickname'
-          | 'allowFindByName'
-          | 'allowFindByPhone'
-          | 'allowFindByAddress'
-          | 'address'
-          | 'privacySetupCompleted'
-        >
-      >
-  ): User {
+  static reconstitute(props: RawUserProps): User {
+    if (!(props.nickname instanceof Nickname)) {
+      throw new Error(UserDomainCodes.NICKNAME_INVALID);
+    }
+
     return new User({
-      ...props,
-      nickname: props.nickname || Nickname.generate(),
+      id: UserId.parse(props.id),
+      firstName: FirstName.parse(props.firstName),
+      lastName: LastName.parse(props.lastName),
+      // Old optional fields may contain an empty string; it represents absence.
+      middleName: props.middleName
+        ? MiddleName.parse(props.middleName)
+        : undefined,
+      password: PasswordHash.parse(props.password),
+      phoneNumber: props.phoneNumber,
+      nickname: props.nickname,
+      address: props.address,
+      language: Language.parse(props.language),
+      createdAt: storedInstant(props.createdAt),
+      consentGivenAt:
+        props.consentGivenAt === undefined
+          ? undefined
+          : storedInstant(props.consentGivenAt),
+      confirmedAt:
+        props.confirmedAt === undefined
+          ? undefined
+          : storedInstant(props.confirmedAt),
+      emailState: restoreUserEmail(
+        props.email,
+        props.emailConfirmedAt === undefined
+          ? undefined
+          : storedInstant(props.emailConfirmedAt)
+      ),
       allowFindByName: props.allowFindByName ?? false,
       allowFindByPhone: props.allowFindByPhone ?? false,
       allowFindByAddress: props.allowFindByAddress ?? false,
-      address: props.address,
       privacySetupCompleted: props.privacySetupCompleted ?? false,
     });
   }
 
-  get id(): string {
+  private static checkNames(
+    props: Pick<UserProps, 'firstName' | 'lastName' | 'middleName'>,
+    profanityChecker?: ProfanityChecker
+  ): void {
+    for (const name of [props.firstName, props.lastName, props.middleName]) {
+      if (name && profanityChecker?.containsProfanity(name)) {
+        throw new Error(SharedDomainCodes.CONTAINS_PROFANITY);
+      }
+    }
+  }
+
+  /** Update registration details without discarding independent privacy/address state. */
+  updateRegistrationDetails(
+    details: Omit<CreateUserProps, 'nickname' | 'consentGivenAt'>,
+    now: Instant,
+    profanityChecker?: ProfanityChecker
+  ): User {
+    User.checkNames(details, profanityChecker);
+
+    return User.reconstitute({
+      ...this.props,
+      firstName: details.firstName,
+      lastName: details.lastName,
+      middleName: details.middleName,
+      phoneNumber: details.phoneNumber,
+      password: details.password,
+      language: details.language ?? 'ru',
+      consentGivenAt: now,
+      // A supplied email starts unconfirmed; omission keeps the stored email.
+      email: details.email ?? this.email,
+      emailConfirmedAt: undefined,
+    });
+  }
+
+  get id(): UserId {
     return this.props.id;
   }
 
-  get firstName(): string {
+  get firstName(): FirstName {
     return this.props.firstName;
   }
 
-  get lastName(): string {
+  get lastName(): LastName {
     return this.props.lastName;
   }
 
-  get middleName(): string | undefined {
+  get middleName(): MiddleName | undefined {
     return this.props.middleName;
   }
 
@@ -262,7 +305,7 @@ export class User {
     return this.props.phoneNumber;
   }
 
-  get password(): string {
+  get password(): PasswordHash {
     return this.props.password;
   }
 
@@ -270,11 +313,11 @@ export class User {
     return this.props.language;
   }
 
-  get createdAt(): Date {
+  get createdAt(): Instant {
     return this.props.createdAt;
   }
 
-  get consentGivenAt(): Date | undefined {
+  get consentGivenAt(): Instant | undefined {
     return this.props.consentGivenAt;
   }
 
@@ -302,7 +345,7 @@ export class User {
     return this.props.privacySetupCompleted;
   }
 
-  get confirmedAt(): Date | undefined {
+  get confirmedAt(): Instant | undefined {
     return this.props.confirmedAt;
   }
 
@@ -310,23 +353,31 @@ export class User {
     return this.props.confirmedAt !== undefined;
   }
 
-  confirm(): User {
+  confirm(now: Instant): User {
     return new User({
       ...this.props,
-      confirmedAt: new Date(),
+      confirmedAt: Instant.parse(now),
     });
   }
 
   get email(): EmailAddress | undefined {
-    return this.props.email;
+    return this.props.emailState.kind === 'absent'
+      ? undefined
+      : this.props.emailState.address;
   }
 
-  get emailConfirmedAt(): Date | undefined {
-    return this.props.emailConfirmedAt;
+  get emailConfirmedAt(): Instant | undefined {
+    return this.props.emailState.kind === 'confirmed'
+      ? this.props.emailState.confirmedAt
+      : undefined;
+  }
+
+  get emailState(): UserEmail {
+    return this.props.emailState;
   }
 
   hasConfirmedEmail(): boolean {
-    return !!this.props.email && this.props.emailConfirmedAt !== undefined;
+    return this.props.emailState.kind === 'confirmed';
   }
 
   /**
@@ -338,23 +389,35 @@ export class User {
   changeEmail(email: EmailAddress): User {
     return new User({
       ...this.props,
-      email,
-      emailConfirmedAt: undefined,
+      emailState: { kind: 'unconfirmed', address: email },
     });
   }
 
-  confirmEmail(): User {
-    return new User({
-      ...this.props,
-      emailConfirmedAt: new Date(),
-    });
+  confirmEmail(
+    now: Instant
+  ): Result<User, typeof UserDomainCodes.EMAIL_NOT_SET> {
+    const current = this.props.emailState;
+
+    if (current.kind === 'absent') {
+      return failure(UserDomainCodes.EMAIL_NOT_SET);
+    }
+
+    return success(
+      new User({
+        ...this.props,
+        emailState: {
+          kind: 'confirmed',
+          address: current.address,
+          confirmedAt: Instant.parse(now),
+        },
+      })
+    );
   }
 
   removeEmail(): User {
     return new User({
       ...this.props,
-      email: undefined,
-      emailConfirmedAt: undefined,
+      emailState: { kind: 'absent' },
     });
   }
 
@@ -380,19 +443,15 @@ export class User {
   }
 
   // Update methods - return new instances to maintain immutability
-  updateLanguage(language: string): User {
-    if (!isValidLocale(language)) {
-      throw new Error(`Language must be one of: ${locales.join(', ')}`);
-    }
-
+  updateLanguage(language: Language): User {
     return new User({
       ...this.props,
-      language: language as Language,
+      language: Language.parse(language),
     });
   }
 
   updateMiddleName(
-    middleName: string | undefined,
+    middleName: MiddleName | undefined,
     profanityChecker?: ProfanityChecker
   ): User {
     if (middleName && profanityChecker?.containsProfanity(middleName)) {
@@ -401,7 +460,8 @@ export class User {
 
     return new User({
       ...this.props,
-      middleName,
+      middleName:
+        middleName === undefined ? undefined : MiddleName.parse(middleName),
     });
   }
 
@@ -425,14 +485,10 @@ export class User {
    * hashing belongs to infrastructure, so the domain never sees the
    * plaintext.
    */
-  changePassword(hashedPassword: string): User {
-    if (!hashedPassword?.trim()) {
-      throw new Error(UserDomainCodes.PASSWORD_REQUIRED);
-    }
-
+  changePassword(hashedPassword: PasswordHash): User {
     return new User({
       ...this.props,
-      password: hashedPassword,
+      password: PasswordHash.parse(hashedPassword),
     });
   }
 

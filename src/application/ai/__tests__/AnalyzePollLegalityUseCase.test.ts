@@ -1,3 +1,7 @@
+/** Analysis authorization and quota behavior retain defaults, units and superadmin bypasses.
+ * Settings failures propagate before related quota queries instead of becoming defaults. */
+import { Instant } from '@/domain/shared/Instant';
+import { decodeStoredSetting } from '@/domain/systemSetting/SystemSetting';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AnalyzePollLegalityUseCase } from '../AnalyzePollLegalityUseCase';
 import { AIErrors } from '../AIErrors';
@@ -6,7 +10,7 @@ import type { OrganizationRepository } from '@/domain/organization/OrganizationR
 import type { LegalCheckRepository } from '@/domain/ai/LegalCheckRepository';
 import type { SystemSettingRepository } from '@/domain/systemSetting/SystemSettingRepository';
 import type { Poll } from '@/domain/poll/Poll';
-import { success } from '@/domain/shared/Result';
+import { success, failure } from '@/domain/shared/Result';
 
 function createMockPoll(
   overrides: Partial<{
@@ -56,10 +60,11 @@ describe('AnalyzePollLegalityUseCase', () => {
     };
 
     systemSettingRepository = {
-      get: vi.fn().mockResolvedValue(null),
+      get: vi.fn().mockResolvedValue(success(null)),
     };
 
     useCase = new AnalyzePollLegalityUseCase({
+      clock: { now: () => Instant.parse('2026-01-01T12:00:00.000Z') },
       pollRepository: pollRepository as PollRepository,
       organizationRepository: organizationRepository as OrganizationRepository,
       legalCheckRepository: legalCheckRepository as LegalCheckRepository,
@@ -76,6 +81,37 @@ describe('AnalyzePollLegalityUseCase', () => {
       locale: 'en',
     });
 
+  it.each([
+    'legal_check_min_org_size',
+    'legal_check_max_per_admin_per_hour',
+    'legal_check_daily_token_cap',
+  ])(
+    'propagates failure reading %s before executing its quota query',
+    async (failedKey) => {
+      (
+        systemSettingRepository.get as ReturnType<typeof vi.fn>
+      ).mockImplementation(async (key: string) =>
+        key === failedKey ? failure('common.errors.unexpected') : success(null)
+      );
+
+      expect(await runValidate()).toEqual(failure('common.errors.unexpected'));
+
+      if (failedKey === 'legal_check_max_per_admin_per_hour') {
+        expect(legalCheckRepository.countRecentChecks).not.toHaveBeenCalled();
+      }
+
+      if (failedKey === 'legal_check_daily_token_cap') {
+        expect(legalCheckRepository.sumDailyTokens).not.toHaveBeenCalled();
+      }
+    }
+  );
+  it('rejects a setting returned for a different quota key', async () => {
+    (systemSettingRepository.get as ReturnType<typeof vi.fn>).mockResolvedValue(
+      decodeStoredSetting('legal_check_daily_token_cap', '0')
+    );
+
+    expect(await runValidate()).toEqual(failure('common.errors.unexpected'));
+  });
   it('fails if poll not found', async () => {
     (pollRepository.getPollById as ReturnType<typeof vi.fn>).mockResolvedValue(
       success(null)
@@ -119,7 +155,9 @@ describe('AnalyzePollLegalityUseCase', () => {
     (
       systemSettingRepository.get as ReturnType<typeof vi.fn>
     ).mockImplementation(async (key: string) =>
-      key === 'legal_check_min_org_size' ? '5' : null
+      key === 'legal_check_min_org_size'
+        ? decodeStoredSetting(key, '5')
+        : success(null)
     );
     (
       organizationRepository.findAcceptedMemberUserIdsIncludingDescendants as ReturnType<
@@ -139,7 +177,9 @@ describe('AnalyzePollLegalityUseCase', () => {
     (
       systemSettingRepository.get as ReturnType<typeof vi.fn>
     ).mockImplementation(async (key: string) =>
-      key === 'legal_check_min_org_size' ? '0' : null
+      key === 'legal_check_min_org_size'
+        ? decodeStoredSetting(key, '0')
+        : success(null)
     );
     (
       organizationRepository.findAcceptedMemberUserIdsIncludingDescendants as ReturnType<
@@ -168,7 +208,9 @@ describe('AnalyzePollLegalityUseCase', () => {
     (
       systemSettingRepository.get as ReturnType<typeof vi.fn>
     ).mockImplementation(async (key: string) =>
-      key === 'legal_check_max_per_admin_per_hour' ? '5' : null
+      key === 'legal_check_max_per_admin_per_hour'
+        ? decodeStoredSetting(key, '5')
+        : success(null)
     );
     (
       legalCheckRepository.countRecentChecks as ReturnType<typeof vi.fn>
@@ -199,7 +241,9 @@ describe('AnalyzePollLegalityUseCase', () => {
     (
       systemSettingRepository.get as ReturnType<typeof vi.fn>
     ).mockImplementation(async (key: string) =>
-      key === 'legal_check_daily_token_cap' ? '0' : null
+      key === 'legal_check_daily_token_cap'
+        ? decodeStoredSetting(key, '0')
+        : success(null)
     );
     (
       legalCheckRepository.sumDailyTokens as ReturnType<typeof vi.fn>

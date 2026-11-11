@@ -1,3 +1,11 @@
+/** Retrieves an authorized report and safe projections; bytes remain behind download ports. */
+import { ReportAttachmentRepository } from '../../domain/report/ReportAttachmentRepository';
+import { PollRepository } from '../../domain/poll/PollRepository';
+import { ReportUseCaseFailure } from './ReportErrors';
+import { z } from 'zod';
+import { ReportId, UserId, PollId } from '../../domain/shared/EntityIds';
+import { PollTitle } from '../../domain/poll/PollContent';
+import { PollState } from '../../domain/poll/PollState';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { Report } from '../../domain/report/Report';
 import { ReportRepository } from '../../domain/report/ReportRepository';
@@ -6,29 +14,19 @@ import { Poll } from '../../domain/poll/Poll';
 import { ResolveReportVisibilityService } from './ResolveReportVisibilityService';
 import { ReportErrors } from './ReportErrors';
 
-export interface AttachmentRepoForGetReport {
-  findByReportId(
-    reportId: string
-  ): Promise<Result<ReportAttachmentMetadata[], string>>;
-}
-
-export interface PollRepoForGetReport {
-  getPollById(id: string): Promise<Result<Poll | null, string>>;
-}
+export type AttachmentRepoForGetReport = Pick<
+  ReportAttachmentRepository,
+  'findByReportId'
+>;
+export type PollRepoForGetReport = Pick<PollRepository, 'getPollById'>;
 
 export interface GetReportForViewerResult {
   report: Report;
-  attachments: Array<{
-    id: string;
-    fileName: string;
-    mimeType: string;
-    sizeBytes: number;
-    createdAt: Date;
-  }>;
+  attachments: Array<Omit<ReportAttachmentMetadata, 'reportId'>>;
   polls: Array<{
-    id: string;
-    title: string;
-    state: string;
+    id: PollId;
+    title: PollTitle;
+    state: PollState;
     archivedAt: Date | null;
   }>;
 }
@@ -44,9 +42,18 @@ export class GetReportForViewerUseCase {
   async execute(input: {
     reportId: string;
     viewerId: string | null;
-  }): Promise<Result<GetReportForViewerResult, string>> {
+  }): Promise<Result<GetReportForViewerResult, ReportUseCaseFailure>> {
+    const decoded = z
+      .object({ reportId: ReportId, viewerId: UserId.nullable() })
+      .safeParse(input);
+
+    if (!decoded.success) {
+      return failure(ReportErrors.REPORT_NOT_FOUND);
+    }
+
+    const command = decoded.data;
     const reportResult = await this.reports.findByIdWithRelations(
-      input.reportId
+      command.reportId
     );
 
     if (!reportResult.success) {
@@ -59,7 +66,7 @@ export class GetReportForViewerUseCase {
 
     const report = reportResult.value;
 
-    const canRead = await this.visibility.canRead(report, input.viewerId);
+    const canRead = await this.visibility.canRead(report, command.viewerId);
 
     // Collapse forbidden → not-found to avoid leaking existence
     if (!canRead) {
@@ -67,7 +74,7 @@ export class GetReportForViewerUseCase {
     }
 
     const attachmentsResult = await this.attachments.findByReportId(
-      input.reportId
+      command.reportId
     );
 
     if (!attachmentsResult.success) {
@@ -82,12 +89,7 @@ export class GetReportForViewerUseCase {
       createdAt: a.createdAt,
     }));
 
-    const pollSummaries: Array<{
-      id: string;
-      title: string;
-      state: string;
-      archivedAt: Date | null;
-    }> = [];
+    const pollSummaries: GetReportForViewerResult['polls'] = [];
 
     for (const pollId of report.pollIds) {
       const pollResult = await this.polls.getPollById(pollId);
@@ -105,7 +107,7 @@ export class GetReportForViewerUseCase {
       pollSummaries.push({
         id: poll.id,
         title: poll.title,
-        state: String(poll.state),
+        state: poll.state,
         archivedAt: poll.archivedAt,
       });
     }

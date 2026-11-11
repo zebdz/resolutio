@@ -1,5 +1,21 @@
 'use server';
 
+/** Server-only claim operations keep authorization and serialization at the boundary.
+ * Validated identities, decisions and attachment metadata retain their types in responses.
+ * Use cases validate incoming commands and receive explicit creation dependencies.
+ * Failed detail reads return explicit errors instead of incomplete claim lists. */
+import {
+  OrganizationId,
+  PropertyId,
+  AssetId,
+  PropertyClaimId,
+  UserId,
+} from '@/domain/shared/EntityIds';
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
+
 import { getTranslations } from 'next-intl/server';
 import {
   prisma,
@@ -14,8 +30,14 @@ import {
 import { SubmitPropertyClaimUseCase } from '@/application/organization/SubmitPropertyClaimUseCase';
 import { ApprovePropertyClaimUseCase } from '@/application/organization/ApprovePropertyClaimUseCase';
 import { DenyPropertyClaimUseCase } from '@/application/organization/DenyPropertyClaimUseCase';
-import { ListOrgPropertiesForMemberUseCase } from '@/application/organization/ListOrgPropertiesForMemberUseCase';
-import { ListClaimableAssetsUseCase } from '@/application/organization/ListClaimableAssetsUseCase';
+import {
+  ListOrgPropertiesForMemberUseCase,
+  type SafePropertyView,
+} from '@/application/organization/ListOrgPropertiesForMemberUseCase';
+import {
+  ListClaimableAssetsUseCase,
+  type ClaimableAssetView,
+} from '@/application/organization/ListClaimableAssetsUseCase';
 import { NotifyPropertyClaimSubmittedUseCase } from '@/application/notification/NotifyPropertyClaimSubmittedUseCase';
 import { NotifyPropertyClaimApprovedUseCase } from '@/application/notification/NotifyPropertyClaimApprovedUseCase';
 import { NotifyPropertyClaimDeniedUseCase } from '@/application/notification/NotifyPropertyClaimDeniedUseCase';
@@ -23,10 +45,24 @@ import { getCurrentUser } from '@/web/lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChecker';
+import type { PropertyClaimAttachmentMetadata } from '@/domain/organization/PropertyClaimAttachmentRepository';
+import { success } from '@/domain/shared/Result';
+import {
+  serializePendingClaim,
+  serializeMyClaim,
+  type PendingClaimView,
+  type PendingClaimsView,
+  type MyClaimsView,
+} from './serializePropertyClaim';
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
   | { success: false; error: string };
+
+type ClaimAttachmentView = Pick<
+  PropertyClaimAttachmentMetadata,
+  'id' | 'fileName' | 'mimeType' | 'sizeBytes'
+>;
 
 const claimRepository = new PrismaPropertyClaimRepository(prisma);
 const claimAttachmentRepository = new PrismaPropertyClaimAttachmentRepository(
@@ -38,21 +74,31 @@ const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 const notificationRepository = new PrismaNotificationRepository(prisma);
 const profanityChecker = LeoProfanityChecker.getInstance();
+const ids = new CryptoIdGenerator();
+const clock = new SystemClock();
 
 const notifySubmitted = new NotifyPropertyClaimSubmittedUseCase({
+  ids: ids,
+  clock: clock,
   notificationRepository,
   claimRepository,
 });
 const notifyApproved = new NotifyPropertyClaimApprovedUseCase({
+  ids: ids,
+  clock: clock,
   notificationRepository,
   claimRepository,
 });
 const notifyDenied = new NotifyPropertyClaimDeniedUseCase({
+  ids: ids,
+  clock: clock,
   notificationRepository,
   claimRepository,
 });
 
 const submit = new SubmitPropertyClaimUseCase({
+  ids,
+  clock,
   claimRepository,
   assetRepository,
   propertyRepository,
@@ -60,6 +106,8 @@ const submit = new SubmitPropertyClaimUseCase({
   notify: notifySubmitted,
 });
 const approve = new ApprovePropertyClaimUseCase({
+  ids,
+  clock,
   claimRepository,
   assetRepository,
   propertyRepository,
@@ -69,6 +117,7 @@ const approve = new ApprovePropertyClaimUseCase({
   notifyDenied,
 });
 const deny = new DenyPropertyClaimUseCase({
+  clock,
   claimRepository,
   organizationRepository,
   userRepository,
@@ -88,7 +137,7 @@ const listClaimableAssets = new ListClaimableAssetsUseCase({
   claimRepository,
 });
 
-async function requireUser(): Promise<{ error: string } | { userId: string }> {
+async function requireUser(): Promise<{ error: string } | { userId: UserId }> {
   const u = await getCurrentUser();
 
   if (!u) {
@@ -107,7 +156,7 @@ async function requireUser(): Promise<{ error: string } | { userId: string }> {
 //   proof          : File (optional) — the proof-of-ownership upload
 export async function submitPropertyClaimAction(
   formData: FormData
-): Promise<ActionResult<{ claimId: string }>> {
+): Promise<ActionResult<{ claimId: PropertyClaimId }>> {
   const rl = await checkRateLimit();
 
   if (rl) {
@@ -165,11 +214,7 @@ export async function submitPropertyClaimAction(
 // download route handler is the only path that streams the actual content.
 export async function listClaimAttachmentsAction(input: {
   claimId: string;
-}): Promise<
-  ActionResult<
-    Array<{ id: string; fileName: string; mimeType: string; sizeBytes: number }>
-  >
-> {
+}): Promise<ActionResult<ClaimAttachmentView[]>> {
   const rl = await checkRateLimit();
 
   if (rl) {
@@ -182,12 +227,23 @@ export async function listClaimAttachmentsAction(input: {
     return { success: false, error: auth.error };
   }
 
+  const claimId = PropertyClaimId.safeParse(input.claimId);
+
+  if (!claimId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode(
+        'domain.organization.propertyClaimNotFound'
+      ),
+    };
+  }
+
   const t = await getTranslations('common.errors');
 
   // Authorisation: only the claimant, an org admin, or a superadmin can see
   // a claim's attachments. Mirrors the download route guard so the list
   // never reveals filenames the caller wouldn't be allowed to download.
-  const claimRes = await claimRepository.findById(input.claimId);
+  const claimRes = await claimRepository.findById(claimId.data);
 
   if (!claimRes.success || !claimRes.value) {
     return { success: false, error: t('generic') };
@@ -207,7 +263,7 @@ export async function listClaimAttachmentsAction(input: {
     return { success: false, error: t('unauthorized') };
   }
 
-  const r = await claimAttachmentRepository.findByClaimId(input.claimId);
+  const r = await claimAttachmentRepository.findByClaimId(claimId.data);
 
   if (!r.success) {
     return { success: false, error: t('generic') };
@@ -287,11 +343,7 @@ export async function denyPropertyClaimAction(input: {
 
 export async function listOrgPropertiesForMemberAction(input: {
   organizationId: string;
-}): Promise<
-  ActionResult<{
-    properties: { id: string; name: string; address: string | null }[];
-  }>
-> {
+}): Promise<ActionResult<{ properties: SafePropertyView[] }>> {
   const rl = await checkRateLimit();
 
   if (rl) {
@@ -319,7 +371,7 @@ export async function listOrgPropertiesForMemberAction(input: {
 export async function listClaimableAssetsAction(input: {
   organizationId: string;
   propertyId: string;
-}): Promise<ActionResult<{ assets: { id: string; name: string }[] }>> {
+}): Promise<ActionResult<{ assets: ClaimableAssetView[] }>> {
   const rl = await checkRateLimit();
 
   if (rl) {
@@ -347,36 +399,7 @@ export async function listClaimableAssetsAction(input: {
 
 export async function listPendingClaimsForOrgAction(input: {
   organizationId: string;
-}): Promise<
-  ActionResult<{
-    rows: {
-      id: string;
-      assetId: string;
-      assetName: string;
-      propertyId: string;
-      propertyName: string;
-      claimantFirstName: string;
-      claimantLastName: string;
-      claimantMiddleName: string | null;
-      externalOwnerLabel: string | null;
-      createdAt: string;
-      attachments: Array<{
-        id: string;
-        fileName: string;
-        mimeType: string;
-        sizeBytes: number;
-      }>;
-      // Placeholder ownership rows on the claimed asset. Drives the slot
-      // picker when there are 2+ external owners — admin must choose
-      // which one the claimant is, otherwise approval is rejected.
-      placeholders: Array<{
-        ownershipId: string;
-        label: string | null;
-        sharePercent: number;
-      }>;
-    }[];
-  }>
-> {
+}): Promise<ActionResult<PendingClaimsView>> {
   const rl = await checkRateLimit();
 
   if (rl) {
@@ -389,9 +412,18 @@ export async function listPendingClaimsForOrgAction(input: {
     return { success: false, error: auth.error };
   }
 
+  const organizationId = OrganizationId.safeParse(input.organizationId);
+
+  if (!organizationId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('organization.errors.notFound'),
+    };
+  }
+
   const isAdmin = await organizationRepository.isUserAdmin(
     auth.userId,
-    input.organizationId
+    organizationId.data
   );
   const isSuper = await userRepository.isSuperAdmin(auth.userId);
 
@@ -402,7 +434,7 @@ export async function listPendingClaimsForOrgAction(input: {
     };
   }
 
-  const r = await claimRepository.findPendingForOrg(input.organizationId);
+  const r = await claimRepository.findPendingForOrg(organizationId.data);
 
   if (!r.success) {
     return { success: false, error: await translateErrorCode(r.error) };
@@ -412,64 +444,41 @@ export async function listPendingClaimsForOrgAction(input: {
   // claim in parallel. Bytes are never selected — the dedicated download
   // route streams them under its own auth check. Placeholders feed the
   // admin's slot-picker when an asset has >1 external owner.
-  const rowsWithAttachments = await Promise.all(
+  const rowResults = await Promise.all(
     r.value.map(async (x) => {
       const [att, ownerships] = await Promise.all([
         claimAttachmentRepository.findByClaimId(x.claim.id),
         assetRepository.findActiveOwnershipForAsset(x.claim.assetId),
       ]);
-      const placeholders = ownerships.success
-        ? ownerships.value
-            .filter((o) => o.userId === null)
-            .map((o) => ({
-              ownershipId: o.id,
-              label: o.externalOwnerLabel,
-              sharePercent: o.share * 100,
-            }))
-        : [];
 
-      return {
-        id: x.claim.id,
-        assetId: x.claim.assetId,
-        assetName: x.assetName,
-        propertyId: x.propertyId,
-        propertyName: x.propertyName,
-        claimantFirstName: x.claimantFirstName,
-        claimantLastName: x.claimantLastName,
-        claimantMiddleName: x.claimantMiddleName,
-        externalOwnerLabel: x.externalOwnerLabel,
-        createdAt: x.claim.createdAt.toISOString(),
-        attachments: att.success
-          ? att.value.map((a) => ({
-              id: a.id,
-              fileName: a.fileName,
-              mimeType: a.mimeType,
-              sizeBytes: a.sizeBytes,
-            }))
-          : [],
-        placeholders,
-      };
+      if (!att.success) {
+        return att;
+      }
+
+      if (!ownerships.success) {
+        return ownerships;
+      }
+
+      return success(serializePendingClaim(x, att.value, ownerships.value));
     })
   );
+  const rows: PendingClaimView[] = [];
 
-  return { success: true, data: { rows: rowsWithAttachments } };
+  for (const row of rowResults) {
+    if (!row.success) {
+      return { success: false, error: await translateErrorCode(row.error) };
+    }
+
+    rows.push(row.value);
+  }
+
+  return { success: true, data: { rows } };
 }
 
 export async function listMyClaimsForPropertyAction(input: {
   organizationId: string;
   propertyId: string;
-}): Promise<
-  ActionResult<{
-    rows: {
-      id: string;
-      assetName: string;
-      status: string;
-      deniedReason: string | null;
-      createdAt: string;
-      decidedAt: string | null;
-    }[];
-  }>
-> {
+}): Promise<ActionResult<MyClaimsView>> {
   const rl = await checkRateLimit();
 
   if (rl) {
@@ -482,9 +491,27 @@ export async function listMyClaimsForPropertyAction(input: {
     return { success: false, error: auth.error };
   }
 
+  const organizationId = OrganizationId.safeParse(input.organizationId);
+
+  if (!organizationId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('organization.errors.notFound'),
+    };
+  }
+
+  const propertyId = PropertyId.safeParse(input.propertyId);
+
+  if (!propertyId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('domain.organization.propertyNotFound'),
+    };
+  }
+
   const isMember = await organizationRepository.isUserMember(
     auth.userId,
-    input.organizationId
+    organizationId.data
   );
 
   if (!isMember) {
@@ -496,7 +523,7 @@ export async function listMyClaimsForPropertyAction(input: {
 
   const r = await claimRepository.findMyClaimsForProperty(
     auth.userId,
-    input.propertyId
+    propertyId.data
   );
 
   if (!r.success) {
@@ -506,14 +533,7 @@ export async function listMyClaimsForPropertyAction(input: {
   return {
     success: true,
     data: {
-      rows: r.value.map((x) => ({
-        id: x.claim.id,
-        assetName: x.assetName,
-        status: x.claim.status,
-        deniedReason: x.claim.deniedReason,
-        createdAt: x.claim.createdAt.toISOString(),
-        decidedAt: x.claim.decidedAt ? x.claim.decidedAt.toISOString() : null,
-      })),
+      rows: r.value.map(serializeMyClaim),
     },
   };
 }

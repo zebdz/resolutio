@@ -1,3 +1,5 @@
+/** Activity actions retain authorized filtering and moderation payload compatibility.
+ * Audit writes now carry supplied identity/time and status reads handle their explicit alternatives. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const { mockIsSuperAdmin, mockPrisma } = vi.hoisted(() => {
@@ -367,6 +369,8 @@ describe('suspiciousActivity actions', () => {
           status: 'blocked',
           statusChangedBySuperadminId: 'admin-1',
           reason: 'spam',
+          id: expect.any(String),
+          createdAt: expect.any(Date),
         },
       });
     });
@@ -397,6 +401,8 @@ describe('suspiciousActivity actions', () => {
           status: 'unblocked',
           statusChangedBySuperadminId: 'admin-1',
           reason: 'verified clean',
+          id: expect.any(String),
+          createdAt: expect.any(Date),
         },
       });
     });
@@ -427,7 +433,10 @@ describe('suspiciousActivity actions', () => {
 
       if (result.success) {
         expect(result.data.blocked).toBe(true);
-        expect(result.data.reason).toBe('spam');
+
+        if (result.data.blocked) {
+          expect(result.data.reason).toBe('spam');
+        }
       }
     });
 
@@ -451,14 +460,22 @@ describe('suspiciousActivity actions', () => {
           status: 'blocked',
           reason: 'spam',
           createdAt: new Date('2026-03-01'),
-          statusChangedBy: { firstName: 'Admin', lastName: 'User' },
+          statusChangedBy: {
+            firstName: 'Admin',
+            lastName: 'User',
+            middleName: null,
+          },
         },
         {
           id: 'h2',
           status: 'unblocked',
           reason: null,
           createdAt: new Date('2026-02-20'),
-          statusChangedBy: { firstName: 'Admin', lastName: 'User' },
+          statusChangedBy: {
+            firstName: 'Admin',
+            lastName: 'User',
+            middleName: null,
+          },
         },
       ]);
 

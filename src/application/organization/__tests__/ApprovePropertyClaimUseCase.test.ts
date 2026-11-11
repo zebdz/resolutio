@@ -1,3 +1,13 @@
+/** Property/claim boundary regressions exercise authorized flows with explicit
+ * creation inputs while keeping raw persistence fixtures distinct from domain values. */
+import {
+  propertyTestCreation,
+  propertyTestInstant,
+  submitTestClaim,
+} from './propertyTestValues';
+import { UserId, AssetId, PropertyId } from '../../../domain/shared/EntityIds';
+import { Instant } from '../../../domain/shared/Instant';
+import { ClaimDenialReason } from '../../../domain/organization/PropertyValues';
 import { describe, it, expect } from 'vitest';
 import { ApprovePropertyClaimUseCase } from '../ApprovePropertyClaimUseCase';
 import { PropertyClaim } from '../../../domain/organization/PropertyClaim';
@@ -29,6 +39,58 @@ const placeholder = PropertyAssetOwnership.reconstitute({
 });
 
 describe('ApprovePropertyClaimUseCase', () => {
+  it('rejects an impossible combined share before approving or saving the claim', async () => {
+    const pending = submitTestClaim('org-1', 'u-42', 'a-1');
+
+    if (!pending.success) {
+      throw new Error('fixture');
+    }
+
+    const ownership = (id: string, userId: string | null, share: number) =>
+      PropertyAssetOwnership.reconstitute({
+        id,
+        assetId: 'a-1',
+        userId,
+        externalOwnerLabel: userId === null ? 'Recorded owner' : null,
+        share,
+        effectiveFrom: new Date(propertyTestInstant),
+        effectiveUntil: null,
+        createdAt: new Date(propertyTestInstant),
+      });
+    let saved = 0;
+    const useCase = new ApprovePropertyClaimUseCase({
+      ...propertyTestCreation(),
+      claimRepository: {
+        findById: async () => success(pending.value),
+        update: async () => {
+          saved++;
+
+          return success(undefined);
+        },
+      } as any,
+      assetRepository: {
+        findActiveOwnershipForAsset: async () =>
+          success([
+            ownership('existing', 'u-42', 0.8),
+            ownership('placeholder', null, 0.4),
+          ]),
+      } as any,
+      propertyRepository: {} as any,
+      organizationRepository: { isUserAdmin: async () => true } as any,
+      userRepository: { isSuperAdmin: async () => false } as any,
+      notifyApproved: {} as any,
+      notifyDenied: {} as any,
+    });
+    expect(
+      await useCase.execute({ claimId: pending.value.id, adminUserId: 'admin' })
+    ).toEqual({
+      success: false,
+      error:
+        OrganizationDomainCodes.PROPERTY_ASSET_OWNERSHIP_SHARE_OUT_OF_RANGE,
+    });
+    expect(pending.value.status).toBe('PENDING');
+    expect(saved).toBe(0);
+  });
   it('approves an ownerless asset by creating a new 100% ownership row', async () => {
     // No active rows exist (admin created C-Spot #6 with no owners). Approval
     // must create a fresh ownership row for the claimant — there is nothing
@@ -48,6 +110,7 @@ describe('ApprovePropertyClaimUseCase', () => {
     let linked: any = null;
     let notified = 0;
     const uc = new ApprovePropertyClaimUseCase({
+      ...propertyTestCreation(),
       claimRepository: {
         findById: async () => success(ownerlessClaim),
         update: async () => success(undefined),
@@ -72,9 +135,11 @@ describe('ApprovePropertyClaimUseCase', () => {
       notifyApproved: {
         execute: async () => {
           notified++;
+
+          return success(undefined);
         },
       } as any,
-      notifyDenied: { execute: async () => {} } as any,
+      notifyDenied: { execute: async () => success(undefined) } as any,
     });
     const r = await uc.execute({
       claimId: ownerlessClaim.id,
@@ -85,6 +150,8 @@ describe('ApprovePropertyClaimUseCase', () => {
     // Used the create path, not the link path.
     expect(linked).toBeNull();
     expect(created).toEqual({
+      ownershipId: 'created-1',
+      at: propertyTestInstant,
       assetId: 'a-2',
       userId: 'u-99',
       share: 1,
@@ -109,6 +176,7 @@ describe('ApprovePropertyClaimUseCase', () => {
     let approvedNotified = 0;
     let deniedNotified = 0;
     const uc = new ApprovePropertyClaimUseCase({
+      ...propertyTestCreation(),
       claimRepository: {
         findById: async () => success(claim),
         update: async (c: PropertyClaim) => {
@@ -132,11 +200,15 @@ describe('ApprovePropertyClaimUseCase', () => {
       notifyApproved: {
         execute: async () => {
           approvedNotified++;
+
+          return success(undefined);
         },
       } as any,
       notifyDenied: {
         execute: async () => {
           deniedNotified++;
+
+          return success(undefined);
         },
       } as any,
     });
@@ -190,6 +262,7 @@ describe('ApprovePropertyClaimUseCase', () => {
     let linkedCount = 0;
     let merged: any = null;
     const uc = new ApprovePropertyClaimUseCase({
+      ...propertyTestCreation(),
       claimRepository: {
         findById: async () => success(freshClaim),
         update: async () => success(undefined),
@@ -215,8 +288,8 @@ describe('ApprovePropertyClaimUseCase', () => {
       propertyRepository: { findById: async () => success(null) } as any,
       organizationRepository: { isUserAdmin: async () => true } as any,
       userRepository: { isSuperAdmin: async () => false } as any,
-      notifyApproved: { execute: async () => {} } as any,
-      notifyDenied: { execute: async () => {} } as any,
+      notifyApproved: { execute: async () => success(undefined) } as any,
+      notifyDenied: { execute: async () => success(undefined) } as any,
     });
     const r = await uc.execute({
       claimId: freshClaim.id,
@@ -225,6 +298,7 @@ describe('ApprovePropertyClaimUseCase', () => {
     expect(r.success).toBe(true);
     expect(linkedCount).toBe(0);
     expect(merged).toEqual({
+      at: propertyTestInstant,
       placeholderOwnershipId: 'o-placeholder',
       existingOwnershipId: 'o-existing',
       newShare: 0.30000000000000004, // 0.1 + 0.2 — JS float; close enough
@@ -276,6 +350,7 @@ describe('ApprovePropertyClaimUseCase', () => {
       onCreate?: () => void;
     }) {
       return new ApprovePropertyClaimUseCase({
+        ...propertyTestCreation(),
         claimRepository: {
           findById: async () => success(multiPlaceholderClaim()),
           update: async () => success(undefined),
@@ -298,8 +373,8 @@ describe('ApprovePropertyClaimUseCase', () => {
         propertyRepository: { findById: async () => success(null) } as any,
         organizationRepository: { isUserAdmin: async () => true } as any,
         userRepository: { isSuperAdmin: async () => false } as any,
-        notifyApproved: { execute: async () => {} } as any,
-        notifyDenied: { execute: async () => {} } as any,
+        notifyApproved: { execute: async () => success(undefined) } as any,
+        notifyDenied: { execute: async () => success(undefined) } as any,
       });
     }
 
@@ -340,6 +415,7 @@ describe('ApprovePropertyClaimUseCase', () => {
       });
       let linkedCount = 0;
       const uc = new ApprovePropertyClaimUseCase({
+        ...propertyTestCreation(),
         claimRepository: {
           findById: async () => success(multiPlaceholderClaim()),
           update: async () => success(undefined),
@@ -357,8 +433,8 @@ describe('ApprovePropertyClaimUseCase', () => {
         propertyRepository: { findById: async () => success(null) } as any,
         organizationRepository: { isUserAdmin: async () => true } as any,
         userRepository: { isSuperAdmin: async () => false } as any,
-        notifyApproved: { execute: async () => {} } as any,
-        notifyDenied: { execute: async () => {} } as any,
+        notifyApproved: { execute: async () => success(undefined) } as any,
+        notifyDenied: { execute: async () => success(undefined) } as any,
       });
       const r = await uc.execute({
         claimId: 'c-multi',
@@ -390,6 +466,7 @@ describe('ApprovePropertyClaimUseCase', () => {
       });
       let linkedCount = 0;
       const uc = new ApprovePropertyClaimUseCase({
+        ...propertyTestCreation(),
         claimRepository: {
           findById: async () => success(multiPlaceholderClaim()),
           update: async () => success(undefined),
@@ -410,8 +487,8 @@ describe('ApprovePropertyClaimUseCase', () => {
         propertyRepository: { findById: async () => success(null) } as any,
         organizationRepository: { isUserAdmin: async () => true } as any,
         userRepository: { isSuperAdmin: async () => false } as any,
-        notifyApproved: { execute: async () => {} } as any,
-        notifyDenied: { execute: async () => {} } as any,
+        notifyApproved: { execute: async () => success(undefined) } as any,
+        notifyDenied: { execute: async () => success(undefined) } as any,
       });
       void otherAssetPlaceholder; // declared for documentation; not in the list
       const r = await uc.execute({

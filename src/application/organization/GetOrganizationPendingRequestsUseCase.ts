@@ -1,6 +1,20 @@
+/** Authorizes an organization's pending-request read and returns typed requester data.
+ * The directory adapter owns storage queries and decodes request timestamps. */
+import {
+  OrganizationDirectory,
+  DirectoryPerson,
+} from './OrganizationDirectory';
+import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { Instant } from '../../domain/shared/Instant';
+import { ResultCount } from '../../domain/shared/Pagination';
+import { OrganizationId, UserId } from '../../domain/shared/EntityIds';
+import { PageNumber, PageSize } from '../../domain/shared/Pagination';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { UserRepository } from '../../domain/user/UserRepository';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 
 export interface GetOrganizationPendingRequestsInput {
   organizationId: string;
@@ -10,21 +24,25 @@ export interface GetOrganizationPendingRequestsInput {
 }
 
 export interface PendingRequest {
-  userId: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  requestedAt: Date;
+  userId: UserId;
+  firstName: DirectoryPerson['firstName'];
+  lastName: DirectoryPerson['lastName'];
+  middleName: DirectoryPerson['middleName'];
+  requestedAt: Instant;
 }
 
 export interface GetOrganizationPendingRequestsResult {
   requests: PendingRequest[];
-  totalCount: number;
+  totalCount: ResultCount;
 }
 
 export interface GetOrganizationPendingRequestsDependencies {
-  prisma: any; // PrismaClient
-  userRepository: UserRepository;
+  directory: Pick<OrganizationDirectory, 'pendingForOrganization'>;
+  organizationRepository: Pick<
+    OrganizationRepository,
+    'findById' | 'isUserAdmin'
+  >;
+  userRepository: Pick<UserRepository, 'isSuperAdmin'>;
 }
 
 export class GetOrganizationPendingRequestsUseCase {
@@ -32,13 +50,46 @@ export class GetOrganizationPendingRequestsUseCase {
 
   async execute(
     input: GetOrganizationPendingRequestsInput
-  ): Promise<Result<GetOrganizationPendingRequestsResult, string>> {
-    const { organizationId, adminUserId, page, pageSize } = input;
+  ): Promise<
+    Result<GetOrganizationPendingRequestsResult, OrganizationUseCaseFailure>
+  > {
+    const parsedOrganizationId = OrganizationId.safeParse(input.organizationId);
+
+    if (!parsedOrganizationId.success) {
+      return failure(OrganizationErrors.NOT_FOUND);
+    }
+
+    const parsedAdminUserId = UserId.safeParse(input.adminUserId);
+
+    if (!parsedAdminUserId.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
+    }
+
+    const parsedPage = PageNumber.optional().safeParse(input.page);
+
+    if (!parsedPage.success) {
+      return failure('common.errors.unexpected');
+    }
+
+    const parsedPageSize = PageSize.optional().safeParse(input.pageSize);
+
+    if (!parsedPageSize.success) {
+      return failure('common.errors.unexpected');
+    }
+
+    const command = {
+      ...input,
+      organizationId: parsedOrganizationId.data,
+      adminUserId: parsedAdminUserId.data,
+      page: parsedPage.data,
+      pageSize: parsedPageSize.data,
+    };
+
+    const { organizationId, adminUserId, page, pageSize } = command;
 
     // Check if organization exists
-    const organization = await this.deps.prisma.organization.findUnique({
-      where: { id: organizationId },
-    });
+    const organization =
+      await this.deps.organizationRepository.findById(organizationId);
 
     if (!organization) {
       return failure(OrganizationErrors.NOT_FOUND);
@@ -49,66 +100,37 @@ export class GetOrganizationPendingRequestsUseCase {
       await this.deps.userRepository.isSuperAdmin(adminUserId);
 
     if (!isSuperAdmin) {
-      const isAdmin = await this.deps.prisma.organizationAdminUser.findUnique({
-        where: {
-          organizationId_userId: {
-            organizationId,
-            userId: adminUserId,
-          },
-        },
-      });
+      const isAdmin = await this.deps.organizationRepository.isUserAdmin(
+        adminUserId,
+        organizationId
+      );
 
       if (!isAdmin) {
         return failure(OrganizationErrors.NOT_ADMIN);
       }
     }
 
-    const whereClause = {
+    const result = await this.deps.directory.pendingForOrganization({
       organizationId,
-      status: 'pending',
-    };
-
-    // Get total count
-    const totalCount = await this.deps.prisma.organizationUser.count({
-      where: whereClause,
+      pagination:
+        page !== undefined && pageSize !== undefined
+          ? { page, pageSize }
+          : undefined,
     });
 
-    // Build pagination args
-    const paginationArgs =
-      page && pageSize && page > 0 && pageSize > 0
-        ? {
-            skip: (page - 1) * pageSize,
-            take: pageSize,
-          }
-        : {};
+    if (!result.success) {
+      return result;
+    }
 
-    // Get pending requests for this organization
-    const pendingRequests = await this.deps.prisma.organizationUser.findMany({
-      where: whereClause,
-      include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            middleName: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-      ...paginationArgs,
+    return success({
+      requests: result.value.requests.map(({ requester, requestedAt }) => ({
+        userId: requester.id,
+        firstName: requester.firstName,
+        lastName: requester.lastName,
+        middleName: requester.middleName,
+        requestedAt,
+      })),
+      totalCount: result.value.totalCount,
     });
-
-    const requests: PendingRequest[] = pendingRequests.map((req: any) => ({
-      userId: req.user.id,
-      firstName: req.user.firstName,
-      lastName: req.user.lastName,
-      middleName: req.user.middleName || undefined,
-      requestedAt: req.createdAt,
-    }));
-
-    return success({ requests, totalCount });
   }
 }

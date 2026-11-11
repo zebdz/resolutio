@@ -1,3 +1,26 @@
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { VotingWeight } from '@/domain/poll/VotingWeight';
+/** Poll use-case compatibility: explicit creation fixtures and repository ports
+ * preserve authorization, eligibility and expected user-visible outcomes. */
+import {
+  expectFailure,
+  expectSuccess,
+} from '@/domain/shared/__tests__/resultAssertions';
+import { createQuestionIds, questionClock } from './questionTestValues';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import {
+  PollId,
+  QuestionId,
+  AnswerId,
+  ParticipantId,
+  ParticipantWeightHistoryId,
+  VoteId,
+  VoteDraftId,
+  UserId,
+  OrganizationId,
+  BoardId,
+} from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UpdateParticipantWeightUseCase } from '../UpdateParticipantWeightUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -30,19 +53,21 @@ describe('UpdateParticipantWeightUseCase', () => {
   beforeEach(() => {
     // Create a poll
     const pollResult = Poll.create(
-      'Test Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'user-admin',
-      new Date('2026-01-15'),
-      new Date('2026-02-15')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-admin'),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(pollResult.success).toBe(true);
 
     if (pollResult.success) {
       poll = pollResult.value;
-      (poll as any).props.id = 'poll-1';
+
       poll.submitToAdmin();
       poll.takeSnapshot();
       poll.activate();
@@ -50,20 +75,20 @@ describe('UpdateParticipantWeightUseCase', () => {
 
     // Create participant
     const participantResult = PollParticipant.create(
-      'poll-1',
-      'user-1',
-      new Decimal(1.0).toNumber()
+      PollId.parse('poll-1'),
+      UserId.parse('user-1'),
+      testCreation(ParticipantId, 'participant-1'),
+      VotingWeight.parse(new Decimal(1.0).toNumber())
     );
     expect(participantResult.success).toBe(true);
 
     if (participantResult.success) {
       participant = participantResult.value;
-      (participant as any).props.id = 'participant-1';
     }
 
     // Mock repositories
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
     };
 
     participantRepository = {
@@ -106,7 +131,9 @@ describe('UpdateParticipantWeightUseCase', () => {
       voteRepository as VoteRepository,
       organizationRepository as OrganizationRepository,
       userRepository as UserRepository,
-      boardRepository as BoardRepository
+      boardRepository as BoardRepository,
+      createQuestionIds(),
+      questionClock
     );
   });
 
@@ -120,7 +147,7 @@ describe('UpdateParticipantWeightUseCase', () => {
 
     expect(result.success).toBe(true);
     expect(participantRepository.updateParticipantWeight).toHaveBeenCalled();
-    expect(participantRepository.createWeightHistory).toHaveBeenCalled();
+    expect(participantRepository.updateParticipantWeight).toHaveBeenCalled();
   });
 
   it('should reject negative weight', async () => {
@@ -213,9 +240,9 @@ describe('UpdateParticipantWeightUseCase', () => {
       reason: 'Property size increased',
     });
 
-    expect(participantRepository.createWeightHistory).toHaveBeenCalled();
-    const historyCall = (participantRepository.createWeightHistory as any).mock
-      .calls[0][0];
+    expect(participantRepository.updateParticipantWeight).toHaveBeenCalled();
+    const historyCall = (participantRepository.updateParticipantWeight as any)
+      .mock.calls[0][1];
     expect(historyCall.reason).toBe('Property size increased');
   });
 
@@ -244,7 +271,7 @@ describe('UpdateParticipantWeightUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(OrganizationErrors.NOT_ADMIN);
+      expect(expectFailure(result)).toBe(OrganizationErrors.NOT_ADMIN);
     });
   });
 
@@ -269,7 +296,7 @@ describe('UpdateParticipantWeightUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.ORGANIZATION_ARCHIVED);
+    expect(expectFailure(result)).toBe(PollErrors.ORGANIZATION_ARCHIVED);
   });
 
   it('should fail if board is archived', async () => {
@@ -290,22 +317,30 @@ describe('UpdateParticipantWeightUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
+    expect(expectFailure(result)).toBe(PollErrors.BOARD_ARCHIVED);
   });
 
   function makeOpenPoll(): Poll {
-    const openPoll = Poll.create(
-      'Open Poll',
-      'Everyone may vote',
-      'org-1',
-      null,
-      'user-admin',
-      new Date('2026-01-15'),
-      new Date('2026-02-15'),
-      undefined,
-      'OPEN'
-    ).value;
-    (openPoll as any).props.id = 'poll-1';
+    let openPoll = expectSuccess(
+      Poll.create(
+        PollTitle.parse('Open Poll'),
+        PollDescription.parse('Everyone may vote'),
+        OrganizationId.parse('org-1'),
+        null,
+        UserId.parse('user-admin'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1'),
+        undefined,
+        'OPEN'
+      )
+    );
+    openPoll = Poll.reconstitute({
+      ...openPoll.toJSON(),
+      questions: openPoll.questions,
+      id: 'poll-1',
+    });
 
     return openPoll;
   }
@@ -323,6 +358,6 @@ describe('UpdateParticipantWeightUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.OPEN_PARTICIPANTS_IMMUTABLE);
+    expect(expectFailure(result)).toBe(PollErrors.OPEN_PARTICIPANTS_IMMUTABLE);
   });
 });

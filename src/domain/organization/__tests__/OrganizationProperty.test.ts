@@ -1,3 +1,29 @@
+/** Property aggregate clients use validated names/units, explicit creation and
+ * archive time; malformed persistence rows cannot bypass those constraints. */
+import { PropertyId, OrganizationId } from '../../shared/EntityIds';
+import { Instant } from '../../shared/Instant';
+import { PropertyName, PropertyAddress } from '../PropertyValues';
+import { SizeUnitValue } from '../SizeUnit';
+const at = Instant.parse('2026-01-01T00:00:00.000Z');
+
+// Deliberate casts exercise runtime guards against malformed external callers.
+function createProperty(
+  organizationId: string,
+  name: string,
+  address: string | null,
+  sizeUnit: string,
+  checker?: ProfanityChecker
+) {
+  return OrganizationProperty.create(
+    OrganizationId.parse(organizationId),
+    name as PropertyName,
+    address === null ? null : PropertyAddress.parse(address),
+    sizeUnit as SizeUnitValue,
+    { id: PropertyId.parse('property-1'), now: at },
+    checker
+  );
+}
+
 import { describe, it, expect } from 'vitest';
 import { OrganizationProperty } from '../OrganizationProperty';
 import { OrganizationDomainCodes } from '../OrganizationDomainCodes';
@@ -5,13 +31,27 @@ import { SharedDomainCodes } from '../../shared/SharedDomainCodes';
 import { ProfanityChecker } from '../../shared/profanity/ProfanityChecker';
 
 const cleanChecker: ProfanityChecker = {
+  findProfaneWords: () => [],
   containsProfanity: (t) => t.includes('badword'),
 };
 
 describe('OrganizationProperty', () => {
+  it('rejects an invalid persisted property identity', () => {
+    expect(() =>
+      OrganizationProperty.reconstitute({
+        id: '',
+        organizationId: 'org-1',
+        name: 'Building',
+        address: null,
+        sizeUnit: 'SQUARE_METERS',
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        archivedAt: null,
+      })
+    ).toThrow();
+  });
   describe('create', () => {
     it('creates with name, address, sizeUnit', () => {
-      const r = OrganizationProperty.create(
+      const r = createProperty(
         'org-1',
         'Building A',
         '1 Main St',
@@ -29,7 +69,7 @@ describe('OrganizationProperty', () => {
     });
 
     it('rejects empty name', () => {
-      const r = OrganizationProperty.create('org-1', '', null, 'SQUARE_METERS');
+      const r = createProperty('org-1', '', null, 'SQUARE_METERS');
       expect(r.success).toBe(false);
 
       if (!r.success) {
@@ -38,7 +78,7 @@ describe('OrganizationProperty', () => {
     });
 
     it('rejects invalid sizeUnit', () => {
-      const r = OrganizationProperty.create('org-1', 'Bldg', null, 'FURLONGS');
+      const r = createProperty('org-1', 'Bldg', null, 'FURLONGS');
       expect(r.success).toBe(false);
 
       if (!r.success) {
@@ -47,7 +87,7 @@ describe('OrganizationProperty', () => {
     });
 
     it('rejects profane name', () => {
-      const r = OrganizationProperty.create(
+      const r = createProperty(
         'org-1',
         'badword tower',
         null,
@@ -64,51 +104,36 @@ describe('OrganizationProperty', () => {
 
   describe('rename', () => {
     it('updates the name', () => {
-      const r = OrganizationProperty.create(
-        'org-1',
-        'Old',
-        null,
-        'SQUARE_METERS'
-      );
+      const r = createProperty('org-1', 'Old', null, 'SQUARE_METERS');
 
       if (!r.success) {
         throw new Error('setup');
       }
 
-      const res = r.value.rename('New');
+      const res = r.value.rename('New' as PropertyName);
       expect(res.success).toBe(true);
       expect(r.value.name).toBe('New');
     });
 
     it('rejects empty name', () => {
-      const r = OrganizationProperty.create(
-        'org-1',
-        'Old',
-        null,
-        'SQUARE_METERS'
-      );
+      const r = createProperty('org-1', 'Old', null, 'SQUARE_METERS');
 
       if (!r.success) {
         throw new Error('setup');
       }
 
-      const res = r.value.rename('');
+      const res = r.value.rename('' as PropertyName);
       expect(res.success).toBe(false);
     });
 
     it('rejects profane name when checker given', () => {
-      const r = OrganizationProperty.create(
-        'org-1',
-        'Old',
-        null,
-        'SQUARE_METERS'
-      );
+      const r = createProperty('org-1', 'Old', null, 'SQUARE_METERS');
 
       if (!r.success) {
         throw new Error('setup');
       }
 
-      const res = r.value.rename('badword', cleanChecker);
+      const res = r.value.rename('badword' as PropertyName, cleanChecker);
       expect(res.success).toBe(false);
 
       if (!res.success) {
@@ -119,12 +144,7 @@ describe('OrganizationProperty', () => {
 
   describe('updateAddress', () => {
     it('accepts null (clears address)', () => {
-      const r = OrganizationProperty.create(
-        'org-1',
-        'Bldg',
-        '1 St',
-        'SQUARE_METERS'
-      );
+      const r = createProperty('org-1', 'Bldg', '1 St', 'SQUARE_METERS');
 
       if (!r.success) {
         throw new Error('setup');
@@ -136,18 +156,13 @@ describe('OrganizationProperty', () => {
     });
 
     it('sets a non-empty address', () => {
-      const r = OrganizationProperty.create(
-        'org-1',
-        'Bldg',
-        null,
-        'SQUARE_METERS'
-      );
+      const r = createProperty('org-1', 'Bldg', null, 'SQUARE_METERS');
 
       if (!r.success) {
         throw new Error('setup');
       }
 
-      const res = r.value.updateAddress('2 St');
+      const res = r.value.updateAddress(PropertyAddress.parse('2 St'));
       expect(res.success).toBe(true);
       expect(r.value.address).toBe('2 St');
     });
@@ -155,12 +170,7 @@ describe('OrganizationProperty', () => {
 
   describe('updateSizeUnit', () => {
     it('accepts a valid unit', () => {
-      const r = OrganizationProperty.create(
-        'org-1',
-        'Bldg',
-        null,
-        'SQUARE_METERS'
-      );
+      const r = createProperty('org-1', 'Bldg', null, 'SQUARE_METERS');
 
       if (!r.success) {
         throw new Error('setup');
@@ -172,36 +182,26 @@ describe('OrganizationProperty', () => {
     });
 
     it('rejects invalid unit', () => {
-      const r = OrganizationProperty.create(
-        'org-1',
-        'Bldg',
-        null,
-        'SQUARE_METERS'
-      );
+      const r = createProperty('org-1', 'Bldg', null, 'SQUARE_METERS');
 
       if (!r.success) {
         throw new Error('setup');
       }
 
-      const res = r.value.updateSizeUnit('FURLONGS');
+      const res = r.value.updateSizeUnit('FURLONGS' as SizeUnitValue);
       expect(res.success).toBe(false);
     });
   });
 
   describe('archive/unarchive', () => {
     it('archives then unarchives', () => {
-      const r = OrganizationProperty.create(
-        'org-1',
-        'B',
-        null,
-        'SQUARE_METERS'
-      );
+      const r = createProperty('org-1', 'B', null, 'SQUARE_METERS');
 
       if (!r.success) {
         throw new Error('setup');
       }
 
-      const a = r.value.archive();
+      const a = r.value.archive(at);
       expect(a.success).toBe(true);
       expect(r.value.isArchived()).toBe(true);
       const u = r.value.unarchive();
@@ -210,19 +210,14 @@ describe('OrganizationProperty', () => {
     });
 
     it('rejects archive when already archived', () => {
-      const r = OrganizationProperty.create(
-        'org-1',
-        'B',
-        null,
-        'SQUARE_METERS'
-      );
+      const r = createProperty('org-1', 'B', null, 'SQUARE_METERS');
 
       if (!r.success) {
         throw new Error('setup');
       }
 
-      r.value.archive();
-      const a = r.value.archive();
+      r.value.archive(at);
+      const a = r.value.archive(at);
       expect(a.success).toBe(false);
 
       if (!a.success) {
@@ -231,12 +226,7 @@ describe('OrganizationProperty', () => {
     });
 
     it('rejects unarchive when not archived', () => {
-      const r = OrganizationProperty.create(
-        'org-1',
-        'B',
-        null,
-        'SQUARE_METERS'
-      );
+      const r = createProperty('org-1', 'B', null, 'SQUARE_METERS');
 
       if (!r.success) {
         throw new Error('setup');

@@ -1,13 +1,13 @@
 'use client';
 
+/** Presents the domain's distribution choices and decodes native select values. */
+import {
+  parseDistributionType,
+  type DistributionType,
+} from '@/domain/poll/DistributionType';
 import { useTranslations } from 'next-intl';
 import { Select } from '@/src/web/components/catalyst/select';
 import { Field, Label } from '@/src/web/components/catalyst/fieldset';
-
-type DistributionType =
-  | 'EQUAL'
-  | 'OWNERSHIP_UNIT_COUNT'
-  | 'OWNERSHIP_SIZE_WEIGHTED';
 
 interface Props {
   value: DistributionType;
@@ -29,7 +29,13 @@ export function DistributionTypeSelector({
       <Label>{t('label')}</Label>
       <Select
         value={value}
-        onChange={(e) => onChange(e.target.value as DistributionType)}
+        onChange={(e) => {
+          const selected = parseDistributionType(e.target.value);
+
+          if (selected.success) {
+            onChange(selected.value);
+          }
+        }}
         disabled={disabled}
       >
         <option value="EQUAL">{t('type.equal')}</option>

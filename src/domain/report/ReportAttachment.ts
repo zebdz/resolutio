@@ -1,16 +1,32 @@
+/** Validated report evidence metadata with caller-assigned identity/time.
+ * Content bytes remain separate, so metadata never leaks file content across boundaries. */
+import { z } from 'zod';
+import { EntityCreation } from '../shared/EntityCreation';
+import { ReportAttachmentId, ReportId } from '../shared/EntityIds';
+import { Instant } from '../shared/Instant';
+import {
+  AttachmentFileName,
+  AttachmentByteCount,
+  AttachmentCount,
+} from '../shared/attachments/AttachmentValues';
+import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 import { Result, success, failure } from '../shared/Result';
-import { ReportDomainCodes } from './ReportDomainCodes';
+import { ReportDomainCodes, ReportDomainCode } from './ReportDomainCodes';
 
 // 5 MB cap for images. Files are stored in object storage; this prevents
 // accidental upload of RAW/uncompressed images that would balloon storage.
-export const REPORT_ATTACHMENT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+export const REPORT_ATTACHMENT_IMAGE_MAX_BYTES = AttachmentByteCount.parse(
+  5 * 1024 * 1024
+);
 
 // 10 MB cap for PDFs. PDF/A archives with embedded fonts can be large;
 // 10 MB is generous while still guarding against abuse.
-export const REPORT_ATTACHMENT_PDF_MAX_BYTES = 10 * 1024 * 1024;
+export const REPORT_ATTACHMENT_PDF_MAX_BYTES = AttachmentByteCount.parse(
+  10 * 1024 * 1024
+);
 
 // Per-report attachment cap. Enforced in the use case, not in this entity.
-export const REPORT_ATTACHMENT_COUNT_LIMIT = 20;
+export const REPORT_ATTACHMENT_COUNT_LIMIT = AttachmentCount.parse(20);
 
 // Whitelist of accepted upload types — common image formats, PDF, Excel
 // (legacy .xls + modern .xlsx), Word (legacy .doc + modern .docx), and
@@ -19,7 +35,7 @@ export const REPORT_ATTACHMENT_COUNT_LIMIT = 20;
 // one of the listed subtypes. Polyglots between ZIP-based office formats
 // are mitigated by Content-Disposition: attachment.
 // Adding a type here is intentional; do not loosen without a security review.
-export const REPORT_ATTACHMENT_ALLOWED_MIME_TYPES = [
+export const REPORT_ATTACHMENT_ALLOWED_MIME_TYPES = Object.freeze([
   'image/png',
   'image/jpeg',
   'image/webp',
@@ -30,14 +46,21 @@ export const REPORT_ATTACHMENT_ALLOWED_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.oasis.opendocument.text',
   'application/vnd.oasis.opendocument.spreadsheet',
-] as const;
+] as const);
 
 export type ReportAttachmentMimeType =
   (typeof REPORT_ATTACHMENT_ALLOWED_MIME_TYPES)[number];
 
+export const ReportAttachmentMime = z.enum(
+  REPORT_ATTACHMENT_ALLOWED_MIME_TYPES
+);
+export type ReportAttachmentFailure =
+  | ReportDomainCode
+  | typeof SharedDomainCodes.INVALID_ATTACHMENT_METADATA;
+
 const MAGIC_HEADER_PREFIX_BYTES = 12;
 
-function maxBytesFor(mimeType: string): number {
+function maxBytesFor(mimeType: ReportAttachmentMimeType): AttachmentByteCount {
   // PDFs, Excel/ODS spreadsheets, and Word/ODT documents share the larger
   // document cap; images get the smaller image cap.
   if (
@@ -66,7 +89,10 @@ function maxBytesFor(mimeType: string): number {
 //
 // Reads up to 12 bytes (the WebP check needs offset 0..3 + 8..11). All
 // other types check offset 0 only.
-function magicMatches(mimeType: string, head: Buffer): boolean {
+function magicMatches(
+  mimeType: ReportAttachmentMimeType,
+  head: Buffer
+): boolean {
   switch (mimeType) {
     case 'image/png':
       // 89 50 4E 47 0D 0A 1A 0A — fixed 8-byte PNG signature.
@@ -140,16 +166,16 @@ function magicMatches(mimeType: string, head: Buffer): boolean {
 }
 
 interface CreateInput {
-  reportId: string;
-  fileName: string;
-  mimeType: string;
-  sizeBytes: number;
+  reportId: ReportId;
+  fileName: AttachmentFileName;
+  mimeType: ReportAttachmentMimeType;
+  sizeBytes: AttachmentByteCount;
 }
 
 interface CreateWithBytesInput {
-  reportId: string;
-  fileName: string;
-  mimeType: string;
+  reportId: ReportId;
+  fileName: AttachmentFileName;
+  mimeType: ReportAttachmentMimeType;
   bytes: Buffer;
 }
 
@@ -162,43 +188,87 @@ interface ReconstituteInput {
   createdAt: Date;
 }
 
+/** Decodes raw upload metadata with this context's established error order.
+ * Factories consume validated values and still enforce byte signatures and parent identity. */
+export function parseReportAttachmentMetadata(input: {
+  fileName: unknown;
+  mimeType: unknown;
+  sizeBytes: unknown;
+}): Result<Omit<CreateInput, 'reportId'>, ReportAttachmentFailure> {
+  const fileName = AttachmentFileName.safeParse(input.fileName);
+
+  if (!fileName.success) {
+    return failure(ReportDomainCodes.REPORT_ATTACHMENT_FILENAME_EMPTY);
+  }
+
+  const mime = ReportAttachmentMime.safeParse(input.mimeType);
+
+  if (!mime.success) {
+    return failure(ReportDomainCodes.REPORT_ATTACHMENT_TYPE_NOT_ALLOWED);
+  }
+
+  if (
+    typeof input.sizeBytes === 'number' &&
+    input.sizeBytes > maxBytesFor(mime.data)
+  ) {
+    return failure(ReportDomainCodes.REPORT_ATTACHMENT_TOO_LARGE);
+  }
+
+  const bytes = AttachmentByteCount.safeParse(input.sizeBytes);
+
+  if (!bytes.success) {
+    return failure(SharedDomainCodes.INVALID_ATTACHMENT_METADATA);
+  }
+
+  return success({
+    fileName: AttachmentFileName.parse(fileName.data.trim()),
+    mimeType: mime.data,
+    sizeBytes: bytes.data,
+  });
+}
+
 export class ReportAttachment {
   private constructor(
-    public readonly id: string | null,
-    public readonly reportId: string,
-    public readonly fileName: string,
-    public readonly mimeType: string,
-    public readonly sizeBytes: number,
-    public readonly createdAt: Date | null
-  ) {}
+    public readonly id: ReportAttachmentId,
+    public readonly reportId: ReportId,
+    public readonly fileName: AttachmentFileName,
+    public readonly mimeType: ReportAttachmentMimeType,
+    public readonly sizeBytes: AttachmentByteCount,
+    private readonly created: Instant
+  ) {
+    Object.freeze(this);
+  }
 
-  static create(input: CreateInput): Result<ReportAttachment, string> {
-    const trimmed = input.fileName.trim();
+  get createdAt(): Date {
+    return Instant.toDate(this.created);
+  }
 
-    if (trimmed.length === 0) {
-      return failure(ReportDomainCodes.REPORT_ATTACHMENT_FILENAME_EMPTY);
+  static create(
+    input: CreateInput,
+    creation: EntityCreation<ReportAttachmentId>
+  ): Result<ReportAttachment, ReportAttachmentFailure> {
+    const metadata = parseReportAttachmentMetadata(input);
+
+    if (!metadata.success) {
+      return metadata;
     }
 
-    if (
-      !(REPORT_ATTACHMENT_ALLOWED_MIME_TYPES as readonly string[]).includes(
-        input.mimeType
-      )
-    ) {
-      return failure(ReportDomainCodes.REPORT_ATTACHMENT_TYPE_NOT_ALLOWED);
-    }
+    const identity = ReportAttachmentId.safeParse(creation?.id);
+    const parent = ReportId.safeParse(input.reportId);
+    const time = Instant.safeParse(creation?.now);
 
-    if (input.sizeBytes > maxBytesFor(input.mimeType)) {
-      return failure(ReportDomainCodes.REPORT_ATTACHMENT_TOO_LARGE);
+    if (!identity.success || !parent.success || !time.success) {
+      return failure(SharedDomainCodes.INVALID_ATTACHMENT_METADATA);
     }
 
     return success(
       new ReportAttachment(
-        null,
-        input.reportId,
-        trimmed,
-        input.mimeType,
-        input.sizeBytes,
-        null
+        identity.data,
+        parent.data,
+        metadata.value.fileName,
+        metadata.value.mimeType,
+        metadata.value.sizeBytes,
+        time.data
       )
     );
   }
@@ -208,18 +278,22 @@ export class ReportAttachment {
   // in upload paths so a renamed-and-lied-about file (e.g., .exe declared
   // as application/pdf) is rejected before any DB write.
   static createWithBytes(
-    input: CreateWithBytesInput
-  ): Result<ReportAttachment, string> {
+    input: CreateWithBytesInput,
+    creation: EntityCreation<ReportAttachmentId>
+  ): Result<ReportAttachment, ReportAttachmentFailure> {
     // Reuse the metadata-only path for type, fileName trim, and size.
     // Validation order: filename → type → size → magic. Returning the
     // size error before magic avoids reading file bytes for obviously
     // oversized uploads.
-    const meta = ReportAttachment.create({
-      reportId: input.reportId,
-      fileName: input.fileName,
-      mimeType: input.mimeType,
-      sizeBytes: input.bytes.length,
-    });
+    const meta = ReportAttachment.create(
+      {
+        reportId: input.reportId,
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        sizeBytes: AttachmentByteCount.parse(input.bytes.length),
+      },
+      creation
+    );
 
     if (!meta.success) {
       return meta;
@@ -227,7 +301,7 @@ export class ReportAttachment {
 
     const head = input.bytes.subarray(0, MAGIC_HEADER_PREFIX_BYTES);
 
-    if (!magicMatches(input.mimeType, head)) {
+    if (!magicMatches(meta.value.mimeType, head)) {
       return failure(ReportDomainCodes.REPORT_ATTACHMENT_MAGIC_MISMATCH);
     }
 
@@ -235,13 +309,29 @@ export class ReportAttachment {
   }
 
   static reconstitute(input: ReconstituteInput): ReportAttachment {
-    return new ReportAttachment(
-      input.id,
-      input.reportId,
-      input.fileName,
-      input.mimeType,
-      input.sizeBytes,
-      input.createdAt
+    const metadata = parseReportAttachmentMetadata(input);
+
+    if (!metadata.success) {
+      throw new Error(metadata.error);
+    }
+
+    const result = ReportAttachment.create(
+      {
+        reportId: ReportId.parse(input.reportId),
+        fileName: metadata.value.fileName,
+        mimeType: metadata.value.mimeType,
+        sizeBytes: metadata.value.sizeBytes,
+      },
+      {
+        id: ReportAttachmentId.parse(input.id),
+        now: Instant.fromDate(input.createdAt),
+      }
     );
+
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+
+    return result.value;
   }
 }

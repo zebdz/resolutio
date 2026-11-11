@@ -1,3 +1,4 @@
+import { UserId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, vi } from 'vitest';
 import { PrismaOtpRepository } from '../PrismaOtpRepository';
 import type { PrismaClient } from '@/generated/prisma/client';
@@ -10,7 +11,7 @@ describe('PrismaOtpRepository deleteAllForUser', () => {
     } as unknown as PrismaClient;
 
     const deleted = await new PrismaOtpRepository(prisma).deleteAllForUser(
-      'user-1'
+      UserId.parse('user-1')
     );
 
     expect(deleted).toBe(3);

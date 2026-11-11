@@ -1,39 +1,37 @@
+/** Resolves one invitation into a typed projection through read ports.
+ * Missing related names stay explicit; browser fallbacks are applied separately. */
+import { InvitationId } from '@/domain/shared/EntityIds';
+import { BoardName } from '@/domain/board/BoardName';
+import { InviteDetails, invitationDetails } from './InviteDetails';
+export type { InviteDetails } from './InviteDetails';
 import { InvitationRepository } from '../../domain/invitation/InvitationRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { User } from '../../domain/user/User';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { InvitationErrors } from './InvitationErrors';
-import {
-  InvitationType,
-  InvitationStatus,
-} from '../../domain/invitation/Invitation';
-
-export interface InviteDetails {
-  id: string;
-  type: InvitationType;
-  status: InvitationStatus;
-  organizationName: string;
-  organizationId: string;
-  boardName: string | null;
-  boardId: string | null;
-  inviterName: string;
-  inviteeId: string;
-  createdAt: Date;
-}
+import { InvitationErrors, InvitationUseCaseFailure } from './InvitationErrors';
 
 export interface GetInviteDetailsDependencies {
-  invitationRepository: InvitationRepository;
-  organizationRepository: OrganizationRepository;
-  boardRepository: BoardRepository;
-  userRepository: UserRepository;
+  invitationRepository: Pick<InvitationRepository, 'findById'>;
+  organizationRepository: Pick<OrganizationRepository, 'findById'>;
+  boardRepository: Pick<BoardRepository, 'findById'>;
+  userRepository: Pick<UserRepository, 'findById'>;
 }
 
 export class GetInviteDetailsUseCase {
   constructor(private deps: GetInviteDetailsDependencies) {}
 
-  async execute(invitationId: string): Promise<Result<InviteDetails, string>> {
+  async execute(
+    rawInvitationId: string
+  ): Promise<Result<InviteDetails, InvitationUseCaseFailure>> {
+    const parsed = InvitationId.safeParse(rawInvitationId);
+
+    if (!parsed.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const invitationId = parsed.data;
     const invitation =
       await this.deps.invitationRepository.findById(invitationId);
 
@@ -46,7 +44,7 @@ export class GetInviteDetailsUseCase {
       this.deps.userRepository.findById(invitation.inviterId),
     ]);
 
-    let boardName: string | null = null;
+    let boardName: BoardName | null = null;
 
     if (invitation.boardId) {
       const board = await this.deps.boardRepository.findById(
@@ -61,19 +59,14 @@ export class GetInviteDetailsUseCase {
           inviter.lastName,
           inviter.middleName
         )
-      : '';
+      : null;
 
-    return success({
-      id: invitation.id,
-      type: invitation.type,
-      status: invitation.status,
-      organizationName: organization?.name || '',
-      organizationId: invitation.organizationId,
-      boardName,
-      boardId: invitation.boardId,
-      inviterName,
-      inviteeId: invitation.inviteeId,
-      createdAt: invitation.createdAt,
-    });
+    return success(
+      invitationDetails(invitation, {
+        organization: organization?.name ?? null,
+        board: boardName,
+        inviter: inviterName,
+      })
+    );
   }
 }

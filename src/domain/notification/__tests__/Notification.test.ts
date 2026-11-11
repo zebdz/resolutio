@@ -1,136 +1,71 @@
+/** Notification clients observe immutable payloads, explicit creation and stable read time. */
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
 import { describe, it, expect } from 'vitest';
 import { Notification } from '../Notification';
+import { NotificationId, UserId } from '../../shared/EntityIds';
+import { Instant } from '../../shared/Instant';
+import { testCreation } from '../../shared/__tests__/creation';
+import { notificationTestContent } from '@/application/notification/__tests__/notificationTestValues';
+
+function notification(readAt: Date | null = null) {
+  return expectSuccess(
+    Notification.restore({
+      id: 'notif-1',
+      userId: 'user-1',
+      ...notificationTestContent,
+      createdAt: new Date('2026-01-01'),
+      readAt,
+    })
+  );
+}
 
 describe('Notification', () => {
-  describe('create', () => {
-    it('should create a notification', () => {
-      const result = Notification.create({
-        userId: 'user-1',
-        type: 'org_joined_parent',
-        title: 'notification.orgJoinedParent.title',
-        body: 'notification.orgJoinedParent.body',
-        data: { childOrgName: 'Child Org', parentOrgName: 'Parent Org' },
-      });
+  it('creates unread at the supplied instant', () => {
+    const creation = testCreation(NotificationId, 'notif-1');
+    const result = Notification.create(
+      { userId: UserId.parse('user-1'), ...notificationTestContent },
+      creation
+    );
+    expect(result.success).toBe(true);
 
-      expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error(result.error);
+    }
 
-      if (result.success) {
-        expect(result.value.userId).toBe('user-1');
-        expect(result.value.type).toBe('org_joined_parent');
-        expect(result.value.title).toBe('notification.orgJoinedParent.title');
-        expect(result.value.body).toBe('notification.orgJoinedParent.body');
-        expect(result.value.data).toEqual({
-          childOrgName: 'Child Org',
-          parentOrgName: 'Parent Org',
-        });
-        expect(result.value.readAt).toBeNull();
-        expect(result.value.createdAt).toBeInstanceOf(Date);
-      }
-    });
-
-    it('should create without data', () => {
-      const result = Notification.create({
-        userId: 'user-1',
-        type: 'test',
-        title: 'title',
-        body: 'body',
-      });
-
-      expect(result.success).toBe(true);
-
-      if (result.success) {
-        expect(result.value.data).toBeNull();
-      }
+    expect(result.value.toJSON()).toEqual({
+      id: 'notif-1',
+      userId: 'user-1',
+      ...notificationTestContent,
+      readAt: null,
+      createdAt: new Date(creation.now),
     });
   });
-
-  describe('reconstitute', () => {
-    it('should reconstitute from props', () => {
-      const now = new Date();
-      const notification = Notification.reconstitute({
-        id: 'notif-1',
-        userId: 'user-1',
-        type: 'org_joined_parent',
-        title: 'title',
-        body: 'body',
-        data: { key: 'value' },
-        readAt: now,
-        createdAt: now,
-      });
-
-      expect(notification.id).toBe('notif-1');
-      expect(notification.readAt).toBe(now);
+  it('requires the content appropriate to its kind', () => {
+    const data = notification().toJSON();
+    expect(Notification.restore({ ...data, data: null })).toEqual({
+      success: false,
+      error: 'domain.notification.invalidData',
     });
   });
-
-  describe('markAsRead', () => {
-    it('should mark notification as read', () => {
-      const notification = Notification.reconstitute({
-        id: 'notif-1',
-        userId: 'user-1',
-        type: 'test',
-        title: 'title',
-        body: 'body',
-        data: null,
-        readAt: null,
-        createdAt: new Date(),
-      });
-
-      expect(notification.readAt).toBeNull();
-
-      notification.markAsRead();
-
-      expect(notification.readAt).toBeInstanceOf(Date);
-    });
-
-    it('should not change readAt if already read', () => {
-      const readAt = new Date('2024-01-01');
-      const notification = Notification.reconstitute({
-        id: 'notif-1',
-        userId: 'user-1',
-        type: 'test',
-        title: 'title',
-        body: 'body',
-        data: null,
-        readAt,
-        createdAt: new Date(),
-      });
-
-      notification.markAsRead();
-
-      expect(notification.readAt).toBe(readAt);
-    });
+  it('rehydrates without sharing mutable date or payload references', () => {
+    const readAt = new Date('2026-01-02');
+    const item = notification(readAt);
+    readAt.setFullYear(2000);
+    item.toJSON().createdAt.setFullYear(2000);
+    expect(item.readAt).toEqual(new Date('2026-01-02'));
+    expect(item.createdAt).toEqual(new Date('2026-01-01'));
+    expect(Object.isFrozen(item.data)).toBe(true);
   });
-
-  describe('isRead', () => {
-    it('should return false for unread', () => {
-      const notification = Notification.reconstitute({
-        id: 'notif-1',
-        userId: 'user-1',
-        type: 'test',
-        title: 'title',
-        body: 'body',
-        data: null,
-        readAt: null,
-        createdAt: new Date(),
-      });
-
-      expect(notification.isRead()).toBe(false);
-    });
-
-    it('should return true for read', () => {
-      const notification = Notification.reconstitute({
-        id: 'notif-1',
-        userId: 'user-1',
-        type: 'test',
-        title: 'title',
-        body: 'body',
-        data: null,
-        readAt: new Date(),
-        createdAt: new Date(),
-      });
-
-      expect(notification.isRead()).toBe(true);
-    });
+  it('marks an unread notification at the supplied instant', () => {
+    const item = notification();
+    expect(item.isRead()).toBe(false);
+    item.markAsRead(Instant.parse('2026-01-02T00:00:00.000Z'));
+    expect(item.isRead()).toBe(true);
+    expect(item.readAt).toEqual(new Date('2026-01-02'));
+  });
+  it('retains the original read time when read again', () => {
+    const item = notification(new Date('2026-01-02'));
+    item.markAsRead(Instant.parse('2026-01-03T00:00:00.000Z'));
+    expect(item.readAt).toEqual(new Date('2026-01-02'));
   });
 });

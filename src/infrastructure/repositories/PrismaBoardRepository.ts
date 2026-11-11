@@ -1,6 +1,13 @@
+/** Maps validated board aggregates and typed identity projections to Prisma.
+ * Persistence retains IDs assigned before creation and decodes all returned values. */
 import { PrismaClient } from '@/generated/prisma/client';
 import { Board } from '../../domain/board/Board';
-import { BoardRepository } from '../../domain/board/BoardRepository';
+import { BoardName } from '../../domain/board/BoardName';
+import { BoardId, OrganizationId, UserId } from '../../domain/shared/EntityIds';
+import {
+  BoardRepository,
+  BoardSummary,
+} from '../../domain/board/BoardRepository';
 
 export class PrismaBoardRepository implements BoardRepository {
   constructor(private prisma: PrismaClient) {}
@@ -10,6 +17,7 @@ export class PrismaBoardRepository implements BoardRepository {
 
     const created = await this.prisma.board.create({
       data: {
+        id: data.id,
         name: data.name,
         organizationId: data.organizationId,
         createdAt: data.createdAt,
@@ -26,7 +34,7 @@ export class PrismaBoardRepository implements BoardRepository {
     });
   }
 
-  async findById(id: string): Promise<Board | null> {
+  async findById(id: BoardId): Promise<Board | null> {
     const board = await this.prisma.board.findUnique({
       where: { id },
     });
@@ -44,7 +52,7 @@ export class PrismaBoardRepository implements BoardRepository {
     });
   }
 
-  async findByOrganizationId(organizationId: string): Promise<Board[]> {
+  async findByOrganizationId(organizationId: OrganizationId): Promise<Board[]> {
     const boards = await this.prisma.board.findMany({
       where: { organizationId },
     });
@@ -60,8 +68,8 @@ export class PrismaBoardRepository implements BoardRepository {
     );
   }
 
-  async findBoardMembers(boardId: string): Promise<{ userId: string }[]> {
-    return await this.prisma.boardUser.findMany({
+  async findBoardMembers(boardId: BoardId): Promise<{ userId: UserId }[]> {
+    const members = await this.prisma.boardUser.findMany({
       where: {
         boardId,
         removedAt: null,
@@ -70,9 +78,11 @@ export class PrismaBoardRepository implements BoardRepository {
         userId: true,
       },
     });
+
+    return members.map((member) => ({ userId: UserId.parse(member.userId) }));
   }
 
-  async isUserMember(userId: string, boardId: string): Promise<boolean> {
+  async isUserMember(userId: UserId, boardId: BoardId): Promise<boolean> {
     const membership = await this.prisma.boardUser.findUnique({
       where: {
         boardId_userId: {
@@ -87,9 +97,9 @@ export class PrismaBoardRepository implements BoardRepository {
   }
 
   async addUserToBoard(
-    userId: string,
-    boardId: string,
-    addedBy?: string
+    userId: UserId,
+    boardId: BoardId,
+    addedBy?: UserId
   ): Promise<void> {
     // Check if user was previously a member (and removed)
     const existingMembership = await this.prisma.boardUser.findUnique({
@@ -135,9 +145,9 @@ export class PrismaBoardRepository implements BoardRepository {
   }
 
   async removeUserFromBoard(
-    userId: string,
-    boardId: string,
-    removedBy?: string,
+    userId: UserId,
+    boardId: BoardId,
+    removedBy?: UserId,
     removedReason?: string
   ): Promise<void> {
     await this.prisma.boardUser.update({
@@ -155,9 +165,7 @@ export class PrismaBoardRepository implements BoardRepository {
     });
   }
 
-  async findActiveBoardsByUserId(
-    userId: string
-  ): Promise<Array<{ id: string; name: string; organizationId: string }>> {
+  async findActiveBoardsByUserId(userId: UserId): Promise<BoardSummary[]> {
     const boards = await this.prisma.board.findMany({
       where: {
         archivedAt: null,
@@ -176,7 +184,11 @@ export class PrismaBoardRepository implements BoardRepository {
       orderBy: { name: 'asc' },
     });
 
-    return boards;
+    return boards.map((board) => ({
+      id: BoardId.parse(board.id),
+      name: BoardName.parse(board.name),
+      organizationId: OrganizationId.parse(board.organizationId),
+    }));
   }
 
   async update(board: Board): Promise<Board> {

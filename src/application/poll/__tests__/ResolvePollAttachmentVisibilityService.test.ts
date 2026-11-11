@@ -1,3 +1,12 @@
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { OrganizationId, BoardId } from '@/domain/shared/EntityIds';
+import { UserId } from '@/domain/shared/EntityIds';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { PollId, QuestionId, AnswerId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, vi } from 'vitest';
 import { ResolvePollAttachmentVisibilityService } from '../ResolvePollAttachmentVisibilityService';
 import { Poll } from '../../../domain/poll/Poll';
@@ -9,13 +18,25 @@ const CREATOR = 'creator-1';
 const ORG = 'org-1';
 
 function questionWithAnswer(pollId: string): Question {
-  const q = Question.create('Q?', pollId, 1, 0, 'single-choice');
+  const q = Question.create(
+    QuestionText.parse('Q?'),
+    PollId.parse(pollId),
+    testCreation(QuestionId, 'question-1'),
+    PageNumber.parse(1),
+    SortOrder.parse(0),
+    'single-choice'
+  );
 
   if (!q.success) {
     throw new Error('fixture question failed: ' + q.error);
   }
 
-  const a = Answer.create('A', 1, q.value.id);
+  const a = Answer.create(
+    AnswerText.parse('A'),
+    SortOrder.parse(1),
+    q.value.id,
+    testCreation(AnswerId, 'answer-1')
+  );
 
   if (!a.success) {
     throw new Error('fixture answer failed: ' + a.error);
@@ -28,20 +49,22 @@ function questionWithAnswer(pollId: string): Question {
 
 function buildPoll(
   overrides: {
-    pollType?: string;
+    pollType?: PollType;
     boardId?: string | null;
     state?: 'DRAFT' | 'ACTIVE';
     archived?: boolean;
   } = {}
 ): Poll {
   const r = Poll.create(
-    'Fence dispute',
-    'The fence was moved.',
-    ORG,
-    overrides.boardId ?? null,
-    CREATOR,
-    new Date('2030-01-01'),
-    new Date('2030-02-01'),
+    PollTitle.parse('Fence dispute'),
+    PollDescription.parse('The fence was moved.'),
+    OrganizationId.parse(ORG),
+    overrides.boardId == null ? null : BoardId.parse(overrides.boardId),
+    UserId.parse(CREATOR),
+    expectSuccess(
+      PollPeriod.create(new Date('2030-01-01'), new Date('2030-02-01'))
+    ),
+    testCreation(PollId, 'poll-1'),
     undefined,
     overrides.pollType ?? PollType.ORGANIZATION
   );
@@ -62,7 +85,7 @@ function buildPoll(
   }
 
   if (overrides.archived) {
-    poll.archive();
+    poll.archive(testCreation(PollId, 'poll-1').now);
   }
 
   return poll;
@@ -127,31 +150,39 @@ describe('ResolvePollAttachmentVisibilityService', () => {
     it('denies a non-member', async () => {
       const { svc } = buildService({ isMember: false });
 
-      expect(await svc.canRead(buildPoll(), 'stranger')).toBe(false);
+      expect(await svc.canRead(buildPoll(), UserId.parse('stranger'))).toBe(
+        false
+      );
     });
 
     it('allows an org member', async () => {
       const { svc } = buildService({ isMember: true });
 
-      expect(await svc.canRead(buildPoll(), 'member-1')).toBe(true);
+      expect(await svc.canRead(buildPoll(), UserId.parse('member-1'))).toBe(
+        true
+      );
     });
 
     it('allows the poll creator', async () => {
       const { svc } = buildService({});
 
-      expect(await svc.canRead(buildPoll(), CREATOR)).toBe(true);
+      expect(await svc.canRead(buildPoll(), UserId.parse(CREATOR))).toBe(true);
     });
 
     it('allows a superadmin', async () => {
       const { svc } = buildService({ isSuper: true });
 
-      expect(await svc.canRead(buildPoll(), 'someone')).toBe(true);
+      expect(await svc.canRead(buildPoll(), UserId.parse('someone'))).toBe(
+        true
+      );
     });
 
     it('allows an org admin', async () => {
       const { svc } = buildService({ isAdmin: true });
 
-      expect(await svc.canRead(buildPoll(), 'admin-1')).toBe(true);
+      expect(await svc.canRead(buildPoll(), UserId.parse('admin-1'))).toBe(
+        true
+      );
     });
   });
 
@@ -160,14 +191,14 @@ describe('ResolvePollAttachmentVisibilityService', () => {
       const { svc } = buildService({ isMember: true, isBoardMember: false });
       const poll = buildPoll({ boardId: 'board-1' });
 
-      expect(await svc.canRead(poll, 'member-1')).toBe(false);
+      expect(await svc.canRead(poll, UserId.parse('member-1'))).toBe(false);
     });
 
     it('allows a board member', async () => {
       const { svc } = buildService({ isMember: true, isBoardMember: true });
       const poll = buildPoll({ boardId: 'board-1' });
 
-      expect(await svc.canRead(poll, 'member-1')).toBe(true);
+      expect(await svc.canRead(poll, UserId.parse('member-1'))).toBe(true);
     });
   });
 
@@ -179,35 +210,35 @@ describe('ResolvePollAttachmentVisibilityService', () => {
       const { svc } = buildService({ isMember: true });
       const poll = buildPoll({ state: 'DRAFT' });
 
-      expect(await svc.canRead(poll, 'member-1')).toBe(false);
+      expect(await svc.canRead(poll, UserId.parse('member-1'))).toBe(false);
     });
 
     it('still allows the creator on a draft poll', async () => {
       const { svc } = buildService({});
       const poll = buildPoll({ state: 'DRAFT' });
 
-      expect(await svc.canRead(poll, CREATOR)).toBe(true);
+      expect(await svc.canRead(poll, UserId.parse(CREATOR))).toBe(true);
     });
 
     it('still allows an org admin on a draft poll', async () => {
       const { svc } = buildService({ isAdmin: true });
       const poll = buildPoll({ state: 'DRAFT' });
 
-      expect(await svc.canRead(poll, 'admin-1')).toBe(true);
+      expect(await svc.canRead(poll, UserId.parse('admin-1'))).toBe(true);
     });
 
     it('denies a plain org member on an archived poll', async () => {
       const { svc } = buildService({ isMember: true });
       const poll = buildPoll({ archived: true });
 
-      expect(await svc.canRead(poll, 'member-1')).toBe(false);
+      expect(await svc.canRead(poll, UserId.parse('member-1'))).toBe(false);
     });
 
     it('still allows a superadmin on an archived poll', async () => {
       const { svc } = buildService({ isSuper: true });
       const poll = buildPoll({ archived: true });
 
-      expect(await svc.canRead(poll, 'someone')).toBe(true);
+      expect(await svc.canRead(poll, UserId.parse('someone'))).toBe(true);
     });
   });
 });

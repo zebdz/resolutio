@@ -1,3 +1,20 @@
+/** Membership decision clients exercise authorization and pending-only transitions.
+ * Typed persistence retains decision actors/times and coordinates hierarchy changes. */
+import { success } from '@/domain/shared/Result';
+import { PrismaMembershipStore } from '@/infrastructure/repositories/PrismaMembershipStore';
+import { MemberCount } from '@/domain/organization/OrganizationValues';
+import { ResultCount } from '@/domain/shared/Pagination';
+import {
+  notificationIds,
+  notificationClock,
+} from '@/application/shared/__tests__/notificationCreation';
+import { UserId } from '../../../domain/shared/EntityIds';
+import { OrganizationName } from '../../../domain/organization/OrganizationValues';
+import { OrganizationId } from '../../../domain/shared/EntityIds';
+import {
+  createOrganization,
+  organizationCreationInputs,
+} from '../../../domain/organization/__tests__/organizationTestValues';
 import { PrismaClient } from '@/generated/prisma/client';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { HandleJoinRequestUseCase } from '../HandleJoinRequestUseCase';
@@ -26,36 +43,46 @@ class MockOrganizationRepository implements OrganizationRepository {
   private memberships: Map<string, Set<string>> = new Map(); // userId -> Set<orgId>
   private removedMemberships: Array<{ userId: string; orgId: string }> = [];
 
-  async save(org: Organization): Promise<Organization> {
+  async save(org: Organization): ReturnType<OrganizationRepository['save']> {
     return org;
   }
-  async findById(id: string): Promise<Organization | null> {
+  async findById(id: string): ReturnType<OrganizationRepository['findById']> {
     return this.organizations.get(id) || null;
   }
-  async findByName(_name: string): Promise<Organization | null> {
+  async findByName(
+    _name: string
+  ): ReturnType<OrganizationRepository['findByName']> {
     return null;
   }
-  async findByCreatorId(_creatorId: string): Promise<Organization[]> {
+  async findByCreatorId(
+    _creatorId: string
+  ): ReturnType<OrganizationRepository['findByCreatorId']> {
     return [];
   }
-  async findByParentId(parentId: string): Promise<Organization[]> {
+  async findByParentId(
+    parentId: string
+  ): ReturnType<OrganizationRepository['findByParentId']> {
     return Array.from(this.organizations.values()).filter(
       (org) => org.parentId === parentId
     );
   }
-  async getAncestorIds(organizationId: string): Promise<string[]> {
+  async getAncestorIds(
+    organizationId: string
+  ): ReturnType<OrganizationRepository['getAncestorIds']> {
     const org = await this.findById(organizationId);
 
     if (!org || !org.parentId) {
-      return [];
+      return OrganizationId.array().parse([]);
     }
 
     const ancestors: string[] = [org.parentId];
     const parentAncestors = await this.getAncestorIds(org.parentId);
 
-    return [...ancestors, ...parentAncestors];
+    return OrganizationId.array().parse([...ancestors, ...parentAncestors]);
   }
-  async getDescendantIds(organizationId: string): Promise<string[]> {
+  async getDescendantIds(
+    organizationId: string
+  ): ReturnType<OrganizationRepository['getDescendantIds']> {
     const children = await this.findByParentId(organizationId);
     const descendants: string[] = children.map((c) => c.id);
 
@@ -64,9 +91,11 @@ class MockOrganizationRepository implements OrganizationRepository {
       descendants.push(...childDescendants);
     }
 
-    return descendants;
+    return OrganizationId.array().parse(descendants);
   }
-  async getFullTreeOrgIds(organizationId: string): Promise<string[]> {
+  async getFullTreeOrgIds(
+    organizationId: string
+  ): ReturnType<OrganizationRepository['getFullTreeOrgIds']> {
     const ancestorIds = await this.getAncestorIds(organizationId);
     const rootId =
       ancestorIds.length > 0
@@ -74,9 +103,14 @@ class MockOrganizationRepository implements OrganizationRepository {
         : organizationId;
     const allDescendants = await this.getDescendantIds(rootId);
 
-    return [rootId, ...allDescendants].filter((id) => id !== organizationId);
+    return OrganizationId.array().parse(
+      [rootId, ...allDescendants].filter((id) => id !== organizationId)
+    );
   }
-  async isUserMember(userId: string, organizationId: string): Promise<boolean> {
+  async isUserMember(
+    userId: string,
+    organizationId: string
+  ): ReturnType<OrganizationRepository['isUserMember']> {
     const userOrgs = this.memberships.get(userId);
 
     return userOrgs ? userOrgs.has(organizationId) : false;
@@ -84,10 +118,12 @@ class MockOrganizationRepository implements OrganizationRepository {
   async isUserAdmin(
     _userId: string,
     _organizationId: string
-  ): Promise<boolean> {
+  ): ReturnType<OrganizationRepository['isUserAdmin']> {
     return false;
   }
-  async findMembershipsByUserId(userId: string): Promise<Organization[]> {
+  async findMembershipsByUserId(
+    userId: string
+  ): ReturnType<OrganizationRepository['findMembershipsByUserId']> {
     const userOrgIds = this.memberships.get(userId) || new Set();
     const orgs: Organization[] = [];
 
@@ -103,35 +139,30 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
   async findAdminOrganizationsByUserId(
     _userId: string
-  ): Promise<Organization[]> {
+  ): ReturnType<OrganizationRepository['findAdminOrganizationsByUserId']> {
     return [];
   }
-  async findAllWithStats(): Promise<
-    Array<{
-      organization: Organization;
-      memberCount: number;
-      firstAdmin: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        middleName: string | null;
-      } | null;
-    }>
+  async findAllWithStats(): ReturnType<
+    OrganizationRepository['findAllWithStats']
   > {
     return [];
   }
-  async update(org: Organization): Promise<Organization> {
+  async update(
+    org: Organization
+  ): ReturnType<OrganizationRepository['update']> {
     return org;
   }
   async findAcceptedMemberUserIdsIncludingDescendants(
     _orgId: string
-  ): Promise<string[]> {
-    return [];
+  ): ReturnType<
+    OrganizationRepository['findAcceptedMemberUserIdsIncludingDescendants']
+  > {
+    return UserId.array().parse([]);
   }
   async removeUserFromOrganization(
     userId: string,
     organizationId: string
-  ): Promise<void> {
+  ): ReturnType<OrganizationRepository['removeUserFromOrganization']> {
     this.removedMemberships.push({ userId, orgId: organizationId });
     const userOrgs = this.memberships.get(userId);
 
@@ -139,7 +170,9 @@ class MockOrganizationRepository implements OrganizationRepository {
       userOrgs.delete(organizationId);
     }
   }
-  async findPendingRequestsByUserId(_userId: string): Promise<Organization[]> {
+  async findPendingRequestsByUserId(
+    _userId: string
+  ): ReturnType<OrganizationRepository['findPendingRequestsByUserId']> {
     return [];
   }
 
@@ -160,47 +193,54 @@ class MockOrganizationRepository implements OrganizationRepository {
     return this.removedMemberships;
   }
 
-  async getAncestors(): Promise<
-    { id: string; name: string; memberCount: number }[]
+  async getAncestors(): ReturnType<OrganizationRepository['getAncestors']> {
+    return [];
+  }
+
+  async getChildrenWithStats(): ReturnType<
+    OrganizationRepository['getChildrenWithStats']
   > {
     return [];
   }
 
-  async getChildrenWithStats(): Promise<
-    { id: string; name: string; memberCount: number }[]
+  async getHierarchyTree(): ReturnType<
+    OrganizationRepository['getHierarchyTree']
   > {
-    return [];
-  }
-
-  async getHierarchyTree(): Promise<{
-    ancestors: { id: string; name: string; memberCount: number }[];
-    tree: { id: string; name: string; memberCount: number; children: any[] };
-  }> {
     return {
       ancestors: [],
-      tree: { id: '', name: '', memberCount: 0, children: [] },
+      tree: {
+        id: OrganizationId.parse('org-fixture'),
+        name: OrganizationName.parse('Fixture organization'),
+        memberCount: MemberCount.parse(0),
+        children: [],
+      },
     };
   }
-  async searchOrganizationsWithStats(): Promise<{
-    organizations: any[];
-    totalCount: number;
-  }> {
-    return { organizations: [], totalCount: 0 };
+  async searchOrganizationsWithStats(): ReturnType<
+    OrganizationRepository['searchOrganizationsWithStats']
+  > {
+    return { organizations: [], totalCount: ResultCount.parse(0) };
   }
   async setParentId(
     organizationId: string,
     parentId: string | null
-  ): Promise<void> {}
-  async findAdminUserIds(): Promise<string[]> {
-    return [];
+  ): ReturnType<OrganizationRepository['setParentId']> {}
+  async findAdminUserIds(): ReturnType<
+    OrganizationRepository['findAdminUserIds']
+  > {
+    return UserId.array().parse([]);
   }
 
-  async addAdmin(): Promise<void> {}
-  async removeAdmin(): Promise<void> {}
-  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+  async addAdmin(): ReturnType<OrganizationRepository['addAdmin']> {}
+  async removeAdmin(): ReturnType<OrganizationRepository['removeAdmin']> {}
+  async searchByNameFuzzy(): ReturnType<
+    OrganizationRepository['searchByNameFuzzy']
+  > {
     return [];
   }
-  async getRootAllowMultiTreeMembership(orgId: string): Promise<boolean> {
+  async getRootAllowMultiTreeMembership(
+    orgId: string
+  ): ReturnType<OrganizationRepository['getRootAllowMultiTreeMembership']> {
     const org = this.organizations.get(orgId);
 
     if (!org) {
@@ -215,13 +255,41 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
   async findUsersWithMultipleMembershipsInOrgs(
     _orgIds: string[]
-  ): Promise<string[]> {
-    return [];
+  ): ReturnType<
+    OrganizationRepository['findUsersWithMultipleMembershipsInOrgs']
+  > {
+    return UserId.array().parse([]);
   }
   async setAllowMultiTreeMembership(
     _organizationId: string,
     _value: boolean | null
-  ): Promise<void> {}
+  ): ReturnType<OrganizationRepository['setAllowMultiTreeMembership']> {}
+
+  async isUserExactMember(
+    ..._args: Parameters<OrganizationRepository['isUserExactMember']>
+  ): ReturnType<OrganizationRepository['isUserExactMember']> {
+    throw new Error('Unexpected isUserExactMember in this test');
+  }
+
+  async getAdminUserIds(
+    ..._args: Parameters<OrganizationRepository['getAdminUserIds']>
+  ): ReturnType<OrganizationRepository['getAdminUserIds']> {
+    throw new Error('Unexpected getAdminUserIds in this test');
+  }
+
+  async findAcceptedMemberUserIdsForOrgs(
+    ..._args: Parameters<
+      OrganizationRepository['findAcceptedMemberUserIdsForOrgs']
+    >
+  ): ReturnType<OrganizationRepository['findAcceptedMemberUserIdsForOrgs']> {
+    throw new Error('Unexpected findAcceptedMemberUserIdsForOrgs in this test');
+  }
+
+  async removeMemberFromOrganization(
+    ..._args: Parameters<OrganizationRepository['removeMemberFromOrganization']>
+  ): ReturnType<OrganizationRepository['removeMemberFromOrganization']> {
+    throw new Error('Unexpected removeMemberFromOrganization in this test');
+  }
 }
 
 // Mock UserRepository
@@ -259,31 +327,19 @@ class MockUserRepository {
 class MockNotificationRepository implements NotificationRepository {
   private saved: Notification[] = [];
 
-  async save(notification: Notification): Promise<Notification> {
+  async save(
+    notification: Notification
+  ): ReturnType<NotificationRepository['save']> {
     this.saved.push(notification);
 
-    return notification;
+    return success(notification);
   }
-  async saveBatch(notifications: Notification[]): Promise<void> {
+  async saveBatch(
+    notifications: Notification[]
+  ): ReturnType<NotificationRepository['saveBatch']> {
     this.saved.push(...notifications);
-  }
-  async findById(): Promise<Notification | null> {
-    return null;
-  }
-  async findByUserId(): Promise<Notification[]> {
-    return [];
-  }
-  async getUnreadCount(): Promise<number> {
-    return 0;
-  }
-  async markAsRead(): Promise<void> {}
-  async markAllAsRead(): Promise<void> {}
-  async findByIds(): Promise<Notification[]> {
-    return [];
-  }
-  async deleteByIds(): Promise<void> {}
-  async getCountByUserId(): Promise<number> {
-    return 0;
+
+    return success(undefined);
   }
 
   getSaved() {
@@ -307,6 +363,8 @@ describe('HandleJoinRequestUseCase', () => {
     userRepository = new MockUserRepository();
     requests = new Map();
     adminRoles = new Map();
+    organizationRepository.isUserAdmin = async (userId, organizationId) =>
+      adminRoles.get(organizationId)?.has(userId) ?? false;
 
     // Override mock implementations
     prisma.organizationUser.findUnique = async (args: any) => {
@@ -343,7 +401,8 @@ describe('HandleJoinRequestUseCase', () => {
     };
 
     useCase = new HandleJoinRequestUseCase({
-      prisma: prisma as unknown as PrismaClient,
+      ...organizationCreationInputs,
+      memberships: new PrismaMembershipStore(prisma as unknown as PrismaClient),
       organizationRepository,
       notificationRepository,
       userRepository: userRepository as unknown as UserRepository,
@@ -598,7 +657,7 @@ describe('HandleJoinRequestUseCase', () => {
     const adminId = 'admin-789';
 
     // Set up organizations in hierarchy
-    const parentResult = Organization.create(
+    const parentResult = createOrganization(
       'Parent Org',
       'Parent desc',
       'creator-1'
@@ -609,11 +668,13 @@ describe('HandleJoinRequestUseCase', () => {
       return;
     }
 
-    const parentOrg = parentResult.value;
-    (parentOrg as any).props.id = parentOrgId;
+    const parentOrg = Organization.reconstitute({
+      ...parentResult.value.toJSON(),
+      id: parentOrgId,
+    });
     organizationRepository.addOrganization(parentOrg);
 
-    const childResult = Organization.create(
+    const childResult = createOrganization(
       'Child Org',
       'Child desc',
       'creator-1',
@@ -625,8 +686,10 @@ describe('HandleJoinRequestUseCase', () => {
       return;
     }
 
-    const childOrg = childResult.value;
-    (childOrg as any).props.id = childOrgId;
+    const childOrg = Organization.reconstitute({
+      ...childResult.value.toJSON(),
+      id: childOrgId,
+    });
     organizationRepository.addOrganization(childOrg);
 
     // User is accepted member of parent org
@@ -671,7 +734,7 @@ describe('HandleJoinRequestUseCase', () => {
     const adminId = 'admin-789';
 
     // Set up organizations in hierarchy
-    const parentResult = Organization.create(
+    const parentResult = createOrganization(
       'Parent Org',
       'Parent desc',
       'creator-1'
@@ -682,11 +745,13 @@ describe('HandleJoinRequestUseCase', () => {
       return;
     }
 
-    const parentOrg = parentResult.value;
-    (parentOrg as any).props.id = parentOrgId;
+    const parentOrg = Organization.reconstitute({
+      ...parentResult.value.toJSON(),
+      id: parentOrgId,
+    });
     organizationRepository.addOrganization(parentOrg);
 
-    const childResult = Organization.create(
+    const childResult = createOrganization(
       'Child Org',
       'Child desc',
       'creator-1',
@@ -698,8 +763,10 @@ describe('HandleJoinRequestUseCase', () => {
       return;
     }
 
-    const childOrg = childResult.value;
-    (childOrg as any).props.id = childOrgId;
+    const childOrg = Organization.reconstitute({
+      ...childResult.value.toJSON(),
+      id: childOrgId,
+    });
     organizationRepository.addOrganization(childOrg);
 
     // User is accepted member of child org
@@ -745,7 +812,7 @@ describe('HandleJoinRequestUseCase', () => {
     const adminId = 'admin-789';
 
     // Set up parent
-    const parentResult = Organization.create(
+    const parentResult = createOrganization(
       'Parent Org',
       'Parent desc',
       'creator-1'
@@ -756,12 +823,14 @@ describe('HandleJoinRequestUseCase', () => {
       return;
     }
 
-    const parentOrg = parentResult.value;
-    (parentOrg as any).props.id = parentOrgId;
+    const parentOrg = Organization.reconstitute({
+      ...parentResult.value.toJSON(),
+      id: parentOrgId,
+    });
     organizationRepository.addOrganization(parentOrg);
 
     // Set up sibling A
-    const siblingAResult = Organization.create(
+    const siblingAResult = createOrganization(
       'Sibling A',
       'Sibling A desc',
       'creator-1',
@@ -773,12 +842,14 @@ describe('HandleJoinRequestUseCase', () => {
       return;
     }
 
-    const siblingA = siblingAResult.value;
-    (siblingA as any).props.id = siblingAId;
+    const siblingA = Organization.reconstitute({
+      ...siblingAResult.value.toJSON(),
+      id: siblingAId,
+    });
     organizationRepository.addOrganization(siblingA);
 
     // Set up sibling B
-    const siblingBResult = Organization.create(
+    const siblingBResult = createOrganization(
       'Sibling B',
       'Sibling B desc',
       'creator-1',
@@ -790,8 +861,10 @@ describe('HandleJoinRequestUseCase', () => {
       return;
     }
 
-    const siblingB = siblingBResult.value;
-    (siblingB as any).props.id = siblingBId;
+    const siblingB = Organization.reconstitute({
+      ...siblingBResult.value.toJSON(),
+      id: siblingBId,
+    });
     organizationRepository.addOrganization(siblingB);
 
     // User is accepted member of sibling A

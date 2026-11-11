@@ -1,71 +1,123 @@
-export type OtpChannel = 'sms' | 'email';
+/** OTP identity, attempts and verification state are validated at the boundary.
+ * Callers supply identity and time; no wall clock or randomness enters the domain. */
+import { OtpVerificationId, UserId } from '../shared/EntityIds';
+import { EntityCreation } from '../shared/EntityCreation';
+import { Instant } from '../shared/Instant';
+import { ClientIp } from '../auth/AuthValues';
+import {
+  OtpAttempts,
+  OtpAttemptLimit,
+  OtpCodeHash,
+  OtpDestination,
+  OtpChannel,
+  OtpPurpose,
+} from './OtpValues';
+export { OtpChannel, OtpPurpose, OtpPurposes } from './OtpValues';
 
-/**
- * What a code was minted for. Without this, two codes issued to the same
- * address on the same channel are indistinguishable rows, and a code sent to
- * confirm an email address could be redeemed at the password-reset endpoint.
- */
-export const OtpPurposes = {
-  PHONE_CONFIRMATION: 'phone_confirmation',
-  EMAIL_CONFIRMATION: 'email_confirmation',
-  PASSWORD_RESET: 'password_reset',
-} as const;
+type VerificationState =
+  | { readonly status: 'pending' }
+  | { readonly status: 'verified'; readonly verifiedAt: Instant };
 
-export type OtpPurpose = (typeof OtpPurposes)[keyof typeof OtpPurposes];
+export type OtpVerificationProps = Readonly<
+  OtpDestination & {
+    id: OtpVerificationId;
+    purpose: OtpPurpose;
+    code: OtpCodeHash;
+    clientIp: ClientIp;
+    attempts: OtpAttempts;
+    maxAttempts: OtpAttemptLimit;
+    expiresAt: Instant;
+    verification: VerificationState;
+    createdAt: Instant;
+    userId: UserId;
+  }
+>;
 
-export interface OtpVerificationProps {
+export type CreateOtpVerificationProps = OtpDestination & {
+  readonly purpose: OtpPurpose;
+  readonly code: OtpCodeHash;
+  readonly clientIp: ClientIp;
+  readonly expiresAt: Instant;
+  readonly maxAttempts?: OtpAttemptLimit;
+  readonly userId: UserId;
+};
+
+/** Untrusted persistence scalars are accepted only by validated reconstitution. */
+export interface RawOtpVerificationProps {
   id: string;
   identifier: string;
-  channel: OtpChannel;
-  purpose: OtpPurpose;
-  code: string; // hashed
+  channel: string;
+  purpose: string;
+  code: string;
   clientIp: string;
   attempts: number;
   maxAttempts: number;
-  expiresAt: Date;
-  verifiedAt: Date | null;
-  createdAt: Date;
+  expiresAt: string | Date;
+  verifiedAt: string | Date | null;
+  createdAt: string | Date;
   userId: string;
 }
 
-export class OtpVerification {
-  private constructor(private readonly props: OtpVerificationProps) {}
+function storedInstant(value: string | Date): Instant {
+  return value instanceof Date ? Instant.fromDate(value) : Instant.parse(value);
+}
 
-  static create(input: {
-    identifier: string;
-    channel: OtpChannel;
-    purpose: OtpPurpose;
-    code: string;
-    clientIp: string;
-    expiresAt: Date;
-    maxAttempts?: number;
-    userId: string;
-  }): OtpVerification {
-    return new OtpVerification({
-      id: '',
-      identifier: input.identifier,
-      channel: input.channel,
-      purpose: input.purpose,
-      code: input.code,
-      clientIp: input.clientIp,
+export class OtpVerification {
+  private readonly props: OtpVerificationProps;
+
+  private constructor(props: OtpVerificationProps) {
+    this.props = Object.freeze({ ...props });
+  }
+
+  static create(
+    input: CreateOtpVerificationProps,
+    creation: EntityCreation<OtpVerificationId>
+  ): OtpVerification {
+    return OtpVerification.reconstitute({
+      ...input,
+      id: creation.id,
       attempts: 0,
       maxAttempts: input.maxAttempts ?? 5,
-      expiresAt: input.expiresAt,
       verifiedAt: null,
-      createdAt: new Date(),
-      userId: input.userId,
+      createdAt: creation.now,
     });
   }
 
-  static reconstitute(props: OtpVerificationProps): OtpVerification {
-    return new OtpVerification(props);
+  static reconstitute(raw: RawOtpVerificationProps): OtpVerification {
+    const destination = OtpDestination.parse({
+      channel: raw.channel,
+      identifier: raw.identifier,
+    });
+
+    return new OtpVerification({
+      ...destination,
+      id: OtpVerificationId.parse(raw.id),
+      userId: UserId.parse(raw.userId),
+      purpose: OtpPurpose.parse(raw.purpose),
+      code: OtpCodeHash.parse(raw.code),
+      clientIp: ClientIp.parse(raw.clientIp),
+      attempts: OtpAttempts.parse(raw.attempts),
+      maxAttempts: OtpAttemptLimit.parse(raw.maxAttempts),
+      expiresAt: storedInstant(raw.expiresAt),
+      createdAt: storedInstant(raw.createdAt),
+      verification:
+        raw.verifiedAt === null
+          ? { status: 'pending' }
+          : { status: 'verified', verifiedAt: storedInstant(raw.verifiedAt) },
+    });
   }
 
-  get id(): string {
+  get id(): OtpVerificationId {
     return this.props.id;
   }
-  get identifier(): string {
+  get identifier(): OtpDestination['identifier'] {
     return this.props.identifier;
+  }
+  get destination(): OtpDestination {
+    return OtpDestination.parse({
+      channel: this.channel,
+      identifier: this.identifier,
+    });
   }
   get channel(): OtpChannel {
     return this.props.channel;
@@ -73,62 +125,63 @@ export class OtpVerification {
   get purpose(): OtpPurpose {
     return this.props.purpose;
   }
-  get code(): string {
+  get code(): OtpCodeHash {
     return this.props.code;
   }
-  get clientIp(): string {
+  get clientIp(): ClientIp {
     return this.props.clientIp;
   }
-  get attempts(): number {
+  get attempts(): OtpAttempts {
     return this.props.attempts;
   }
-  get maxAttempts(): number {
+  get maxAttempts(): OtpAttemptLimit {
     return this.props.maxAttempts;
   }
-  get expiresAt(): Date {
+  get expiresAt(): Instant {
     return this.props.expiresAt;
   }
-  get verifiedAt(): Date | null {
-    return this.props.verifiedAt;
+  get verifiedAt(): Instant | null {
+    return this.props.verification.status === 'verified'
+      ? this.props.verification.verifiedAt
+      : null;
   }
-  get createdAt(): Date {
+  get createdAt(): Instant {
     return this.props.createdAt;
   }
-  get userId(): string {
+  get userId(): UserId {
     return this.props.userId;
   }
 
-  isExpired(): boolean {
-    return new Date() > this.props.expiresAt;
+  isExpired(now: Instant): boolean {
+    // Preserve the existing exact-expiry boundary: expiry starts strictly after it.
+    return Instant.parse(now) > this.props.expiresAt;
   }
 
   isVerified(): boolean {
-    return this.props.verifiedAt !== null;
+    return this.props.verification.status === 'verified';
   }
 
-  /**
-   * Still awaiting a correct entry: not yet verified, not expired, and with
-   * attempts left. This is the code the confirm-phone page asks the user for.
-   */
-  isPending(): boolean {
-    return !this.isVerified() && !this.isExpired() && !this.hasMaxAttempts();
+  /** Still awaiting a correct entry: unverified, unexpired and with attempts left. */
+  isPending(now: Instant): boolean {
+    return !this.isVerified() && !this.isExpired(now) && !this.hasMaxAttempts();
   }
 
   hasMaxAttempts(): boolean {
+    // Existing historical rows may exceed their limit; they remain exhausted.
     return this.props.attempts >= this.props.maxAttempts;
   }
 
   incrementAttempts(): OtpVerification {
     return new OtpVerification({
       ...this.props,
-      attempts: this.props.attempts + 1,
+      attempts: OtpAttempts.parse(this.props.attempts + 1),
     });
   }
 
-  markVerified(): OtpVerification {
+  markVerified(now: Instant): OtpVerification {
     return new OtpVerification({
       ...this.props,
-      verifiedAt: new Date(),
+      verification: { status: 'verified', verifiedAt: Instant.parse(now) },
     });
   }
 }

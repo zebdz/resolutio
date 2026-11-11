@@ -1,17 +1,21 @@
-import { PrismaClient } from '@/generated/prisma/client';
+/** Authorizes organization directory access after validating external query values.
+ * The typed read port isolates storage projections and query implementation. */
+import { ResultCount } from '../../domain/shared/Pagination';
+import { OrganizationId, UserId } from '../../domain/shared/EntityIds';
+import { PageNumber, PageSize } from '../../domain/shared/Pagination';
+import {
+  OrganizationDirectory,
+  DirectoryMember,
+} from './OrganizationDirectory';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
-import { Result, success, failure } from '../../domain/shared/Result';
-import { OrganizationErrors } from './OrganizationErrors';
+import { Result, failure } from '../../domain/shared/Result';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 
-export interface OrgMember {
-  id: string;
-  firstName: string;
-  lastName: string;
-  middleName: string | null;
-  nickname: string;
-  joinedAt: Date | null;
-}
+export type OrgMember = DirectoryMember;
 
 export interface GetOrgMembersInput {
   organizationId: string;
@@ -22,9 +26,12 @@ export interface GetOrgMembersInput {
 }
 
 export interface GetOrgMembersDependencies {
-  prisma: PrismaClient;
-  organizationRepository: OrganizationRepository;
-  userRepository: UserRepository;
+  directory: Pick<OrganizationDirectory, 'members'>;
+  organizationRepository: Pick<
+    OrganizationRepository,
+    'findById' | 'isUserMember' | 'isUserAdmin'
+  >;
+  userRepository: Pick<UserRepository, 'isSuperAdmin'>;
 }
 
 export class GetOrgMembersUseCase {
@@ -32,8 +39,45 @@ export class GetOrgMembersUseCase {
 
   async execute(
     input: GetOrgMembersInput
-  ): Promise<Result<{ members: OrgMember[]; totalCount: number }, string>> {
-    const { organizationId, actorUserId, page, pageSize, query } = input;
+  ): Promise<
+    Result<
+      { members: OrgMember[]; totalCount: ResultCount },
+      OrganizationUseCaseFailure
+    >
+  > {
+    const parsedOrganizationId = OrganizationId.safeParse(input.organizationId);
+
+    if (!parsedOrganizationId.success) {
+      return failure(OrganizationErrors.NOT_FOUND);
+    }
+
+    const parsedActorUserId = UserId.safeParse(input.actorUserId);
+
+    if (!parsedActorUserId.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
+    }
+
+    const parsedPage = PageNumber.safeParse(input.page);
+
+    if (!parsedPage.success) {
+      return failure('common.errors.unexpected');
+    }
+
+    const parsedPageSize = PageSize.safeParse(input.pageSize);
+
+    if (!parsedPageSize.success) {
+      return failure('common.errors.unexpected');
+    }
+
+    const command = {
+      ...input,
+      organizationId: parsedOrganizationId.data,
+      actorUserId: parsedActorUserId.data,
+      page: parsedPage.data,
+      pageSize: parsedPageSize.data,
+    };
+
+    const { organizationId, actorUserId, page, pageSize, query } = command;
 
     // Check org exists
     const organization =
@@ -62,59 +106,11 @@ export class GetOrgMembersUseCase {
       }
     }
 
-    const skip = (page - 1) * pageSize;
-
-    const userFilter = query
-      ? {
-          user: {
-            OR: [
-              { firstName: { contains: query, mode: 'insensitive' as const } },
-              { lastName: { contains: query, mode: 'insensitive' as const } },
-              { middleName: { contains: query, mode: 'insensitive' as const } },
-              { nickname: { contains: query, mode: 'insensitive' as const } },
-            ],
-          },
-        }
-      : {};
-
-    const whereClause = {
+    return this.deps.directory.members({
       organizationId,
-      status: 'accepted' as const,
-      ...userFilter,
-    };
-
-    const [rows, totalCount] = await Promise.all([
-      this.deps.prisma.organizationUser.findMany({
-        where: whereClause,
-        include: {
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              middleName: true,
-              nickname: true,
-            },
-          },
-        },
-        orderBy: { acceptedAt: 'desc' },
-        skip,
-        take: pageSize,
-      }),
-      this.deps.prisma.organizationUser.count({
-        where: whereClause,
-      }),
-    ]);
-
-    const members: OrgMember[] = rows.map((row) => ({
-      id: row.user.id,
-      firstName: row.user.firstName,
-      lastName: row.user.lastName,
-      middleName: row.user.middleName,
-      nickname: row.user.nickname,
-      joinedAt: row.acceptedAt,
-    }));
-
-    return success({ members, totalCount });
+      page,
+      pageSize,
+      query,
+    });
   }
 }

@@ -1,4 +1,17 @@
+/** Applies authorized snapshot weight changes with explicit audit identity/time.
+ * Domain validation precedes writes; the repository enforces the locked cutoff. */
+import { VotingWeight } from '@/domain/poll/VotingWeight';
 import { Result, success, failure } from '../../domain/shared/Result';
+import {
+  Clock,
+  IdGenerator,
+  entityCreation,
+} from '@/application/shared/EntityCreation';
+import {
+  ParticipantId,
+  UserId,
+  ParticipantWeightHistoryId,
+} from '@/domain/shared/EntityIds';
 import { ParticipantWeightHistory } from '../../domain/poll/ParticipantWeightHistory';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
@@ -6,7 +19,7 @@ import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 import { OrganizationErrors } from '../organization/OrganizationErrors';
 import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
@@ -26,13 +39,26 @@ export class UpdateParticipantWeightUseCase {
     private organizationRepository: OrganizationRepository,
     private userRepository: UserRepository,
     private boardRepository: BoardRepository,
+    private ids: IdGenerator,
+    private clock: Clock,
     private profanityChecker?: ProfanityChecker
   ) {}
 
   async execute(
     input: UpdateParticipantWeightInput
-  ): Promise<Result<void, string>> {
-    const { participantId, newWeight, adminUserId, reason } = input;
+  ): Promise<
+    Result<void, PollUseCaseFailure | typeof OrganizationErrors.NOT_ADMIN>
+  > {
+    const { reason } = input;
+    const participantIdResult = ParticipantId.safeParse(input.participantId);
+    const adminResult = UserId.safeParse(input.adminUserId);
+
+    if (!participantIdResult.success || !adminResult.success) {
+      return failure(PollDomainCodes.INVALID_BALLOT);
+    }
+
+    const participantId = participantIdResult.data;
+    const adminUserId = adminResult.data;
 
     // 1. Get participant
     const participantResult =
@@ -45,7 +71,7 @@ export class UpdateParticipantWeightUseCase {
     const participant = participantResult.value;
 
     if (!participant) {
-      return failure('poll.errors.participantNotFound');
+      return failure(PollErrors.PARTICIPANT_NOT_FOUND);
     }
 
     // 2. Get poll
@@ -115,30 +141,23 @@ export class UpdateParticipantWeightUseCase {
       return failure(PollDomainCodes.CANNOT_MODIFY_PARTICIPANTS_HAS_VOTES);
     }
 
-    // 5. Update participant weight
-    const oldWeight = participant.userWeight;
-    const updateResult = participant.updateWeight(newWeight);
+    const weight = VotingWeight.safeParse(input.newWeight);
 
-    if (!updateResult.success) {
-      return failure(updateResult.error);
+    if (!weight.success) {
+      return failure(PollDomainCodes.INVALID_WEIGHT);
     }
 
-    // 6. Save updated participant
-    const saveResult =
-      await this.participantRepository.updateParticipantWeight(participant);
+    const newWeight = weight.data;
 
-    if (!saveResult.success) {
-      return failure(saveResult.error);
-    }
-
-    // 7. Create weight history record
+    // Validate the audit entry before mutating or persisting the participant.
     const historyResult = ParticipantWeightHistory.create(
       participantId,
       participant.pollId,
       participant.userId,
-      oldWeight,
+      participant.userWeight,
       newWeight,
       adminUserId,
+      entityCreation(ParticipantWeightHistoryId, this.ids, this.clock),
       reason || null,
       this.profanityChecker
     );
@@ -147,11 +166,21 @@ export class UpdateParticipantWeightUseCase {
       return failure(historyResult.error);
     }
 
-    const createHistoryResult =
-      await this.participantRepository.createWeightHistory(historyResult.value);
+    // 5. Update participant weight
+    const updateResult = participant.updateWeight(newWeight);
 
-    if (!createHistoryResult.success) {
-      return failure(createHistoryResult.error);
+    if (!updateResult.success) {
+      return failure(updateResult.error);
+    }
+
+    // Save the updated participant and its audit entry atomically.
+    const saveResult = await this.participantRepository.updateParticipantWeight(
+      participant,
+      historyResult.value
+    );
+
+    if (!saveResult.success) {
+      return failure(saveResult.error);
     }
 
     return success(undefined);

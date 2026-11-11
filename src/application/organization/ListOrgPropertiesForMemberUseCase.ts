@@ -1,3 +1,15 @@
+/** Membership-authorized property projection validates caller identities before
+ * returning only the fields members may see. */
+import { OrganizationUseCaseFailure } from './OrganizationErrors';
+import {
+  OrganizationId,
+  PropertyId,
+  UserId,
+} from '../../domain/shared/EntityIds';
+import {
+  PropertyName,
+  PropertyAddress,
+} from '../../domain/organization/PropertyValues';
 import { OrganizationPropertyRepository } from '../../domain/organization/OrganizationPropertyRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
@@ -10,9 +22,9 @@ export interface ListOrgPropertiesForMemberInput {
 }
 
 export interface SafePropertyView {
-  id: string;
-  name: string;
-  address: string | null;
+  id: PropertyId;
+  name: PropertyName;
+  address: PropertyAddress | null;
 }
 
 export interface ListOrgPropertiesForMemberDependencies {
@@ -26,17 +38,24 @@ export class ListOrgPropertiesForMemberUseCase {
 
   async execute(
     input: ListOrgPropertiesForMemberInput
-  ): Promise<Result<SafePropertyView[], string>> {
+  ): Promise<Result<SafePropertyView[], OrganizationUseCaseFailure>> {
+    const userId = UserId.safeParse(input.userId);
+    const organizationId = OrganizationId.safeParse(input.organizationId);
+
+    if (!userId.success || !organizationId.success) {
+      return failure(OrganizationDomainCodes.NOT_ORG_MEMBER);
+    }
+
     const [isMember, isAdmin, isSuper] = await Promise.all([
       this.deps.organizationRepository.isUserMember(
-        input.userId,
-        input.organizationId
+        userId.data,
+        organizationId.data
       ),
       this.deps.organizationRepository.isUserAdmin(
-        input.userId,
-        input.organizationId
+        userId.data,
+        organizationId.data
       ),
-      this.deps.userRepository.isSuperAdmin(input.userId),
+      this.deps.userRepository.isSuperAdmin(userId.data),
     ]);
 
     if (!(isMember || isAdmin || isSuper)) {
@@ -44,7 +63,7 @@ export class ListOrgPropertiesForMemberUseCase {
     }
 
     const res = await this.deps.propertyRepository.findByOrganization(
-      input.organizationId
+      organizationId.data
     );
 
     if (!res.success) {

@@ -1,10 +1,11 @@
+import { OrganizationId, BoardId } from '@/domain/shared/EntityIds';
 import { describe, it, expect } from 'vitest';
 import { canPollSatisfyReportAudience } from '../canPollSatisfyReportAudience';
-import { Report, ReportProps } from '../../../domain/report/Report';
+import { Report, ReportData } from '../../../domain/report/Report';
 import { ReportVisibility } from '../../../domain/report/ReportVisibility';
 import { PollState } from '../../../domain/poll/PollState';
 
-const makeReport = (overrides: Partial<ReportProps> = {}) =>
+const makeReport = (overrides: Partial<ReportData> = {}) =>
   Report.reconstitute({
     id: 'r1',
     organizationId: 'org-1',
@@ -19,25 +20,31 @@ const makeReport = (overrides: Partial<ReportProps> = {}) =>
     createdAt: new Date(),
     updatedAt: new Date(),
     archivedAt: null,
-    boardIds: ['b1', 'b2'],
+    boardIds: [],
     pollIds: [],
     attachmentIds: [],
     ...overrides,
+    ...(overrides.state === 'PUBLISHED'
+      ? {
+          publishedById: overrides.publishedById ?? 'admin-1',
+          lastPublishedAt: overrides.lastPublishedAt ?? new Date('2026-01-01'),
+        }
+      : {}),
   });
 
 const orgPoll = {
-  organizationId: 'org-1',
-  boardId: null as string | null,
+  organizationId: OrganizationId.parse('org-1'),
+  boardId: null,
   state: PollState.FINISHED,
 };
 const boardPoll = {
-  organizationId: 'org-1',
-  boardId: 'b1',
+  organizationId: OrganizationId.parse('org-1'),
+  boardId: BoardId.parse('b1'),
   state: PollState.FINISHED,
 };
 const foreignBoardPoll = {
-  organizationId: 'org-1',
-  boardId: 'b-foreign',
+  organizationId: OrganizationId.parse('org-1'),
+  boardId: BoardId.parse('b-foreign'),
   state: PollState.FINISHED,
 };
 

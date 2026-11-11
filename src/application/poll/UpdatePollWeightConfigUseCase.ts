@@ -1,19 +1,43 @@
+/** Poll application boundary validates requests, invokes domain behavior and
+ * preserves known failure codes across authorization and persistence ports. */
+import { VotingWeight } from '../../domain/poll/VotingWeight';
+import { z } from 'zod';
+import {
+  PollId,
+  UserId,
+  PropertyId,
+  ParticipantId,
+  ParticipantWeightHistoryId,
+} from '../../domain/shared/EntityIds';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
-import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
+import { Clock, IdGenerator } from '../shared/EntityCreation';
+import {
+  ParticipantRepository,
+  ParticipantAddition,
+  ParticipantRemoval,
+  ParticipantReweighting,
+} from '../../domain/poll/ParticipantRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { PollEligibleMemberRepository } from '../../domain/poll/PollEligibleMemberRepository';
 import { PropertyAssetRepository } from '../../domain/organization/PropertyAssetRepository';
 import { OrganizationPropertyRepository } from '../../domain/organization/OrganizationPropertyRepository';
 import {
+  DistributionType,
   isOwnershipMode,
   parseDistributionType,
 } from '../../domain/poll/DistributionType';
-import { parsePropertyAggregation } from '../../domain/poll/PropertyAggregation';
+import {
+  PropertyAggregation,
+  parsePropertyAggregation,
+} from '../../domain/poll/PropertyAggregation';
 import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
-import { PollErrors } from './PollErrors';
-import { PollWeightCalculator } from './PollWeightCalculator';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
+import {
+  PollWeightCalculator,
+  PollWeightCalculationFailure,
+} from './PollWeightCalculator';
 
 export interface UpdatePollWeightConfigInput {
   pollId: string;
@@ -34,12 +58,24 @@ export class UpdatePollWeightConfigUseCase {
     private eligibleRepository: PollEligibleMemberRepository,
     private propertyAssetRepository: PropertyAssetRepository,
     private organizationPropertyRepository: OrganizationPropertyRepository,
-    private pollWeightCalculator: PollWeightCalculator
+    private pollWeightCalculator: PollWeightCalculator,
+    private ids: IdGenerator,
+    private clock: Clock
   ) {}
 
   async execute(
-    input: UpdatePollWeightConfigInput
-  ): Promise<Result<void, string>> {
+    rawRequest: UpdatePollWeightConfigInput
+  ): Promise<Result<void, PollUseCaseFailure | PollWeightCalculationFailure>> {
+    const decoded = z
+      .object({ pollId: PollId, adminUserId: UserId })
+      .safeParse(rawRequest);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawRequest, ...decoded.data };
+
     const pollR = await this.pollRepository.getPollById(input.pollId);
 
     if (!pollR.success) {
@@ -95,7 +131,15 @@ export class UpdatePollWeightConfigUseCase {
     const dtStr = input.newConfig.distributionType ?? poll.distributionType;
     const paStr =
       input.newConfig.propertyAggregation ?? poll.propertyAggregation;
-    const propIds = input.newConfig.propertyIds ?? poll.propertyIds;
+    const decodedProperties = z
+      .array(PropertyId)
+      .safeParse(input.newConfig.propertyIds ?? poll.propertyIds);
+
+    if (!decodedProperties.success) {
+      return failure(PollDomainCodes.PROPERTY_NOT_IN_ORG);
+    }
+
+    const propIds = decodedProperties.data;
 
     const dtR = parseDistributionType(dtStr);
 
@@ -180,18 +224,14 @@ export class UpdatePollWeightConfigUseCase {
 
     const newWeights = weightR.value;
 
-    const add: Array<{ userId: string; weight: number }> = [];
-    const remove: Array<{
-      participantId: string;
-      userId: string;
-      oldWeight: number;
-    }> = [];
-    const update: Array<{
-      participantId: string;
-      userId: string;
-      oldWeight: number;
-      newWeight: number;
-    }> = [];
+    const add: ParticipantAddition[] = [];
+    const remove: ParticipantRemoval[] = [];
+    const update: ParticipantReweighting[] = [];
+    const at = this.clock.now();
+    const historyCreation = () => ({
+      id: this.ids.generate(ParticipantWeightHistoryId),
+      now: at,
+    });
 
     for (const userId of candidates) {
       const w = newWeights.get(userId);
@@ -202,15 +242,22 @@ export class UpdatePollWeightConfigUseCase {
           participantId: cur.id,
           userId,
           oldWeight: cur.userWeight,
+          historyCreation: historyCreation(),
         });
       } else if (w !== undefined && !cur) {
-        add.push({ userId, weight: w });
+        add.push({
+          userId,
+          weight: w,
+          creation: { id: this.ids.generate(ParticipantId), now: at },
+          historyCreation: historyCreation(),
+        });
       } else if (w !== undefined && cur && cur.userWeight !== w) {
         update.push({
           participantId: cur.id,
           userId,
           oldWeight: cur.userWeight,
           newWeight: w,
+          historyCreation: historyCreation(),
         });
       }
     }
@@ -233,7 +280,8 @@ export class UpdatePollWeightConfigUseCase {
       remove,
       update,
       input.adminUserId,
-      reason
+      reason,
+      poll.revision
     );
 
     if (!applyR.success) {
@@ -244,12 +292,12 @@ export class UpdatePollWeightConfigUseCase {
   }
 
   private buildReason(
-    oldDT: string,
-    newDT: string,
-    oldPA: string,
-    newPA: string,
-    oldIds: string[],
-    newIds: string[]
+    oldDT: DistributionType,
+    newDT: DistributionType,
+    oldPA: PropertyAggregation,
+    newPA: PropertyAggregation,
+    oldIds: PropertyId[],
+    newIds: PropertyId[]
   ): string {
     const dtChanged = oldDT !== newDT;
     const paChanged = oldPA !== newPA;

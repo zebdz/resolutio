@@ -8,6 +8,10 @@
 // deliberately is not: a description with 20 images issues 20 GETs per page
 // view, so limiting reads would break rendering.
 
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
@@ -30,7 +34,9 @@ const uc = new AddPollAttachmentUseCase(
   pollRepo,
   orgRepo,
   userRepo,
-  attachmentRepo
+  attachmentRepo,
+  new CryptoIdGenerator(),
+  new SystemClock()
 );
 
 export async function POST(request: NextRequest) {

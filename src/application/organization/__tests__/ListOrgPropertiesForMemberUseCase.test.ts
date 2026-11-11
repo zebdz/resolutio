@@ -1,3 +1,5 @@
+/** Property/claim boundary regressions exercise authorized flows with explicit
+ * creation inputs while keeping raw persistence fixtures distinct from domain values. */
 import { describe, it, expect } from 'vitest';
 import { ListOrgPropertiesForMemberUseCase } from '../ListOrgPropertiesForMemberUseCase';
 import { OrganizationProperty } from '../../../domain/organization/OrganizationProperty';

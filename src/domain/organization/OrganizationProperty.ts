@@ -1,7 +1,19 @@
+/** Organization property with validated identity, name and units. Creation and
+ * archive time are supplied by the application; persistence is decoded explicitly. */
+import { PropertyId, OrganizationId } from '../shared/EntityIds';
+import { EntityCreation } from '../shared/EntityCreation';
+import { Instant } from '../shared/Instant';
+import { PropertyName, PropertyAddress } from './PropertyValues';
 import { Result, success, failure } from '../shared/Result';
-import { OrganizationDomainCodes } from './OrganizationDomainCodes';
+import {
+  OrganizationDomainCode,
+  OrganizationDomainCodes,
+} from './OrganizationDomainCodes';
 import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
-import { SharedDomainCodes } from '../shared/SharedDomainCodes';
+import {
+  SharedDomainCode,
+  SharedDomainCodes,
+} from '../shared/SharedDomainCodes';
 import { SizeUnit, SizeUnitValue } from './SizeUnit';
 
 export interface OrganizationPropertyProps {
@@ -9,21 +21,32 @@ export interface OrganizationPropertyProps {
   organizationId: string;
   name: string;
   address: string | null;
-  sizeUnit: SizeUnitValue;
+  sizeUnit: string;
   createdAt: Date;
   archivedAt: Date | null;
 }
 
+type PropertyFailure = OrganizationDomainCode | SharedDomainCode;
+interface PropertyState {
+  readonly id: PropertyId;
+  readonly organizationId: OrganizationId;
+  name: PropertyName;
+  address: PropertyAddress | null;
+  sizeUnit: SizeUnitValue;
+  readonly createdAt: Instant;
+  archivedAt: Instant | null;
+}
 export class OrganizationProperty {
-  private constructor(private props: OrganizationPropertyProps) {}
+  private constructor(private props: PropertyState) {}
 
   public static create(
-    organizationId: string,
-    name: string,
-    address: string | null,
-    sizeUnit: string,
+    organizationId: OrganizationId,
+    name: PropertyName,
+    address: PropertyAddress | null,
+    sizeUnit: SizeUnitValue,
+    creation: EntityCreation<PropertyId>,
     profanityChecker?: ProfanityChecker
-  ): Result<OrganizationProperty, string> {
+  ): Result<OrganizationProperty, PropertyFailure> {
     if (!name || name.trim().length === 0) {
       return failure(OrganizationDomainCodes.PROPERTY_NAME_EMPTY);
     }
@@ -31,12 +54,12 @@ export class OrganizationProperty {
     const unitParse = SizeUnit.parse(sizeUnit);
 
     if (!unitParse.success) {
-      return failure(unitParse.error);
+      return failure(OrganizationDomainCodes.SIZE_UNIT_INVALID);
     }
 
-    const trimmedName = name.trim();
+    const trimmedName = PropertyName.parse(name);
     const trimmedAddress =
-      address && address.trim().length > 0 ? address.trim() : null;
+      address === null ? null : PropertyAddress.parse(address);
 
     if (profanityChecker?.containsProfanity(trimmedName)) {
       return failure(SharedDomainCodes.CONTAINS_PROFANITY);
@@ -48,12 +71,12 @@ export class OrganizationProperty {
 
     return success(
       new OrganizationProperty({
-        id: '',
-        organizationId,
+        id: PropertyId.parse(creation.id),
+        organizationId: OrganizationId.parse(organizationId),
         name: trimmedName,
         address: trimmedAddress,
         sizeUnit: unitParse.value,
-        createdAt: new Date(),
+        createdAt: Instant.parse(creation.now),
         archivedAt: null,
       })
     );
@@ -62,43 +85,62 @@ export class OrganizationProperty {
   public static reconstitute(
     props: OrganizationPropertyProps
   ): OrganizationProperty {
-    return new OrganizationProperty(props);
+    const sizeUnit = SizeUnit.parse(props.sizeUnit);
+
+    if (!sizeUnit.success) {
+      throw new Error(sizeUnit.error);
+    }
+
+    return new OrganizationProperty({
+      id: PropertyId.parse(props.id),
+      organizationId: OrganizationId.parse(props.organizationId),
+      name: PropertyName.parse(props.name),
+      address:
+        props.address === null ? null : PropertyAddress.parse(props.address),
+      sizeUnit: sizeUnit.value,
+      createdAt: Instant.fromDate(props.createdAt),
+      archivedAt:
+        props.archivedAt === null ? null : Instant.fromDate(props.archivedAt),
+    });
   }
 
-  public get id(): string {
+  public get id(): PropertyId {
     return this.props.id;
   }
-  public get organizationId(): string {
+  public get organizationId(): OrganizationId {
     return this.props.organizationId;
   }
-  public get name(): string {
+  public get name(): PropertyName {
     return this.props.name;
   }
-  public get address(): string | null {
+  public get address(): PropertyAddress | null {
     return this.props.address;
   }
   public get sizeUnit(): SizeUnitValue {
     return this.props.sizeUnit;
   }
+  // Defensive Date projections preserve the existing serialization contract.
   public get createdAt(): Date {
-    return this.props.createdAt;
+    return Instant.toDate(this.props.createdAt);
   }
   public get archivedAt(): Date | null {
-    return this.props.archivedAt;
+    return this.props.archivedAt === null
+      ? null
+      : Instant.toDate(this.props.archivedAt);
   }
   public isArchived(): boolean {
     return this.props.archivedAt !== null;
   }
 
   public rename(
-    newName: string,
+    newName: PropertyName,
     profanityChecker?: ProfanityChecker
-  ): Result<void, string> {
+  ): Result<void, PropertyFailure> {
     if (!newName || newName.trim().length === 0) {
       return failure(OrganizationDomainCodes.PROPERTY_NAME_EMPTY);
     }
 
-    const trimmed = newName.trim();
+    const trimmed = PropertyName.parse(newName);
 
     if (profanityChecker?.containsProfanity(trimmed)) {
       return failure(SharedDomainCodes.CONTAINS_PROFANITY);
@@ -110,11 +152,11 @@ export class OrganizationProperty {
   }
 
   public updateAddress(
-    newAddress: string | null,
+    newAddress: PropertyAddress | null,
     profanityChecker?: ProfanityChecker
-  ): Result<void, string> {
+  ): Result<void, PropertyFailure> {
     const trimmed =
-      newAddress && newAddress.trim().length > 0 ? newAddress.trim() : null;
+      newAddress === null ? null : PropertyAddress.parse(newAddress);
 
     if (trimmed && profanityChecker?.containsProfanity(trimmed)) {
       return failure(SharedDomainCodes.CONTAINS_PROFANITY);
@@ -125,11 +167,11 @@ export class OrganizationProperty {
     return success(undefined);
   }
 
-  public updateSizeUnit(newUnit: string): Result<void, string> {
+  public updateSizeUnit(newUnit: SizeUnitValue): Result<void, PropertyFailure> {
     const parsed = SizeUnit.parse(newUnit);
 
     if (!parsed.success) {
-      return failure(parsed.error);
+      return failure(OrganizationDomainCodes.SIZE_UNIT_INVALID);
     }
 
     this.props.sizeUnit = parsed.value;
@@ -137,17 +179,17 @@ export class OrganizationProperty {
     return success(undefined);
   }
 
-  public archive(): Result<void, string> {
+  public archive(at: Instant): Result<void, PropertyFailure> {
     if (this.props.archivedAt) {
       return failure(OrganizationDomainCodes.PROPERTY_ALREADY_ARCHIVED);
     }
 
-    this.props.archivedAt = new Date();
+    this.props.archivedAt = Instant.parse(at);
 
     return success(undefined);
   }
 
-  public unarchive(): Result<void, string> {
+  public unarchive(): Result<void, PropertyFailure> {
     if (!this.props.archivedAt) {
       return failure(OrganizationDomainCodes.PROPERTY_NOT_ARCHIVED);
     }

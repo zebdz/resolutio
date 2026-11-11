@@ -793,6 +793,7 @@
       "pollNotFound": "Голосование не найдено",
       "questionNotFound": "Вопрос не найден",
       "answerNotFound": "Ответ не найден",
+      "participantNotFound": "Участник не найден",
       "cannotModifyFinished": "Нельзя изменять завершённое голосование",
       "cannotModifyActive": "Нельзя изменять активное голосование",
       "cannotModifyHasVotes": "Нельзя изменять голосование, по которому уже проголосовали",
@@ -1356,21 +1357,25 @@
       "propertyClaimAttachmentFileNameEmpty": "Требуется имя файла подтверждения",
       "propertyClaimAttachmentNotFound": "Файл подтверждения не найден",
       "notOrgMember": "Вы не являетесь членом этой организации",
-      "lastAdmin": "Нельзя удалить последнего администратора организации"
+      "lastAdmin": "Нельзя удалить последнего администратора организации",
+      "notOrgAdmin": "Вы не являетесь администратором этой организации."
     },
     "invitation": {
-      "notPending": "Приглашение больше не ожидает ответа"
+      "notPending": "Приглашение больше не ожидает ответа",
+      "invalidData": "Некорректные данные приглашения."
     },
     "joinParentRequest": {
       "messageEmpty": "Сообщение не может быть пустым",
       "messageTooLong": "Сообщение не может превышать {maxLength} символов",
       "notPending": "Запрос на присоединение к родителю не ожидает рассмотрения",
-      "rejectionReasonRequired": "Причина отклонения обязательна"
+      "rejectionReasonRequired": "Причина отклонения обязательна",
+      "rejectionReasonTooLong": "Причина отклонения не должна превышать 500 символов"
     },
     "board": {
       "boardNameEmpty": "Название органа управления не может быть пустым",
       "boardNameTooLong": "Название органа управления не может превышать {maxLength} символов",
-      "boardAlreadyArchived": "Орган управления уже архивирован"
+      "boardAlreadyArchived": "Орган управления уже архивирован",
+      "boardInvalidData": "Данные органа управления некорректны."
     },
     "otp": {
       "invalidCodeFormat": "Код должен содержать 6 цифр"
@@ -1380,6 +1385,8 @@
       "answerTextTooLong": "Текст ответа не может превышать {maxLength} символов",
       "answerOrderNegative": "Порядок ответа должен быть положительным числом",
       "answerAlreadyArchived": "Ответ уже архивирован",
+      "questionInvalidData": "Некорректные данные вопроса.",
+      "answerInvalidData": "Некорректные данные ответа.",
       "questionTextEmpty": "Текст вопроса не может быть пустым",
       "questionTextTooLong": "Текст вопроса не может превышать {maxLength} символов",
       "questionDetailsTooLong": "Детали вопроса не могут превышать {maxLength} символов",
@@ -1420,6 +1427,9 @@
       "alreadyVoted": "Вы уже проголосовали в этом голосовании",
       "notParticipant": "Вы не являетесь участником этого голосования",
       "mustAnswerAllQuestions": "Необходимо ответить на все вопросы перед завершением",
+      "receiptSecretImmutable": "Код квитанции нельзя изменить.",
+      "invalidBallot": "Бюллетень содержит недопустимые ответы. Обновите страницу голосования и попробуйте снова.",
+      "stale": "Голосование изменилось. Обновите страницу и попробуйте снова.",
       "invalidWeight": "Недопустимый вес голоса",
       "cannotModifyParticipantsHasVotes": "Нельзя изменять участников - голосование уже имеет голоса",
       "questionInvalidPage": "Недопустимый номер страницы вопроса",
@@ -1450,7 +1460,8 @@
       "attachmentLimitReached": "К голосованию можно прикрепить не более {limit} файлов",
       "attachmentNotFound": "Файл не найден",
       "descriptionInvalidAttachmentRef": "Описание ссылается на файл, не принадлежащий этому голосованию",
-      "cannotChangeAttachmentsActive": "Нельзя изменять вложения после начала голосования"
+      "cannotChangeAttachmentsActive": "Нельзя изменять вложения после начала голосования",
+      "invalidId": "Некорректный идентификатор голосования"
     },
     "user": {
       "userNotFound": "Пользователь не найден",
@@ -1478,8 +1489,10 @@
         "cityRequired": "Укажите город",
         "streetRequired": "Укажите улицу",
         "buildingRequired": "Укажите дом",
-        "apartmentRequired": "Укажите номер квартиры"
-      }
+        "apartmentRequired": "Укажите номер квартиры",
+        "registryIdInvalid": "Выберите адрес заново: его идентификатор в реестре некорректен"
+      },
+      "languageInvalid": "Некорректный язык."
     },
     "joinToken": {
       "descriptionEmpty": "Описание токена обязательно",
@@ -1509,11 +1522,22 @@
       "attachmentMagicMismatch": "Содержимое файла не соответствует заявленному типу",
       "attachmentLimitReached": "Максимум {maxCount} файлов на отчёт",
       "pollAudienceTooNarrow": "Аудитория голосования должна включать аудиторию отчёта",
-      "pollNotFound": "Голосование не найдено"
+      "pollNotFound": "Голосование не найдено",
+      "invalidData": "Некорректные данные отчёта."
     },
     "shared": {
       "containsProfanity": "Содержит ненормативную лексику",
-      "containsProfanityWithWords": "Содержит ненормативную лексику: {words}"
+      "containsProfanityWithWords": "Содержит ненормативную лексику: {words}",
+      "invalidAttachmentMetadata": "Некорректные метаданные вложения."
+    },
+    "notification": {
+      "invalidData": "Некорректные данные уведомления."
+    },
+    "legalCheck": {
+      "checkedByRequired": "Необходимо указать пользователя, запросившего проверку.",
+      "invalidData": "Некорректные данные юридической проверки.",
+      "pollNotFound": "Голосование не найдено.",
+      "alreadyInProgress": "Юридическая проверка уже выполняется."
     }
   },
   "phone": {

@@ -1,10 +1,13 @@
+/** Authenticated shell enforces setup/moderation gates before rendering protected children.
+ * Moderation and unread-count failures display explicit localized errors before rendering the shell. */
 import { redirectLocalized } from '@/web/lib/redirectLocalized';
+import { getUserModerationAccess } from '@/application/user/getUserModerationAccess';
+import { PrismaUserModerationRepository } from '@/infrastructure/repositories/PrismaUserModerationRepository';
+import { PrismaNotificationReader } from '@/infrastructure/repositories/PrismaNotificationReader';
+import { GetUnreadNotificationCountUseCase } from '@/application/notification/GetUnreadNotificationCountUseCase';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { getCurrentUser } from '@/web/lib/session';
-import {
-  prisma,
-  PrismaUserRepository,
-  PrismaNotificationRepository,
-} from '@/infrastructure/index';
+import { prisma, PrismaUserRepository } from '@/infrastructure/index';
 import { StackedLayout } from '@/src/web/components/catalyst/stacked-layout';
 import { AppNavbar } from './AppNavbar';
 import { MobileSidebar } from './MobileSidebar';
@@ -34,16 +37,33 @@ export async function AuthenticatedLayout({
   }
 
   const userRepository = new PrismaUserRepository(prisma);
-  const notificationRepository = new PrismaNotificationRepository(prisma);
+  const unreadCount = new GetUnreadNotificationCountUseCase({
+    notificationReader: new PrismaNotificationReader(prisma),
+  });
 
-  const [isSuperAdmin, isBlocked, unreadNotificationCount] = await Promise.all([
+  const [isSuperAdmin, access, unreadNotificationCount] = await Promise.all([
     userRepository.isSuperAdmin(user.id),
-    userRepository.isUserBlocked(user.id),
-    notificationRepository.getUnreadCount(user.id),
+    getUserModerationAccess(
+      new PrismaUserModerationRepository(prisma),
+      user.id
+    ),
+    unreadCount.execute({ userId: user.id }),
   ]);
 
-  if (isBlocked) {
+  if (!access.success) {
+    return <div role="alert">{await translateErrorCode(access.error)}</div>;
+  }
+
+  if (access.value === 'blocked') {
     redirectLocalized(await getLocale(), '/blocked');
+  }
+
+  if (!unreadNotificationCount.success) {
+    return (
+      <div role="alert">
+        {await translateErrorCode(unreadNotificationCount.error)}
+      </div>
+    );
   }
 
   return (
@@ -51,14 +71,14 @@ export async function AuthenticatedLayout({
       navbar={
         <AppNavbar
           isSuperAdmin={isSuperAdmin}
-          unreadNotificationCount={unreadNotificationCount}
+          unreadNotificationCount={unreadNotificationCount.value.count}
           firstName={user.firstName}
         />
       }
       sidebar={
         <MobileSidebar
           isSuperAdmin={isSuperAdmin}
-          unreadNotificationCount={unreadNotificationCount}
+          unreadNotificationCount={unreadNotificationCount.value.count}
           firstName={user.firstName}
         />
       }

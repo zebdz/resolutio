@@ -1,11 +1,30 @@
-import { PrismaClient } from '@/generated/prisma/client';
+/** Creates an organization invitation after authorization and typed membership checks.
+ * Identity/time are supplied explicitly; notifications follow persisted invitations. */
+import {
+  IdGenerator,
+  Clock,
+  entityCreation,
+} from '@/application/shared/EntityCreation';
+import { Instant } from '@/domain/shared/Instant';
+import { z } from 'zod';
+import {
+  OrganizationId,
+  UserId,
+  InvitationId,
+  BoardId,
+} from '@/domain/shared/EntityIds';
+import {
+  MembershipStore,
+  MembershipStoreFailure,
+} from '../organization/MembershipStore';
+import { MembershipReference } from '../../domain/organization/MembershipPolicy';
 import { InvitationRepository } from '../../domain/invitation/InvitationRepository';
 import { Invitation } from '../../domain/invitation/Invitation';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { InvitationErrors } from './InvitationErrors';
+import { InvitationErrors, InvitationUseCaseFailure } from './InvitationErrors';
 import { User } from '../../domain/user/User';
 import { NotifyOrgMemberInviteReceivedUseCase } from '../notification/NotifyOrgMemberInviteReceivedUseCase';
 
@@ -16,7 +35,9 @@ export interface CreateOrgMemberInviteInput {
 }
 
 export interface CreateOrgMemberInviteDependencies {
-  prisma: PrismaClient;
+  ids: IdGenerator;
+  clock: Clock;
+  memberships: Pick<MembershipStore, 'findStatus'>;
   invitationRepository: InvitationRepository;
   organizationRepository: OrganizationRepository;
   userRepository: UserRepository;
@@ -27,8 +48,24 @@ export class CreateOrgMemberInviteUseCase {
   constructor(private deps: CreateOrgMemberInviteDependencies) {}
 
   async execute(
-    input: CreateOrgMemberInviteInput
-  ): Promise<Result<Invitation, string>> {
+    rawInput: CreateOrgMemberInviteInput
+  ): Promise<
+    Result<Invitation, InvitationUseCaseFailure | MembershipStoreFailure>
+  > {
+    const parsed = z
+      .object({
+        organizationId: OrganizationId,
+        inviteeId: UserId,
+        actorUserId: UserId,
+      })
+      .safeParse(rawInput);
+
+    if (!parsed.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawInput, ...parsed.data };
+
     const { organizationId, inviteeId, actorUserId } = input;
 
     // Check org exists and not archived
@@ -76,16 +113,15 @@ export class CreateOrgMemberInviteUseCase {
     }
 
     // Check invitee doesn't have a pending join request
-    const pendingRequest = await this.deps.prisma.organizationUser.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId,
-          userId: inviteeId,
-        },
-      },
-    });
+    const membership = await this.deps.memberships.findStatus(
+      MembershipReference.parse({ organizationId, userId: inviteeId })
+    );
 
-    if (pendingRequest && pendingRequest.status === 'pending') {
+    if (!membership.success) {
+      return membership;
+    }
+
+    if (membership.value === 'pending') {
       return failure(InvitationErrors.INVITEE_HAS_PENDING_REQUEST);
     }
 
@@ -118,7 +154,8 @@ export class CreateOrgMemberInviteUseCase {
       organizationId,
       actorUserId,
       inviteeId,
-      'member_invite'
+      { type: 'member_invite', boardId: null },
+      entityCreation(InvitationId, this.deps.ids, this.deps.clock)
     );
 
     const saved = await this.deps.invitationRepository.save(invitation);
@@ -135,6 +172,8 @@ export class CreateOrgMemberInviteUseCase {
 
     // Notify invitee (fire-and-forget)
     new NotifyOrgMemberInviteReceivedUseCase({
+      ids: this.deps.ids,
+      clock: this.deps.clock,
       notificationRepository: this.deps.notificationRepository,
     })
       .execute({
@@ -143,6 +182,14 @@ export class CreateOrgMemberInviteUseCase {
         inviteeUserId: inviteeId,
         inviterName,
         organizationName: organization.name,
+      })
+      .then((outcome) => {
+        if (!outcome.success) {
+          console.error(
+            'Notification delivery failed (NotifyOrgMemberInviteReceivedUseCase):',
+            outcome.error
+          );
+        }
       })
       .catch((err) =>
         console.error('Failed to notify member invite received:', err)

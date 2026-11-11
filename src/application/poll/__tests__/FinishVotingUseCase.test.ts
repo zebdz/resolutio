@@ -1,4 +1,31 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+/** Voting policy and orchestration tests. Atomic storage is represented by a
+ * fake ballot boundary; actual rollback and locking use PostgreSQL tests. */
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { PollInstant } from '@/domain/poll/PollValues';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { VotingWeight } from '@/domain/poll/VotingWeight';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import {
+  PollId,
+  QuestionId,
+  AnswerId,
+  ParticipantId,
+  VoteId,
+  VoteDraftId,
+  UserId,
+  BoardId,
+  OrganizationId,
+} from '@/domain/shared/EntityIds';
+import { createQuestionIds, questionClock } from './questionTestValues';
+import { BallotSnapshot, RecordedBallot } from '@/domain/poll/BallotSnapshot';
+import { ReceiptSecret } from '@/domain/poll/ReceiptSecret';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FinishVotingUseCase } from '../FinishVotingUseCase';
 import { Poll } from '../../../domain/poll/Poll';
 import { Question } from '../../../domain/poll/Question';
@@ -29,15 +56,17 @@ class MockPollRepository implements Pick<PollRepository, 'getPollById'> {
   private answers: Map<string, Answer> = new Map();
   private nextId = 1;
 
-  async getPollById(pollId: string): Promise<Result<Poll | null, string>> {
-    const poll = this.polls.get(pollId);
+  async getPollById(
+    pollId: string
+  ): ReturnType<Pick<PollRepository, 'getPollById'>['getPollById']> {
+    let poll = this.polls.get(pollId);
 
     if (poll) {
       // Populate questions
       const questions = Array.from(this.questions.values()).filter(
         (q) => q.pollId === pollId
       );
-      (poll as any).props.questions = questions;
+      poll = Poll.reconstitute({ ...poll.toJSON(), questions: questions });
     }
 
     return success(poll || null);
@@ -45,24 +74,21 @@ class MockPollRepository implements Pick<PollRepository, 'getPollById'> {
 
   // Helper methods for test setup
   async createPoll(poll: Poll): Promise<Result<Poll, string>> {
-    const id = `poll-${this.nextId++}`;
-    (poll as any).props.id = id;
+    const id = poll.id;
     this.polls.set(id, poll);
 
     return success(poll);
   }
 
   async createQuestion(question: Question): Promise<Result<Question, string>> {
-    const id = `question-${this.nextId++}`;
-    (question as any).props.id = id;
+    const id = question.id;
     this.questions.set(id, question);
 
     return success(question);
   }
 
   async createAnswer(answer: Answer): Promise<Result<Answer, string>> {
-    const id = `answer-${this.nextId++}`;
-    (answer as any).props.id = id;
+    const id = answer.id;
     this.answers.set(id, answer);
 
     return success(answer);
@@ -85,12 +111,36 @@ class MockParticipantRepository implements Pick<
   'getParticipantByUserAndPoll' | 'updateWillingToSignProtocol'
 > {
   private participants: Map<string, PollParticipant> = new Map();
+  ballots = new Map<string, RecordedBallot>();
+  persist!: (
+    participant: PollParticipant,
+    votes: Vote[],
+    willingness: boolean,
+    secret: ReceiptSecret
+  ) => Promise<Result<RecordedBallot, string>>;
+  async getCastBallot(pollId: string, userId: string) {
+    return success(this.ballots.get(`${pollId}:${userId}`) ?? null);
+  }
+  async castVotes(
+    id: string,
+    votes: Vote[],
+    willingness: boolean,
+    secret: ReceiptSecret
+  ) {
+    return this.persist(this.participants.get(id)!, votes, willingness, secret);
+  }
+
   private nextId = 1;
 
   async getParticipantByUserAndPoll(
     pollId: string,
     userId: string
-  ): Promise<Result<PollParticipant | null, string>> {
+  ): ReturnType<
+    Pick<
+      ParticipantRepository,
+      'getParticipantByUserAndPoll' | 'updateWillingToSignProtocol'
+    >['getParticipantByUserAndPoll']
+  > {
     const participant = Array.from(this.participants.values()).find(
       (p) => p.userId === userId && p.pollId === pollId
     );
@@ -101,7 +151,12 @@ class MockParticipantRepository implements Pick<
   async updateWillingToSignProtocol(
     participantId: string,
     willingToSignProtocol: boolean
-  ): Promise<Result<void, string>> {
+  ): ReturnType<
+    Pick<
+      ParticipantRepository,
+      'getParticipantByUserAndPoll' | 'updateWillingToSignProtocol'
+    >['updateWillingToSignProtocol']
+  > {
     const participant = this.participants.get(participantId);
 
     if (participant) {
@@ -116,8 +171,7 @@ class MockParticipantRepository implements Pick<
     participants: PollParticipant[]
   ): Promise<Result<void, string>> {
     for (const p of participants) {
-      const id = `participant-${this.nextId++}`;
-      (p as any).props.id = id;
+      const id = p.id;
       this.participants.set(id, p);
     }
 
@@ -141,8 +195,9 @@ class MockParticipantRepository implements Pick<
     participant: PollParticipant,
     history: ParticipantWeightHistory,
     votes: Vote[],
-    willingToSignProtocol: boolean
-  ): Promise<Result<void, string>> {
+    willingToSignProtocol: boolean,
+    secret: ReceiptSecret
+  ): Promise<Result<RecordedBallot, string>> {
     this.joinAndVoteCalls.push({
       participant,
       history,
@@ -150,11 +205,10 @@ class MockParticipantRepository implements Pick<
       willingToSignProtocol,
     });
 
-    const id = `participant-${this.nextId++}`;
-    (participant as any).props.id = id;
+    const id = participant.id;
     this.participants.set(id, participant);
 
-    return success(undefined);
+    return this.persist(participant, votes, willingToSignProtocol, secret);
   }
 }
 
@@ -173,7 +227,12 @@ class MockVoteRepository implements Pick<
   async hasUserFinishedVoting(
     pollId: string,
     userId: string
-  ): Promise<Result<boolean, string>> {
+  ): ReturnType<
+    Pick<
+      VoteRepository,
+      'hasUserFinishedVoting' | 'createVotes' | 'pollHasVotes'
+    >['hasUserFinishedVoting']
+  > {
     // Get all questions for this poll
     const pollQuestions = Array.from(this.questions.values()).filter(
       (q) => q.pollId === pollId
@@ -188,7 +247,14 @@ class MockVoteRepository implements Pick<
     return success(votes.length > 0);
   }
 
-  async createVotes(votes: Vote[]): Promise<Result<void, string>> {
+  async createVotes(
+    votes: Vote[]
+  ): ReturnType<
+    Pick<
+      VoteRepository,
+      'hasUserFinishedVoting' | 'createVotes' | 'pollHasVotes'
+    >['createVotes']
+  > {
     for (const vote of votes) {
       this.votes.set(`${vote.userId}-${vote.answerId}`, vote);
     }
@@ -196,7 +262,14 @@ class MockVoteRepository implements Pick<
     return success(undefined);
   }
 
-  async pollHasVotes(pollId: string): Promise<Result<boolean, string>> {
+  async pollHasVotes(
+    pollId: string
+  ): ReturnType<
+    Pick<
+      VoteRepository,
+      'hasUserFinishedVoting' | 'createVotes' | 'pollHasVotes'
+    >['pollHasVotes']
+  > {
     // Get all questions for this poll
     const pollQuestions = Array.from(this.questions.values()).filter(
       (q) => q.pollId === pollId
@@ -245,7 +318,9 @@ class MockDraftRepository implements Pick<
   async getUserDrafts(
     pollId: string,
     userId: string
-  ): Promise<Result<VoteDraft[], string>> {
+  ): ReturnType<
+    Pick<DraftRepository, 'getUserDrafts' | 'deleteUserDrafts'>['getUserDrafts']
+  > {
     return success(
       Array.from(this.drafts.values()).filter(
         (d) => d.userId === userId && d.pollId === pollId
@@ -256,7 +331,12 @@ class MockDraftRepository implements Pick<
   async deleteUserDrafts(
     pollId: string,
     userId: string
-  ): Promise<Result<void, string>> {
+  ): ReturnType<
+    Pick<
+      DraftRepository,
+      'getUserDrafts' | 'deleteUserDrafts'
+    >['deleteUserDrafts']
+  > {
     const toDelete: string[] = [];
     this.drafts.forEach((draft, key) => {
       if (draft.userId === userId && draft.pollId === pollId) {
@@ -355,13 +435,15 @@ describe('FinishVotingUseCase', () => {
 
     // Create a poll
     const pollResult = Poll.create(
-      'Test Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'user-admin',
-      new Date('2026-01-15'),
-      new Date('2026-02-15')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-admin'),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(pollResult.success).toBe(true);
 
@@ -372,10 +454,11 @@ describe('FinishVotingUseCase', () => {
 
     // Create two questions
     const question1Result = Question.create(
-      'Question 1',
+      QuestionText.parse('Question 1'),
       poll.id,
-      1,
-      0,
+      testCreation(QuestionId, 'question-1'),
+      PageNumber.parse(1),
+      SortOrder.parse(0),
       'single-choice'
     );
     expect(question1Result.success).toBe(true);
@@ -386,10 +469,11 @@ describe('FinishVotingUseCase', () => {
     }
 
     const question2Result = Question.create(
-      'Question 2',
+      QuestionText.parse('Question 2'),
       poll.id,
-      1,
-      1,
+      testCreation(QuestionId, 'question-2'),
+      PageNumber.parse(1),
+      SortOrder.parse(1),
       'single-choice'
     );
     expect(question2Result.success).toBe(true);
@@ -400,7 +484,12 @@ describe('FinishVotingUseCase', () => {
     }
 
     // Create answers and add to questions
-    const answer1Result = Answer.create('Answer 1', 1, question1.id);
+    const answer1Result = Answer.create(
+      AnswerText.parse('Answer 1'),
+      SortOrder.parse(1),
+      question1.id,
+      testCreation(AnswerId, 'answer-1')
+    );
     expect(answer1Result.success).toBe(true);
 
     if (answer1Result.success) {
@@ -409,7 +498,12 @@ describe('FinishVotingUseCase', () => {
       await pollRepository.createAnswer(answer1);
     }
 
-    const answer2Result = Answer.create('Answer 2', 1, question2.id);
+    const answer2Result = Answer.create(
+      AnswerText.parse('Answer 2'),
+      SortOrder.parse(1),
+      question2.id,
+      testCreation(AnswerId, 'answer-2')
+    );
     expect(answer2Result.success).toBe(true);
 
     if (answer2Result.success) {
@@ -422,7 +516,7 @@ describe('FinishVotingUseCase', () => {
     const questions = Array.from(pollRepository.getQuestions().values()).filter(
       (q: any) => q.pollId === poll.id
     );
-    (poll as any).props.questions = questions;
+    poll = Poll.reconstitute({ ...poll.toJSON(), questions: questions });
     poll.submitToAdmin();
     poll.takeSnapshot();
     poll.activate();
@@ -431,8 +525,9 @@ describe('FinishVotingUseCase', () => {
     // Create a participant
     const participantResult = PollParticipant.create(
       poll.id,
-      'user-1',
-      new Decimal(2.5).toNumber()
+      UserId.parse('user-1'),
+      testCreation(ParticipantId, 'participant-1'),
+      VotingWeight.parse(new Decimal(2.5).toNumber())
     );
     expect(participantResult.success).toBe(true);
 
@@ -451,6 +546,45 @@ describe('FinishVotingUseCase', () => {
       findById: async () => confirmedUser,
     };
 
+    participantRepository.persist = async (
+      voter,
+      votes,
+      willingness,
+      secret
+    ) => {
+      await voteRepository.createVotes(votes);
+      voter.setWillingToSignProtocol(willingness);
+      voter.assignReceiptSecret(secret);
+      const current = await pollRepository.getPollById(voter.pollId);
+
+      if (!current.success || !current.value) {
+        return failure('poll.errors.pollNotFound');
+      }
+
+      const snapshot = BallotSnapshot.parse({
+        version: 1,
+        pollId: voter.pollId,
+        userId: voter.userId,
+        receiptSecret: secret,
+        pollTitle: current.value.title,
+        votes: votes.map((v) => ({
+          questionId: v.questionId,
+          answerId: v.answerId,
+          weight: v.userWeight.toFixed(6),
+          castAt: v.createdAt.toISOString(),
+          questionText: 'Question',
+          answerText: 'Answer',
+        })),
+      });
+      const ballot: RecordedBallot = { kind: 'original', snapshot };
+      participantRepository.ballots.set(
+        `${voter.pollId}:${voter.userId}`,
+        ballot
+      );
+
+      return success(ballot);
+    };
+
     // Create use case with all repositories
     useCase = new FinishVotingUseCase(
       pollRepository as unknown as PollRepository,
@@ -459,7 +593,10 @@ describe('FinishVotingUseCase', () => {
       draftRepository as unknown as DraftRepository,
       organizationRepository as unknown as OrganizationRepository,
       boardRepository as unknown as BoardRepository,
-      userRepository as UserRepository
+      userRepository as UserRepository,
+      { generate: () => ReceiptSecret.parse('ab'.repeat(32)) },
+      createQuestionIds(),
+      questionClock
     );
   });
 
@@ -469,7 +606,8 @@ describe('FinishVotingUseCase', () => {
       poll.id,
       question1.id,
       answer1.id,
-      'user-1'
+      UserId.parse('user-1'),
+      testCreation(VoteDraftId, 'draft-1')
     );
     expect(draft1Result.success).toBe(true);
 
@@ -481,7 +619,8 @@ describe('FinishVotingUseCase', () => {
       poll.id,
       question2.id,
       answer2.id,
-      'user-1'
+      UserId.parse('user-1'),
+      testCreation(VoteDraftId, 'draft-2')
     );
     expect(draft2Result.success).toBe(true);
 
@@ -540,13 +679,15 @@ describe('FinishVotingUseCase', () => {
   it('should reject when poll not active', async () => {
     // Create inactive poll
     const inactivePollResult = Poll.create(
-      'Inactive Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'user-admin',
-      new Date('2026-01-15'),
-      new Date('2026-02-15')
+      PollTitle.parse('Inactive Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-admin'),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(inactivePollResult.success).toBe(true);
 
@@ -569,7 +710,7 @@ describe('FinishVotingUseCase', () => {
   });
 
   it('should reject when poll is finished', async () => {
-    poll.finish();
+    poll.finish(PollInstant.parse(new Date().toISOString()));
     await pollRepository.updatePoll(poll);
 
     const result = await useCase.execute({
@@ -601,7 +742,13 @@ describe('FinishVotingUseCase', () => {
 
   it('should reject when user has already voted', async () => {
     // Create a vote
-    const voteResult = Vote.create(question1.id, answer1.id, 'user-1', 2.5);
+    const voteResult = Vote.create(
+      question1.id,
+      answer1.id,
+      UserId.parse('user-1'),
+      VotingWeight.parse(2.5),
+      testCreation(VoteId, 'vote-1')
+    );
     expect(voteResult.success).toBe(true);
 
     if (voteResult.success) {
@@ -610,6 +757,7 @@ describe('FinishVotingUseCase', () => {
       const result = await useCase.execute({
         userId: 'user-1',
         pollId: poll.id,
+        willingToSignProtocol: false,
       });
 
       expect(result.success).toBe(false);
@@ -626,7 +774,8 @@ describe('FinishVotingUseCase', () => {
       poll.id,
       question1.id,
       answer1.id,
-      'user-1'
+      UserId.parse('user-1'),
+      testCreation(VoteDraftId, 'draft-3')
     );
     expect(draft1Result.success).toBe(true);
 
@@ -653,13 +802,15 @@ describe('FinishVotingUseCase', () => {
       poll.id,
       question1.id,
       answer1.id,
-      'user-1'
+      UserId.parse('user-1'),
+      testCreation(VoteDraftId, 'draft-4')
     );
     const draft2Result = VoteDraft.create(
       poll.id,
       question2.id,
       answer2.id,
-      'user-1'
+      UserId.parse('user-1'),
+      testCreation(VoteDraftId, 'draft-5')
     );
     expect(draft1Result.success && draft2Result.success).toBe(true);
 
@@ -689,30 +840,39 @@ describe('FinishVotingUseCase', () => {
 
   it('should reject when single-choice question has multiple drafts', async () => {
     // Create a second answer for question1 (single-choice)
-    const answer1bResult = Answer.create('Answer 1b', 2, question1.id);
+    const answer1bResult = Answer.create(
+      AnswerText.parse('Answer 1b'),
+      SortOrder.parse(2),
+      question1.id,
+      testCreation(AnswerId, 'answer-3')
+    );
     expect(answer1bResult.success).toBe(true);
-    const answer1b = answer1bResult.value;
+    const answer1b = expectSuccess(answer1bResult);
     await pollRepository.createAnswer(answer1b);
+    question1.addAnswer(answer1b);
 
     // Create two drafts for single-choice question1
     const draft1aResult = VoteDraft.create(
       poll.id,
       question1.id,
       answer1.id,
-      'user-1'
+      UserId.parse('user-1'),
+      testCreation(VoteDraftId, 'draft-6')
     );
     const draft1bResult = VoteDraft.create(
       poll.id,
       question1.id,
       answer1b.id,
-      'user-1'
+      UserId.parse('user-1'),
+      testCreation(VoteDraftId, 'draft-7')
     );
     // Draft for question2
     const draft2Result = VoteDraft.create(
       poll.id,
       question2.id,
       answer2.id,
-      'user-1'
+      UserId.parse('user-1'),
+      testCreation(VoteDraftId, 'draft-8')
     );
 
     expect(
@@ -747,13 +907,15 @@ describe('FinishVotingUseCase', () => {
       poll.id,
       question1.id,
       answer1.id,
-      'user-1'
+      UserId.parse('user-1'),
+      testCreation(VoteDraftId, 'draft-9')
     );
     const draft2Result = VoteDraft.create(
       poll.id,
       question2.id,
       answer2.id,
-      'user-1'
+      UserId.parse('user-1'),
+      testCreation(VoteDraftId, 'draft-10')
     );
     expect(draft1Result.success && draft2Result.success).toBe(true);
 
@@ -781,13 +943,15 @@ describe('FinishVotingUseCase', () => {
       poll.id,
       question1.id,
       answer1.id,
-      'user-1'
+      UserId.parse('user-1'),
+      testCreation(VoteDraftId, 'draft-11')
     );
     const draft2Result = VoteDraft.create(
       poll.id,
       question2.id,
       answer2.id,
-      'user-1'
+      UserId.parse('user-1'),
+      testCreation(VoteDraftId, 'draft-12')
     );
     expect(draft1Result.success && draft2Result.success).toBe(true);
 
@@ -831,7 +995,7 @@ describe('FinishVotingUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.ORGANIZATION_ARCHIVED);
+    expect(expectFailure(result)).toBe(PollErrors.ORGANIZATION_ARCHIVED);
   });
 
   it('should fail if board is archived', async () => {
@@ -852,28 +1016,38 @@ describe('FinishVotingUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
+    expect(expectFailure(result)).toBe(PollErrors.BOARD_ARCHIVED);
   });
   describe('open polls', () => {
     // The poll built in the outer beforeEach is reused as an open poll: same
     // questions and drafts machinery, different electorate rules.
     beforeEach(async () => {
-      (poll as any).props.pollType = 'OPEN';
+      poll = Poll.reconstitute({
+        ...poll.toJSON(),
+        questions: poll.questions,
+        boardId: null,
+        distributionType: 'EQUAL',
+        propertyIds: [],
+        pollType: 'OPEN',
+      });
+      await pollRepository.createPoll(poll);
 
       const draft1 = VoteDraft.create(
         poll.id,
         question1.id,
         answer1.id,
-        'outsider-1'
+        UserId.parse('outsider-1'),
+        testCreation(VoteDraftId, 'draft-13')
       );
       const draft2 = VoteDraft.create(
         poll.id,
         question2.id,
         answer2.id,
-        'outsider-1'
+        UserId.parse('outsider-1'),
+        testCreation(VoteDraftId, 'draft-14')
       );
-      await draftRepository.saveDraft(draft1.value);
-      await draftRepository.saveDraft(draft2.value);
+      await draftRepository.saveDraft(expectSuccess(draft1));
+      await draftRepository.saveDraft(expectSuccess(draft2));
     });
 
     it('creates participant, history and votes in one call', async () => {
@@ -897,21 +1071,42 @@ describe('FinishVotingUseCase', () => {
       expect(call.votes).toHaveLength(2);
       expect(call.votes.every((v) => v.userWeight === 1)).toBe(true);
       expect(call.willingToSignProtocol).toBe(true);
+      expect(call.history.participantId).toBe(call.participant.id);
+      expect(call.history.changedAt).toEqual(call.votes[0].createdAt);
+    });
+
+    it('keeps an existing open-poll participant identity when accepting the ballot', async () => {
+      const existing = PollParticipant.create(
+        poll.id,
+        UserId.parse('outsider-1'),
+        testCreation(ParticipantId, 'legacy-participant')
+      );
+
+      if (!existing.success) {
+        throw new Error(existing.error);
+      }
+
+      await participantRepository.createParticipants([existing.value]);
+      const result = await useCase.execute({
+        userId: 'outsider-1',
+        pollId: poll.id,
+        willingToSignProtocol: false,
+      });
+      expect(result.success).toBe(true);
+      const call = participantRepository.joinAndVoteCalls[0];
+      expect(call.participant.id).toBe(existing.value.id);
+      expect(call.history.participantId).toBe(existing.value.id);
     });
 
     it('does not use the organization vote path', async () => {
+      const organizationCast = vi.spyOn(participantRepository, 'castVotes');
       await useCase.execute({
         userId: 'outsider-1',
         pollId: poll.id,
         willingToSignProtocol: false,
       });
 
-      const votesResult = await voteRepository.getUserVotes(
-        poll.id,
-        'outsider-1'
-      );
-      expect(votesResult.success).toBe(true);
-      expect(votesResult.value.length).toBe(0);
+      expect(organizationCast).not.toHaveBeenCalled();
     });
 
     it('deletes the drafts after joining', async () => {
@@ -926,7 +1121,7 @@ describe('FinishVotingUseCase', () => {
         'outsider-1'
       );
       expect(draftsResult.success).toBe(true);
-      expect(draftsResult.value.length).toBe(0);
+      expect(expectSuccess(draftsResult).length).toBe(0);
     });
 
     it('rejects an unconfirmed user', async () => {
@@ -939,7 +1134,7 @@ describe('FinishVotingUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.USER_NOT_CONFIRMED);
+      expect(expectFailure(result)).toBe(PollDomainCodes.USER_NOT_CONFIRMED);
       expect(participantRepository.joinAndVoteCalls).toHaveLength(0);
     });
 
@@ -949,9 +1144,10 @@ describe('FinishVotingUseCase', () => {
         poll.id,
         question1.id,
         answer1.id,
-        'outsider-2'
+        UserId.parse('outsider-2'),
+        testCreation(VoteDraftId, 'draft-15')
       );
-      await draftRepository.saveDraft(partialDraft.value);
+      await draftRepository.saveDraft(expectSuccess(partialDraft));
 
       const result = await useCase.execute({
         userId: 'outsider-2',
@@ -960,7 +1156,9 @@ describe('FinishVotingUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.MUST_ANSWER_ALL_QUESTIONS);
+      expect(expectFailure(result)).toBe(
+        PollDomainCodes.MUST_ANSWER_ALL_QUESTIONS
+      );
       expect(participantRepository.joinAndVoteCalls).toHaveLength(0);
     });
   });

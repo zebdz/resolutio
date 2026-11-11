@@ -1,36 +1,47 @@
+/** Poll persistence with parent-row locking and optimistic revision checks.
+ * A stale lifecycle or full-row save cannot overwrite a committed finish. */
+import { ResultCount } from '../../domain/shared/Pagination';
 import {
-  PrismaClient,
-  PollState as PrismaPollState,
-  PollType as PrismaPollType,
-} from '@/generated/prisma/client';
+  PollId,
+  BoardId,
+  OrganizationId,
+  UserId,
+} from '../../domain/shared/EntityIds';
+import { PollWriteFailure } from '../../domain/poll/PollWriteFailure';
+import { lockPollRevision, pollWriteError } from './PollWriteLock';
+import { Prisma, PrismaClient } from '@/generated/prisma/client';
 import { Poll } from '../../domain/poll/Poll';
-import { Question } from '../../domain/poll/Question';
-import { Answer } from '../../domain/poll/Answer';
+import {
+  editablePollInclude,
+  pollUpdateData,
+  toDomainPoll,
+  toPrismaState,
+  toPrismaPollType,
+} from './PrismaPollMapper';
 import {
   PollRepository,
   PollSearchFilters,
 } from '../../domain/poll/PollRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { QuestionType } from '../../domain/poll/QuestionType';
-import { PollState } from '../../domain/poll/PollState';
-import { PollType } from '../../domain/poll/PollType';
 
 export class PrismaPollRepository implements PollRepository {
   constructor(private prisma: PrismaClient) {}
 
-  async createPoll(poll: Poll): Promise<Result<Poll, string>> {
+  async createPoll(poll: Poll): Promise<Result<Poll, PollWriteFailure>> {
     try {
       const created = await this.prisma.poll.create({
         data: {
+          id: poll.id,
+          createdAt: poll.createdAt,
           title: poll.title,
           description: poll.description,
           organizationId: poll.organizationId,
           boardId: poll.boardId,
-          pollType: this.toPrismaPollType(poll.pollType),
+          pollType: toPrismaPollType(poll.pollType),
           createdBy: poll.createdBy,
           startDate: poll.startDate,
           endDate: poll.endDate,
-          state: this.toPrismaState(poll.state),
+          state: toPrismaState(poll.state),
           weightCriteria: poll.weightCriteria,
           distributionType: poll.distributionType,
           propertyAggregation: poll.propertyAggregation,
@@ -63,7 +74,7 @@ export class PrismaPollRepository implements PollRepository {
         },
       });
 
-      return success(this.toDomainPoll(created));
+      return success(toDomainPoll(created));
     } catch (error) {
       console.error('Failed to create poll:', error);
 
@@ -71,34 +82,20 @@ export class PrismaPollRepository implements PollRepository {
     }
   }
 
-  async getPollById(pollId: string): Promise<Result<Poll | null, string>> {
+  async getPollById(
+    pollId: PollId
+  ): Promise<Result<Poll | null, PollWriteFailure>> {
     try {
       const poll = await this.prisma.poll.findUnique({
         where: { id: pollId },
-        include: {
-          questions: {
-            where: { archivedAt: null },
-            include: {
-              answers: {
-                where: { archivedAt: null },
-                orderBy: { order: 'asc' },
-              },
-            },
-            orderBy: [{ page: 'asc' }, { order: 'asc' }],
-          },
-          properties: true,
-          // Ids only — never `bytes`. The description renderer needs the id
-          // allowlist so it can refuse refs to other polls' files; file
-          // content is served solely by the download route.
-          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
-        },
+        include: editablePollInclude,
       });
 
       if (!poll) {
         return success(null);
       }
 
-      return success(this.toDomainPoll(poll));
+      return success(toDomainPoll(poll));
     } catch (error) {
       console.error('Failed to get poll:', error);
 
@@ -106,7 +103,9 @@ export class PrismaPollRepository implements PollRepository {
     }
   }
 
-  async getPollsByBoardId(boardId: string): Promise<Result<Poll[], string>> {
+  async getPollsByBoardId(
+    boardId: BoardId
+  ): Promise<Result<Poll[], PollWriteFailure>> {
     try {
       const polls = await this.prisma.poll.findMany({
         where: {
@@ -133,7 +132,7 @@ export class PrismaPollRepository implements PollRepository {
         orderBy: { createdAt: 'desc' },
       });
 
-      return success(polls.map((poll) => this.toDomainPoll(poll)));
+      return success(polls.map((poll) => toDomainPoll(poll)));
     } catch (error) {
       console.error('Failed to get polls by board:', error);
 
@@ -142,8 +141,8 @@ export class PrismaPollRepository implements PollRepository {
   }
 
   async getPollsByOrganizationId(
-    orgId: string
-  ): Promise<Result<Poll[], string>> {
+    orgId: OrganizationId
+  ): Promise<Result<Poll[], PollWriteFailure>> {
     try {
       const polls = await this.prisma.poll.findMany({
         where: {
@@ -170,7 +169,7 @@ export class PrismaPollRepository implements PollRepository {
         orderBy: { createdAt: 'desc' },
       });
 
-      return success(polls.map((poll) => this.toDomainPoll(poll)));
+      return success(polls.map((poll) => toDomainPoll(poll)));
     } catch (error) {
       console.error('Failed to get polls by organization:', error);
 
@@ -178,7 +177,9 @@ export class PrismaPollRepository implements PollRepository {
     }
   }
 
-  async getPollsByUserId(userId: string): Promise<Result<Poll[], string>> {
+  async getPollsByUserId(
+    userId: UserId
+  ): Promise<Result<Poll[], PollWriteFailure>> {
     try {
       const polls = await this.prisma.poll.findMany({
         where: {
@@ -233,7 +234,7 @@ export class PrismaPollRepository implements PollRepository {
         orderBy: { createdAt: 'desc' },
       });
 
-      return success(polls.map((poll) => this.toDomainPoll(poll)));
+      return success(polls.map((poll) => toDomainPoll(poll)));
     } catch (error) {
       console.error('Failed to get polls by user:', error);
 
@@ -243,11 +244,13 @@ export class PrismaPollRepository implements PollRepository {
 
   async searchPolls(
     filters: PollSearchFilters,
-    userId?: string,
-    adminOrgIds?: string[]
-  ): Promise<Result<{ polls: Poll[]; totalCount: number }, string>> {
+    userId?: UserId,
+    adminOrgIds?: OrganizationId[]
+  ): Promise<
+    Result<{ polls: Poll[]; totalCount: ResultCount }, PollWriteFailure>
+  > {
     try {
-      const where: any = { archivedAt: null };
+      const where: Prisma.PollWhereInput = { archivedAt: null };
 
       if (filters.titleSearch) {
         where.title = {
@@ -258,7 +261,7 @@ export class PrismaPollRepository implements PollRepository {
 
       if (filters.statuses && filters.statuses.length > 0) {
         where.state = {
-          in: filters.statuses.map((s) => this.toPrismaState(s)),
+          in: filters.statuses.map((s) => toPrismaState(s)),
         };
       }
 
@@ -331,7 +334,7 @@ export class PrismaPollRepository implements PollRepository {
         }
       }
 
-      const findManyArgs: any = {
+      const findManyArgs = {
         where,
         include: {
           questions: {
@@ -351,12 +354,13 @@ export class PrismaPollRepository implements PollRepository {
           attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
         },
         orderBy: { createdAt: 'desc' },
-      };
-
-      if (filters.page && filters.pageSize) {
-        findManyArgs.skip = (filters.page - 1) * filters.pageSize;
-        findManyArgs.take = filters.pageSize;
-      }
+        ...(filters.page && filters.pageSize
+          ? {
+              skip: (filters.page - 1) * filters.pageSize,
+              take: filters.pageSize,
+            }
+          : {}),
+      } satisfies Prisma.PollFindManyArgs;
 
       const [polls, totalCount] = await Promise.all([
         this.prisma.poll.findMany(findManyArgs),
@@ -364,8 +368,8 @@ export class PrismaPollRepository implements PollRepository {
       ]);
 
       return success({
-        polls: polls.map((poll) => this.toDomainPoll(poll)),
-        totalCount,
+        polls: polls.map((poll) => toDomainPoll(poll)),
+        totalCount: ResultCount.parse(totalCount),
       });
     } catch (error) {
       console.error('Failed to search polls:', error);
@@ -374,36 +378,26 @@ export class PrismaPollRepository implements PollRepository {
     }
   }
 
-  async updatePoll(poll: Poll): Promise<Result<void, string>> {
+  async updatePoll(poll: Poll): Promise<Result<void, PollWriteFailure>> {
     try {
-      await this.prisma.poll.update({
-        where: { id: poll.id },
-        data: {
-          title: poll.title,
-          description: poll.description,
-          startDate: poll.startDate,
-          endDate: poll.endDate,
-          pollType: this.toPrismaPollType(poll.pollType),
-          state: this.toPrismaState(poll.state),
-          weightCriteria: poll.weightCriteria,
-          distributionType: poll.distributionType,
-          propertyAggregation: poll.propertyAggregation,
-          // The domain exposes no mutator, so this only ever rewrites the
-          // value it loaded — it exists so a round-trip cannot drop the flag.
-          anonymous: poll.isAnonymous(),
-          archivedAt: poll.archivedAt,
-        },
+      await this.prisma.$transaction(async (tx) => {
+        await lockPollRevision(tx, poll);
+
+        await tx.poll.update({
+          where: { id: poll.id },
+          data: pollUpdateData(poll),
+        });
       });
 
       return success(undefined);
     } catch (error) {
       console.error('Failed to update poll:', error);
 
-      return failure('common.errors.unexpected');
+      return failure(pollWriteError(error));
     }
   }
 
-  async deletePoll(pollId: string): Promise<Result<void, string>> {
+  async deletePoll(pollId: PollId): Promise<Result<void, PollWriteFailure>> {
     try {
       await this.prisma.poll.update({
         where: { id: pollId },
@@ -416,110 +410,5 @@ export class PrismaPollRepository implements PollRepository {
 
       return failure('common.errors.unexpected');
     }
-  }
-
-  private toDomainPoll(prismaData: any): Poll {
-    const questions = prismaData.questions
-      ? prismaData.questions.map((q: any) => this.toDomainQuestion(q))
-      : [];
-
-    return Poll.reconstitute({
-      id: prismaData.id,
-      title: prismaData.title,
-      description: prismaData.description,
-      organizationId: prismaData.organizationId,
-      boardId: prismaData.boardId,
-      pollType: this.toDomainPollType(prismaData.pollType),
-      startDate: prismaData.startDate,
-      endDate: prismaData.endDate,
-      state: this.toDomainState(prismaData.state),
-      weightCriteria: prismaData.weightCriteria || null,
-      distributionType: prismaData.distributionType,
-      propertyAggregation: prismaData.propertyAggregation,
-      propertyIds: (prismaData.properties ?? []).map(
-        (p: { propertyId: string }) => p.propertyId
-      ),
-      anonymous: prismaData.anonymous ?? false,
-      createdBy: prismaData.createdBy,
-      createdAt: prismaData.createdAt,
-      archivedAt: prismaData.archivedAt,
-      questions,
-      attachmentIds: (prismaData.attachments ?? []).map(
-        (a: { id: string }) => a.id
-      ),
-    });
-  }
-
-  private toDomainState(prismaState: PrismaPollState): PollState {
-    switch (prismaState) {
-      case 'DRAFT':
-        return PollState.DRAFT;
-      case 'SUBMITTED':
-        return PollState.SUBMITTED;
-      case 'READY':
-        return PollState.READY;
-      case 'ACTIVE':
-        return PollState.ACTIVE;
-      case 'FINISHED':
-        return PollState.FINISHED;
-    }
-  }
-
-  private toPrismaState(domainState: PollState): PrismaPollState {
-    switch (domainState) {
-      case PollState.DRAFT:
-        return 'DRAFT';
-      case PollState.SUBMITTED:
-        return 'SUBMITTED';
-      case PollState.READY:
-        return 'READY';
-      case PollState.ACTIVE:
-        return 'ACTIVE';
-      case PollState.FINISHED:
-        return 'FINISHED';
-    }
-  }
-
-  private toDomainPollType(prismaPollType: PrismaPollType): string {
-    switch (prismaPollType) {
-      case 'ORGANIZATION':
-        return PollType.ORGANIZATION;
-      case 'OPEN':
-        return PollType.OPEN;
-    }
-  }
-
-  private toPrismaPollType(domainPollType: string): PrismaPollType {
-    return domainPollType === PollType.OPEN ? 'OPEN' : 'ORGANIZATION';
-  }
-
-  private toDomainQuestion(prismaData: any): Question {
-    const answers = prismaData.answers
-      ? prismaData.answers.map((a: any) => this.toDomainAnswer(a))
-      : [];
-
-    return Question.reconstitute({
-      id: prismaData.id,
-      text: prismaData.text,
-      details: prismaData.details,
-      pollId: prismaData.pollId,
-      page: prismaData.page,
-      order: prismaData.order,
-      questionType: prismaData.questionType as QuestionType,
-      createdAt: prismaData.createdAt,
-      archivedAt: prismaData.archivedAt,
-      answers,
-    });
-  }
-
-  private toDomainAnswer(prismaData: any): Answer {
-    return Answer.reconstitute({
-      id: prismaData.id,
-      text: prismaData.text,
-      order: prismaData.order,
-      questionId: prismaData.questionId,
-      createdAt: prismaData.createdAt,
-      archivedAt: prismaData.archivedAt,
-    });
   }
 }

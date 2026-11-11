@@ -1,5 +1,16 @@
 'use server';
 
+/** Composes authentication ports at the server boundary; domain code receives explicit time and randomness. */
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
+import { CryptoOtpCodeGenerator } from '@/infrastructure/auth/CryptoOtpCodeGenerator';
+import { CryptoSessionTokenGenerator } from '@/infrastructure/auth/CryptoSessionTokenGenerator';
+import { CryptoNicknameGenerator } from '@/infrastructure/auth/CryptoNicknameGenerator';
+import { CaptchaChallenge } from '@/domain/auth/AuthValues';
+import { otpExpiryMinutesFromEnv } from '@/infrastructure/auth/otpConfiguration';
+
 import { headers } from 'next/headers';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { RegisterUserUseCase } from '@/application/auth/RegisterUserUseCase';
@@ -103,6 +114,11 @@ const profanityChecker = LeoProfanityChecker.getInstance();
 
 // Use cases
 const registerUserUseCase = new RegisterUserUseCase({
+  clock: new SystemClock(),
+  ids: new CryptoIdGenerator(),
+  otpCodeGenerator: new CryptoOtpCodeGenerator(),
+  sessionTokenGenerator: new CryptoSessionTokenGenerator(),
+  nicknameGenerator: new CryptoNicknameGenerator(),
   userRepository,
   passwordHasher,
   otpRepository,
@@ -111,16 +127,20 @@ const registerUserUseCase = new RegisterUserUseCase({
   deliveryChannel,
   emailDeliveryChannel: createEmailDeliveryChannelFromEnv(),
   profanityChecker,
-  expiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '10', 10),
+  expiryMinutes: otpExpiryMinutesFromEnv(),
 });
 const loginUserUseCase = new LoginUserUseCase({
+  clock: new SystemClock(),
+  ids: new CryptoIdGenerator(),
+  otpCodeGenerator: new CryptoOtpCodeGenerator(),
+  sessionTokenGenerator: new CryptoSessionTokenGenerator(),
   userRepository,
   sessionRepository,
   passwordVerifier,
   otpRepository,
   otpCodeHasher,
   deliveryChannel,
-  otpExpiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '10', 10),
+  otpExpiryMinutes: otpExpiryMinutesFromEnv(),
 });
 const logoutUserUseCase = new LogoutUserUseCase(sessionRepository);
 
@@ -279,7 +299,7 @@ export async function loginAction(
 
     // Verify CAPTCHA
     const clientIp = await getClientIp();
-    const captchaToken = formData.get('captchaToken') as string;
+    const captchaToken = formData.get('captchaToken');
 
     // A missing token is a failed CAPTCHA, not a reason to skip it: treating
     // absence as "nothing to check" let any client opt out by omitting the
@@ -289,7 +309,12 @@ export async function loginAction(
     }
 
     if (captchaToken) {
-      const captchaValid = await captchaVerifier.verify(captchaToken, clientIp);
+      const challenge = CaptchaChallenge.safeParse({
+        token: captchaToken,
+        clientIp,
+      });
+      const captchaValid =
+        challenge.success && (await captchaVerifier.verify(challenge.data));
 
       if (!captchaValid) {
         return { success: false, error: t('captchaFailed') };

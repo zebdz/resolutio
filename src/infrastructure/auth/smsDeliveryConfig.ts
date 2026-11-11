@@ -1,13 +1,24 @@
-export interface SmsDeliveryConfig {
+/** Decodes raw environment settings into the effective SMS configuration.
+ * A flagged invalid ceiling cannot also carry a value; display and channel creation share it. */
+import { SmsCostLimitRubles } from './SmsRuProtocol';
+
+interface SmsDeliveryFlags {
   /** true = real sms.ru channel; false = stub (SMS effectively disabled). */
-  channelActive: boolean;
+  readonly channelActive: boolean;
   /** sms.ru test mode — messages are validated but not actually sent/charged. */
-  testMode: boolean;
-  /** Effective per-SMS cost cap in rubles; null means no cap. */
-  maxCostRubles: number | null;
-  /** True when SMS_RU_MAX_COST_RUBLES is set but not a finite number. */
-  maxCostInvalid: boolean;
+  readonly testMode: boolean;
 }
+
+export type SmsDeliveryConfig = SmsDeliveryFlags &
+  (
+    | {
+        /** Effective per-SMS cost cap in rubles; null means no cap. */
+        readonly maxCostRubles: SmsCostLimitRubles | null;
+        /** True when SMS_RU_MAX_COST_RUBLES is set but not a finite number. */
+        readonly maxCostInvalid: false;
+      }
+    | { readonly maxCostRubles: null; readonly maxCostInvalid: true }
+  );
 
 /**
  * Pure resolver: given the raw SMS env-var strings, compute the effective
@@ -26,20 +37,25 @@ export function resolveSmsDeliveryConfig(raw: {
   const channelActive = Boolean(raw.apiId);
   const testMode = raw.testMode === 'true';
 
-  let maxCostRubles: number | null = null;
-  let maxCostInvalid = false;
-
-  if (raw.maxCost) {
-    const parsed = Number(raw.maxCost);
-
-    if (Number.isFinite(parsed)) {
-      maxCostRubles = parsed;
-    } else {
-      maxCostInvalid = true;
-    }
+  if (!raw.maxCost) {
+    return {
+      channelActive,
+      testMode,
+      maxCostRubles: null,
+      maxCostInvalid: false,
+    };
   }
 
-  return { channelActive, testMode, maxCostRubles, maxCostInvalid };
+  const parsed = SmsCostLimitRubles.safeParse(Number(raw.maxCost));
+
+  return parsed.success
+    ? {
+        channelActive,
+        testMode,
+        maxCostRubles: parsed.data,
+        maxCostInvalid: false,
+      }
+    : { channelActive, testMode, maxCostRubles: null, maxCostInvalid: true };
 }
 
 export interface SmsDeliveryDisplayKeys {

@@ -1,5 +1,8 @@
 'use client';
 
+/** Renders a poll snapshot and its available lifecycle controls. */
+import type { PollListItem } from '@/web/actions/poll/PollQueryViews';
+
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/src/web/components/catalyst/button';
@@ -27,7 +30,7 @@ import {
 } from '@/src/web/components/polls/pollControlLabels';
 
 interface PollCardProps {
-  poll: any;
+  poll: PollListItem;
   userId: string;
   canManage: boolean;
   onPollStateChange: () => void;

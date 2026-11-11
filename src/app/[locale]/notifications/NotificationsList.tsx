@@ -1,5 +1,8 @@
 'use client';
 
+/** Recipient notification list preserves validated event payloads and selection identities.
+ * Local optimistic counts are presentation counters; authoritative reads retain domain units. */
+
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -34,23 +37,20 @@ import {
 import { Link } from '@/src/i18n/routing';
 import { getNotificationActionUrl } from '@/web/utils/notificationActionUrl';
 
-interface NotificationData {
-  id: string;
-  type: string;
-  title: string;
-  body: string;
-  data: Record<string, unknown> | null;
-  readAt: Date | null;
-  createdAt: Date;
+import type { NotificationView } from '@/web/actions/notification/serializeNotification';
+import type {
+  NotificationCount,
+  NotificationType,
+} from '@/domain/notification/NotificationContent';
+import type { NotificationId } from '@/domain/shared/EntityIds';
+
+export interface NotificationsListProps {
+  initialNotifications: NotificationView[];
+  initialUnreadCount: NotificationCount;
+  initialTotalCount: NotificationCount;
 }
 
-interface NotificationsListProps {
-  initialNotifications: NotificationData[];
-  initialUnreadCount: number;
-  initialTotalCount: number;
-}
-
-function getNotificationIcon(type: string) {
+function getNotificationIcon(type: NotificationType) {
   switch (type) {
     case 'org_joined_parent':
       return <BuildingOffice2Icon className="h-5 w-5 text-blue-500" />;
@@ -94,14 +94,16 @@ export function NotificationsList({
 }: NotificationsListProps) {
   const t = useTranslations('notification.page');
   const tActions = useTranslations('notification.page.actions');
-  const tTypes = useTranslations('notification.types');
+  const tTypes = useTranslations();
   const router = useRouter();
   const [notifications, setNotifications] = useState(initialNotifications);
-  const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
-  const [totalCount, setTotalCount] = useState(initialTotalCount);
-  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState<number>(initialUnreadCount);
+  const [totalCount, setTotalCount] = useState<number>(initialTotalCount);
+  const [loadingId, setLoadingId] = useState<NotificationId | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<NotificationId>>(
+    new Set()
+  );
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -175,7 +177,7 @@ export function NotificationsList({
     }
   }, [hasMore, loadingMore, loadMore, notifications.length]);
 
-  async function handleMarkAsRead(id: string) {
+  async function handleMarkAsRead(id: NotificationId) {
     setLoadingId(id);
     const result = await markNotificationReadAction(id);
 
@@ -204,7 +206,7 @@ export function NotificationsList({
     router.refresh();
   }
 
-  function toggleSelect(id: string) {
+  function toggleSelect(id: NotificationId) {
     setSelectedIds((prev) => {
       const next = new Set(prev);
 
@@ -247,32 +249,19 @@ export function NotificationsList({
   }
 
   function resolveLocalizedText(
-    key: string,
-    data: Record<string, unknown> | null
+    key: NotificationView['title' | 'body'],
+    data: NotificationView['data']
   ): string {
-    // key format: notification.types.orgJoinedParent.title
-    // We need to extract the part after "notification.types."
-    const typeKey = key.replace('notification.types.', '');
-    const parts = typeKey.split('.');
+    // Pass data values directly to next-intl for ICU interpolation.
+    const values = Object.fromEntries(
+      Object.entries(data).map(([name, value]) => [name, String(value)])
+    );
 
-    if (parts.length === 2) {
-      const [typeName, field] = parts;
-
-      try {
-        // Pass data values directly to next-intl for ICU interpolation
-        const values = data
-          ? Object.fromEntries(
-              Object.entries(data).map(([k, v]) => [k, String(v)])
-            )
-          : {};
-
-        return tTypes(`${typeName}.${field}` as any, values);
-      } catch {
-        return key;
-      }
+    try {
+      return tTypes(key, values);
+    } catch {
+      return key;
     }
-
-    return key;
   }
 
   if (notifications.length === 0) {
@@ -410,7 +399,7 @@ export function NotificationsList({
                         <button
                           onClick={() => handleMarkAsRead(notification.id)}
                           disabled={loadingId === notification.id}
-                          className="cursor-pointer text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                          className="cursor-pointer text-xs text-blue-600 hover:text-blue-700 disabled:cursor-not-allowed dark:text-blue-400 dark:hover:text-blue-300"
                         >
                           {t('markRead')}
                         </button>
@@ -418,10 +407,7 @@ export function NotificationsList({
                     </div>
 
                     {(() => {
-                      const action = getNotificationActionUrl(
-                        notification.type,
-                        notification.data
-                      );
+                      const action = getNotificationActionUrl(notification);
 
                       if (!action) {
                         return null;
@@ -438,7 +424,7 @@ export function NotificationsList({
                           }}
                           className="mt-1.5 inline-flex items-center gap-0.5 text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                         >
-                          {tActions(action.actionKey as any)}
+                          {tActions(action.actionKey)}
                           <ChevronRightIcon className="h-3.5 w-3.5" />
                         </Link>
                       );

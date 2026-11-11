@@ -1,3 +1,7 @@
+/** Poll searches decode persisted records and preserve filter/pagination semantics. */
+import { Instant } from '@/domain/shared/Instant';
+import { OrganizationId, BoardId, UserId } from '@/domain/shared/EntityIds';
+import { PageNumber, PageSize } from '@/domain/shared/Pagination';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PrismaPollRepository } from '../PrismaPollRepository';
 import { PollState } from '../../../domain/poll/PollState';
@@ -10,7 +14,7 @@ function createMockPrisma() {
       create: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
-      count: vi.fn(),
+      count: vi.fn().mockResolvedValue(0),
       update: vi.fn(),
     },
   };
@@ -29,10 +33,14 @@ function buildPrismaPoll(overrides: Record<string, any> = {}) {
     description: 'A test poll description',
     organizationId: 'org-1',
     boardId: 'board-1',
+    pollType: 'ORGANIZATION',
     createdBy: 'user-1',
     startDate,
     endDate,
     state: 'DRAFT' as const,
+    distributionType: 'EQUAL',
+    propertyAggregation: 'RAW_SUM',
+    anonymous: false,
     weightCriteria: null,
     createdAt: now,
     archivedAt: null,
@@ -107,7 +115,7 @@ describe('PrismaPollRepository.searchPolls', () => {
   it('should filter by organizationId', async () => {
     mockPrisma.poll.findMany.mockResolvedValue([]);
 
-    await repo.searchPolls({ organizationId: 'org-1' });
+    await repo.searchPolls({ organizationId: OrganizationId.parse('org-1') });
 
     expect(mockPrisma.poll.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -121,7 +129,7 @@ describe('PrismaPollRepository.searchPolls', () => {
   it('should filter by boardId', async () => {
     mockPrisma.poll.findMany.mockResolvedValue([]);
 
-    await repo.searchPolls({ boardId: 'board-1' });
+    await repo.searchPolls({ boardId: BoardId.parse('board-1') });
 
     expect(mockPrisma.poll.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -133,8 +141,8 @@ describe('PrismaPollRepository.searchPolls', () => {
   });
 
   it('should filter by createdFrom/createdTo', async () => {
-    const from = new Date('2025-01-01');
-    const to = new Date('2025-06-01');
+    const from = Instant.fromDate(new Date('2025-01-01'));
+    const to = Instant.fromDate(new Date('2025-06-01'));
     mockPrisma.poll.findMany.mockResolvedValue([]);
 
     await repo.searchPolls({ createdFrom: from, createdTo: to });
@@ -149,7 +157,7 @@ describe('PrismaPollRepository.searchPolls', () => {
   });
 
   it('should filter by createdFrom only', async () => {
-    const from = new Date('2025-01-01');
+    const from = Instant.fromDate(new Date('2025-01-01'));
     mockPrisma.poll.findMany.mockResolvedValue([]);
 
     await repo.searchPolls({ createdFrom: from });
@@ -164,8 +172,8 @@ describe('PrismaPollRepository.searchPolls', () => {
   });
 
   it('should filter by startFrom/startTo', async () => {
-    const from = new Date('2025-07-01');
-    const to = new Date('2025-08-01');
+    const from = Instant.fromDate(new Date('2025-07-01'));
+    const to = Instant.fromDate(new Date('2025-08-01'));
     mockPrisma.poll.findMany.mockResolvedValue([]);
 
     await repo.searchPolls({ startFrom: from, startTo: to });
@@ -182,7 +190,7 @@ describe('PrismaPollRepository.searchPolls', () => {
   it('should add membership WHERE clause when userId provided', async () => {
     mockPrisma.poll.findMany.mockResolvedValue([]);
 
-    await repo.searchPolls({}, 'user-1');
+    await repo.searchPolls({}, UserId.parse('user-1'));
 
     expect(mockPrisma.poll.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -220,7 +228,7 @@ describe('PrismaPollRepository.searchPolls', () => {
     // creating a poll on the parent for cross-tree weighting).
     mockPrisma.poll.findMany.mockResolvedValue([]);
 
-    await repo.searchPolls({}, 'user-1');
+    await repo.searchPolls({}, UserId.parse('user-1'));
 
     const call = mockPrisma.poll.findMany.mock.calls[0][0];
     expect(call.where.OR).toEqual(
@@ -231,7 +239,10 @@ describe('PrismaPollRepository.searchPolls', () => {
   it('should add admin org IDs to OR clause when provided with userId', async () => {
     mockPrisma.poll.findMany.mockResolvedValue([]);
 
-    await repo.searchPolls({}, 'user-1', ['org-admin-1', 'org-admin-2']);
+    await repo.searchPolls({}, UserId.parse('user-1'), [
+      OrganizationId.parse('org-admin-1'),
+      OrganizationId.parse('org-admin-2'),
+    ]);
 
     const call = mockPrisma.poll.findMany.mock.calls[0][0];
     // 3 membership-style branches + creator + admin-orgs = 5
@@ -244,7 +255,7 @@ describe('PrismaPollRepository.searchPolls', () => {
   it('should not add admin org clause when adminOrgIds is empty', async () => {
     mockPrisma.poll.findMany.mockResolvedValue([]);
 
-    await repo.searchPolls({}, 'user-1', []);
+    await repo.searchPolls({}, UserId.parse('user-1'), []);
 
     const call = mockPrisma.poll.findMany.mock.calls[0][0];
     // 3 membership-style branches + creator = 4
@@ -267,9 +278,9 @@ describe('PrismaPollRepository.searchPolls', () => {
       {
         titleSearch: 'Budget',
         statuses: [PollState.ACTIVE],
-        organizationId: 'org-2',
+        organizationId: OrganizationId.parse('org-2'),
       },
-      'user-1'
+      UserId.parse('user-1')
     );
 
     const call = mockPrisma.poll.findMany.mock.calls[0][0];
@@ -329,7 +340,10 @@ describe('PrismaPollRepository.searchPolls', () => {
     mockPrisma.poll.findMany.mockResolvedValue([buildPrismaPoll()]);
     mockPrisma.poll.count.mockResolvedValue(25);
 
-    const result = await repo.searchPolls({ page: 2, pageSize: 10 });
+    const result = await repo.searchPolls({
+      page: PageNumber.parse(2),
+      pageSize: PageSize.parse(10),
+    });
 
     expect(result.success).toBe(true);
     expect(mockPrisma.poll.findMany).toHaveBeenCalledWith(
@@ -344,7 +358,10 @@ describe('PrismaPollRepository.searchPolls', () => {
     mockPrisma.poll.findMany.mockResolvedValue([buildPrismaPoll()]);
     mockPrisma.poll.count.mockResolvedValue(42);
 
-    const result = await repo.searchPolls({ page: 1, pageSize: 10 });
+    const result = await repo.searchPolls({
+      page: PageNumber.parse(1),
+      pageSize: PageSize.parse(10),
+    });
 
     if (!result.success) {
       return;
@@ -361,8 +378,8 @@ describe('PrismaPollRepository.searchPolls', () => {
     await repo.searchPolls({
       titleSearch: 'Budget',
       statuses: [PollState.ACTIVE],
-      page: 1,
-      pageSize: 10,
+      page: PageNumber.parse(1),
+      pageSize: PageSize.parse(10),
     });
 
     const findManyWhere = mockPrisma.poll.findMany.mock.calls[0][0].where;
@@ -394,7 +411,10 @@ describe('PrismaPollRepository.searchPolls', () => {
     mockPrisma.poll.findMany.mockResolvedValue([]);
     mockPrisma.poll.count.mockResolvedValue(0);
 
-    await repo.searchPolls({ boardId: 'board-1', orgWideOnly: true });
+    await repo.searchPolls({
+      boardId: BoardId.parse('board-1'),
+      orgWideOnly: true,
+    });
 
     const where = mockPrisma.poll.findMany.mock.calls[0][0].where;
     expect(where.boardId).toBe('board-1');

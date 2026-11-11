@@ -1,3 +1,11 @@
+/** Verifies account ownership before validating and replacing a password.
+ * Plaintext enters the hashing port only after policy checks; successful resets revoke sessions. */
+import { AuthenticationError } from './AuthenticationError';
+import { PlaintextPassword } from '@/domain/user/UserValues';
+
+import { Clock } from '@/application/shared/EntityCreation';
+import { OtpDestination } from '@/domain/otp/OtpValues';
+
 import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { OtpPurposes } from '@/domain/otp/OtpVerification';
 import { UserRepository } from '@/domain/user/UserRepository';
@@ -8,7 +16,7 @@ import {
 } from '@/domain/user/User';
 import { UserDomainCodes } from '@/domain/user/UserDomainCodes';
 import { Result, success, failure } from '@/domain/shared/Result';
-import { OtpCodeHasher } from './OtpCodeHasher';
+import { OtpCodeHasher, verifyEnteredOtpCode } from './OtpCodeHasher';
 import { OtpErrors } from './OtpErrors';
 import { PasswordHasher } from './RegisterUserUseCase';
 import { parseAccountIdentifier } from './parseAccountIdentifier';
@@ -20,6 +28,7 @@ export interface ResetPasswordWithOtpInput {
 }
 
 interface Dependencies {
+  clock: Clock;
   userRepository: UserRepository;
   otpRepository: OtpRepository;
   sessionRepository: SessionRepository;
@@ -34,6 +43,7 @@ interface Dependencies {
  * reported identically, so step two is no more of an oracle than step one.
  */
 export class ResetPasswordWithOtpUseCase {
+  private readonly clock: Clock;
   private readonly userRepository: UserRepository;
   private readonly otpRepository: OtpRepository;
   private readonly sessionRepository: SessionRepository;
@@ -41,6 +51,7 @@ export class ResetPasswordWithOtpUseCase {
   private readonly passwordHasher: PasswordHasher;
 
   constructor(deps: Dependencies) {
+    this.clock = deps.clock;
     this.userRepository = deps.userRepository;
     this.otpRepository = deps.otpRepository;
     this.sessionRepository = deps.sessionRepository;
@@ -50,7 +61,8 @@ export class ResetPasswordWithOtpUseCase {
 
   async execute(
     input: ResetPasswordWithOtpInput
-  ): Promise<Result<{ reset: true }, string>> {
+  ): Promise<Result<{ reset: true }, AuthenticationError>> {
+    const now = this.clock.now();
     const parsed = parseAccountIdentifier(input.identifier);
 
     if (!parsed) {
@@ -67,8 +79,10 @@ export class ResetPasswordWithOtpUseCase {
     }
 
     const otp = await this.otpRepository.findLatestByIdentifier(
-      user.email.getValue(),
-      'email',
+      OtpDestination.parse({
+        identifier: user.email.getValue(),
+        channel: 'email',
+      }),
       OtpPurposes.PASSWORD_RESET
     );
 
@@ -91,7 +105,7 @@ export class ResetPasswordWithOtpUseCase {
       return failure(OtpErrors.ALREADY_VERIFIED);
     }
 
-    if (otp.isExpired()) {
+    if (otp.isExpired(now)) {
       return failure(OtpErrors.EXPIRED);
     }
 
@@ -102,7 +116,7 @@ export class ResetPasswordWithOtpUseCase {
     const incremented = otp.incrementAttempts();
     await this.otpRepository.update(incremented);
 
-    if (!this.otpCodeHasher.verify(input.code, otp.code)) {
+    if (!verifyEnteredOtpCode(this.otpCodeHasher, input.code, otp.code)) {
       return failure(OtpErrors.INVALID);
     }
 
@@ -125,9 +139,10 @@ export class ResetPasswordWithOtpUseCase {
       return failure(UserDomainCodes.PASSWORD_MATCHES_PERSONAL_INFO);
     }
 
-    await this.otpRepository.update(incremented.markVerified());
+    const password = PlaintextPassword.parse(input.newPassword);
+    await this.otpRepository.update(incremented.markVerified(now));
 
-    const hashedPassword = await this.passwordHasher.hash(input.newPassword);
+    const hashedPassword = await this.passwordHasher.hash(password);
     await this.userRepository.save(user.changePassword(hashedPassword));
 
     // Every live session was opened with the old password. A reset prompted by

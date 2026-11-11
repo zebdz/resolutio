@@ -137,7 +137,7 @@ export default async function AnonReportPage({ params }: AnonReportPageProps) {
     fileName: a.fileName,
     mimeType: a.mimeType,
     sizeBytes: a.sizeBytes,
-    createdAt: a.createdAt.toISOString(),
+    createdAt: a.createdAt,
   }));
 
   const serializedPolls = polls.map((p) => ({

@@ -1,3 +1,6 @@
+/** Administrator inbox tests preserve role isolation, ordering and pagination.
+ * Stored requester data is decoded before entering the application result. */
+import { PrismaOrganizationDirectory } from '@/infrastructure/repositories/PrismaOrganizationDirectory';
 import { PrismaClient } from '@/generated/prisma/client';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GetPendingRequestsUseCase } from '../GetPendingRequestsUseCase';
@@ -50,7 +53,10 @@ describe('GetPendingRequestsUseCase', () => {
         filtered = filtered.slice(0, args.take);
       }
 
-      return filtered;
+      return filtered.map((row) => ({
+        ...row,
+        user: { ...row.user, middleName: row.user.middleName ?? null },
+      }));
     };
 
     prisma.organizationUser.count = async (args: any) => {
@@ -66,7 +72,9 @@ describe('GetPendingRequestsUseCase', () => {
     };
 
     useCase = new GetPendingRequestsUseCase({
-      prisma: prisma as unknown as PrismaClient,
+      directory: new PrismaOrganizationDirectory(
+        prisma as unknown as PrismaClient
+      ),
     });
   });
 
@@ -78,6 +86,12 @@ describe('GetPendingRequestsUseCase', () => {
     if (result.success) {
       expect(result.value.requests).toEqual([]);
     }
+  });
+
+  it('rejects fractional pagination before querying pending requests', async () => {
+    expect(
+      await useCase.execute('admin-123', { page: 1.5, pageSize: 20 })
+    ).toEqual({ success: false, error: 'common.errors.unexpected' });
   });
 
   it('should return empty list when there are no pending requests', async () => {
@@ -150,7 +164,9 @@ describe('GetPendingRequestsUseCase', () => {
       expect(result.value.requests[0].requester.id).toBe('user-456');
       expect(result.value.requests[0].requester.firstName).toBe('John');
       expect(result.value.requests[0].requester.lastName).toBe('Doe');
-      expect(result.value.requests[0].requestedAt).toBeInstanceOf(Date);
+      expect(result.value.requests[0].requestedAt).toBe(
+        pendingRequests[0].createdAt.toISOString()
+      );
     }
   });
 
@@ -425,7 +441,12 @@ describe('GetPendingRequestsUseCase', () => {
         userId: 'u-1',
         status: 'pending',
         createdAt: new Date('2024-01-01'),
-        user: { id: 'u-1', firstName: 'A', lastName: 'B', phoneNumber: '+1' },
+        user: {
+          id: 'u-1',
+          firstName: 'Alice',
+          lastName: 'Brown',
+          phoneNumber: '+1',
+        },
         organization: { id: 'org-1', name: 'Org One' },
       },
       {
@@ -434,7 +455,12 @@ describe('GetPendingRequestsUseCase', () => {
         userId: 'u-2',
         status: 'pending',
         createdAt: new Date('2024-01-02'),
-        user: { id: 'u-2', firstName: 'C', lastName: 'D', phoneNumber: '+2' },
+        user: {
+          id: 'u-2',
+          firstName: 'Carol',
+          lastName: 'Davis',
+          phoneNumber: '+2',
+        },
         organization: { id: 'org-1', name: 'Org One' },
       }
     );
@@ -465,7 +491,7 @@ describe('GetPendingRequestsUseCase', () => {
         createdAt: new Date(`2024-01-${String(i).padStart(2, '0')}`),
         user: {
           id: `u-${i}`,
-          firstName: `User${i}`,
+          firstName: ['Alice', 'Boris', 'Carol', 'David', 'Elena'][i - 1],
           lastName: 'Test',
           phoneNumber: `+${i}`,
         },
@@ -483,8 +509,8 @@ describe('GetPendingRequestsUseCase', () => {
     if (result1.success) {
       expect(result1.value.requests).toHaveLength(2);
       expect(result1.value.totalCount).toBe(5);
-      expect(result1.value.requests[0].requester.firstName).toBe('User1');
-      expect(result1.value.requests[1].requester.firstName).toBe('User2');
+      expect(result1.value.requests[0].requester.firstName).toBe('Alice');
+      expect(result1.value.requests[1].requester.firstName).toBe('Boris');
     }
 
     // Page 2 of size 2
@@ -497,8 +523,8 @@ describe('GetPendingRequestsUseCase', () => {
     if (result2.success) {
       expect(result2.value.requests).toHaveLength(2);
       expect(result2.value.totalCount).toBe(5);
-      expect(result2.value.requests[0].requester.firstName).toBe('User3');
-      expect(result2.value.requests[1].requester.firstName).toBe('User4');
+      expect(result2.value.requests[0].requester.firstName).toBe('Carol');
+      expect(result2.value.requests[1].requester.firstName).toBe('David');
     }
 
     // Page 3 of size 2 (last page, only 1 item)
@@ -511,7 +537,7 @@ describe('GetPendingRequestsUseCase', () => {
     if (result3.success) {
       expect(result3.value.requests).toHaveLength(1);
       expect(result3.value.totalCount).toBe(5);
-      expect(result3.value.requests[0].requester.firstName).toBe('User5');
+      expect(result3.value.requests[0].requester.firstName).toBe('Elena');
     }
   });
 
@@ -531,7 +557,7 @@ describe('GetPendingRequestsUseCase', () => {
         createdAt: new Date(`2024-01-${String(i).padStart(2, '0')}`),
         user: {
           id: `u-${i}`,
-          firstName: `User${i}`,
+          firstName: ['Alice', 'Boris', 'Carol', 'David', 'Elena'][i - 1],
           lastName: 'Test',
           phoneNumber: `+${i}`,
         },

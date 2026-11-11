@@ -1,3 +1,4 @@
+/** Authorizes and explicitly maps named poll records into the localized PDF projection. */
 import { stripMarkdownToPlainText } from '@/application/shared/StripMarkdownToPlainText';
 import fs from 'fs';
 import path from 'path';
@@ -6,10 +7,7 @@ import { getCurrentUser } from '@/web/lib/session';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { GetNamedProtocolUseCase } from '@/application/poll/GetNamedProtocolUseCase';
 import { User } from '@/domain/user/User';
-import {
-  DistributionType,
-  isOwnershipMode,
-} from '@/domain/poll/DistributionType';
+import { isOwnershipMode } from '@/domain/poll/DistributionType';
 import {
   prisma,
   PrismaPollRepository,
@@ -151,9 +149,7 @@ export async function GET(
       endDate: poll.endDate ? poll.endDate.toISOString().split('T')[0] : '',
       // A poll that is still running produces an interim document.
       isPreliminary: poll.isActive(),
-      isPropertyBased: isOwnershipMode(
-        poll.distributionType as DistributionType
-      ),
+      isPropertyBased: isOwnershipMode(poll.distributionType),
       isOpenPoll: poll.isOpen(),
       totalParticipants,
       totalParticipantWeight,

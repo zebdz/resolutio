@@ -1,3 +1,6 @@
+/** CAPTCHA verification accepts a decoded challenge and client address. */
+import { CaptchaChallenge } from '@/domain/auth/AuthValues';
+
 export interface CaptchaVerifier {
-  verify(token: string, clientIp: string): Promise<boolean>;
+  verify(challenge: CaptchaChallenge): Promise<boolean>;
 }

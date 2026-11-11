@@ -1,12 +1,25 @@
+/** Creation boundary validates request values and supplies explicit identity/time
+ * before persisting the organization aggregate. Existing authorization rules remain here. */
+import { OrganizationId, UserId } from '../../domain/shared/EntityIds';
+import {
+  parseOrganizationName,
+  parseOrganizationDescription,
+} from '../../domain/organization/OrganizationValues';
+import { Clock, IdGenerator, entityCreation } from '../shared/EntityCreation';
 import { Organization } from '../../domain/organization/Organization';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { CreateOrganizationInput } from './CreateOrganizationSchema';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 
 export interface CreateOrganizationDependencies {
+  ids: IdGenerator;
+  clock: Clock;
   organizationRepository: OrganizationRepository;
   userRepository: UserRepository;
   profanityChecker: ProfanityChecker;
@@ -17,9 +30,38 @@ export class CreateOrganizationUseCase {
 
   async execute(
     input: CreateOrganizationInput,
-    userId: string
-  ): Promise<Result<{ organization: Organization }, string>> {
-    const { name, description, parentId } = input;
+    rawUserId: string
+  ): Promise<
+    Result<{ organization: Organization }, OrganizationUseCaseFailure>
+  > {
+    const actor = UserId.safeParse(rawUserId);
+
+    if (!actor.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
+    }
+
+    const userId = actor.data;
+    const parsedName = parseOrganizationName(input.name);
+
+    if (!parsedName.success) {
+      return parsedName;
+    }
+
+    const parsedDescription = parseOrganizationDescription(input.description);
+
+    if (!parsedDescription.success) {
+      return parsedDescription;
+    }
+
+    const parent = OrganizationId.nullish().safeParse(input.parentId);
+
+    if (!parent.success) {
+      return failure(OrganizationErrors.PARENT_NOT_FOUND);
+    }
+
+    const name = parsedName.value;
+    const description = parsedDescription.value;
+    const parentId = parent.data ?? null;
 
     // Check if organization with this name already exists
     const existingOrg = await this.deps.organizationRepository.findByName(name);
@@ -61,8 +103,13 @@ export class CreateOrganizationUseCase {
       name,
       description,
       userId,
-      parentId,
-      input.allowMultiTreeMembership,
+      parentId === null
+        ? {
+            kind: 'root',
+            allowMultiTreeMembership: input.allowMultiTreeMembership ?? false,
+          }
+        : { kind: 'child', parentId },
+      entityCreation(OrganizationId, this.deps.ids, this.deps.clock),
       this.deps.profanityChecker
     );
 

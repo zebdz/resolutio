@@ -1,3 +1,4 @@
+/** Nickname clients retain validated scalar text and cannot bypass syntax through boxed values. */
 import { describe, it, expect } from 'vitest';
 import { Nickname } from '../Nickname';
 import { UserDomainCodes } from '../UserDomainCodes';
@@ -6,6 +7,13 @@ import { ProfanityChecker } from '../../shared/profanity/ProfanityChecker';
 
 describe('Nickname', () => {
   describe('create', () => {
+    it('rejects boxed text rather than storing an object as a nickname', () => {
+      const boxed: unknown = Object('john_doe');
+      // @ts-expect-error Exercise an untyped constructor caller.
+      expect(() => Nickname.create(boxed)).toThrow(
+        UserDomainCodes.NICKNAME_INVALID
+      );
+    });
     it('should create a valid nickname', () => {
       const nickname = Nickname.create('john_doe');
       expect(nickname.getValue()).toBe('john_doe');
@@ -64,6 +72,7 @@ describe('Nickname', () => {
       const profaneChecker: ProfanityChecker = {
         containsProfanity: (text: string) =>
           text.toLowerCase().includes('badword'),
+        findProfaneWords: () => [],
       };
 
       it('should throw when nickname contains profanity', () => {
@@ -99,23 +108,6 @@ describe('Nickname', () => {
           UserDomainCodes.NICKNAME_INVALID
         );
       }
-    });
-  });
-
-  describe('generate', () => {
-    it('should generate a nickname starting with user_', () => {
-      const nickname = Nickname.generate();
-      expect(nickname.getValue()).toMatch(/^user_[a-z0-9]{8}$/);
-    });
-
-    it('should generate unique nicknames', () => {
-      const nicknames = new Set<string>();
-
-      for (let i = 0; i < 100; i++) {
-        nicknames.add(Nickname.generate().getValue());
-      }
-
-      expect(nicknames.size).toBe(100);
     });
   });
 

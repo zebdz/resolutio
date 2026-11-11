@@ -1,3 +1,10 @@
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { Minutes } from '@/domain/auth/AuthValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import {
+  authTestDependencies,
+  authTestNow,
+} from '@/application/auth/__tests__/authTestValues';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RequestPasswordResetUseCase } from '../RequestPasswordResetUseCase';
 import { AuthErrors } from '../AuthErrors';
@@ -15,7 +22,7 @@ describe('RequestPasswordResetUseCase', () => {
   let useCase: RequestPasswordResetUseCase;
   let userRepository: Partial<UserRepository>;
   let otpRepository: Partial<OtpRepository>;
-  let deliveryChannel: OtpDeliveryChannel;
+  let deliveryChannel: OtpDeliveryChannel<'email'>;
   let otpCodeHasher: OtpCodeHasher;
 
   function buildUser(email?: string, confirmed = true) {
@@ -34,7 +41,7 @@ describe('RequestPasswordResetUseCase', () => {
       user = user.changeEmail(EmailAddress.create(email));
 
       if (confirmed) {
-        user = user.confirmEmail();
+        user = expectSuccess(user.confirmEmail(authTestNow()));
       }
     }
 
@@ -61,11 +68,12 @@ describe('RequestPasswordResetUseCase', () => {
     };
 
     useCase = new RequestPasswordResetUseCase({
+      ...authTestDependencies(),
       userRepository: userRepository as UserRepository,
       otpRepository: otpRepository as OtpRepository,
       deliveryChannel,
       otpCodeHasher,
-      expiryMinutes: 10,
+      expiryMinutes: Minutes.parse(10),
     });
   });
 
@@ -174,7 +182,7 @@ describe('RequestPasswordResetUseCase', () => {
         expiresAt: new Date(Date.now() + 600_000),
         verifiedAt: null,
         createdAt: new Date(),
-        userId: 'user-1',
+        userId: UserId.parse('user-1'),
       })
     );
 
@@ -201,10 +209,9 @@ describe('RequestPasswordResetUseCase', () => {
     await run();
 
     expect(otpRepository.countRecentByIdentifier).toHaveBeenCalledWith(
-      'ivan@mail.ru',
-      'email',
+      { identifier: 'ivan@mail.ru', channel: 'email' },
       OtpPurposes.PASSWORD_RESET,
-      expect.any(Number)
+      expect.any(String)
     );
   });
 

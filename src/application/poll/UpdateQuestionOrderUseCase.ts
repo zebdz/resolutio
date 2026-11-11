@@ -1,17 +1,27 @@
+/** Decodes raw reorder requests before authorization and typed persistence.
+ * Position constraints are owned by the domain value schemas. */
+import { z } from 'zod';
+import { PollId, QuestionId, UserId } from '@/domain/shared/EntityIds';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
-import {
-  QuestionRepository,
-  UpdateQuestionOrderData,
-} from '../../domain/poll/QuestionRepository';
+import { QuestionRepository } from '../../domain/poll/QuestionRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 
 export interface UpdateQuestionOrderInput {
   pollId: string;
   userId: string;
-  updates: UpdateQuestionOrderData[];
+  updates: { questionId: string; page: number; order: number }[];
 }
+
+const request = z.object({
+  pollId: PollId,
+  userId: UserId,
+  updates: z.array(
+    z.object({ questionId: QuestionId, page: PageNumber, order: SortOrder })
+  ),
+});
 
 export class UpdateQuestionOrderUseCase {
   constructor(
@@ -21,8 +31,15 @@ export class UpdateQuestionOrderUseCase {
   ) {}
 
   async execute(
-    input: UpdateQuestionOrderInput
-  ): Promise<Result<void, string>> {
+    rawInput: UpdateQuestionOrderInput
+  ): Promise<Result<void, PollUseCaseFailure>> {
+    const decoded = request.safeParse(rawInput);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = decoded.data;
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(input.pollId);
 
@@ -53,6 +70,21 @@ export class UpdateQuestionOrderUseCase {
     // 4. Validate updates
     if (!input.updates || input.updates.length === 0) {
       return failure(PollErrors.NO_UPDATES);
+    }
+
+    // Authorization for one poll does not grant access to another poll's questions.
+    const editableQuestionIds = new Set(
+      poll.questions
+        .filter((question) => !question.isArchived())
+        .map((question) => question.id)
+    );
+
+    if (
+      input.updates.some(
+        (update) => !editableQuestionIds.has(update.questionId)
+      )
+    ) {
+      return failure(PollErrors.QUESTION_NOT_FOUND);
     }
 
     // 4. Update question orders

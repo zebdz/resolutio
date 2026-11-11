@@ -1,3 +1,24 @@
+/** Verifies Finish Poll behavior through application ports.
+ * Notification doubles return explicit append outcomes, matching the production writer. */
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { PollInstant } from '@/domain/poll/PollValues';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { BoardId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import {
+  pollFixtureCreation,
+  pollFixtureIds,
+  pollFixtureClock,
+} from '@/application/poll/__tests__/pollFixtureCreation';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { QuestionId, AnswerId, PollId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { FinishPollUseCase } from '../FinishPollUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -33,34 +54,51 @@ describe('FinishPollUseCase', () => {
   beforeEach(() => {
     // Create a test poll
     const pollResult = Poll.create(
-      'Test Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'user-1',
-      new Date('2024-01-01'),
-      new Date('2024-12-31')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2024-01-01'), new Date('2024-12-31'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(pollResult.success).toBe(true);
-    poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    poll = expectSuccess(pollResult);
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      id: 'poll-1',
+    });
 
     // Add a question with answer
     const questionResult = Question.create(
-      'Question 1',
+      QuestionText.parse('Question 1'),
       poll.id,
-      1,
-      1,
+      pollFixtureCreation(QuestionId),
+      PageNumber.parse(1),
+      SortOrder.parse(1),
       'single-choice'
     );
     expect(questionResult.success).toBe(true);
-    const question = questionResult.value;
-    (question as any).props.id = 'question-1';
+    let question = expectSuccess(questionResult);
+    question = Question.reconstitute({
+      ...question.toJSON(),
+      answers: question.answers,
+      id: 'question-1',
+    });
 
     // Add answer
-    const answerResult = Answer.create('Answer 1', 1, question.id);
-    (answerResult.value as any).props.id = 'answer-1';
-    question.addAnswer(answerResult.value);
+    const answer = expectSuccess(
+      Answer.create(
+        AnswerText.parse('Answer 1'),
+        SortOrder.parse(1),
+        question.id,
+        testCreation(AnswerId, 'answer-1')
+      )
+    );
+    question.addAnswer(answer);
 
     poll.addQuestion(question);
 
@@ -71,7 +109,7 @@ describe('FinishPollUseCase', () => {
 
     // Mock repositories
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
       updatePoll: vi.fn().mockResolvedValue(success(undefined)),
     };
 
@@ -103,6 +141,8 @@ describe('FinishPollUseCase', () => {
     notificationRepository = {
       saveBatch: vi.fn().mockImplementation(async (notifs: Notification[]) => {
         savedNotifications.push(...notifs);
+
+        return success(undefined);
       }),
     };
 
@@ -133,7 +173,9 @@ describe('FinishPollUseCase', () => {
       userRepository as UserRepository,
       notificationRepository as NotificationRepository,
       participantRepository as ParticipantRepository,
-      boardRepository as BoardRepository
+      boardRepository as BoardRepository,
+      pollFixtureIds,
+      pollFixtureClock
     );
   });
 
@@ -165,11 +207,11 @@ describe('FinishPollUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.NOT_FOUND);
+    expect(expectFailure(result)).toBe(PollErrors.NOT_FOUND);
   });
 
   it('should fail if poll is already finished', async () => {
-    poll.finish();
+    poll.finish(PollInstant.parse(new Date().toISOString()));
 
     const result = await useCase.execute({
       pollId: poll.id,
@@ -177,7 +219,7 @@ describe('FinishPollUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
+    expect(expectFailure(result)).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
   });
 
   it('should fail if poll is in READY state (not active)', async () => {
@@ -189,7 +231,7 @@ describe('FinishPollUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
+    expect(expectFailure(result)).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
   });
 
   // Authorization tests
@@ -203,7 +245,7 @@ describe('FinishPollUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollErrors.NOT_AUTHORIZED);
+      expect(expectFailure(result)).toBe(PollErrors.NOT_AUTHORIZED);
     });
 
     it('should allow admin user', async () => {
@@ -229,6 +271,15 @@ describe('FinishPollUseCase', () => {
   });
 
   describe('notifications', () => {
+    it('preserves finish success and notifications when draft cleanup throws', async () => {
+      draftRepository.deleteAllPollDrafts = vi
+        .fn()
+        .mockRejectedValue(new Error('cleanup unavailable'));
+      expect(
+        (await useCase.execute({ pollId: poll.id, userId: 'admin-1' })).success
+      ).toBe(true);
+      expect(savedNotifications).toHaveLength(1);
+    });
     it('should notify participants when poll is finished', async () => {
       await useCase.execute({ pollId: poll.id, userId: 'admin-1' });
 
@@ -238,7 +289,7 @@ describe('FinishPollUseCase', () => {
     });
 
     it('should not send notifications if finish fails', async () => {
-      poll.finish(); // already finished
+      poll.finish(PollInstant.parse(new Date().toISOString())); // already finished
 
       await useCase.execute({ pollId: poll.id, userId: 'admin-1' });
 
@@ -265,7 +316,7 @@ describe('FinishPollUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.ORGANIZATION_ARCHIVED);
+    expect(expectFailure(result)).toBe(PollErrors.ORGANIZATION_ARCHIVED);
   });
 
   it('should fail if board is archived', async () => {
@@ -285,6 +336,6 @@ describe('FinishPollUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
+    expect(expectFailure(result)).toBe(PollErrors.BOARD_ARCHIVED);
   });
 });

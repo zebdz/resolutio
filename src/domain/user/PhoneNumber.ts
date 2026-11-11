@@ -1,4 +1,6 @@
-// Value Object: Phone Number
+/** Validates canonical phone text without coercion before it becomes a contact value. */
+import { UserDomainCodes } from './UserDomainCodes';
+
 export const PHONE_NUMBER_REGEX = /^\+[1-9]\d{1,14}$/;
 
 export class PhoneNumber {
@@ -8,10 +10,11 @@ export class PhoneNumber {
     // Validate phone number format: +<country code><number>
     // Example: +79161234567, +14155551234
 
-    if (!PHONE_NUMBER_REGEX.test(phoneNumber)) {
-      throw new Error(
-        'Invalid phone number format. Must be in format: +<country code><number>'
-      );
+    if (
+      typeof phoneNumber !== 'string' ||
+      !PHONE_NUMBER_REGEX.test(phoneNumber)
+    ) {
+      throw new Error(UserDomainCodes.PHONE_NUMBER_INVALID);
     }
 
     return new PhoneNumber(phoneNumber);

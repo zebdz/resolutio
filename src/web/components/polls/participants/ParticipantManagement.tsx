@@ -1,5 +1,13 @@
 'use client';
 
+/** Presents the participant snapshot and coordinates authorized weight edits and previews. */
+import type {
+  PollId,
+  PropertyId,
+  OrganizationId,
+} from '@/domain/shared/EntityIds';
+import type { WeightConfigDraft } from './WeightConfigEditor';
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -37,27 +45,21 @@ interface Participant {
   updatedAt: string; // ISO date string
 }
 
-interface WeightConfig {
-  distributionType: string;
-  propertyAggregation: string;
-  propertyIds: string[];
-}
-
 interface DescendantGroup {
-  orgId: string;
+  orgId: OrganizationId;
   orgName: string;
-  properties: Array<{ id: string; name: string }>;
+  properties: Array<{ id: PropertyId; name: string }>;
 }
 
 interface ParticipantManagementProps {
-  pollId: string;
+  pollId: PollId;
   participantsData: { participants: Participant[]; canModify: boolean };
   pollState: PollState;
   // Open polls have a fixed EQUAL config and their participants are people who
   // already voted — neither may be edited here.
   isOpenPoll?: boolean;
-  weightConfig: WeightConfig;
-  properties: Array<{ id: string; name: string }>;
+  weightConfig: WeightConfigDraft;
+  properties: Array<{ id: PropertyId; name: string }>;
   descendantGroups?: DescendantGroup[];
   orgHasOwnershipData: boolean;
   votesCast: boolean;

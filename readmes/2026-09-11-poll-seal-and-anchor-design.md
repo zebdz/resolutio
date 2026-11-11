@@ -1,7 +1,7 @@
 # Poll seal and blockchain anchor — design
 
 **Date:** 2026-09-11
-**Status:** decisions resolved; Phase 1 domain complete (2026-10-26), awaiting review. Application integration not started.
+**Status:** decisions resolved; Phases 1–2 complete (2026-10-26). Phase 2 awaiting review; sealing integration not started.
 **Reviewed:** 2026-10-25 against the current implementation
 
 ## 1. Problem
@@ -381,7 +381,7 @@ Boundary codecs preserve all v1 bytes and revalidate persisted data. See the
 
 Changes in the poll context:
 
-- `Poll.ts`: `finishedAt: Date | null` in props; `finish()` sets it and raises `PollFinished`; getter;
+- `Poll.ts`: `finishedAt: Date | null` in props; `finish(now)` sets it and raises `PollFinished`; getter;
   reconstitute round-trips it without raising a new event. Mutable metadata is captured later by sealing.
 - `PollParticipant.ts`: `receiptSecret: string | null`, set once via `assignReceiptSecret(secret)`;
   refuses a second assignment.
@@ -395,12 +395,14 @@ browser verifier imports them directly.
 model Poll {
   // ...
   finishedAt DateTime? @map("finished_at")
+  revision   Int       @default(0) // optimistic lifecycle guard
   seal       PollSeal?
 }
 
 model PollParticipant {
   // ...
   receiptSecret String? @map("receipt_secret")
+  ballotSnapshot Json? @map("ballot_snapshot") // versioned original labels, selections, weights and times
 }
 
 model PollSeal {
@@ -544,6 +546,43 @@ Changed:
   back finishing or suppresses the finish notification. Persisted-state reconciliation covers a
   crash between these calls. Notifications carry a root digest only when a seal already exists.
 - **`NotifyPollFinishedUseCase`** accepts the optional root digest.
+
+### Phase 2 implementation notes
+
+`castVotes` and `joinAndVote` return a committed `RecordedBallot`: an immutable versioned snapshot,
+or an explicit legacy marker when original cast data does not exist. The application translates
+that snapshot into `VoteReceiptView` after commit. Snapshot version 1 retains original labels,
+secret, exact weights and persisted timestamps; receipt replay never joins live labels. The seal
+context remains independent of poll entities. New snapshots are validated before being saved.
+
+The poll policy and new atomic ports use validated poll/user/question/answer/participant IDs,
+exact `BallotWeight`, `PollRevision`, immutable `PollInstant` and closed failure codes. Legacy
+request/database facts are decoded before entering the policy; lifecycle, poll kind and question
+kind are closed alternatives. OPEN polls retain weight 1; organization polls may have other weights.
+`PollFinished` carries a validated persisted ID and instant, and validation failures leave the poll
+unchanged. Raw wire receipts, database rows, labels, boolean facts and local counts intentionally
+remain primitives. The separate [domain migration](../plans/archive/2026-10-26-domain-type-migration.md)
+carries these rules through older contracts without starting sealing Phase 3.
+
+Detached lifecycle saves compare the loaded `PollRevision` under the poll row lock. PostgreSQL
+increments it for every poll update, including narrow writers. Reload a poll before saving it again.
+Snapshot discard uses the application-owned `PollSnapshotTransaction`: after authorization, lock
+and reload the poll, read vote existence, invoke `Poll.discardSnapshot(hasVotes)`, then explicitly
+save the poll and remove its participant snapshot in that transaction. The domain owns the state
+and vote rules; the Prisma adapter owns locking, mapping and rollback, including failed `Result`s.
+Generic `updatePoll` persists only the poll and never infers snapshot removal from a state pair.
+SQL guards additionally make finished state/time, votes, and issued receipt data immutable, with
+the documented operator bypass.
+
+The owner receipt lookup uses repeatable-read so participant metadata and vote presence cannot
+observe different commits. A concurrent request that loses an earlier eligibility/draft check
+rechecks committed evidence before reporting failure. Both cast and finish tolerate post-commit
+cleanup failures. The participant-list server action explicitly excludes receipt credentials.
+
+`yarn db:backfill-receipts` is the restartable operator command after migration, with vote/finish
+writers paused. It fills missing secrets only for ACTIVE/READY voters and leaves original snapshot
+and legacy finish-time fields null. See [Testing](Testing.md#disposable-postgresql-tests) for the
+isolated database harness. Application databases have not been migrated as part of Phase 2.
 
 ## 9. Infrastructure layer
 

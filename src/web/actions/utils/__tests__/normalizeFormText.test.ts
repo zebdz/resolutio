@@ -39,6 +39,7 @@ describe('normalizeFormText', () => {
   });
 
   it('coerces a missing form value to an empty string', () => {
+    // @ts-expect-error A malformed JavaScript caller may omit the form value.
     expect(normalizeFormText(undefined)).toBe('');
   });
 });

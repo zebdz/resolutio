@@ -1,5 +1,7 @@
 'use client';
 
+/** Edits a typed poll snapshot, retaining incomplete editor drafts until submission. */
+
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
@@ -399,15 +401,15 @@ export function EditPollForm({ readOnly = false }: EditPollFormProps = {}) {
 
         // Load questions
         if (poll.questions && poll.questions.length > 0) {
-          const loadedQuestions = poll.questions.map((q: any) => ({
+          const loadedQuestions = poll.questions.map((q) => ({
             id: q.id,
             text: q.text,
             details: q.details || '',
-            questionType: q.questionType as QuestionType,
+            questionType: q.questionType,
             page: q.page,
             order: q.order,
             answers: q.answers
-              ? q.answers.map((a: any) => ({
+              ? q.answers.map((a) => ({
                   id: a.id,
                   text: a.text,
                   order: a.order,

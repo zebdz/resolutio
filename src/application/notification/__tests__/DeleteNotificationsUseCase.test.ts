@@ -1,40 +1,38 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+/** Selection deletion checks every recipient before writing and preserves explicit failures.
+ * Missing, foreign or unavailable selections must leave all notifications untouched. */
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { NotificationId } from '@/domain/shared/EntityIds';
+import { notificationTestContent } from '@/application/notification/__tests__/notificationTestValues';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { failure, success } from '@/domain/shared/Result';
 import { DeleteNotificationsUseCase } from '../DeleteNotificationsUseCase';
-import { NotificationRepository } from '../../../domain/notification/NotificationRepository';
+import { NotificationRecipientRepository } from '../../../domain/notification/NotificationRecipientRepository';
 import { NotificationErrors } from '../NotificationErrors';
 import { Notification } from '../../../domain/notification/Notification';
 
-class MockNotificationRepository implements NotificationRepository {
-  private notifications: Map<string, Notification> = new Map();
-  private deletedIds: string[] = [];
+class MockNotificationRecipientRepository implements Pick<
+  NotificationRecipientRepository,
+  'findByIds' | 'deleteByIds'
+> {
+  private notifications: Map<NotificationId, Notification> = new Map();
+  private deletedIds: NotificationId[] = [];
 
-  async save(notification: Notification): Promise<Notification> {
-    return notification;
+  async findByIds(
+    ids: readonly NotificationId[]
+  ): ReturnType<NotificationRecipientRepository['findByIds']> {
+    return success(
+      ids
+        .map((id) => this.notifications.get(id))
+        .filter((n): n is Notification => n !== undefined)
+    );
   }
-  async saveBatch(): Promise<void> {}
-  async findById(id: string): Promise<Notification | null> {
-    return this.notifications.get(id) || null;
-  }
-  async findByUserId(): Promise<Notification[]> {
-    return [];
-  }
-  async getUnreadCount(): Promise<number> {
-    return 0;
-  }
-  async markAsRead(): Promise<void> {}
-  async markAllAsRead(): Promise<void> {}
-  async findByIds(ids: string[]): Promise<Notification[]> {
-    return ids
-      .map((id) => this.notifications.get(id))
-      .filter((n): n is Notification => n !== undefined);
-  }
-  async deleteByIds(ids: string[]): Promise<void> {
+  async deleteByIds(
+    ids: readonly NotificationId[]
+  ): ReturnType<NotificationRecipientRepository['deleteByIds']> {
     this.deletedIds.push(...ids);
     ids.forEach((id) => this.notifications.delete(id));
-  }
-  async getCountByUserId(userId: string): Promise<number> {
-    return [...this.notifications.values()].filter((n) => n.userId === userId)
-      .length;
+
+    return success(undefined);
   }
 
   // Test helpers
@@ -47,32 +45,51 @@ class MockNotificationRepository implements NotificationRepository {
 }
 
 function createNotification(userId: string, id: string): Notification {
-  return Notification.reconstitute({
-    id,
-    userId,
-    type: 'org_joined_parent',
-    title: 'title',
-    body: 'body',
-    data: null,
-    readAt: null,
-    createdAt: new Date(),
-  });
+  return expectSuccess(
+    Notification.restore({
+      ...notificationTestContent,
+      id,
+      userId,
+      readAt: null,
+      createdAt: new Date(),
+    })
+  );
 }
 
 describe('DeleteNotificationsUseCase', () => {
   let useCase: DeleteNotificationsUseCase;
-  let notifRepo: MockNotificationRepository;
+  let notifRepo: MockNotificationRecipientRepository;
 
   beforeEach(() => {
-    notifRepo = new MockNotificationRepository();
+    notifRepo = new MockNotificationRecipientRepository();
     useCase = new DeleteNotificationsUseCase({
       notificationRepository: notifRepo,
     });
+  });
+  it('propagates failed deletion instead of reporting success', async () => {
+    notifRepo.addNotification(createNotification('user-1', 'notif-1'));
+    vi.spyOn(notifRepo, 'deleteByIds').mockResolvedValue(
+      failure('common.errors.unexpected')
+    );
+    expect(
+      await useCase.execute({ notificationIds: ['notif-1'], userId: 'user-1' })
+    ).toEqual(failure('common.errors.unexpected'));
+  });
+  it('does not delete when the selection cannot be loaded', async () => {
+    vi.spyOn(notifRepo, 'findByIds').mockResolvedValue(
+      failure('common.errors.unexpected')
+    );
+    const write = vi.spyOn(notifRepo, 'deleteByIds');
+    expect(
+      await useCase.execute({ notificationIds: ['notif-1'], userId: 'user-1' })
+    ).toEqual(failure('common.errors.unexpected'));
+    expect(write).not.toHaveBeenCalled();
   });
 
   it('should delete notifications belonging to user', async () => {
     notifRepo.addNotification(createNotification('user-1', 'notif-1'));
     notifRepo.addNotification(createNotification('user-1', 'notif-2'));
+    const write = vi.spyOn(notifRepo, 'deleteByIds');
 
     const result = await useCase.execute({
       notificationIds: ['notif-1', 'notif-2'],
@@ -81,6 +98,7 @@ describe('DeleteNotificationsUseCase', () => {
 
     expect(result.success).toBe(true);
     expect(notifRepo.getDeletedIds()).toEqual(['notif-1', 'notif-2']);
+    expect(write).toHaveBeenCalledWith(['notif-1', 'notif-2'], 'user-1');
   });
 
   it('should fail EMPTY_IDS on empty array', async () => {
@@ -106,6 +124,7 @@ describe('DeleteNotificationsUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+    expect(notifRepo.getDeletedIds()).toEqual([]);
 
     if (!result.success) {
       expect(result.error).toBe(NotificationErrors.NOT_OWNER);
@@ -121,6 +140,7 @@ describe('DeleteNotificationsUseCase', () => {
     });
 
     expect(result.success).toBe(false);
+    expect(notifRepo.getDeletedIds()).toEqual([]);
 
     if (!result.success) {
       expect(result.error).toBe(NotificationErrors.SOME_NOT_FOUND);

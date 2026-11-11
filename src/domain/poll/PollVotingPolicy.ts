@@ -1,6 +1,14 @@
+/** Pure voting eligibility returns only the domain reasons this policy can produce. */
 import { Result, success, failure } from '../shared/Result';
 import { Poll } from './Poll';
 import { PollDomainCodes } from './PollDomainCodes';
+
+export type VotingEligibilityFailure =
+  | typeof PollDomainCodes.POLL_FINISHED
+  | typeof PollDomainCodes.POLL_NOT_ACTIVE
+  | typeof PollDomainCodes.USER_NOT_CONFIRMED
+  | typeof PollDomainCodes.NOT_PARTICIPANT
+  | typeof PollDomainCodes.ALREADY_VOTED;
 
 export interface VoterFacts {
   isParticipant: boolean;
@@ -16,7 +24,10 @@ export interface VoterFacts {
  * electorate is every verified platform user, and the participant row is
  * created at the moment the vote is finished.
  */
-function canVote(poll: Poll, facts: VoterFacts): Result<void, string> {
+function canVote(
+  poll: Poll,
+  facts: VoterFacts
+): Result<void, VotingEligibilityFailure> {
   if (poll.isFinished()) {
     return failure(PollDomainCodes.POLL_FINISHED);
   }

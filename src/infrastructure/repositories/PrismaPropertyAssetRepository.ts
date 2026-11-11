@@ -1,11 +1,30 @@
+/** Prisma adapter for property assets and ownership history. It validates ORM
+ * records, persists domain-supplied identity/time, and normalizes storage failures. */
+import {
+  AssetId,
+  PropertyId,
+  OwnershipId,
+  UserId,
+  OrganizationId,
+} from '../../domain/shared/EntityIds';
+import { Instant } from '../../domain/shared/Instant';
+import {
+  AssetName,
+  PropertyName,
+  AssetSize,
+  OwnershipShare,
+} from '../../domain/organization/PropertyValues';
+import { SizeUnit, SizeUnitValue } from '../../domain/organization/SizeUnit';
 import { PrismaClient, Prisma } from '@/generated/prisma/client';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PropertyAsset } from '../../domain/organization/PropertyAsset';
 import { PropertyAssetOwnership } from '../../domain/organization/PropertyAssetOwnership';
 import {
   PropertyAssetRepository,
+  PropertyAssetRepositoryError,
   AssetOwnershipRow,
   AllOwnershipRow,
+  OwnershipOwnerProjection,
   AllOwnershipFilter,
   OwnershipRowToInsert,
   HoldingRow,
@@ -58,9 +77,9 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
   constructor(private prisma: PrismaClient) {}
 
   async findCurrentOwnershipByOrg(
-    organizationId: string,
-    propertyIds: string[]
-  ): Promise<Result<AssetOwnershipRow[], string>> {
+    organizationId: OrganizationId,
+    propertyIds: PropertyId[]
+  ): Promise<Result<AssetOwnershipRow[], PropertyAssetRepositoryError>> {
     try {
       const where: Prisma.PropertyAssetOwnershipWhereInput = {
         effectiveUntil: null,
@@ -101,14 +120,14 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
         }))
       );
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findCurrentOwnership(
-    organizationIds: string[],
-    propertyIds: string[]
-  ): Promise<Result<AssetOwnershipRow[], string>> {
+    organizationIds: OrganizationId[],
+    propertyIds: PropertyId[]
+  ): Promise<Result<AssetOwnershipRow[], PropertyAssetRepositoryError>> {
     try {
       if (organizationIds.length === 0) {
         return success([]);
@@ -153,15 +172,18 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
         }))
       );
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findAssetsInScope(
-    organizationIds: string[],
-    propertyIds: string[]
+    organizationIds: OrganizationId[],
+    propertyIds: PropertyId[]
   ): Promise<
-    Result<Array<{ id: string; propertyId: string; size: number }>, string>
+    Result<
+      Array<{ id: AssetId; propertyId: PropertyId; size: AssetSize }>,
+      PropertyAssetRepositoryError
+    >
   > {
     try {
       if (organizationIds.length === 0) {
@@ -182,22 +204,22 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
 
       return success(
         rows.map((r) => ({
-          id: r.id,
-          propertyId: r.propertyId,
-          size: Number(r.size),
+          id: AssetId.parse(r.id),
+          propertyId: PropertyId.parse(r.propertyId),
+          size: AssetSize.parse(Number(r.size)),
         }))
       );
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findHoldingsAsOf(input: {
-    organizationIds: string[];
-    propertyIds: string[];
-    userIds: string[];
-    asOf: Date;
-  }): Promise<Result<HoldingRow[], string>> {
+    organizationIds: OrganizationId[];
+    propertyIds: PropertyId[];
+    userIds: UserId[];
+    asOf: Instant;
+  }): Promise<Result<HoldingRow[], PropertyAssetRepositoryError>> {
     try {
       if (input.userIds.length === 0 || input.organizationIds.length === 0) {
         return success([]);
@@ -208,8 +230,11 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
       // which stamps the closing row and the opening row with the same instant.
       const where: Prisma.PropertyAssetOwnershipWhereInput = {
         userId: { in: input.userIds },
-        effectiveFrom: { lte: input.asOf },
-        OR: [{ effectiveUntil: null }, { effectiveUntil: { gt: input.asOf } }],
+        effectiveFrom: { lte: Instant.toDate(input.asOf) },
+        OR: [
+          { effectiveUntil: null },
+          { effectiveUntil: { gt: Instant.toDate(input.asOf) } },
+        ],
         asset: {
           archivedAt: null,
           property: {
@@ -232,12 +257,12 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
       });
 
       const holdings: HoldingRow[] = rows.map((r) => ({
-        userId: r.userId as string,
-        propertyName: r.asset.property.name,
-        assetName: r.asset.name,
-        size: Number(r.asset.size),
-        sizeUnit: r.asset.property.sizeUnit,
-        share: Number(r.share),
+        userId: UserId.parse(r.userId),
+        propertyName: PropertyName.parse(r.asset.property.name),
+        assetName: AssetName.parse(r.asset.name),
+        size: AssetSize.parse(Number(r.asset.size)),
+        sizeUnit: this.sizeUnit(r.asset.property.sizeUnit),
+        share: OwnershipShare.parse(Number(r.share)),
       }));
 
       // Sorted here rather than in SQL: ordering across two nested to-one
@@ -250,13 +275,13 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
 
       return success(holdings);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async orgHasOwnershipData(
-    organizationId: string
-  ): Promise<Result<boolean, string>> {
+    organizationId: OrganizationId
+  ): Promise<Result<boolean, PropertyAssetRepositoryError>> {
     try {
       const allOrgIds = await this.getOrgTreeIds(organizationId);
       const row = await this.prisma.propertyAssetOwnership.findFirst({
@@ -275,14 +300,14 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
 
       return success(row !== null);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async hasUserOwnership(
-    organizationId: string,
-    userId: string
-  ): Promise<Result<boolean, string>> {
+    organizationId: OrganizationId,
+    userId: UserId
+  ): Promise<Result<boolean, PropertyAssetRepositoryError>> {
     try {
       const allOrgIds = await this.getOrgTreeIds(organizationId);
       const row = await this.prisma.propertyAssetOwnership.findFirst({
@@ -302,16 +327,18 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
 
       return success(row !== null);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   // Cross-tree poll scope: a poll on rootOrgId may include descendants'
   // properties. Mirrors PrismaOrganizationPropertyRepository.findByOrganizationTree
   // and PrismaOrganizationRepository.getDescendantIds. Skips archived orgs.
-  private async getOrgTreeIds(rootOrgId: string): Promise<string[]> {
-    const descendants: string[] = [];
-    const queue: string[] = [rootOrgId];
+  private async getOrgTreeIds(
+    rootOrgId: OrganizationId
+  ): Promise<OrganizationId[]> {
+    const descendants: OrganizationId[] = [];
+    const queue: OrganizationId[] = [rootOrgId];
 
     while (queue.length > 0) {
       const currentId = queue.shift()!;
@@ -321,8 +348,9 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
       });
 
       for (const child of children) {
-        descendants.push(child.id);
-        queue.push(child.id);
+        const childId = OrganizationId.parse(child.id);
+        descendants.push(childId);
+        queue.push(childId);
       }
     }
 
@@ -330,9 +358,9 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
   }
 
   async findAssetsByProperty(
-    propertyId: string,
+    propertyId: PropertyId,
     includeArchived: boolean
-  ): Promise<Result<PropertyAsset[], string>> {
+  ): Promise<Result<PropertyAsset[], PropertyAssetRepositoryError>> {
     try {
       const rows = await this.prisma.propertyAsset.findMany({
         where: {
@@ -344,13 +372,13 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
 
       return success(rows.map((r) => this.assetToEntity(r)));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findAssetById(
-    assetId: string
-  ): Promise<Result<PropertyAsset | null, string>> {
+    assetId: AssetId
+  ): Promise<Result<PropertyAsset | null, PropertyAssetRepositoryError>> {
     try {
       const row = await this.prisma.propertyAsset.findUnique({
         where: { id: assetId },
@@ -358,13 +386,13 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
 
       return success(row ? this.assetToEntity(row) : null);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findActiveOwnershipForAsset(
-    assetId: string
-  ): Promise<Result<PropertyAssetOwnership[], string>> {
+    assetId: AssetId
+  ): Promise<Result<PropertyAssetOwnership[], PropertyAssetRepositoryError>> {
     try {
       const rows = await this.prisma.propertyAssetOwnership.findMany({
         where: { assetId, effectiveUntil: null },
@@ -373,13 +401,15 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
 
       return success(rows.map((r) => this.ownershipToEntity(r)));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findOwnershipById(
-    ownershipId: string
-  ): Promise<Result<PropertyAssetOwnership | null, string>> {
+    ownershipId: OwnershipId
+  ): Promise<
+    Result<PropertyAssetOwnership | null, PropertyAssetRepositoryError>
+  > {
     try {
       const row = await this.prisma.propertyAssetOwnership.findUnique({
         where: { id: ownershipId },
@@ -387,13 +417,13 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
 
       return success(row ? this.ownershipToEntity(row) : null);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findOwnershipRows(
     filter: AllOwnershipFilter
-  ): Promise<Result<AllOwnershipRow[], string>> {
+  ): Promise<Result<AllOwnershipRow[], PropertyAssetRepositoryError>> {
     try {
       const ownerQuery = filter.ownerQuery?.trim();
       const assetQuery = filter.assetQuery?.trim();
@@ -468,32 +498,52 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
       });
 
       return success(
-        rows.map((r) => ({
-          id: r.id,
-          assetId: r.assetId,
-          assetName: r.asset.name,
-          propertyId: r.asset.propertyId,
-          propertyName: r.asset.property.name,
-          userId: r.userId,
-          userLabel: r.user
-            ? `${[r.user.lastName, r.user.firstName, r.user.middleName]
-                .filter(Boolean)
-                .join(' ')} (@${r.user.nickname})`
-            : null,
-          externalOwnerLabel: r.externalOwnerLabel,
-          share: Number(r.share),
-          effectiveFrom: r.effectiveFrom,
-          effectiveUntil: r.effectiveUntil,
-        }))
+        rows.map((r) => {
+          const ownership = this.ownershipToEntity(r);
+          const owner = ownership.owner;
+          const ownerProjection: OwnershipOwnerProjection =
+            owner.kind === 'user'
+              ? {
+                  userId: owner.userId,
+                  userLabel: r.user
+                    ? `${[r.user.lastName, r.user.firstName, r.user.middleName]
+                        .filter(Boolean)
+                        .join(' ')} (@${r.user.nickname})`
+                    : null,
+                  externalOwnerLabel: null,
+                }
+              : {
+                  userId: null,
+                  userLabel: null,
+                  externalOwnerLabel: owner.label,
+                };
+
+          return {
+            id: ownership.id,
+            assetId: ownership.assetId,
+            assetName: AssetName.parse(r.asset.name),
+            propertyId: PropertyId.parse(r.asset.propertyId),
+            propertyName: PropertyName.parse(r.asset.property.name),
+            ...ownerProjection,
+            share: ownership.share,
+            effectiveFrom: Instant.fromDate(ownership.effectiveFrom),
+            effectiveUntil:
+              ownership.effectiveUntil === null
+                ? null
+                : Instant.fromDate(ownership.effectiveUntil),
+          };
+        })
       );
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findClaimableAssets(
-    propertyId: string
-  ): Promise<Result<{ id: string; name: string }[], string>> {
+    propertyId: PropertyId
+  ): Promise<
+    Result<{ id: AssetId; name: AssetName }[], PropertyAssetRepositoryError>
+  > {
     try {
       // "Claimable" = non-archived asset that's either
       //   (a) placeholder-owned: has an active ownership row with user_id IS NULL
@@ -521,18 +571,26 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
         orderBy: { createdAt: 'asc' },
       });
 
-      return success(rows);
+      return success(
+        rows.map((row) => ({
+          id: AssetId.parse(row.id),
+          name: AssetName.parse(row.name),
+        }))
+      );
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async saveAsset(
     asset: PropertyAsset
-  ): Promise<Result<PropertyAsset, string>> {
+  ): Promise<Result<PropertyAsset, PropertyAssetRepositoryError>> {
     try {
       const created = await this.prisma.propertyAsset.create({
         data: {
+          id: asset.id,
+          createdAt: asset.createdAt,
+          archivedAt: asset.archivedAt,
           propertyId: asset.propertyId,
           name: asset.name,
           size: new Prisma.Decimal(asset.size.toString()),
@@ -541,11 +599,13 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
 
       return success(this.assetToEntity(created));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
-  async updateAsset(asset: PropertyAsset): Promise<Result<void, string>> {
+  async updateAsset(
+    asset: PropertyAsset
+  ): Promise<Result<void, PropertyAssetRepositoryError>> {
     try {
       await this.prisma.propertyAsset.update({
         where: { id: asset.id },
@@ -558,30 +618,33 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
 
       return success(undefined);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async replaceOwners(input: {
-    assetId: string;
-    at: Date;
+    assetId: AssetId;
+    at: Instant;
     inserts: OwnershipRowToInsert[];
-  }): Promise<Result<void, string>> {
+  }): Promise<Result<void, PropertyAssetRepositoryError>> {
     try {
       await this.prisma.$transaction(async (tx) => {
         await tx.propertyAssetOwnership.updateMany({
           where: { assetId: input.assetId, effectiveUntil: null },
-          data: { effectiveUntil: input.at },
+          data: { effectiveUntil: Instant.toDate(input.at) },
         });
 
         if (input.inserts.length > 0) {
           await tx.propertyAssetOwnership.createMany({
             data: input.inserts.map((r) => ({
+              id: r.id,
               assetId: input.assetId,
-              userId: r.userId,
-              externalOwnerLabel: r.externalOwnerLabel,
+              userId: r.owner.kind === 'user' ? r.owner.userId : null,
+              externalOwnerLabel:
+                r.owner.kind === 'external' ? r.owner.label : null,
               share: new Prisma.Decimal(r.share.toString()),
-              effectiveFrom: input.at,
+              effectiveFrom: Instant.toDate(input.at),
+              createdAt: Instant.toDate(r.createdAt),
             })),
           });
         }
@@ -593,14 +656,14 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
         return failure(OrganizationDomainCodes.OWNERSHIP_DUPLICATE_OWNER);
       }
 
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async correctOwnership(input: {
-    ownershipId: string;
-    newShare: number;
-  }): Promise<Result<void, string>> {
+    ownershipId: OwnershipId;
+    newShare: OwnershipShare;
+  }): Promise<Result<void, PropertyAssetRepositoryError>> {
     try {
       await this.prisma.propertyAssetOwnership.update({
         where: { id: input.ownershipId },
@@ -609,14 +672,14 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
 
       return success(undefined);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async linkOwnershipToUser(input: {
-    ownershipId: string;
-    userId: string;
-  }): Promise<Result<void, string>> {
+    ownershipId: OwnershipId;
+    userId: UserId;
+  }): Promise<Result<void, PropertyAssetRepositoryError>> {
     try {
       await this.prisma.propertyAssetOwnership.update({
         where: { id: input.ownershipId },
@@ -629,24 +692,28 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
         return failure(OrganizationDomainCodes.OWNERSHIP_DUPLICATE_OWNER);
       }
 
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async createOwnershipForUser(input: {
-    assetId: string;
-    userId: string;
-    share: number;
-  }): Promise<Result<void, string>> {
+    ownershipId: OwnershipId;
+    at: Instant;
+    assetId: AssetId;
+    userId: UserId;
+    share: OwnershipShare;
+  }): Promise<Result<void, PropertyAssetRepositoryError>> {
     try {
       await this.prisma.propertyAssetOwnership.create({
         data: {
+          id: input.ownershipId,
           assetId: input.assetId,
           userId: input.userId,
           externalOwnerLabel: null,
           share: new Prisma.Decimal(input.share.toString()),
-          // effectiveFrom defaults to now() in DB; effectiveUntil stays null
-          // — caller is responsible for ensuring no other active rows exist.
+          // Caller supplies creation time and ensures no other active rows exist.
+          effectiveFrom: Instant.toDate(input.at),
+          createdAt: Instant.toDate(input.at),
         },
       });
 
@@ -656,15 +723,16 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
         return failure(OrganizationDomainCodes.OWNERSHIP_DUPLICATE_OWNER);
       }
 
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async mergePlaceholderIntoExistingOwner(input: {
-    placeholderOwnershipId: string;
-    existingOwnershipId: string;
-    newShare: number;
-  }): Promise<Result<void, string>> {
+    at: Instant;
+    placeholderOwnershipId: OwnershipId;
+    existingOwnershipId: OwnershipId;
+    newShare: OwnershipShare;
+  }): Promise<Result<void, PropertyAssetRepositoryError>> {
     try {
       await this.prisma.$transaction(async (tx) => {
         // End-date the external placeholder row first. This is an SCD-2
@@ -672,7 +740,7 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
         // the slot (useful for audits when "Who is miss-c?" comes up).
         await tx.propertyAssetOwnership.update({
           where: { id: input.placeholderOwnershipId },
-          data: { effectiveUntil: new Date() },
+          data: { effectiveUntil: Instant.toDate(input.at) },
         });
         // Bump the claimant's existing row to the combined share. SCD-1
         // in-place — same pattern as `linkOwnershipToUser`. Asset total
@@ -686,8 +754,18 @@ export class PrismaPropertyAssetRepository implements PropertyAssetRepository {
 
       return success(undefined);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
+  }
+
+  private sizeUnit(raw: string): SizeUnitValue {
+    const parsed = SizeUnit.parse(raw);
+
+    if (!parsed.success) {
+      throw new Error(parsed.error);
+    }
+
+    return parsed.value;
   }
 
   private assetToEntity(row: {

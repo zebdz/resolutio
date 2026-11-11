@@ -1,3 +1,21 @@
+/** Application client regressions exercise typed question/answer creation and editing.
+ * Raw requests remain transport values; fixtures supply deterministic identity/time. */
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { PollInstant } from '@/domain/poll/PollValues';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { SortOrder, PageNumber } from '@/domain/poll/QuestionValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { BoardId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { PollId } from '@/domain/shared/EntityIds';
+import { QuestionId, AnswerId } from '@/domain/shared/EntityIds';
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UpdateQuestionOrderUseCase } from '../UpdateQuestionOrderUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -19,21 +37,54 @@ describe('UpdateQuestionOrderUseCase', () => {
   beforeEach(() => {
     // Create a poll
     const pollResult = Poll.create(
-      'Test Poll',
-      'Description',
-      'org-1',
-      'board-1',
-      'user-1',
-      new Date('2025-01-01'),
-      new Date('2025-12-31')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2025-01-01'), new Date('2025-12-31'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(pollResult.success).toBe(true);
-    poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    poll = expectSuccess(pollResult);
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      id: 'poll-1',
+    });
+
+    // Reorder only questions actually owned by this poll.
+    for (let index = 1; index <= 5; index++) {
+      const question = Question.create(
+        QuestionText.parse(`Question ${index}`),
+        poll.id,
+        testCreation(QuestionId, `q-${index}`)
+      );
+
+      if (!question.success) {
+        throw new Error(question.error);
+      }
+
+      const answer = Answer.create(
+        AnswerText.parse('Yes'),
+        SortOrder.parse(0),
+        question.value.id,
+        testCreation(AnswerId, `answer-q-${index}`)
+      );
+
+      if (!answer.success) {
+        throw new Error(answer.error);
+      }
+
+      question.value.addAnswer(answer.value);
+      poll.addQuestion(question.value);
+    }
 
     // Mock repositories
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
     };
 
     questionRepository = {
@@ -103,23 +154,25 @@ describe('UpdateQuestionOrderUseCase', () => {
   it('should fail when poll is finished', async () => {
     // Add question with answer and transition to FINISHED
     const questionResult = Question.create(
-      'Test Question',
-      'poll-1',
-      1,
-      0,
+      QuestionText.parse('Test Question'),
+      PollId.parse('poll-1'),
+      testCreation(QuestionId, 'question-1'),
+      PageNumber.parse(1),
+      SortOrder.parse(0),
       'single-choice'
     );
     const answerResult = Answer.create(
-      'Test Answer',
-      1,
-      questionResult.value.id
+      AnswerText.parse('Test Answer'),
+      SortOrder.parse(1),
+      expectSuccess(questionResult).id,
+      testCreation(AnswerId, 'answer-1')
     );
-    questionResult.value.addAnswer(answerResult.value);
-    poll.addQuestion(questionResult.value);
+    expectSuccess(questionResult).addAnswer(expectSuccess(answerResult));
+    poll.addQuestion(expectSuccess(questionResult));
     poll.submitToAdmin();
     poll.takeSnapshot();
     poll.activate();
-    poll.finish();
+    poll.finish(PollInstant.parse(new Date().toISOString()));
 
     const result = await useCase.execute({
       pollId: 'poll-1',
@@ -172,7 +225,7 @@ describe('UpdateQuestionOrderUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollErrors.NOT_POLL_CREATOR);
+      expect(expectFailure(result)).toBe(PollErrors.NOT_POLL_CREATOR);
     });
   });
 });

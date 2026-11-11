@@ -1,3 +1,5 @@
+/** Renders authorized join-link preview metadata using validated application projections. */
+import { PrismaOrganizationDirectory } from '@/infrastructure/repositories/PrismaOrganizationDirectory';
 import { ImageResponse } from 'next/og';
 import { getTranslations } from 'next-intl/server';
 import {
@@ -24,7 +26,7 @@ export default async function OgImage({
   const getPublicInfoUseCase = new GetJoinTokenPublicInfoUseCase({
     joinTokenRepository,
     organizationRepository,
-    prisma,
+    directory: new PrismaOrganizationDirectory(prisma),
   });
 
   const result = await getPublicInfoUseCase.execute(token);

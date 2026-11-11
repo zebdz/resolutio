@@ -1,12 +1,17 @@
+/** Applies validated user profile changes and persists privacy audit updates. */
+import { UserId } from '@/domain/shared/EntityIds';
 import { User } from '@/src/domain/user/User';
 import { Nickname } from '@/src/domain/user/Nickname';
 import type { UserRepository } from '@/src/domain/user/UserRepository';
 import { ProfanityChecker } from '@/src/domain/shared/profanity/ProfanityChecker';
 import { Result, success, failure } from '@/src/domain/shared/Result';
-import { UserDomainCodes } from '@/src/domain/user/UserDomainCodes';
+import {
+  UserDomainCodes,
+  UserDomainCode,
+} from '@/src/domain/user/UserDomainCodes';
 
 export interface CompletePrivacySetupInput {
-  userId: string;
+  userId: UserId;
   nickname?: string;
   allowFindByName: boolean;
   allowFindByPhone: boolean;
@@ -25,7 +30,7 @@ export class CompletePrivacySetupUseCase {
 
   async execute(
     input: CompletePrivacySetupInput
-  ): Promise<Result<User, string>> {
+  ): Promise<Result<User, UserDomainCode>> {
     const user = await this.userRepository.findById(input.userId);
 
     if (!user) {
@@ -45,9 +50,8 @@ export class CompletePrivacySetupUseCase {
       }
 
       if (!user.nickname.equals(nickname)) {
-        const available = await this.userRepository.isNicknameAvailable(
-          nickname.getValue()
-        );
+        const available =
+          await this.userRepository.isNicknameAvailable(nickname);
 
         if (!available) {
           return failure(UserDomainCodes.NICKNAME_TAKEN);

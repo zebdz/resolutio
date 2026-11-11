@@ -1,19 +1,28 @@
+/** Decodes attachment removal requests before resolving their authoritative poll. */
+import { z } from 'zod';
+import {
+  PollId,
+  UserId,
+  OrganizationId,
+  PollAttachmentId,
+} from '../../domain/shared/EntityIds';
+import { PollWriteFailure } from '../../domain/poll/PollWriteFailure';
 import { Result, failure } from '../../domain/shared/Result';
 import { Poll } from '../../domain/poll/Poll';
 import { PollAttachmentRepository } from '../../domain/poll/PollAttachmentRepository';
 import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 
 export interface PollRepoForRemoveAttachment {
-  getPollById(pollId: string): Promise<Result<Poll | null, string>>;
+  getPollById(pollId: PollId): Promise<Result<Poll | null, PollWriteFailure>>;
 }
 
 export interface OrgRepoForRemovePollAttachment {
-  isUserAdmin(userId: string, organizationId: string): Promise<boolean>;
+  isUserAdmin(userId: UserId, organizationId: OrganizationId): Promise<boolean>;
 }
 
 export interface UserRepoForRemovePollAttachment {
-  isSuperAdmin(userId: string): Promise<boolean>;
+  isSuperAdmin(userId: UserId): Promise<boolean>;
 }
 
 export interface RemovePollAttachmentInput {
@@ -38,8 +47,17 @@ export class RemovePollAttachmentUseCase {
 
   async execute(
     input: RemovePollAttachmentInput
-  ): Promise<Result<void, string>> {
-    const metaResult = await this.attachments.findById(input.attachmentId);
+  ): Promise<Result<void, PollUseCaseFailure>> {
+    const decoded = z
+      .object({ attachmentId: PollAttachmentId, callerId: UserId })
+      .safeParse(input);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const command = decoded.data;
+    const metaResult = await this.attachments.findById(command.attachmentId);
 
     if (!metaResult.success) {
       return failure(metaResult.error);
@@ -63,12 +81,14 @@ export class RemovePollAttachmentUseCase {
 
     const poll = lookup.value;
 
-    const isCreator = poll.createdBy === input.callerId;
+    const isCreator = poll.createdBy === command.callerId;
     const isAdmin =
       !isCreator &&
-      (await this.orgs.isUserAdmin(input.callerId, poll.organizationId));
+      (await this.orgs.isUserAdmin(command.callerId, poll.organizationId));
     const isSuper =
-      !isCreator && !isAdmin && (await this.users.isSuperAdmin(input.callerId));
+      !isCreator &&
+      !isAdmin &&
+      (await this.users.isSuperAdmin(command.callerId));
 
     if (!isCreator && !isAdmin && !isSuper) {
       return failure(PollErrors.NOT_AUTHORIZED);
@@ -78,6 +98,6 @@ export class RemovePollAttachmentUseCase {
       return failure(PollDomainCodes.POLL_CANNOT_CHANGE_ATTACHMENTS_ACTIVE);
     }
 
-    return this.attachments.deleteById(input.attachmentId);
+    return this.attachments.deleteById(command.attachmentId);
   }
 }

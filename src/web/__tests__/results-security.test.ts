@@ -293,9 +293,9 @@ describe('Poll Results Security', () => {
 
       // All voter arrays should be empty for non-authorized users
       serializedResults.questions.forEach((question) => {
-        question.answers.forEach((answer) => {
+        for (const answer of question.answers) {
           expect(answer.voters).toEqual([]);
-        });
+        }
       });
     });
 

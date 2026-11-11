@@ -18,6 +18,8 @@ produces distinct domain values; core calculations do not reuse the raw DTOs.
 - [SealValues.ts](SealValues.ts) supplies validated branded IDs, `ReceiptSecret`, `VoteSalt`,
   `Digest`, `UtcTimestamp`, holding sizes/shares, anchor counters/heights/errors, proof bytes and
   fencing tokens. IDs of different kinds and secrets/digests cannot be interchanged by checked TS.
+  Each ID supplies its own regex; v1 retains 1–256 ASCII letters, digits, underscores or hyphens.
+  Application and seal identities have separate brands even when their accepted syntax matches.
   Factories accept `unknown`, throw `SealError` on invalid input, and integrate with `sealResult`.
   Adapters use these factories rather than assertions such as `as PollId`.
 - [VoteLeaf.ts](VoteLeaf.ts) parses raw preimages into immutable vote snapshots with `RowWeight`
@@ -40,7 +42,7 @@ nonempty bytes; neither its type nor an evidence label establishes cryptographic
 Aggregate read methods return detached snapshots, including proof arrays.
 
 The type contract runs during ordinary `yarn test`: `TypeSafety.test.ts` compiles positive usage
-examples and requires 13 invalid client examples to fail compilation. Assertions/`any` can bypass
+examples and requires 15 invalid client examples to fail compilation. Assertions/`any` can bypass
 TypeScript, so strict boundary parsing and cryptographic verification remain necessary.
 
 ## Exact v1 shapes

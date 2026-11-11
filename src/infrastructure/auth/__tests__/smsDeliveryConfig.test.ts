@@ -1,4 +1,6 @@
+/** Effective SMS ceilings preserve configuration semantics and correlate invalid states. */
 import { describe, it, expect } from 'vitest';
+import { SmsCostLimitRubles } from '../SmsRuProtocol';
 import {
   resolveSmsDeliveryConfig,
   smsDeliveryDisplayKeys,
@@ -55,8 +57,8 @@ describe('smsDeliveryDisplayKeys', () => {
   const active = {
     channelActive: true,
     testMode: false,
-    maxCostRubles: null as number | null,
-    maxCostInvalid: false,
+    maxCostRubles: null,
+    maxCostInvalid: false as const,
   };
 
   it('maps stub channel to channelStub and N/A rows', () => {
@@ -77,7 +79,10 @@ describe('smsDeliveryDisplayKeys', () => {
 
   it('maps active + numeric cap to value', () => {
     expect(
-      smsDeliveryDisplayKeys({ ...active, maxCostRubles: 10 }).maxCostKey
+      smsDeliveryDisplayKeys({
+        ...active,
+        maxCostRubles: SmsCostLimitRubles.parse(10),
+      }).maxCostKey
     ).toBe('maxCostValue');
   });
 

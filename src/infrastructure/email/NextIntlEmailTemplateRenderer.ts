@@ -1,3 +1,7 @@
+/** Renders validated authentication purposes, locales and time units into email text. */
+import { Language } from '@/domain/user/UserValues';
+import { OtpDigits } from '@/domain/otp/OtpValues';
+import { Minutes } from '@/domain/auth/AuthValues';
 import { getTranslations } from 'next-intl/server';
 import type {
   EmailTemplateRenderer,
@@ -14,9 +18,9 @@ const NAMESPACE_BY_PURPOSE: Record<OtpPurpose, string> = {
 export class NextIntlEmailTemplateRenderer implements EmailTemplateRenderer {
   async renderOtp(
     purpose: OtpPurpose,
-    locale: string,
-    code: string,
-    expiryMinutes: number
+    locale: Language,
+    code: OtpDigits,
+    expiryMinutes: Minutes
   ): Promise<RenderedEmail> {
     const t = await getTranslations({
       locale,
@@ -30,7 +34,7 @@ export class NextIntlEmailTemplateRenderer implements EmailTemplateRenderer {
   }
 
   async renderEmailChangedNotice(
-    locale: string,
+    locale: Language,
     newEmailMasked: string
   ): Promise<RenderedEmail> {
     const t = await getTranslations({

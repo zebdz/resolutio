@@ -1,4 +1,9 @@
+/** Authorizes poll-content access before reading a voter's progress.
+ * Draft and answered-question references keep their domain identity types. */
+import { QuestionCount } from '../../domain/poll/QuestionValues';
 import { Result, success, failure } from '../../domain/shared/Result';
+import { PollId, UserId, QuestionId } from '@/domain/shared/EntityIds';
+import { PollDomainCodes } from '@/domain/poll/PollDomainCodes';
 import { Poll } from '../../domain/poll/Poll';
 import { VoteDraft } from '../../domain/poll/VoteDraft';
 import { PollRepository } from '../../domain/poll/PollRepository';
@@ -6,8 +11,10 @@ import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { DraftRepository } from '../../domain/poll/DraftRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
+import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
+import { PollReadPolicy } from '../../domain/poll/PollReadPolicy';
 import { PollVotingPolicy } from '../../domain/poll/PollVotingPolicy';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 
 export interface GetUserVotingProgressInput {
   pollId: string;
@@ -19,8 +26,8 @@ export interface GetUserVotingProgressResult {
   drafts: VoteDraft[];
   hasFinished: boolean;
   canVote: boolean;
-  answeredQuestionIds: string[];
-  totalQuestions: number;
+  answeredQuestionIds: QuestionId[];
+  totalQuestions: QuestionCount;
 }
 
 export class GetUserVotingProgressUseCase {
@@ -29,13 +36,22 @@ export class GetUserVotingProgressUseCase {
     private participantRepository: ParticipantRepository,
     private voteRepository: VoteRepository,
     private draftRepository: DraftRepository,
-    private userRepository: UserRepository
+    private userRepository: UserRepository,
+    private organizationRepository: OrganizationRepository
   ) {}
 
   async execute(
     input: GetUserVotingProgressInput
-  ): Promise<Result<GetUserVotingProgressResult, string>> {
-    const { pollId, userId } = input;
+  ): Promise<Result<GetUserVotingProgressResult, PollUseCaseFailure>> {
+    const parsedPollId = PollId.safeParse(input.pollId);
+    const parsedUserId = UserId.safeParse(input.userId);
+
+    if (!parsedPollId.success || !parsedUserId.success) {
+      return failure(PollDomainCodes.INVALID_BALLOT);
+    }
+
+    const pollId = parsedPollId.data;
+    const userId = parsedUserId.data;
 
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(pollId);
@@ -48,6 +64,32 @@ export class GetUserVotingProgressUseCase {
 
     if (!poll) {
       return failure(PollErrors.NOT_FOUND);
+    }
+
+    // Match poll-content access even when a direct action caller bypasses the vote page.
+    if (!poll.isOpen()) {
+      const isSuperAdmin = await this.userRepository.isSuperAdmin(userId);
+      const [isOrgMember, isOrgAdmin] = isSuperAdmin
+        ? [false, false]
+        : await Promise.all([
+            this.organizationRepository.isUserMember(
+              userId,
+              poll.organizationId
+            ),
+            this.organizationRepository.isUserAdmin(
+              userId,
+              poll.organizationId
+            ),
+          ]);
+
+      if (
+        !PollReadPolicy.canViewPoll(poll, {
+          isAdmin: isSuperAdmin || isOrgAdmin,
+          isOrgMember,
+        })
+      ) {
+        return failure(PollErrors.NOT_ORG_MEMBER);
+      }
     }
 
     // 2. Gather the facts the voting policy needs. Only organization polls
@@ -120,7 +162,7 @@ export class GetUserVotingProgressUseCase {
       hasFinished,
       canVote,
       answeredQuestionIds,
-      totalQuestions: activeQuestions.length,
+      totalQuestions: QuestionCount.parse(activeQuestions.length),
     });
   }
 }

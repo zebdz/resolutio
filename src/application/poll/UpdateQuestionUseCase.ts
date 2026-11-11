@@ -1,10 +1,18 @@
+/** UpdateQuestion decodes raw request identities before invoking core ports.
+ * Authorization and persistence are coordinated here; entity invariants stay in the domain. */
+import { z } from 'zod';
+import {
+  parseQuestionText,
+  parseQuestionDetails,
+} from '@/domain/poll/QuestionValues';
+import { QuestionId, UserId } from '@/domain/shared/EntityIds';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { QuestionRepository } from '../../domain/poll/QuestionRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 import { QuestionType } from '../../domain/poll/QuestionType';
 
 export interface UpdateQuestionInput {
@@ -15,6 +23,8 @@ export interface UpdateQuestionInput {
   questionType?: QuestionType;
 }
 
+const request = z.object({ questionId: QuestionId, userId: UserId });
+
 export class UpdateQuestionUseCase {
   constructor(
     private pollRepository: PollRepository,
@@ -24,7 +34,17 @@ export class UpdateQuestionUseCase {
     private profanityChecker?: ProfanityChecker
   ) {}
 
-  async execute(input: UpdateQuestionInput): Promise<Result<void, string>> {
+  async execute(
+    rawInput: UpdateQuestionInput
+  ): Promise<Result<void, PollUseCaseFailure>> {
+    const decoded = request.safeParse(rawInput);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawInput, ...decoded.data };
+
     // Get the question
     const questionResult = await this.questionRepository.getQuestionById(
       input.questionId
@@ -88,7 +108,13 @@ export class UpdateQuestionUseCase {
 
     // Update question properties
     if (input.text !== undefined) {
-      const textResult = question.updateText(input.text, this.profanityChecker);
+      const text = parseQuestionText(input.text);
+
+      if (!text.success) {
+        return text;
+      }
+
+      const textResult = question.updateText(text.value, this.profanityChecker);
 
       if (!textResult.success) {
         return failure(textResult.error);
@@ -96,8 +122,14 @@ export class UpdateQuestionUseCase {
     }
 
     if (input.details !== undefined) {
+      const details = parseQuestionDetails(input.details);
+
+      if (!details.success) {
+        return details;
+      }
+
       const detailsResult = question.updateDetails(
-        input.details,
+        details.value,
         this.profanityChecker
       );
 

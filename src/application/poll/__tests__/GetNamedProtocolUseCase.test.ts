@@ -1,3 +1,22 @@
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { VotingWeight } from '@/domain/poll/VotingWeight';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { UserId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import { participantFixtureData } from '@/application/poll/__tests__/pollFixtureCreation';
+import { Instant } from '@/domain/shared/Instant';
+import { pollFixtureCreation } from '@/application/poll/__tests__/pollFixtureCreation';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import {
+  ParticipantId,
+  QuestionId,
+  AnswerId,
+  VoteId,
+  PollId,
+} from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GetNamedProtocolUseCase } from '../GetNamedProtocolUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -33,51 +52,120 @@ describe('GetNamedProtocolUseCase', () => {
     weight: number,
     snapshotAt: Date = SNAPSHOT_AT
   ) {
-    const p = PollParticipant.create('poll-1', userId, weight).value;
-    (p as any).props.id = `participant-${userId}`;
-    (p as any).props.snapshotAt = snapshotAt;
+    let p = expectSuccess(
+      PollParticipant.create(
+        PollId.parse('poll-1'),
+        UserId.parse(userId),
+        pollFixtureCreation(ParticipantId),
+        VotingWeight.parse(weight)
+      )
+    );
+    p = PollParticipant.reconstitute({
+      ...participantFixtureData(p),
+      id: `participant-${userId}`,
+    });
+    p = PollParticipant.reconstitute({
+      ...participantFixtureData(p),
+      snapshotAt: snapshotAt,
+    });
 
     return p;
   }
 
   beforeEach(() => {
-    poll = Poll.create(
-      'Test Poll',
-      'Test Description',
-      'org-1',
-      null,
-      'user-admin',
-      new Date('2026-01-15'),
-      new Date('2026-02-15')
-    ).value;
-    (poll as any).props.id = 'poll-1';
-    (poll as any).props.state = PollState.FINISHED;
+    poll = expectSuccess(
+      Poll.create(
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Test Description'),
+        OrganizationId.parse('org-1'),
+        null,
+        UserId.parse('user-admin'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1')
+      )
+    );
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      id: 'poll-1',
+    });
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      finishedAt: null,
+      state: PollState.FINISHED,
+    });
 
-    const question = Question.create(
-      'Q1',
-      'poll-1',
-      1,
-      0,
-      'single-choice'
-    ).value;
-    (question as any).props.id = 'question-1';
+    let question = expectSuccess(
+      Question.create(
+        QuestionText.parse('Q1'),
+        PollId.parse('poll-1'),
+        pollFixtureCreation(QuestionId),
+        PageNumber.parse(1),
+        SortOrder.parse(0),
+        'single-choice'
+      )
+    );
+    question = Question.reconstitute({
+      ...question.toJSON(),
+      answers: question.answers,
+      id: 'question-1',
+    });
 
-    const answer1 = Answer.create('Yes', 1, 'question-1').value;
-    (answer1 as any).props.id = 'answer-1';
-    const answer2 = Answer.create('No', 2, 'question-1').value;
-    (answer2 as any).props.id = 'answer-2';
-    (question as any).props.answers = [answer1, answer2];
-    (poll as any).props.questions = [question];
+    let answer1 = expectSuccess(
+      Answer.create(
+        AnswerText.parse('Yes'),
+        SortOrder.parse(1),
+        QuestionId.parse('question-1'),
+        pollFixtureCreation(AnswerId)
+      )
+    );
+    answer1 = Answer.reconstitute({ ...answer1.toJSON(), id: 'answer-1' });
+    let answer2 = expectSuccess(
+      Answer.create(
+        AnswerText.parse('No'),
+        SortOrder.parse(2),
+        QuestionId.parse('question-1'),
+        pollFixtureCreation(AnswerId)
+      )
+    );
+    answer2 = Answer.reconstitute({ ...answer2.toJSON(), id: 'answer-2' });
+
+    for (const answer of [answer1, answer2]) {
+      question.addAnswer(answer);
+    }
+
+    poll = Poll.reconstitute({ ...poll.toJSON(), questions: [question] });
 
     const p1 = makeParticipant('user-1', 2);
     const p2 = makeParticipant('user-2', 3);
     const p3 = makeParticipant('user-3', 1);
 
-    const vote1 = Vote.create('question-1', 'answer-1', 'user-1', 2).value;
-    const vote2 = Vote.create('question-1', 'answer-2', 'user-2', 3).value;
+    const vote1 = expectSuccess(
+      Vote.create(
+        QuestionId.parse('question-1'),
+        AnswerId.parse('answer-1'),
+        UserId.parse('user-1'),
+        VotingWeight.parse(2),
+        pollFixtureCreation(VoteId, new Date())
+      )
+    );
+    const vote2 = expectSuccess(
+      Vote.create(
+        QuestionId.parse('question-1'),
+        AnswerId.parse('answer-2'),
+        UserId.parse('user-2'),
+        VotingWeight.parse(3),
+        pollFixtureCreation(VoteId, new Date())
+      )
+    );
 
     deps = {
-      pollRepository: { getPollById: vi.fn().mockResolvedValue(success(poll)) },
+      pollRepository: {
+        getPollById: vi.fn().mockImplementation(async () => success(poll)),
+      },
       participantRepository: {
         getParticipants: vi.fn().mockResolvedValue(success([p1, p2, p3])),
         getParticipantByUserAndPoll: vi.fn().mockResolvedValue(success(null)),
@@ -123,7 +211,11 @@ describe('GetNamedProtocolUseCase', () => {
 
   describe('authorization', () => {
     it('refuses on an anonymous poll', async () => {
-      (poll as any).props.anonymous = true;
+      poll = Poll.reconstitute({
+        ...poll.toJSON(),
+        questions: poll.questions,
+        anonymous: true,
+      });
 
       const result = await useCase.execute({ pollId: 'poll-1', userId: 'u' });
 
@@ -153,7 +245,12 @@ describe('GetNamedProtocolUseCase', () => {
     });
 
     it('refuses on a READY poll — nothing has been voted yet', async () => {
-      (poll as any).props.state = PollState.READY;
+      poll = Poll.reconstitute({
+        ...poll.toJSON(),
+        questions: poll.questions,
+        finishedAt: null,
+        state: PollState.READY,
+      });
 
       const result = await useCase.execute({ pollId: 'poll-1', userId: 'u' });
 
@@ -233,9 +330,33 @@ describe('GetNamedProtocolUseCase', () => {
         .fn()
         .mockResolvedValue(
           success([
-            Vote.create('question-1', 'answer-1', 'user-1', 2).value,
-            Vote.create('question-1', 'answer-2', 'user-1', 2).value,
-            Vote.create('question-1', 'answer-2', 'user-2', 3).value,
+            expectSuccess(
+              Vote.create(
+                QuestionId.parse('question-1'),
+                AnswerId.parse('answer-1'),
+                UserId.parse('user-1'),
+                VotingWeight.parse(2),
+                pollFixtureCreation(VoteId, new Date())
+              )
+            ),
+            expectSuccess(
+              Vote.create(
+                QuestionId.parse('question-1'),
+                AnswerId.parse('answer-2'),
+                UserId.parse('user-1'),
+                VotingWeight.parse(2),
+                pollFixtureCreation(VoteId, new Date())
+              )
+            ),
+            expectSuccess(
+              Vote.create(
+                QuestionId.parse('question-1'),
+                AnswerId.parse('answer-2'),
+                UserId.parse('user-2'),
+                VotingWeight.parse(3),
+                pollFixtureCreation(VoteId, new Date())
+              )
+            ),
           ])
         );
       useCase = build();
@@ -254,7 +375,14 @@ describe('GetNamedProtocolUseCase', () => {
     });
 
     it('leaves nonVoterIds empty for an open poll', async () => {
-      (poll as any).props.pollType = 'OPEN';
+      poll = Poll.reconstitute({
+        ...poll.toJSON(),
+        questions: poll.questions,
+        boardId: null,
+        distributionType: 'EQUAL',
+        propertyIds: [],
+        pollType: 'OPEN',
+      });
 
       const result = await useCase.execute({ pollId: 'poll-1', userId: 'u' });
 
@@ -266,7 +394,7 @@ describe('GetNamedProtocolUseCase', () => {
     });
 
     it('skips archived questions', async () => {
-      (poll as any).props.questions[0].archive();
+      poll.questions[0].archive(Instant.parse('2026-01-02T00:00:00.000Z'));
 
       const result = await useCase.execute({ pollId: 'poll-1', userId: 'u' });
 
@@ -280,8 +408,16 @@ describe('GetNamedProtocolUseCase', () => {
 
   describe('holdings', () => {
     function makePropertyBased() {
-      (poll as any).props.distributionType = 'OWNERSHIP_SIZE_WEIGHTED';
-      (poll as any).props.propertyIds = ['prop-1'];
+      poll = Poll.reconstitute({
+        ...poll.toJSON(),
+        questions: poll.questions,
+        distributionType: 'OWNERSHIP_SIZE_WEIGHTED',
+      });
+      poll = Poll.reconstitute({
+        ...poll.toJSON(),
+        questions: poll.questions,
+        propertyIds: ['prop-1'],
+      });
     }
 
     it('skips the holdings query entirely for an EQUAL poll', async () => {
@@ -319,7 +455,7 @@ describe('GetNamedProtocolUseCase', () => {
         organizationIds: ['org-1', 'org-child'],
         propertyIds: ['prop-1'],
         userIds: ['user-1', 'user-2', 'user-3'],
-        asOf: SNAPSHOT_AT,
+        asOf: Instant.fromDate(SNAPSHOT_AT),
       });
 
       if (!result.success) {
@@ -360,9 +496,9 @@ describe('GetNamedProtocolUseCase', () => {
 
       expect(calls).toHaveLength(2);
       expect(calls[0][0].userIds).toEqual(['user-1']);
-      expect(calls[0][0].asOf).toEqual(SNAPSHOT_AT);
+      expect(calls[0][0].asOf).toEqual(Instant.fromDate(SNAPSHOT_AT));
       expect(calls[1][0].userIds).toEqual(['user-2']);
-      expect(calls[1][0].asOf).toEqual(LATER_SNAPSHOT_AT);
+      expect(calls[1][0].asOf).toEqual(Instant.fromDate(LATER_SNAPSHOT_AT));
     });
 
     it('propagates a holdings read failure instead of silently emptying it', async () => {

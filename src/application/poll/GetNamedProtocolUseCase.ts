@@ -1,3 +1,41 @@
+/** Named protocol read model retains voter references, ownership units and tallies.
+ * Holdings are loaded at each participant snapshot; output permissions stay server-side. */
+import {
+  VoteCount,
+  ParticipantCount,
+  TotalVotingWeight,
+  VotingPercentage,
+  sumVotingWeights,
+  percentageOfWeight,
+} from '../../domain/poll/ResultTallies';
+import { VotingWeight } from '../../domain/poll/VotingWeight';
+import {
+  AnswerText,
+  QuestionText,
+  QuestionDetails,
+} from '../../domain/poll/QuestionValues';
+import { QuestionType } from '../../domain/poll/QuestionType';
+import { PollWriteFailure } from '../../domain/poll/PollWriteFailure';
+import { PollError } from './PollErrors';
+import {
+  AssetSize,
+  OwnershipShare,
+  PropertyName,
+  AssetName,
+} from '../../domain/organization/PropertyValues';
+import {
+  SizeUnit,
+  SizeUnitTranslationKey,
+} from '../../domain/organization/SizeUnit';
+import { PropertyAssetRepositoryError } from '../../domain/organization/PropertyAssetRepository';
+import { Instant } from '../../domain/shared/Instant';
+import { z } from 'zod';
+import {
+  PollId,
+  UserId,
+  QuestionId,
+  AnswerId,
+} from '../../domain/shared/EntityIds';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { Poll } from '../../domain/poll/Poll';
 import { Vote } from '../../domain/poll/Vote';
@@ -11,10 +49,7 @@ import {
   PollResultsPolicy,
   ResultsViewerFacts,
 } from '../../domain/poll/PollResultsPolicy';
-import {
-  DistributionType,
-  isOwnershipMode,
-} from '../../domain/poll/DistributionType';
+import { isOwnershipMode } from '../../domain/poll/DistributionType';
 import { PollErrors } from './PollErrors';
 
 export interface GetNamedProtocolInput {
@@ -23,63 +58,55 @@ export interface GetNamedProtocolInput {
 }
 
 export interface NamedProtocolHolding {
-  propertyName: string;
-  assetName: string;
-  size: number;
+  propertyName: PropertyName;
+  assetName: AssetName;
+  size: AssetSize;
   // Translation key, e.g. 'propertyAdmin.sizeUnit.squareMeters'. Resolved by
   // the presentation layer so the protocol renders in the reader's language.
-  sizeUnitKey: string;
+  sizeUnitKey: SizeUnitTranslationKey;
   // 1 = sole owner. Anything below is a shared asset.
-  share: number;
+  share: OwnershipShare;
 }
 
 export interface NamedProtocolPerson {
-  userId: string;
+  userId: UserId;
   firstName: string;
   lastName: string;
   middleName: string | null;
-  weight: number;
+  weight: VotingWeight;
   holdings: NamedProtocolHolding[];
 }
 
 export interface NamedProtocolAnswer {
-  answerId: string;
-  answerText: string;
-  voteCount: number;
-  totalWeight: number;
-  percentage: number;
+  answerId: AnswerId;
+  answerText: AnswerText;
+  voteCount: VoteCount;
+  totalWeight: TotalVotingWeight;
+  percentage: VotingPercentage;
   // References into `register` — the holdings are printed there once, not
   // repeated under every answer a multi-choice voter ticked.
-  voters: Array<{ userId: string; weight: number }>;
+  voters: Array<{ userId: UserId; weight: VotingWeight }>;
 }
 
 export interface NamedProtocolQuestion {
-  questionId: string;
-  questionText: string;
-  questionDetails: string | null;
-  questionType: string;
+  questionId: QuestionId;
+  questionText: QuestionText;
+  questionDetails: QuestionDetails | null;
+  questionType: QuestionType;
   answers: NamedProtocolAnswer[];
-  totalVotes: number;
-  totalWeight: number;
-  participantWeight: number;
+  totalVotes: VoteCount;
+  totalWeight: TotalVotingWeight;
+  participantWeight: TotalVotingWeight;
   // Empty for open polls: they have no fixed electorate to be absent from.
-  nonVoterIds: string[];
+  nonVoterIds: UserId[];
 }
 
 export interface GetNamedProtocolResult {
   poll: Poll;
   register: NamedProtocolPerson[];
   questions: NamedProtocolQuestion[];
-  totalParticipants: number;
-  totalParticipantWeight: number;
-}
-
-function sizeUnitKey(sizeUnit: string): string {
-  const camel = sizeUnit
-    .toLowerCase()
-    .replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
-
-  return `propertyAdmin.sizeUnit.${camel}`;
+  totalParticipants: ParticipantCount;
+  totalParticipantWeight: TotalVotingWeight;
 }
 
 /**
@@ -100,8 +127,26 @@ export class GetNamedProtocolUseCase {
   ) {}
 
   async execute(
-    input: GetNamedProtocolInput
-  ): Promise<Result<GetNamedProtocolResult, string>> {
+    rawRequest: GetNamedProtocolInput
+  ): Promise<
+    Result<
+      GetNamedProtocolResult,
+      | PollWriteFailure
+      | PollError
+      | PropertyAssetRepositoryError
+      | 'common.errors.validationFailed'
+    >
+  > {
+    const decoded = z
+      .object({ pollId: PollId, userId: UserId })
+      .safeParse(rawRequest);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawRequest, ...decoded.data };
+
     const { pollId, userId } = input;
 
     const pollResult = await this.pollRepository.getPollById(pollId);
@@ -152,9 +197,8 @@ export class GetNamedProtocolUseCase {
     const votes = votesResult.value;
     const participants = participantsResult.value;
 
-    const totalParticipantWeight = participants.reduce(
-      (sum, p) => sum + p.userWeight,
-      0
+    const totalParticipantWeight = sumVotingWeights(
+      participants.map((p) => p.userWeight)
     );
 
     const users =
@@ -165,9 +209,9 @@ export class GetNamedProtocolUseCase {
 
     // Holdings only make sense when the weight came from property. An EQUAL
     // poll — including every open poll — skips the query entirely.
-    let holdingsByUser = new Map<string, NamedProtocolHolding[]>();
+    let holdingsByUser = new Map<UserId, NamedProtocolHolding[]>();
 
-    if (isOwnershipMode(poll.distributionType as DistributionType)) {
+    if (isOwnershipMode(poll.distributionType)) {
       const holdingsResult = await this.loadHoldings(poll, participants);
 
       if (!holdingsResult.success) {
@@ -197,7 +241,7 @@ export class GetNamedProtocolUseCase {
           (a.middleName ?? '').localeCompare(b.middleName ?? '')
       );
 
-    const votesByQuestion = new Map<string, Vote[]>();
+    const votesByQuestion = new Map<QuestionId, Vote[]>();
 
     for (const vote of votes) {
       const bucket = votesByQuestion.get(vote.questionId);
@@ -218,7 +262,7 @@ export class GetNamedProtocolUseCase {
       }
 
       const questionVotes = votesByQuestion.get(question.id) ?? [];
-      const votesByAnswer = new Map<string, Vote[]>();
+      const votesByAnswer = new Map<AnswerId, Vote[]>();
 
       for (const vote of questionVotes) {
         const bucket = votesByAnswer.get(vote.answerId);
@@ -238,20 +282,16 @@ export class GetNamedProtocolUseCase {
         }
 
         const answerVotes = votesByAnswer.get(answer.id) ?? [];
-        const totalWeight = answerVotes.reduce(
-          (sum, v) => sum + v.userWeight,
-          0
+        const totalWeight = sumVotingWeights(
+          answerVotes.map((v) => v.userWeight)
         );
 
         answers.push({
           answerId: answer.id,
           answerText: answer.text,
-          voteCount: answerVotes.length,
+          voteCount: VoteCount.parse(answerVotes.length),
           totalWeight,
-          percentage:
-            totalParticipantWeight > 0
-              ? (totalWeight / totalParticipantWeight) * 100
-              : 0,
+          percentage: percentageOfWeight(totalWeight, totalParticipantWeight),
           voters: answerVotes.map((v) => ({
             userId: v.userId,
             weight: v.userWeight,
@@ -261,7 +301,7 @@ export class GetNamedProtocolUseCase {
 
       // Dedupe by userId — a multi-choice voter casting N votes contributes
       // their weight to participation only once.
-      const uniqueVoterWeights = new Map<string, number>();
+      const uniqueVoterWeights = new Map<UserId, VotingWeight>();
 
       for (const v of questionVotes) {
         if (!uniqueVoterWeights.has(v.userId)) {
@@ -275,11 +315,10 @@ export class GetNamedProtocolUseCase {
         questionDetails: question.details,
         questionType: question.questionType,
         answers,
-        totalVotes: questionVotes.length,
-        totalWeight: answers.reduce((sum, a) => sum + a.totalWeight, 0),
-        participantWeight: Array.from(uniqueVoterWeights.values()).reduce(
-          (sum, w) => sum + w,
-          0
+        totalVotes: VoteCount.parse(questionVotes.length),
+        totalWeight: sumVotingWeights(answers.map((a) => a.totalWeight)),
+        participantWeight: sumVotingWeights(
+          Array.from(uniqueVoterWeights.values())
         ),
         nonVoterIds: poll.isOpen()
           ? []
@@ -291,7 +330,7 @@ export class GetNamedProtocolUseCase {
       poll,
       register,
       questions,
-      totalParticipants: participants.length,
+      totalParticipants: ParticipantCount.parse(participants.length),
       totalParticipantWeight,
     });
   }
@@ -304,17 +343,19 @@ export class GetNamedProtocolUseCase {
    */
   private async loadHoldings(
     poll: Poll,
-    participants: Array<{ userId: string; snapshotAt: Date }>
-  ): Promise<Result<Map<string, NamedProtocolHolding[]>, string>> {
+    participants: Array<{ userId: UserId; snapshotAt: Date }>
+  ): Promise<
+    Result<Map<UserId, NamedProtocolHolding[]>, PropertyAssetRepositoryError>
+  > {
     const descendantIds = await this.organizationRepository.getDescendantIds(
       poll.organizationId
     );
     const organizationIds = [poll.organizationId, ...descendantIds];
 
-    const bySnapshot = new Map<number, string[]>();
+    const bySnapshot = new Map<Instant, UserId[]>();
 
     for (const p of participants) {
-      const key = p.snapshotAt.getTime();
+      const key = Instant.fromDate(p.snapshotAt);
       const bucket = bySnapshot.get(key);
 
       if (bucket) {
@@ -324,14 +365,14 @@ export class GetNamedProtocolUseCase {
       }
     }
 
-    const holdingsByUser = new Map<string, NamedProtocolHolding[]>();
+    const holdingsByUser = new Map<UserId, NamedProtocolHolding[]>();
 
     for (const [time, userIds] of bySnapshot) {
       const rowsResult = await this.propertyAssetRepository.findHoldingsAsOf({
         organizationIds,
         propertyIds: poll.propertyIds,
         userIds,
-        asOf: new Date(time),
+        asOf: time,
       });
 
       if (!rowsResult.success) {
@@ -343,7 +384,7 @@ export class GetNamedProtocolUseCase {
           propertyName: row.propertyName,
           assetName: row.assetName,
           size: row.size,
-          sizeUnitKey: sizeUnitKey(row.sizeUnit),
+          sizeUnitKey: SizeUnit.translationKey(row.sizeUnit),
           share: row.share,
         };
         const bucket = holdingsByUser.get(row.userId);

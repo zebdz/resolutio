@@ -1,8 +1,12 @@
+/** Mail delivery accepts validated recipients and already rendered message text.
+ * Adapters serialize addresses; only development transports may return a body preview. */
+import { EmailAddress } from '@/domain/user/EmailAddress';
+
 export interface EmailMessage {
-  to: string;
-  subject: string;
-  text: string;
-  html?: string;
+  readonly to: EmailAddress;
+  readonly subject: string;
+  readonly text: string;
+  readonly html?: string;
 }
 
 export interface EmailSendResult {

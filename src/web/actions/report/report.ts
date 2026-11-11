@@ -1,5 +1,12 @@
 'use server';
 
+/** Report actions enforce access/rate limits and serialize permitted report data.
+ * Attachment metadata uses canonical instants and never includes content bytes. */
+
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
 import { getTranslations } from 'next-intl/server';
 import {
   prisma,
@@ -44,7 +51,13 @@ export type ActionResult<T = void> =
 // can be imported by 'use server' callers (which forbid non-async exports)
 // and by non-server callers like the public /r/[id] page.
 
-import { serializeReport, type SerializedReport } from './serializeReport';
+import {
+  serializeReport,
+  serializeReportDetails,
+  type SerializedReportDetails,
+  type SerializedReportList,
+} from './serializeReport';
+import type { UserId, ReportId } from '@/domain/shared/EntityIds';
 
 // ---------------------------------------------------------------------------
 // Module-level repository + use-case singletons
@@ -66,6 +79,8 @@ const visibilitySvc = new ResolveReportVisibilityService(
 );
 
 const notifyPublished = new NotifyReportPublishedUseCase({
+  ids: new CryptoIdGenerator(),
+  clock: new SystemClock(),
   orgRepo,
   boardRepo,
   notificationRepository: notificationRepo,
@@ -75,6 +90,8 @@ const createReport = new CreateReportUseCase(
   reportRepo,
   orgRepo,
   boardRepo,
+  new CryptoIdGenerator(),
+  new SystemClock(),
   profanity
 );
 
@@ -82,6 +99,7 @@ const updateReport = new UpdateReportUseCase(
   reportRepo,
   orgRepo,
   userRepo,
+  new SystemClock(),
   profanity
 );
 
@@ -89,7 +107,8 @@ const setReportVisibility = new SetReportVisibilityUseCase(
   reportRepo,
   orgRepo,
   userRepo,
-  boardRepo
+  boardRepo,
+  new SystemClock()
 );
 
 // Actual ctor: (reports, orgs, users, polls)
@@ -97,34 +116,48 @@ const attachPoll = new AttachPollUseCase(
   reportRepo,
   orgRepo,
   userRepo,
-  pollRepo
+  pollRepo,
+  new SystemClock()
 );
 
 // Actual ctor: (reports, orgs, users) — no pollRepo
-const detachPoll = new DetachPollUseCase(reportRepo, orgRepo, userRepo);
+const detachPoll = new DetachPollUseCase(
+  reportRepo,
+  orgRepo,
+  userRepo,
+  new SystemClock()
+);
 
 // Actual ctor: (reports, orgs, users, attachmentRepo)
 const removeAttachment = new RemoveReportAttachmentUseCase(
   reportRepo,
   orgRepo,
   userRepo,
-  attachmentRepo
+  attachmentRepo,
+  new SystemClock()
 );
 
 const publishReport = new PublishReportUseCase(
   reportRepo,
   orgRepo,
   userRepo,
-  notifyPublished
+  notifyPublished,
+  new SystemClock()
 );
 
 const downgradeReport = new DowngradeReportToDraftUseCase(
   reportRepo,
   orgRepo,
-  userRepo
+  userRepo,
+  new SystemClock()
 );
 
-const archiveReport = new ArchiveReportUseCase(reportRepo, orgRepo, userRepo);
+const archiveReport = new ArchiveReportUseCase(
+  reportRepo,
+  orgRepo,
+  userRepo,
+  new SystemClock()
+);
 
 const getReport = new GetReportForViewerUseCase(
   reportRepo,
@@ -144,13 +177,13 @@ const listReports = new ListReportsForViewerUseCase(
 // Auth helper
 // ---------------------------------------------------------------------------
 
-async function requireUser(): Promise<{ error: string } | { userId: string }> {
+async function requireUser(): Promise<{ error: string } | { userId: UserId }> {
   const u = await getCurrentUser();
 
   if (!u) {
     const t = await getTranslations('common.errors');
 
-    return { error: t('unauthorized') as string };
+    return { error: t('unauthorized') };
   }
 
   return { userId: u.id };
@@ -166,7 +199,7 @@ export async function createReportAction(input: {
   body: string;
   visibility: ReportVisibility;
   boardIds: string[];
-}): Promise<ActionResult<{ reportId: string }>> {
+}): Promise<ActionResult<{ reportId: ReportId }>> {
   const rl = await checkRateLimit();
 
   if (rl) {
@@ -437,24 +470,9 @@ export async function archiveReportAction(input: {
   return { success: true, data: undefined };
 }
 
-export async function getReportAction(input: { reportId: string }): Promise<
-  ActionResult<{
-    report: SerializedReport;
-    attachments: Array<{
-      id: string;
-      fileName: string;
-      mimeType: string;
-      sizeBytes: number;
-      createdAt: string;
-    }>;
-    polls: Array<{
-      id: string;
-      title: string;
-      state: string;
-      archivedAt: string | null;
-    }>;
-  }>
-> {
+export async function getReportAction(input: {
+  reportId: string;
+}): Promise<ActionResult<SerializedReportDetails>> {
   const rl = await checkRateLimit();
 
   if (rl) {
@@ -476,26 +494,9 @@ export async function getReportAction(input: { reportId: string }): Promise<
     return { success: false, error: await translateErrorCode(result.error) };
   }
 
-  const { report, attachments, polls } = result.value;
-
   return {
     success: true,
-    data: {
-      report: serializeReport(report),
-      attachments: attachments.map((a) => ({
-        id: a.id,
-        fileName: a.fileName,
-        mimeType: a.mimeType,
-        sizeBytes: a.sizeBytes,
-        createdAt: a.createdAt.toISOString(),
-      })),
-      polls: polls.map((p) => ({
-        id: p.id,
-        title: p.title,
-        state: p.state,
-        archivedAt: p.archivedAt?.toISOString() ?? null,
-      })),
-    },
+    data: serializeReportDetails(result.value),
   };
 }
 
@@ -505,14 +506,7 @@ export async function listReportsAction(input: {
   publishedOnly?: boolean;
   page?: number;
   pageSize?: number;
-}): Promise<
-  ActionResult<{
-    reports: SerializedReport[];
-    totalCount: number;
-    page: number;
-    pageSize: number;
-  }>
-> {
+}): Promise<ActionResult<SerializedReportList>> {
   const rl = await checkRateLimit();
 
   if (rl) {

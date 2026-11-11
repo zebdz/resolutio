@@ -1,3 +1,6 @@
+import { createOtpFixture } from '@/domain/otp/__tests__/otpTestValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { OtpVerification, OtpChannel, OtpPurposes } from '../OtpVerification';
 
@@ -14,12 +17,12 @@ describe('OtpVerification', () => {
     expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 min from now
     verifiedAt: null,
     createdAt: new Date(),
-    userId: 'user-1',
+    userId: UserId.parse('user-1'),
   };
 
   describe('create', () => {
     it('should create a new OtpVerification', () => {
-      const otp = OtpVerification.create({
+      const otp = createOtpFixture({
         identifier: '+79161234567',
         channel: 'sms',
         purpose: OtpPurposes.PHONE_CONFIRMATION,
@@ -36,7 +39,7 @@ describe('OtpVerification', () => {
       expect(otp.attempts).toBe(0);
       expect(otp.maxAttempts).toBe(5);
       expect(otp.verifiedAt).toBeNull();
-      expect(otp.id).toBe('');
+      expect(otp.id).toBe('otp-fixture');
     });
   });
 
@@ -53,7 +56,7 @@ describe('OtpVerification', () => {
   describe('isExpired', () => {
     it('should return false when not expired', () => {
       const otp = OtpVerification.reconstitute(baseProps);
-      expect(otp.isExpired()).toBe(false);
+      expect(otp.isExpired(Instant.fromDate(new Date()))).toBe(false);
     });
 
     it('should return true when expired', () => {
@@ -61,7 +64,7 @@ describe('OtpVerification', () => {
         ...baseProps,
         expiresAt: new Date(Date.now() - 1000), // 1 sec ago
       });
-      expect(otp.isExpired()).toBe(true);
+      expect(otp.isExpired(Instant.fromDate(new Date()))).toBe(true);
     });
   });
 
@@ -123,10 +126,10 @@ describe('OtpVerification', () => {
   describe('markVerified', () => {
     it('should return new instance with verifiedAt set', () => {
       const otp = OtpVerification.reconstitute(baseProps);
-      const verified = otp.markVerified();
+      const verified = otp.markVerified(Instant.fromDate(new Date()));
 
       expect(verified.isVerified()).toBe(true);
-      expect(verified.verifiedAt).toBeInstanceOf(Date);
+      expect(Instant.safeParse(verified.verifiedAt).success).toBe(true);
       // Original unchanged
       expect(otp.isVerified()).toBe(false);
     });
@@ -135,7 +138,7 @@ describe('OtpVerification', () => {
 
 describe('OtpVerification purpose', () => {
   it('carries the purpose it was created for', () => {
-    const otp = OtpVerification.create({
+    const otp = createOtpFixture({
       identifier: 'ivan@mail.ru',
       channel: 'email',
       purpose: OtpPurposes.PASSWORD_RESET,
@@ -149,7 +152,7 @@ describe('OtpVerification purpose', () => {
   });
 
   it('keeps the purpose across incrementAttempts and markVerified', () => {
-    const otp = OtpVerification.create({
+    const otp = createOtpFixture({
       identifier: 'ivan@mail.ru',
       channel: 'email',
       purpose: OtpPurposes.EMAIL_CONFIRMATION,
@@ -160,7 +163,9 @@ describe('OtpVerification purpose', () => {
     });
 
     expect(otp.incrementAttempts().purpose).toBe('email_confirmation');
-    expect(otp.markVerified().purpose).toBe('email_confirmation');
+    expect(otp.markVerified(Instant.fromDate(new Date())).purpose).toBe(
+      'email_confirmation'
+    );
   });
 
   it('exposes exactly the three known purposes', () => {
@@ -185,11 +190,13 @@ describe('OtpVerification isPending', () => {
     expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     verifiedAt: null,
     createdAt: new Date(),
-    userId: 'user-1',
+    userId: UserId.parse('user-1'),
   };
 
   it('is pending while unverified, unexpired and with attempts left', () => {
-    expect(OtpVerification.reconstitute(live).isPending()).toBe(true);
+    expect(
+      OtpVerification.reconstitute(live).isPending(Instant.fromDate(new Date()))
+    ).toBe(true);
   });
 
   it('stops being pending once verified', () => {
@@ -198,7 +205,7 @@ describe('OtpVerification isPending', () => {
       verifiedAt: new Date(),
     });
 
-    expect(otp.isPending()).toBe(false);
+    expect(otp.isPending(Instant.fromDate(new Date()))).toBe(false);
   });
 
   it('stops being pending once expired', () => {
@@ -207,12 +214,12 @@ describe('OtpVerification isPending', () => {
       expiresAt: new Date(Date.now() - 1000),
     });
 
-    expect(otp.isPending()).toBe(false);
+    expect(otp.isPending(Instant.fromDate(new Date()))).toBe(false);
   });
 
   it('stops being pending once out of attempts', () => {
     const otp = OtpVerification.reconstitute({ ...live, attempts: 5 });
 
-    expect(otp.isPending()).toBe(false);
+    expect(otp.isPending(Instant.fromDate(new Date()))).toBe(false);
   });
 });

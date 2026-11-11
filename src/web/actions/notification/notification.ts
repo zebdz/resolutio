@@ -1,5 +1,14 @@
 'use server';
 
+/** Notification actions authorize recipients and preserve typed event payloads/counts.
+ * Result-based reads/mutations propagate localized failures; explicit mapping filters server fields. */
+
+import {
+  serializeNotification,
+  type NotificationView,
+} from './serializeNotification';
+import type { NotificationCount } from '@/domain/notification/NotificationContent';
+import { SystemClock } from '@/infrastructure/shared/SystemEntityCreation';
 import { getTranslations } from 'next-intl/server';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { GetNotificationsUseCase } from '@/application/notification/GetNotificationsUseCase';
@@ -7,28 +16,35 @@ import { MarkNotificationReadUseCase } from '@/application/notification/MarkNoti
 import { MarkAllNotificationsReadUseCase } from '@/application/notification/MarkAllNotificationsReadUseCase';
 import { GetUnreadNotificationCountUseCase } from '@/application/notification/GetUnreadNotificationCountUseCase';
 import { DeleteNotificationsUseCase } from '@/application/notification/DeleteNotificationsUseCase';
-import { prisma, PrismaNotificationRepository } from '@/infrastructure/index';
+import { prisma } from '@/infrastructure/index';
+import { PrismaNotificationReader } from '@/infrastructure/repositories/PrismaNotificationReader';
+import { PrismaNotificationRecipientRepository } from '@/infrastructure/repositories/PrismaNotificationRecipientRepository';
 import { getCurrentUser } from '../../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { ActionResult } from '../organization/organization';
 
-const notificationRepository = new PrismaNotificationRepository(prisma);
+const notificationRepository = new PrismaNotificationRecipientRepository(
+  prisma
+);
+const notificationReader = new PrismaNotificationReader(prisma);
 
 const getNotificationsUseCase = new GetNotificationsUseCase({
-  notificationRepository,
+  notificationReader,
 });
 
 const markNotificationReadUseCase = new MarkNotificationReadUseCase({
+  clock: new SystemClock(),
   notificationRepository,
 });
 
 const markAllNotificationsReadUseCase = new MarkAllNotificationsReadUseCase({
+  clock: new SystemClock(),
   notificationRepository,
 });
 
 const getUnreadNotificationCountUseCase = new GetUnreadNotificationCountUseCase(
   {
-    notificationRepository,
+    notificationReader,
   }
 );
 
@@ -41,17 +57,9 @@ export async function getNotificationsAction(
   offset?: number
 ): Promise<
   ActionResult<{
-    notifications: Array<{
-      id: string;
-      type: string;
-      title: string;
-      body: string;
-      data: Record<string, unknown> | null;
-      readAt: Date | null;
-      createdAt: Date;
-    }>;
-    unreadCount: number;
-    totalCount: number;
+    notifications: NotificationView[];
+    unreadCount: NotificationCount;
+    totalCount: NotificationCount;
   }>
 > {
   const rateLimited = await checkRateLimit();
@@ -82,15 +90,7 @@ export async function getNotificationsAction(
     return {
       success: true,
       data: {
-        notifications: result.value.notifications.map((n) => ({
-          id: n.id,
-          type: n.type,
-          title: n.title,
-          body: n.body,
-          data: n.data,
-          readAt: n.readAt,
-          createdAt: n.createdAt,
-        })),
+        notifications: result.value.notifications.map(serializeNotification),
         unreadCount: result.value.unreadCount,
         totalCount: result.value.totalCount,
       },
@@ -170,7 +170,7 @@ export async function markAllNotificationsReadAction(): Promise<ActionResult> {
 }
 
 export async function getUnreadNotificationCountAction(): Promise<
-  ActionResult<{ count: number }>
+  ActionResult<{ count: NotificationCount }>
 > {
   const rateLimited = await checkRateLimit();
 

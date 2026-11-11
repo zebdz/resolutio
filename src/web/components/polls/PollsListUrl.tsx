@@ -1,5 +1,8 @@
 'use client';
 
+/** Keeps poll-list filters in the URL while rendering typed server snapshots. */
+import type { PollListItem } from '@/web/actions/poll/PollQueryViews';
+
 import { useState, useCallback, useTransition } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { getBoardsByOrganizationAction } from '@/src/web/actions/board/board';
@@ -20,7 +23,7 @@ interface PollFilters {
 }
 
 interface PollsListUrlProps {
-  polls: any[];
+  polls: PollListItem[];
   totalCount: number;
   totalPages: number;
   currentPage: number;
