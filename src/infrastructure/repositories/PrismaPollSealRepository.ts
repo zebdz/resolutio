@@ -1,25 +1,25 @@
 /** Transaction-scoped seal persistence. Immutable canonical bytes are stored verbatim;
  * every write rechecks the fenced owner under the same transaction's row lock. */
-import { z } from 'zod';
 import { Prisma } from '@/generated/prisma/client';
 import { PollSealRepository } from '@/domain/seal/PollSealRepository';
 import { PollSeal } from '@/domain/seal/PollSeal';
 import { SealPersistenceFailureCode as Failure } from '@/domain/seal/SealPersistenceFailureCode';
-import { Digest, PollId, FencingToken } from '@/domain/seal/SealValues';
-import { votePreimageSchema, votePreimageData } from '@/domain/seal/VoteLeaf';
+import { FencingToken } from '@/domain/seal/SealValues';
 import { failure, success } from '@/domain/shared/Result';
 import { SealWorkClaim } from '@/application/seal/SealWorkRepository';
 import { lockSealWorkClaim } from './PrismaSealWorkRepository';
 
-const votesSchema = z.array(
-  z.strictObject({ hash: Digest.schema, preimage: votePreimageSchema })
-);
-export class PrismaPollSealRepository implements PollSealRepository {
+import { PrismaSealReader } from './PrismaSealReader';
+export class PrismaPollSealRepository
+  extends PrismaSealReader
+  implements PollSealRepository
+{
   constructor(
-    private readonly tx: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient,
     private readonly claim: SealWorkClaim
-  ) {}
-
+  ) {
+    super(tx);
+  }
   async save(seal: PollSeal): ReturnType<PollSealRepository['save']> {
     if (seal.pollId !== this.claim.pollId) {
       return failure(Failure.parse('seal.errors.claimLost'));
@@ -54,79 +54,6 @@ export class PrismaPollSealRepository implements PollSealRepository {
     });
 
     return success(undefined);
-  }
-  async findByPollId(
-    pollId: PollId
-  ): ReturnType<PollSealRepository['findByPollId']> {
-    return this.load({ pollId });
-  }
-  async findByRootDigest(
-    rootDigest: Digest
-  ): ReturnType<PollSealRepository['findByRootDigest']> {
-    return this.load({ rootDigest });
-  }
-  private async load(
-    where: Prisma.PollSealWhereUniqueInput
-  ): ReturnType<PollSealRepository['findByPollId']> {
-    const row = await this.tx.pollSeal.findUnique({
-      where,
-      include: { anchors: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] } },
-    });
-
-    if (!row) {
-      return success(null);
-    }
-
-    const votes = votesSchema.safeParse(row.votes);
-
-    if (!votes.success) {
-      return failure(Failure.parse('domain.seal.inconsistentRecord'));
-    }
-
-    const decoded = PollSeal.reconstitute(
-      {
-        manifest: row.manifest,
-        rootDigest: row.rootDigest,
-        sections: {
-          poll: row.sectionPoll,
-          tallies: row.sectionTallies,
-          register: row.sectionRegister,
-          signers: row.sectionSigners,
-        },
-        votes: votes.data.map((v) => ({
-          hash: v.hash,
-          preimage: votePreimageData(v.preimage),
-        })),
-      },
-      row.anchors.map((a) => ({
-        id: a.id,
-        provider: a.provider,
-        status: a.status,
-        pendingProof: a.pendingProof,
-        confirmedProof: a.confirmedProof,
-        bitcoinHeight: a.bitcoinHeight,
-        bitcoinTime: a.bitcoinTime?.toISOString() ?? null,
-        attempts: a.attempts,
-        lastError: a.lastError,
-        nextAttemptAt: a.nextAttemptAt?.toISOString() ?? null,
-        submittedAt: a.submittedAt?.toISOString() ?? null,
-        confirmedAt: a.confirmedAt?.toISOString() ?? null,
-        createdAt: a.createdAt.toISOString(),
-      }))
-    );
-
-    if (!decoded.success) {
-      return failure(Failure.parse(decoded.error));
-    }
-
-    if (
-      decoded.value.pollId !== row.pollId ||
-      decoded.value.manifest.sealedAt !== row.sealedAt.toISOString()
-    ) {
-      return failure(Failure.parse('domain.seal.inconsistentRecord'));
-    }
-
-    return decoded;
   }
   async saveAnchors(
     seal: PollSeal,

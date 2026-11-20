@@ -54,6 +54,9 @@ export class PollSeal {
   get record(): SealedRecord {
     return structuredClone(this.contents);
   }
+  get manifestBytes(): string {
+    return this.contents.manifest;
+  }
   get manifest(): SealManifest {
     return structuredClone(this.parsedManifest);
   }

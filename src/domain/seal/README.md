@@ -6,8 +6,8 @@ entities. `SealedRecordBuilder.build(input, sealedAt)` returns a `Result<PollSea
 `PollSeal.reconstitute(record, anchors)` validates persisted data before restoring the aggregate.
 `fromRecord` is the throwing smart constructor used inside the builder's Result boundary.
 
-Phase 1 supplies the domain only. Voting transactions, storage, actual OpenTimestamps verification,
-authorization, delivery, CLI and UI are subsequent phases of the [implementation plan](../../../plans/2026-09-15-poll-seal-and-anchor.md).
+`verifyEvidence` checks exported local evidence and distinguishes receipt agreement, inclusion, labels
+and timestamp binding. See the [standalone verifier guide](../../../readmes/Poll-Seal-Verifier.md).
 
 ## Domain types and boundary codecs
 
@@ -86,7 +86,7 @@ The root digest identifies the domain seal; persistence may assign its own surro
 Each leaf contains `{preimage, hash, questionText, answerText}`. Receipt leaves sort by hash too.
 The secret and labels remain in the voter's receipt, separately from the sealed record. Labels are
 cast-time claims; they are not part of a vote leaf's hash. A fresh export is not independent evidence
-of an original ballot. Full receipt-versus-bundle verification is Phase 5.
+of an original ballot. The verifier compares the complete saved receipt with all leaves in the voter bundle.
 
 ## Canonical bytes and validation
 

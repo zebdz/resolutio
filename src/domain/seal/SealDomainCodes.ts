@@ -11,6 +11,14 @@ export const SealDomainCodes = {
   SEAL_LEAF_NOT_FOUND: 'domain.seal.leafNotFound',
   SEAL_INVALID_WEIGHT: 'domain.seal.invalidWeight',
   SEAL_INVALID_CANONICAL: 'domain.seal.invalidCanonical',
+  SEAL_INVALID_BUNDLE: 'domain.seal.invalidBundle',
+  SEAL_MANIFEST_MISMATCH: 'domain.seal.manifestMismatch',
+  SEAL_SECTION_MISMATCH: 'domain.seal.sectionMismatch',
+  SEAL_RECEIPT_MISMATCH: 'domain.seal.receiptMismatch',
+  SEAL_LABEL_MISMATCH: 'domain.seal.labelMismatch',
+  SEAL_CODE_MISMATCH: 'domain.seal.codeMismatch',
+  SEAL_INVALID_PATH: 'domain.seal.invalidPath',
+  SEAL_PROOF_DIGEST_MISMATCH: 'domain.seal.proofDigestMismatch',
   SEAL_INVALID_PROOF: 'domain.seal.invalidProof',
 } as const;
 

@@ -143,3 +143,15 @@ OTS_LIVE_TEST=1 yarn vitest run --maxWorkers=1 src/infrastructure/anchor
 The fresh submission and historical confirmation are independent. The live test prints the
 fresh digest and its observed upgrade status. Calendar and explorer endpoints can be set through
 `OTS_CALENDAR_URLS` and `OTS_ESPLORA_URL`.
+
+The export suite casts a weighted ballot, saves the receipt, finishes and seals the poll, downloads
+the four HTTP responses and runs the standalone CLI in a temporary directory with an empty
+environment. It also covers anonymous and named disclosures across poll types and viewer roles.
+To exercise a fresh real calendar submission in the same test, use the disposable database above.
+
+```sh
+OTS_LIVE_TEST=1 yarn test:poll-db --maxWorkers=1 SealDownloads.database
+```
+
+The [standalone verifier guide](Poll-Seal-Verifier.md) includes the exported fixture and exact
+Python OpenTimestamps commands.

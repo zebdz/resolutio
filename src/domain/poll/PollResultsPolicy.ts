@@ -23,7 +23,7 @@ export interface ResultsViewerFacts {
  * collected under a separate consent, not part of the voting record.
  */
 function canViewResults(
-  poll: Poll,
+  poll: Pick<Poll, 'isOpen' | 'isActive' | 'isAnonymous'>,
   facts: ResultsViewerFacts
 ): Result<void, PollDomainCode> {
   if (facts.isAdmin) {
@@ -45,7 +45,10 @@ function canViewResults(
   return success(undefined);
 }
 
-function canViewVoterNames(poll: Poll, facts: ResultsViewerFacts): boolean {
+function canViewVoterNames(
+  poll: Pick<Poll, 'isOpen' | 'isActive' | 'isAnonymous'>,
+  facts: ResultsViewerFacts
+): boolean {
   if (facts.isAdmin) {
     return true;
   }

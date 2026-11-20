@@ -36,3 +36,6 @@ prisma/migrations
 package-lock.json
 pnpm-lock.yaml
 yarn.lock
+
+# These downloads are cryptographic test vectors; whitespace is committed.
+src/domain/seal/__tests__/fixtures/export-v1/*.json

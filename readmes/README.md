@@ -5,9 +5,9 @@ this index does not require loading every reference or historical plan.
 
 ## Active work
 
-| Feature                    | Design                                                       | Implementation plan                                        | Status                              |
-| -------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- | ----------------------------------- |
-| Poll sealing and anchoring | [Approved design](2026-09-11-poll-seal-and-anchor-design.md) | [Phased plan](../plans/2026-09-15-poll-seal-and-anchor.md) | Phase 4 approved; ready for Phase 5 |
+| Feature                    | Design                                                       | Implementation plan                                        | Status           |
+| -------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- | ---------------- |
+| Poll sealing and anchoring | [Approved design](2026-09-11-poll-seal-and-anchor-design.md) | [Phased plan](../plans/2026-09-15-poll-seal-and-anchor.md) | Phase 5 approved |
 
 Visual walkthrough: [Poll seal and anchor flow](poll-seal-and-anchor-flow.html) — lifecycle,
 record commitments, access rules, recovery and verification.
@@ -15,6 +15,8 @@ record commitments, access rules, recovery and verification.
 User guide: [English](how-your-vote-is-protected.html),
 [Русский](how-your-vote-is-protected-ru.html) — plain-language
 feature preview explaining receipts, verification, privacy and the limits of the guarantees.
+
+[Verify exported poll evidence](Poll-Seal-Verifier.md) with the standalone CLI and OpenTimestamps.
 
 ## Reference documents
 

@@ -5,6 +5,8 @@ import { canonical, parseCanonical } from './Canonical';
 import { assertHash, hashText } from './Hash';
 import { MerkleTree } from './MerkleTree';
 import {
+  PollSection,
+  SealManifest,
   manifestSchema,
   pollSchema,
   registerEntrySchema,
@@ -17,7 +19,7 @@ import { byHolding, orderPoll, tally } from './RecordSections';
 import { requireSeal } from './SealDomainCodes';
 import { unique, validateSnapshot } from './SnapshotValidation';
 import { assertV1, compareText, exactKeys } from './Validation';
-import { hashLeaf, parseVotePreimage } from './VoteLeaf';
+import { VotePreimage, hashLeaf, parseVotePreimage } from './VoteLeaf';
 import { Digest } from './SealValues';
 
 function decode<T>(schema: z.ZodType<T>, bytes: string): T {
@@ -51,11 +53,6 @@ export function validateRecord(record: SealedRecord) {
   }
 
   const poll = decode(pollSchema, record.sections.poll);
-  const register = decode(
-    z.array(registerEntrySchema),
-    record.sections.register
-  );
-  const signers = decode(z.array(signerSchema), record.sections.signers);
   decode(talliesSchema, record.sections.tallies);
   requireSeal(
     poll.id === manifest.pollId &&
@@ -78,19 +75,30 @@ export function validateRecord(record: SealedRecord) {
     tree.root === manifest.sections.votes.root &&
       hashes.length === manifest.sections.votes.leafCount
   );
+  validateNamedSections(manifest, poll, record.sections, votes);
+
+  return { manifest, rootDigest: record.rootDigest };
+}
+
+/** When the register and vote list are disclosed, reproduce the tally and enforce the
+ * same participant and ballot invariants as record rehydration. Only admins get signers. */
+export function validateNamedSections(
+  manifest: SealManifest,
+  poll: PollSection,
+  sections: { register: string; tallies: string; signers?: string },
+  votes: VotePreimage[]
+) {
+  const register = decode(z.array(registerEntrySchema), sections.register);
   validateSnapshot(poll, register, votes, manifest.sealedAt);
-  requireSeal(
-    canonical(tally(poll, register, votes)) === record.sections.tallies
-  );
+  requireSeal(canonical(tally(poll, register, votes)) === sections.tallies);
   requireSeal(
     canonical(
       [...register]
         .sort((a, b) => compareText(a.userId, b.userId))
         .map(registerEntryData)
-    ) === record.sections.register
+    ) === sections.register
   );
   const voters = new Set(votes.map((v) => v.userId));
-  const byUser = new Map(register.map((p) => [p.userId, p]));
 
   for (const person of register) {
     requireSeal(person.voted === voters.has(person.userId));
@@ -100,10 +108,16 @@ export function validateRecord(record: SealedRecord) {
     );
   }
 
+  if (sections.signers === undefined) {
+    return;
+  }
+
+  const signers = decode(z.array(signerSchema), sections.signers);
+  const byUser = new Map(register.map((p) => [p.userId, p]));
   unique(signers.map((p) => p.userId));
   requireSeal(
     canonical([...signers].sort((a, b) => compareText(a.userId, b.userId))) ===
-      record.sections.signers
+      sections.signers
   );
 
   for (const signer of signers) {
@@ -117,6 +131,4 @@ export function validateRecord(record: SealedRecord) {
     );
     requireSeal(signer.willingToSignProtocol || signer.phoneNumber === null);
   }
-
-  return { manifest, rootDigest: record.rootDigest };
 }
