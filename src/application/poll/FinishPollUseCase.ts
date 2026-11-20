@@ -1,5 +1,6 @@
 /** Authorizes finishing with a validated cutoff instant, commits through the guarded
- * repository, then performs cleanup/notifications without undoing the cutoff. */
+ * repository, then performs cleanup/notifications and explicit event handlers independently. */
+import { PollFinishedHandler } from './PollFinishedHandler';
 import { Clock, IdGenerator } from '../shared/EntityCreation';
 import { PollInstant } from '../../domain/poll/PollValues';
 import { z } from 'zod';
@@ -30,7 +31,8 @@ export class FinishPollUseCase {
     private participantRepository: ParticipantRepository,
     private boardRepository: BoardRepository,
     private ids: IdGenerator,
-    private clock: Clock
+    private clock: Clock,
+    private readonly finishedHandlers: readonly PollFinishedHandler[]
   ) {}
 
   async execute(
@@ -105,6 +107,8 @@ export class FinishPollUseCase {
       return failure(updateResult.error);
     }
 
+    const events = poll.pullDomainEvents();
+
     // Clean up all remaining drafts for this poll
     try {
       const deleteDraftsResult = await this.draftRepository.deleteAllPollDrafts(
@@ -142,6 +146,21 @@ export class FinishPollUseCase {
       .catch((err) => {
         console.error('Failed to send poll finished notifications:', err);
       });
+
+    for (const event of events) {
+      for (const handler of this.finishedHandlers) {
+        try {
+          const handled = await handler.handle(event);
+
+          if (!handled.success) {
+            console.error('PollFinished handler failed:', handled.error);
+          }
+        } catch {
+          // A crashed handler cannot undo the finish or suppress other handlers.
+          console.error('PollFinished handler unexpectedly failed');
+        }
+      }
+    }
 
     return success(undefined);
   }

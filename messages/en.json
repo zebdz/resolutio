@@ -2417,5 +2417,12 @@
         "body": "The email address on your account was changed to {newEmail}.\n\nIf this was not you, contact an administrator immediately — whoever made the change can now request password resets."
       }
     }
+  },
+  "seal": {
+    "errors": {
+      "claimLost": "This sealing work is now owned by another worker or its lease expired.",
+      "notFound": "No sealed record exists for this poll.",
+      "providerMismatch": "The saved anchor uses a different timestamp provider."
+    }
   }
 }

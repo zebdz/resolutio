@@ -87,6 +87,47 @@ export type ConfirmedAnchor = Extract<SealAnchor, { status: 'CONFIRMED' }>;
 export type SupersededAnchor = Extract<SealAnchor, { status: 'SUPERSEDED' }>;
 export type SealAnchorData = z.input<typeof anchorSchema>;
 
+/** The aggregate decides when submission, upgrade or replacement is due.
+ * Applications execute the selected I/O and feed its evidence back to the aggregate. */
+export type AnchorWork =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'submit'; readonly previous: FailedAnchor | null }
+  | { readonly kind: 'upgrade'; readonly anchor: SubmittedAnchor }
+  | { readonly kind: 'replace'; readonly anchor: SubmittedAnchor };
+
+export function planAnchorWork(
+  anchor: SealAnchor | null,
+  at: UtcTimestamp
+): AnchorWork {
+  if (!anchor || anchor.status === 'SUPERSEDED') {
+    return { kind: 'submit', previous: null };
+  }
+
+  switch (anchor.status) {
+    case 'CONFIRMED':
+      return { kind: 'idle' };
+    case 'FAILED':
+      return at < anchor.nextAttemptAt
+        ? { kind: 'idle' }
+        : { kind: 'submit', previous: anchor };
+    case 'SUBMITTED':
+      if (at < anchor.nextAttemptAt) {
+        return { kind: 'idle' };
+      }
+
+      return Date.parse(at) - Date.parse(anchor.submittedAt) >
+        3 * 24 * 60 * 60000
+        ? { kind: 'replace', anchor }
+        : { kind: 'upgrade', anchor };
+
+    default: {
+      const exhaustive: never = anchor;
+
+      return exhaustive;
+    }
+  }
+}
+
 export interface AnchorAttempt {
   readonly id: AnchorId;
   readonly provider: AnchorProviderName;
@@ -316,4 +357,18 @@ export function refreshedAnchor(
     lastError: null,
     nextAttemptAt: afterMinutes(at, 10),
   };
+}
+
+/** Upgrade failures keep the last usable proof and the original submission age. */
+export function deferredAnchor(
+  previous: SealAnchor | null,
+  error: AnchorFailureCode,
+  at: UtcTimestamp
+): SubmittedAnchor {
+  requireSeal(
+    previous?.status === 'SUBMITTED' && at >= previous.nextAttemptAt,
+    illegal
+  );
+
+  return { ...previous, lastError: error, nextAttemptAt: afterMinutes(at, 10) };
 }

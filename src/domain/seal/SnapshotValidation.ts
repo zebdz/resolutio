@@ -1,8 +1,10 @@
 /** Parse raw snapshots into validated finished-poll inputs with required voter secrets.
+ * Zero-share source holdings are omitted; participants and saved voting weights stay intact.
  * Cross-field checks establish agreement between votes, participants and poll metadata. */
 import { z } from 'zod';
 import {
   dateSchema,
+  holdingSchema,
   PollSection,
   pollSchema,
   RegisterEntry,
@@ -10,10 +12,29 @@ import {
 } from './RecordFormat';
 import { requireSeal, SealDomainCodes } from './SealDomainCodes';
 import { voteSelectionSchema, VoteSelection } from './VoteLeaf';
-import { QuestionId, ReceiptSecret, UserId, UtcTimestamp } from './SealValues';
+import {
+  OwnershipShare,
+  QuestionId,
+  ReceiptSecret,
+  UserId,
+  UtcTimestamp,
+} from './SealValues';
 
 export const voteInputSchema = voteSelectionSchema;
 const participantSchema = registerEntrySchema.omit({ voted: true }).extend({
+  // Source ownership permits zero. Validate the whole row before omitting it;
+  // committed v1 holdings still require a strictly positive share.
+  holdings: z
+    .array(
+      holdingSchema.extend({
+        share: OwnershipShare.schema.or(z.literal('0.00000000')),
+      })
+    )
+    .transform((holdings) =>
+      holdings.flatMap(({ share, ...holding }) =>
+        share === '0.00000000' ? [] : [{ ...holding, share }]
+      )
+    ),
   receiptSecret: ReceiptSecret.schema.nullable(),
   willingToSignProtocol: z.boolean().nullable(),
   phoneNumber: z.string().nullable(),

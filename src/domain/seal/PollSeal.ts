@@ -11,12 +11,15 @@ import {
   refreshedAnchor,
   validateAnchor,
   parseAnchor,
+  AnchorWork,
+  planAnchorWork,
+  deferredAnchor,
 } from './SealAnchor';
 import { BitcoinAnchorEvidence, PendingAnchorEvidence } from './AnchorProvider';
 import { requireSeal, SealDomainCodes, sealResult } from './SealDomainCodes';
 import { validateRecord } from './RecordValidation';
 import { SealedRecord, SealManifest } from './RecordFormat';
-import { PollId, Digest, UtcTimestamp } from './SealValues';
+import { PollId, Digest, UtcTimestamp, AnchorFailureCode } from './SealValues';
 
 export class PollSeal {
   private anchorStates: SealAnchor[] = [];
@@ -68,6 +71,16 @@ export class PollSeal {
       this.anchorStates.find((anchor) => anchor.status !== 'SUPERSEDED') ?? null
     );
   }
+  anchorWork(at: UtcTimestamp) {
+    return sealResult((): AnchorWork => {
+      requireSeal(
+        at >= this.manifest.sealedAt,
+        SealDomainCodes.SEAL_ANCHOR_ILLEGAL_TRANSITION
+      );
+
+      return planAnchorWork(this.activeAnchor(), at);
+    });
+  }
   private saveAnchor(anchor: SealAnchor): void {
     validateAnchor(anchor, this.manifest.sealedAt);
     requireSeal(
@@ -107,6 +120,11 @@ export class PollSeal {
       this.saveAnchor(
         refreshedAnchor(this.activeAnchor(), evidence, at, this.rootDigest)
       );
+    });
+  }
+  deferAnchor(error: AnchorFailureCode, at: UtcTimestamp) {
+    return sealResult(() => {
+      this.saveAnchor(deferredAnchor(this.activeAnchor(), error, at));
     });
   }
   confirmAnchor(evidence: BitcoinAnchorEvidence, at: UtcTimestamp) {

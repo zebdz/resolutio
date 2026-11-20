@@ -158,7 +158,9 @@ results page; the `votes` tree, by contrast, contains every vote row.
 **`register`** — every participant: userId, lastName, firstName, middleName, weight, snapshotAt, voted,
 and the property holdings printed in the named protocol (property/asset ids and names, size, unit,
 ownership share). Holdings use the participant's weight snapshot as in `GetNamedProtocolUseCase`;
-their resolved values and labels are then frozen in this section. Decimal holding values use defined
+their resolved values and labels are then frozen in this section. Zero-share source holdings are
+omitted; the participant, saved voting weight and votes remain unchanged. Source ownership rows
+are retained, and committed v1 holdings continue to require positive shares. Decimal holding values use defined
 decimal strings, not binary floating-point serialization. Names are convenience; userId is
 authoritative. Open polls list only voters, since they join on vote.
 
@@ -287,7 +289,9 @@ verify page   nudge only this poll's stale pending anchor through the same claim
 | `FAILED`     | Submission failed; `attempts`, `lastError`, `nextAttemptAt` drive backoff.           |
 | `SUPERSEDED` | Pending for more than three days; replaced by a fresh submission of the same digest. |
 
-Backoff after a failure: 5 min, 15 min, 1 h, 6 h, then every 24 h. Upgrade attempts on a `SUBMITTED`
+Backoff after a submission failure: 5 min, 15 min, 1 h, 6 h, then every 24 h.
+Upgrade failures retain the pending proof and original submission time, record the error, and
+defer the next attempt by 10 minutes; they do not turn an accepted submission into a failed one. Upgrade attempts on a `SUBMITTED`
 anchor run on every poller tick, but not more often than every 10 minutes from the lazy verify-page
 nudge. A seal has at most one **active** anchor: the one not `SUPERSEDED`. No active anchor is a
 recoverable state, not a completed workflow. A database constraint enforces this uniqueness.
@@ -457,12 +461,19 @@ model SealAnchor {
 }
 ```
 
+Implementation note (Phase 3, 2026-11-11): the schema above was a storage sketch. The implementation
+uses `pollId` as the seal primary key, stores the manifest as exact canonical text, and stores an
+ordered `votes` JSON array of `{ preimage, hash }` pairs. Version/algorithm remain validated in the
+canonical manifest. Anchors reference `pollId` and use text status with CHECK constraints matching
+the domain variants. Seal/anchor foreign keys restrict deletion. These choices preserve v1 record
+bytes and domain identity while avoiding redundant surrogate IDs and parallel arrays.
+
 Additional workflow persistence: a per-poll claim row `(pollId, owner, leaseUntil, fencingToken)`
 and per-recipient bundle delivery rows `(sealId, userId, status, attemptStartedAt, completedAt,
 lastError)`, unique on `(sealId, userId)`. These are operational records, not extra domain aggregates.
 Persist claim validation and the resulting aggregate update in one transaction. Enforce anchor-state
 proof requirements with database checks as well as aggregate invariants. A partial unique index on
-`seal_anchors(seal_id) WHERE status <> 'SUPERSEDED'` permits at most one active anchor.
+`seal_anchors(poll_id) WHERE status <> 'SUPERSEDED'` (using the implemented key) permits at most one active anchor.
 
 Mutable metadata is persisted in the seal's canonical sections, with `metadataCapturedAt` in the
 `poll` section. `sectionSigners` stores its own canonical bytes, separately from the member-visible

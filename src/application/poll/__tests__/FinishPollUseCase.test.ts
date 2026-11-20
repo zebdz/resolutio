@@ -49,6 +49,7 @@ describe('FinishPollUseCase', () => {
   let participantRepository: Partial<ParticipantRepository>;
   let savedNotifications: Notification[];
   let useCase: FinishPollUseCase;
+  const finishedHandler = { handle: vi.fn() };
   let poll: Poll;
 
   beforeEach(() => {
@@ -166,6 +167,7 @@ describe('FinishPollUseCase', () => {
       findById: vi.fn().mockResolvedValue(null),
     };
 
+    finishedHandler.handle.mockReset().mockResolvedValue(success(undefined));
     useCase = new FinishPollUseCase(
       pollRepository as PollRepository,
       draftRepository as DraftRepository,
@@ -175,8 +177,60 @@ describe('FinishPollUseCase', () => {
       participantRepository as ParticipantRepository,
       boardRepository as BoardRepository,
       pollFixtureIds,
-      pollFixtureClock
+      pollFixtureClock,
+      [finishedHandler]
     );
+  });
+
+  it('dispatches finish events only after successful persistence', async () => {
+    let committed = false;
+    vi.mocked(pollRepository.updatePoll!).mockImplementation(async () => {
+      committed = true;
+
+      return success(undefined);
+    });
+    finishedHandler.handle.mockImplementation(async (event) => {
+      expect(committed).toBe(true);
+      expect(event).toMatchObject({ type: 'PollFinished', pollId: poll.id });
+
+      return success(undefined);
+    });
+    expect(
+      await useCase.execute({ pollId: poll.id, userId: 'admin-1' })
+    ).toEqual(success(undefined));
+    expect(finishedHandler.handle).toHaveBeenCalledOnce();
+  });
+
+  it('does not dispatch an event when saving the finish fails', async () => {
+    vi.mocked(pollRepository.updatePoll!).mockResolvedValue(
+      failure('common.errors.unexpected')
+    );
+    expect(
+      (await useCase.execute({ pollId: poll.id, userId: 'admin-1' })).success
+    ).toBe(false);
+    expect(finishedHandler.handle).not.toHaveBeenCalled();
+  });
+
+  it('preserves finish and notifications when sealing returns a failure', async () => {
+    finishedHandler.handle.mockResolvedValue(
+      failure('domain.seal.inconsistentRecord')
+    );
+    expect(
+      await useCase.execute({ pollId: poll.id, userId: 'admin-1' })
+    ).toEqual(success(undefined));
+    expect(finishedHandler.handle).toHaveBeenCalledOnce();
+    expect(savedNotifications).toHaveLength(1);
+  });
+
+  it('preserves finish and notifications when a handler unexpectedly rejects', async () => {
+    finishedHandler.handle.mockRejectedValue(
+      new Error('unexpected test failure')
+    );
+    expect(
+      await useCase.execute({ pollId: poll.id, userId: 'admin-1' })
+    ).toEqual(success(undefined));
+    expect(finishedHandler.handle).toHaveBeenCalledOnce();
+    expect(savedNotifications).toHaveLength(1);
   });
 
   it('should finish an active poll', async () => {

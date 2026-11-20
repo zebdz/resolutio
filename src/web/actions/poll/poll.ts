@@ -1,7 +1,12 @@
 'use server';
 
 /** Poll actions authenticate/rate-limit requests, wire application ports to Prisma
- * adapters and translate results for clients. Snapshot discard has an explicit transaction. */
+ * adapters and translate results for clients. Finish dispatches sealing only after commit. */
+import { PrismaSealWorkRepository } from '@/infrastructure/repositories/PrismaSealWorkRepository';
+import { PrismaSealingTransaction } from '@/infrastructure/repositories/PrismaSealingTransaction';
+import { SealPollUseCase } from '@/application/seal/SealPollUseCase';
+import { SealFinishedPollHandler } from '@/application/seal/SealFinishedPollHandler';
+import { SealLeaseSeconds } from '@/application/seal/SealWorkRepository';
 import { PageNumber, PageSize } from '@/domain/shared/Pagination';
 import { Instant } from '@/domain/shared/Instant';
 import { PollReadPolicy } from '@/domain/poll/PollReadPolicy';
@@ -238,7 +243,17 @@ const finishPollUseCase = new FinishPollUseCase(
   participantRepository,
   boardRepository,
   ids,
-  clock
+  clock,
+  [
+    new SealFinishedPollHandler(
+      new SealPollUseCase(
+        new PrismaSealWorkRepository(prisma),
+        new PrismaSealingTransaction(prisma)
+      ),
+      ids,
+      SealLeaseSeconds.parse(120)
+    ),
+  ]
 );
 const previewPollWeightConfigUseCase = new PreviewPollWeightConfigUseCase(
   pollRepository,

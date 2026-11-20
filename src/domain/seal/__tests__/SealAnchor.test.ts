@@ -396,3 +396,77 @@ it('rehydrates failed submissions with paired proof and time, preserving both on
       .success
   ).toBe(false);
 });
+
+it('plans only due anchor work, retaining the original retry identity and proof', () => {
+  const record = seal();
+  expect(record.anchorWork(at)).toEqual({
+    success: true,
+    value: { kind: 'submit', previous: null },
+  });
+  expect(
+    record.failAnchor({
+      id: AnchorId.parse('retry'),
+      provider: 'opentimestamps',
+      at,
+      error: AnchorFailureCode.parse('offline'),
+    }).success
+  ).toBe(true);
+  expect(record.anchorWork(later(4))).toEqual({
+    success: true,
+    value: { kind: 'idle' },
+  });
+  expect(record.anchorWork(later(5))).toMatchObject({
+    success: true,
+    value: { kind: 'submit', previous: { id: 'retry', status: 'FAILED' } },
+  });
+  expect(
+    record.submitAnchor({
+      id: AnchorId.parse('retry'),
+      provider: 'opentimestamps',
+      at: later(5),
+      evidence: pending(),
+    }).success
+  ).toBe(true);
+  expect(record.anchorWork(later(14))).toEqual({
+    success: true,
+    value: { kind: 'idle' },
+  });
+  expect(record.anchorWork(later(15))).toMatchObject({
+    success: true,
+    value: {
+      kind: 'upgrade',
+      anchor: { id: 'retry', pendingProof: pending().proof },
+    },
+  });
+  expect(record.anchorWork(later(3 * 24 * 60 + 6))).toMatchObject({
+    success: true,
+    value: { kind: 'replace', anchor: { id: 'retry' } },
+  });
+});
+
+it('defers a failed upgrade without losing accepted proof or submission age', () => {
+  const record = seal();
+  expect(
+    record.submitAnchor({
+      id: AnchorId.parse('pending'),
+      provider: 'opentimestamps',
+      at,
+      evidence: pending(),
+    }).success
+  ).toBe(true);
+  expect(
+    record.deferAnchor(AnchorFailureCode.parse('explorer_offline'), later(9))
+      .success
+  ).toBe(false);
+  expect(
+    record.deferAnchor(AnchorFailureCode.parse('explorer_offline'), later(10))
+      .success
+  ).toBe(true);
+  expect(record.activeAnchor()).toMatchObject({
+    status: 'SUBMITTED',
+    pendingProof: pending().proof,
+    submittedAt: at,
+    lastError: 'explorer_offline',
+    nextAttemptAt: later(20),
+  });
+});

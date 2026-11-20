@@ -363,3 +363,26 @@ it('keeps exact tallies when totals exceed Decimal(15,6)', () => {
     participantWeight: '1999999999.999998',
   });
 });
+
+it.each([0, 1, 2])(
+  'omits zero-share holdings without changing participant %s or vote commitments',
+  (index) => {
+    const input = sampleInput();
+    input.participants[index].holdings.push({
+      ...input.participants[2].holdings[0],
+      assetId: 'zero-share-asset',
+      share: '0.00000000',
+    });
+    const before = structuredClone(input);
+    const result = SealedRecordBuilder.build(input, new Date(fixture.sealedAt));
+    expect(result.success).toBe(true);
+
+    if (!result.success) {
+      return;
+    }
+
+    // Identical bytes include participants, positive holdings, weights, votes and tallies.
+    expect(result.value.record).toEqual(fixture.record);
+    expect(input).toEqual(before);
+  }
+);

@@ -234,7 +234,7 @@ Prisma generation and typecheck. Mark complete, record evidence, stop for review
   Phase 2 work; rollout must pause all old vote/finish writers as the design specifies. Sealing and
   event dispatch are Phase 3; receipt email and receipt UI remain Phases 6–7. No Phase 3 work started.
 
-## Phase 3 — Consistent immutable sealing — NOT STARTED
+## Phase 3 — Consistent immutable sealing — COMPLETE
 
 **Outcome:** finishing commits independently; a successful seal saves one complete consistent
 snapshot and is never rebuilt from current data.
@@ -245,33 +245,73 @@ Prisma snapshot/seal/work adapters, schema/migrations, explicit `PollFinished` d
 
 **Work and tests first:**
 
-- [ ] Add immutable seal storage, nullable-proof anchor storage, per-poll work claims, anchor-state
+- [x] Add immutable seal storage, nullable-proof anchor storage, per-poll work claims, anchor-state
       checks and the partial unique active-anchor index. Add the seal mutation trigger. Manifest
       downloads must reproduce the exact bytes hashed, even if the stored manifest uses JSON.
-- [ ] Implement fenced claims with owner, expiry and monotonically increasing token. Validate a
+- [x] Implement fenced claims with owner, expiry and monotonically increasing token. Validate a
       claim and persist its result in one transaction. Test expired ownership and stale saves using
       the database; network work will use these claims in Phase 4.
-- [ ] Implement `SealingTransaction` with repeatable-read and transaction-scoped read/repository
+- [x] Implement `SealingTransaction` with repeatable-read and transaction-scoped read/repository
       ports. Do not expose Prisma transaction clients to the core or call network services inside it.
-- [ ] Read archived questions/answers, full attachment metadata, persisted votes, all participants,
+- [x] Read archived questions/answers, full attachment metadata, persisted votes, all participants,
       organization/board/user metadata and protocol holdings as of participant `snapshotAt`.
       The existing filtered `getPollById()` is not the sealing reader.
-- [ ] Map into the seal context and atomically save canonical sections, private salted preimages,
+- [x] Map into the seal context and atomically save canonical sections, private salted preimages,
       ordered leaves, manifest and `metadataCapturedAt`. Never store receipt secrets in seal exports.
-- [ ] Test metadata changed after finish but before sealing, concurrent metadata changes during the
+- [x] Test metadata changed after finish but before sealing, concurrent metadata changes during the
       snapshot, failed-transaction retry with newer metadata, and unchanged reads after a saved seal.
       Receipt leaf hashes must equal sealed hashes after the complete database round trip.
-- [ ] Make concurrent sealing idempotent: recover the saved seal after a uniqueness race without
+- [x] Make concurrent sealing idempotent: recover the saved seal after a uniqueness race without
       replacing it. Reject non-finished polls and legacy finished polls with null `finishedAt`.
-- [ ] Dispatch `PollFinished` only after commit to explicit handlers. Preserve finish success and
+- [x] Dispatch `PollFinished` only after commit to explicit handlers. Preserve finish success and
       finish notification delivery when sealing fails; do not make notification dispatch depend on
       successful anchoring. Reconciliation will recover interrupted sealing work in Phase 4.
 
 **Acceptance:** snapshot, immutability, idempotency and fencing integration tests pass; signer fields
 and holdings remain frozen after live mutations. Run affected tests and typecheck. Mark complete,
-record evidence, stop for review.
+record evidence. User authorized continuing across phases on 2026-11-11; do not commit before review.
 
-## Phase 4 — Anchoring and durable recovery — NOT STARTED
+**Implementation evidence (2026-11-11, uncommitted):**
+
+- Immutable canonical text sections/manifest and ordered salted vote preimages/hashes persist
+  atomically. PostgreSQL rejects seal updates/deletes and impossible anchor states, and enforces
+  one active anchor. Failed first submissions may have no proof.
+- Claims retain monotonic tokens after release. Real lock-wait tests caught and fixed checking
+  expiry before acquiring the row lock; ownership is now checked after locking and before writes.
+- The repeatable-read adapter rolls back failed callback Results and retries serialization/unique
+  conflicts at most three times. An actual concurrent insert test reloads the authoritative seal.
+- The private snapshot reader explicitly maps archived definitions, attachment metadata, all
+  participants, board/organization/person labels, exact decimals and historical ownership windows.
+  Holdings queries are grouped by participant snapshot time, matching the named protocol's
+  descendant-organization, selected-property and unarchived-asset/property scope.
+- The real atomic ballot adapter's original receipt matches sealed leaves after database storage.
+  Concurrent metadata changes stay outside the current snapshot; rollback/retry captures newer
+  metadata. Saved signer fields and holdings remain frozen after live changes.
+- Explicit `PollFinished` handlers run only after a successful save. Finish success and notifications
+  survive both typed sealing failures and unexpected handler rejection. Production composition now
+  wires the sealing handler, with a 120-second lease; reconciliation remains Phase 4.
+- Verification: 4,273 unit tests (457 files), all 40 database checks (8 files), and full source/test
+  `yarn tsc --noEmit` passed. Scoped ESLint, Prettier and `git diff --check` passed. Prisma client
+  generation and schema formatting completed. No application migration or commit was run.
+
+**Implementation choices:** snapshot mapping stays in the infrastructure boundary next to its
+Prisma reader instead of adding a second application DTO/mapper. `pollId` is the seal table's primary
+key; the domain identity remains the root digest. Manifest/section columns store exact text. One
+ordered JSON array stores each salted preimage beside its hash, avoiding separate arrays drifting
+out of alignment. Anchor rows reference `pollId`; status alternatives use database CHECK constraints
+rather than an extra PostgreSQL enum. No receipt secret enters seal storage.
+
+**Resolved (2026-11-11):** omit zero-share source holdings, retaining participants, saved weights
+and votes. The domain snapshot parser validates source rows before omitting zero; committed v1
+holdings remain strictly positive. Three domain regressions preserve the original record bytes,
+and a PostgreSQL acceptance test preserves the actual cast receipt while retaining the source row.
+Targeted checks: 61 domain tests, 8 sealing database tests and full source/test typecheck passed.
+
+**Limits:** migrations exercised only in disposable local schemas, never the application database.
+No timestamp provider calls, recovery worker, exports, receipt delivery or new UI implemented here.
+Do not deploy this slice as complete recovery support; Phase 4 must recover interrupted/failed work.
+
+## Phase 4 — Anchoring and durable recovery — IN PROGRESS
 
 **Outcome:** OpenTimestamps failures and process interruptions leave discoverable work; concurrent
 workers cannot replace authoritative state with stale results.
@@ -288,9 +328,9 @@ workers cannot replace authoritative state with stale results.
 - [ ] Fail production startup for missing, unknown or stub provider configuration. Require the
       internal worker secret. Dev/test simulations are explicitly identifiable throughout read models
       and can never produce a real Bitcoin-verification result.
-- [ ] Keep network calls outside database transactions. Save aggregate changes with the current
+- [x] Keep network calls outside database transactions. Save aggregate changes with the current
       fencing token; test a slow expired worker returning after another worker has acquired the claim.
-- [ ] Implement failure backoff (5 min, 15 min, 1 h, 6 h, then daily), pending upgrades and atomic
+- [x] Implement failure backoff (5 min, 15 min, 1 h, 6 h, then daily), pending upgrades and atomic
       supersession/replacement after three days. Preserve at most one active anchor, including after
       failed first submission and failed replacement submission.
 - [ ] Reconcile eligible finished polls without seals, seals without active anchors and due anchors
@@ -306,6 +346,22 @@ workers cannot replace authoritative state with stale results.
 **Acceptance:** failure/restart/fencing/state-constraint tests pass with no external services in the
 regular suite. Test real adapter behavior with retained proof fixtures and run the live smoke test
 when the integration environment is available. Mark complete, record evidence, stop for review.
+
+**Progress at the requested 11:20 wrap-up (2026-11-11, uncommitted):**
+
+- Added aggregate-owned due-work selection and deferred upgrade failure. The original pending
+  proof and submission age survive upgrade failures; failed submissions retain backoff and identity.
+- Added `AnchorSealUseCase` for submission, retry, pending proof refresh, verified confirmation and
+  atomic three-day replacement, including failed replacements. Provider calls run between two
+  fenced transactions. Provider mismatch fails explicitly; busy claims skip provider calls.
+- Unit tests cover these outcomes. A real PostgreSQL slow-provider/takeover test proves an expired
+  worker cannot overwrite the newer worker's saved proof.
+- Final wrap-up checks: 4,285 unit tests (458 files), 42 PostgreSQL tests (8 files), full source/test
+  TypeScript, scoped ESLint/Prettier and whitespace checks passed.
+- This slice uses provider test doubles only and is not wired to production anchoring. Remaining:
+  real OpenTimestamps adapter and retained proof fixtures, production configuration validation,
+  reconciliation/discovery, durable lazy nudges, authenticated worker route, and optional live smoke
+  test. Phase 4 remains incomplete. No timestamp requests or commits were made.
 
 ## Phase 5 — Authorized exports and standalone CLI — NOT STARTED
 
