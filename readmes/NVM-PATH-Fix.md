@@ -1,5 +1,7 @@
 # Fix for NVM/Node PATH Issue
 
+Historical troubleshooting notes. Current packaging, credential handling and release commands are in the [deployment summary](DEPLOYMENT-SUMMARY.md).
+
 ## Problem
 
 When deploying via SSH, `node` and `yarn` commands were not found because they're installed via NVM, which doesn't load in non-interactive SSH sessions.

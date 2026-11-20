@@ -3,20 +3,14 @@
 Start here to find current work and task-relevant documentation. Read linked documents as needed;
 this index does not require loading every reference or historical plan.
 
-## Active work
+## Poll sealing and verification
 
-| Feature                    | Design                                                       | Implementation plan                                        | Status              |
-| -------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- | ------------------- |
-| Poll sealing and anchoring | [Approved design](2026-09-11-poll-seal-and-anchor-design.md) | [Phased plan](../plans/2026-09-15-poll-seal-and-anchor.md) | Phase 9 in progress |
+Implemented on `blockchain` and rehearsed locally on 2026-11-20. [Approved design](2026-09-11-poll-seal-and-anchor-design.md) · [Completed phases and evidence](../plans/archive/2026-09-15-poll-seal-and-anchor.md)
 
-Visual walkthrough: [Poll seal and anchor flow](poll-seal-and-anchor-flow.html) — lifecycle,
-record commitments, access rules, recovery and verification.
-
-User guide: [English](how-your-vote-is-protected.html),
-[Русский](how-your-vote-is-protected-ru.html) — plain-language
-feature preview explaining receipts, verification, privacy and the limits of the guarantees.
-
-[Verify exported poll evidence](Poll-Seal-Verifier.md) with the standalone CLI and OpenTimestamps.
+- [Standalone verifier and Bitcoin checks](Poll-Seal-Verifier.md)
+- [Rollout, monitoring and rollback](Poll-Seal-Rollout.md)
+- [Visual walkthrough](poll-seal-and-anchor-flow.html)
+- Voter guides in [English](how-your-vote-is-protected.html) and [Russian](how-your-vote-is-protected-ru.html)
 
 ## Reference documents
 

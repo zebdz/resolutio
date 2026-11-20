@@ -3,16 +3,16 @@
 **Created:** 2026-09-15  
 **Revised:** 2026-11-20
 
-**Status:** Phases 1–8 complete locally on `blockchain`. Phase 9 in progress. Final review requested after all phases.
+**Status:** Phases 1–9 complete locally on `blockchain`. Rollout rehearsed on disposable infrastructure on 2026-11-20. Ready for final review. Production deployment is separate.
 
-**Source of truth:** [approved design](../readmes/2026-09-11-poll-seal-and-anchor-design.md), committed as `8653fa9`.
+**Source of truth:** [approved design](../../readmes/2026-09-11-poll-seal-and-anchor-design.md), committed as `8653fa9`.
 This revision replaces the earlier task list and its conflicting format refinements and golden vectors.
 The design determines behavior; this plan determines implementation order and review gates.
 
 ## Delivery rules
 
 - Implement one phase at a time. Run its checks, mark its checklist and heading complete, record the
-  evidence here, then **stop for user review**. Do not start the next phase automatically.
+  evidence here, then **stop for user review**. For the final phases the user explicitly approved continuing and committing through Phase 9, with review at the end.
 - Use TDD: first demonstrate client usage of each new domain object in a failing test, then implement
   the smallest behavior that passes. Add a failing regression for every bug fixed.
 - Keep `src/domain/seal/` pure and independent of `src/domain/poll/`. Translate complete poll snapshot
@@ -67,7 +67,7 @@ for parallel implementation.
 | 6     | Receipt emails and recoverable first bundle delivery      | 2, 4–5          | Complete, approved   |
 | 7     | Hosted receipt and verification flows                     | 5–6             | Approved for Phase 8 |
 | 8     | Frozen final results and all three PDFs                   | 3, 5, 7         | Complete             |
-| 9     | Rollout rehearsal, operational checks and release handoff | 1–8             | In progress          |
+| 9     | Rollout rehearsal, operational checks and release handoff | 1–8             | Complete             |
 
 ## Phase 1 — Canonical record and cryptographic domain — COMPLETE
 
@@ -112,7 +112,7 @@ Run focused domain tests and typecheck. Mark complete, record evidence, stop for
 
 - Added the pure seal context, immutable record/receipt models, aggregate-owned anchor transitions,
   repository/provider ports, and English/Russian domain codes. No application or database wiring yet.
-- Defined the exact unpublished v1 format in [the domain reference](../src/domain/seal/README.md),
+- Defined the exact unpublished v1 format in [the domain reference](../../src/domain/seal/README.md),
   strict schemas, and self-contained golden record/receipt fixtures. Holding sizes use six decimal
   places; ownership shares preserve the database's eight places. IDs exclude the HMAC separator.
 - `@noble/hashes@2.4.0` is pinned; installed `sha2.js`, `hmac.js`, and `utils.js` exports were checked.
@@ -212,7 +212,7 @@ Prisma generation and typecheck. Mark complete, record evidence, stop for review
 - **Passing:** 3,445 unit tests in 333 files; 22 PostgreSQL tests (15 ballot/cutoff/replay/backfill,
   five snapshot-discard tests and two existing property constraints moved to the safe harness); repository and scoped
   new-test typechecks; Prisma generation/validation; scoped ESLint/Prettier; `git diff --check`.
-  Checks use four workers and a 20 GiB memory cap. See [database test commands](../readmes/Testing.md#disposable-postgresql-tests).
+  Checks use four workers and a 20 GiB memory cap. See [database test commands](../../readmes/Testing.md#disposable-postgresql-tests).
 - Observed red → green for finish events/time, secret immutability, whole-ballot acceptance,
   transaction rollback, concurrent open retries, stale saves, insert/mutation guards, backfill,
   exact timestamp adapters, cleanup failures and receipt privacy. Vote/finish interleavings use
@@ -452,7 +452,7 @@ receipt-code-only checks. Mark complete, record evidence, stop for review.
 - A built Next server on loopback served the fixture's public manifest and proof. Sessionless private
   requests returned 403. A real disposable session downloaded the member sections and own bundle,
   and their exact HTTP response bytes passed the standalone verifier.
-- The [verifier guide](../readmes/Poll-Seal-Verifier.md) records the Python OTS commands and trust
+- The [verifier guide](../../readmes/Poll-Seal-Verifier.md) records the Python OTS commands and trust
   assumptions. The fresh fixture and earlier disposable poll were pending. Both file and raw-digest
   forms verified a separate historical proof at Bitcoin block 358391 using a public Bitcoin RPC.
   Passing a text file of hex digits as the original file failed for all three proofs. The offline CLI reports a
@@ -628,7 +628,7 @@ for review.
 
 - Validation passed 4,466 unit tests, 61 database checks, types, production build, three development browser flows and two production browser flows.
 
-## Phase 9 — Rollout rehearsal and release handoff — IN PROGRESS
+## Phase 9 — Rollout rehearsal and release handoff — COMPLETE
 
 **Outcome:** a tested release procedure covers migrations, backfill, all writers, recovery and
 independent verification. Production deployment is a separate explicit action.
@@ -638,28 +638,38 @@ independent verification. Production deployment is a separate explicit action.
 
 **Work and checks:**
 
-- [ ] Wire production provider/poller configuration and the canonical site origin in both runtime
+- [x] Wire production provider/poller configuration and the canonical site origin in both runtime
       and build environments as needed. Validate startup before accepting traffic; never fall back
       to a synthetic provider in production.
-- [ ] Rehearse the rollout on representative data: disable vote/finish writes across all instances,
+- [x] Rehearse the rollout on representative data: disable vote/finish writes across all instances,
       migrate, backfill, verify coverage, deploy all updated writers, then re-enable writes. Include
       paused `READY` polls and preserve legacy `FINISHED` eligibility rules.
-- [ ] Document failure/rollback handling that keeps writes disabled until all writers are compatible;
+- [x] Document failure/rollback handling that keeps writes disabled until all writers are compatible;
       do not erase seals or replace existing receipt secrets to recover a deployment.
-- [ ] Prepare and rehearse installation of the 15-minute worker schedule and nginx route restriction.
+- [x] Prepare and rehearse installation of the 15-minute worker schedule and nginx route restriction.
       Document restricted DB mutation privileges, deliberate transaction-scoped bypass and required
       PostgreSQL audit logging.
-- [ ] Add operational evidence for pending seals, failed/due anchors, stale claims and delivery
+- [x] Add operational evidence for pending seals, failed/due anchors, stale claims and delivery
       failures/unknown outcomes. Logs contain identifiers/status/codes, never receipt secrets or
       private ballot/signer payloads.
-- [ ] Run the full bounded suite once, real-database migration/concurrency tests, production build,
+- [x] Run the full bounded suite once, real-database migration/concurrency tests, production build,
       CLI-from-clean-directory checks and a representative end-to-end flow. Rehearse restart at each
       workflow boundary. Repeat checks only when failures or subsequent changes justify it.
-- [ ] Complete an opt-in live OTS submission/upgrade/verification check; do not label a pending
+- [x] Complete an opt-in live OTS submission/upgrade/verification check; do not label a pending
       attestation confirmed if Bitcoin confirmation is still outstanding. Record any external wait
       as incomplete evidence rather than marking that verification passed.
-- [ ] Record validation evidence and any remaining limitations; update the design's implementation
+- [x] Record validation evidence and any remaining limitations; update the design's implementation
       status only after its scope is actually complete. Mark this phase complete and stop for review.
+
+**Rollout evidence, 2026-11-20**
+
+- Migrated a disposable PostgreSQL 17 database from the pre-seal migrations with synthetic weighted ballots in ACTIVE, paused READY and legacy FINISHED polls. Independent legacy finish and vote connections were held before and after migration. Premature release failed at two uncovered ballots. The packaged backfill assigned two secrets, then zero on retry. Historical finish eligibility and original cast snapshots remained absent. Freeze, restart and explicit release preserved the data.
+- A schema-owner login was rejected by the runtime privilege check. The restricted app login could read and insert but could not update or delete votes or seals even after setting the maintenance variable. The maintenance transaction was rolled back and its SQL was retrieved from PostgreSQL's operator log.
+- Installed the 15-minute system cron entry and the nginx internal-route guard in disposable containers. The public login returned 200, the public worker route returned 403, direct unauthenticated access returned 401, and the authorized scheduler returned counts. A packaged app restart recovered a persisted finish, then a failed calendar submission. A later restart recovered the due upgrade and reconciled an expired SMTP handoff to UNKNOWN. SMTP was disabled. Failed and pending deliveries were preserved.
+- The packaging test initially failed because the deployed Next configuration could not find the i18n entry point. The corrected private archive contained the startup inputs, compiled backfill and standalone verifier. The second instance used the deployment script and a separate restricted app login.
+- The Phase 8 production build, 61 PostgreSQL checks, two built-server browser flows and three development browser flows cover the application code used in the rehearsal. The weighted end-to-end browser flow saved a cast-time receipt, finished and sealed, exported, and verified it in a clean directory. Tamper, anonymous-data and timestamp-status cases passed. The bounded full suite passed 4,467 tests including the packaging regression. The two opt-in provider checks ran separately. Changing the retained vote weight from 1.234567 to 1.234568 failed the offline verifier.
+- All 12 provider tests passed with live testing enabled. Fresh digest `7e909f508c2963981b51acd7de22f9b16d4b01b134a68ff26ab95cbdd3cc0036` was accepted and its first upgrade remained pending. The historical proof verified via Esplora at block 358391. The packaged offline verifier matched the weighted receipt and reported its upgraded attestation as unverified offline. Independent Python OTS verification via remote Bitcoin RPC matched the exact manifest and raw digest at block 976744 and rejected the hex-text control. The Phase 7 disposable poll verified at block 976737. These checks used remote Bitcoin chain data. No production rollout or real email send was performed.
+- Operational commands, prerequisites, privilege and auditing requirements, and the failure procedure are in the [cutover runbook](../../readmes/Poll-Seal-Rollout.md). The release operator must supply site credentials, install the public vhost and schedule, and acknowledge the complete production fleet before releasing writes.
 
 ## Verification commands and progress evidence
 
@@ -693,7 +703,7 @@ At each phase boundary, update this record:
 | 6     | Yes, 2026-11-20 | Yes, receipt attachments, delivery claims, expired handoffs, fair discovery and sealed notifications | 4,374 unit and 61 PostgreSQL tests, isolated mail capture, types, production build and loopback cron                     | Approved               |
 | 7     | Yes, 2026-11-20 | Yes, cast receipt, initial bundle queue, label revocation and private data in streamed pages         | 4,414 unit and 61 PostgreSQL checks, two-voter Chromium/CLI rehearsal, real Bitcoin blocks 976737 and 976744, full build | Approved for Phase 8   |
 | 8     | Yes, 2026-11-20 | Yes, downloaded PDF included changed live data                                                       | 4,466 unit and 61 database tests, three development and two production browser flows, six QR codes                       | Final review requested |
-| 9     | No              | —                                                                                                    | —                                                                                                                        | Not started            |
+| 9     | Yes, 2026-11-20 | Yes, legacy writer could change the poll and package omitted startup input                           | Real pre-seal DB, two app instances, private archive, scheduled recovery, nginx, live OTS and independent Bitcoin RPC    | Ready for final review |
 
 ## Unresolved questions
 

@@ -1,7 +1,7 @@
 # Poll seal and blockchain anchor — design
 
 **Date:** 2026-09-11
-**Status:** Approved design. Phases 1–8 complete locally as of 2026-11-20. Phase 9 rollout rehearsal in progress.
+**Status:** Approved design. Implemented and rehearsed locally on `blockchain` on 2026-11-20. Production deployment awaits a separate release. [Completed phases and checks](../plans/archive/2026-09-15-poll-seal-and-anchor.md) · [Cutover runbook](Poll-Seal-Rollout.md)
 **Reviewed:** 2026-10-25 against the current implementation
 
 ## 1. Problem

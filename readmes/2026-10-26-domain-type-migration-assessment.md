@@ -6,7 +6,7 @@ The domain type migration and its calling paths are complete. The user authorize
 then continuation through all remaining batches on 2026-11-10. The
 [archived migration plan](../plans/archive/2026-10-26-domain-type-migration.md) records all phases,
 checkpoints and deviations. Poll-sealing Phase 3 remains unstarted under its
-[separate feature plan](../plans/2026-09-15-poll-seal-and-anchor.md).
+[separate feature plan](../plans/archive/2026-09-15-poll-seal-and-anchor.md).
 
 ## Final completion — 2026-11-10
 
