@@ -1,9 +1,9 @@
 # Poll seal and blockchain anchor — implementation plan
 
 **Created:** 2026-09-15  
-**Revised:** 2026-10-26
+**Revised:** 2026-11-20
 
-**Status:** Phase 2 complete; awaiting review. Phases 3–9 not started.
+**Status:** Phases 1–4 complete on `blockchain`. Phase 4 approved. Phases 5–9 pending.
 
 **Source of truth:** [approved design](../readmes/2026-09-11-poll-seal-and-anchor-design.md), committed as `8653fa9`.
 This revision replaces the earlier task list and its conflicting format refinements and golden vectors.
@@ -57,17 +57,17 @@ The design determines behavior; this plan determines implementation order and re
 Phases run in this order. The dependencies indicate the contracts each phase extends, not permission
 for parallel implementation.
 
-| Phase | Reviewable result                                         | Depends on      | Status                    |
-| ----- | --------------------------------------------------------- | --------------- | ------------------------- |
-| 1     | Canonical record, receipts and cryptographic domain       | Approved design | Complete                  |
-| 2     | Atomic voting cutoff and reproducible cast-time receipts  | 1               | Complete; awaiting review |
-| 3     | Consistent immutable sealing and post-commit dispatch     | 1–2             | Not started               |
-| 4     | Real anchoring and durable recovery                       | 3               | Not started               |
-| 5     | Authorized exports and standalone verifier CLI            | 1, 3–4          | Not started               |
-| 6     | Receipt emails and recoverable first bundle delivery      | 2, 4–5          | Not started               |
-| 7     | Hosted receipt and verification flows                     | 5–6             | Not started               |
-| 8     | Frozen final results and all three PDFs                   | 3, 5, 7         | Not started               |
-| 9     | Rollout rehearsal, operational checks and release handoff | 1–8             | Not started               |
+| Phase | Reviewable result                                         | Depends on      | Status             |
+| ----- | --------------------------------------------------------- | --------------- | ------------------ |
+| 1     | Canonical record, receipts and cryptographic domain       | Approved design | Complete           |
+| 2     | Atomic voting cutoff and reproducible cast-time receipts  | 1               | Complete           |
+| 3     | Consistent immutable sealing and post-commit dispatch     | 1–2             | Complete           |
+| 4     | Real anchoring and durable recovery                       | 3               | Complete; approved |
+| 5     | Authorized exports and standalone verifier CLI            | 1, 3–4          | Not started        |
+| 6     | Receipt emails and recoverable first bundle delivery      | 2, 4–5          | Not started        |
+| 7     | Hosted receipt and verification flows                     | 5–6             | Not started        |
+| 8     | Frozen final results and all three PDFs                   | 3, 5, 7         | Not started        |
+| 9     | Rollout rehearsal, operational checks and release handoff | 1–8             | Not started        |
 
 ## Phase 1 — Canonical record and cryptographic domain — COMPLETE
 
@@ -188,7 +188,7 @@ construction/secret-generation ports; Prisma poll/participant/vote adapters, oth
 receipt replay and exact timestamp round trips. Run affected poll/application tests, database tests,
 Prisma generation and typecheck. Mark complete, record evidence, stop for review.
 
-**Completed 2026-10-26 — awaiting user review.**
+**Completed 2026-10-26.**
 
 - Organization and open ballots lock the poll, re-read eligibility, validate complete selections
   through `BallotPolicy`, and commit votes, exact millisecond timestamps, willingness, a set-once
@@ -271,7 +271,7 @@ Prisma snapshot/seal/work adapters, schema/migrations, explicit `PollFinished` d
 and holdings remain frozen after live mutations. Run affected tests and typecheck. Mark complete,
 record evidence. User authorized continuing across phases on 2026-11-11; do not commit before review.
 
-**Implementation evidence (2026-11-11, uncommitted):**
+**Implementation evidence (2026-11-11, committed in `5835281`):**
 
 - Immutable canonical text sections/manifest and ordered salted vote preimages/hashes persist
   atomically. PostgreSQL rejects seal updates/deletes and impossible anchor states, and enforces
@@ -311,7 +311,7 @@ Targeted checks: 61 domain tests, 8 sealing database tests and full source/test 
 No timestamp provider calls, recovery worker, exports, receipt delivery or new UI implemented here.
 Do not deploy this slice as complete recovery support; Phase 4 must recover interrupted/failed work.
 
-## Phase 4 — Anchoring and durable recovery — IN PROGRESS
+## Phase 4 — Anchoring and durable recovery — COMPLETE
 
 **Outcome:** OpenTimestamps failures and process interruptions leave discoverable work; concurrent
 workers cannot replace authoritative state with stale results.
@@ -322,10 +322,10 @@ workers cannot replace authoritative state with stale results.
 
 **Work and tests first:**
 
-- [ ] Wrap OpenTimestamps behind the domain port; verify installed library behavior with fixtures.
+- [x] Wrap OpenTimestamps behind the domain port; verify installed library behavior with fixtures.
       Submit the raw manifest digest, validate proof/digest agreement, bound calls with timeouts,
       preserve upgraded proof bytes when explorer verification fails, and isolate library logging.
-- [ ] Fail production startup for missing, unknown or stub provider configuration. Require the
+- [x] Fail production startup for missing, unknown or stub provider configuration. Require the
       internal worker secret. Dev/test simulations are explicitly identifiable throughout read models
       and can never produce a real Bitcoin-verification result.
 - [x] Keep network calls outside database transactions. Save aggregate changes with the current
@@ -333,21 +333,21 @@ workers cannot replace authoritative state with stale results.
 - [x] Implement failure backoff (5 min, 15 min, 1 h, 6 h, then daily), pending upgrades and atomic
       supersession/replacement after three days. Preserve at most one active anchor, including after
       failed first submission and failed replacement submission.
-- [ ] Reconcile eligible finished polls without seals, seals without active anchors and due anchors
+- [x] Reconcile eligible finished polls without seals, seals without active anchors and due anchors
       in bounded batches. Add the hook for missing/pending bundle deliveries implemented in Phase 6.
       Test restart after each durable boundary; one failing item must not starve the rest.
-- [ ] Reuse claims for immediate handlers, cron and poll-specific lazy nudges. Enforce the lazy
+- [x] Reuse claims for immediate handlers, cron and poll-specific lazy nudges. Enforce the lazy
       nudge interval through durable state so multiple server instances cannot bypass it.
-- [ ] Add the POST-only internal worker route with constant-time bearer authentication, fail-closed
+- [x] Add the POST-only internal worker route with constant-time bearer authentication, fail-closed
       behavior and counts. Test unauthorized requests, empty/malformed secrets and concurrent calls.
-- [ ] Add an opt-in `OTS_LIVE_TEST=1` smoke test. It is not a dependency of normal tests; pending
+- [x] Add an opt-in `OTS_LIVE_TEST=1` smoke test. It is not a dependency of normal tests; pending
       calendar acceptance is not evidence of Bitcoin confirmation.
 
 **Acceptance:** failure/restart/fencing/state-constraint tests pass with no external services in the
 regular suite. Test real adapter behavior with retained proof fixtures and run the live smoke test
 when the integration environment is available. Mark complete, record evidence, stop for review.
 
-**Progress at the requested 11:20 wrap-up (2026-11-11, uncommitted):**
+**Partial implementation (2026-11-11, committed in `5835281`):**
 
 - Added aggregate-owned due-work selection and deferred upgrade failure. The original pending
   proof and submission age survive upgrade failures; failed submissions retain backoff and identity.
@@ -362,6 +362,37 @@ when the integration environment is available. Mark complete, record evidence, s
   real OpenTimestamps adapter and retained proof fixtures, production configuration validation,
   reconciliation/discovery, durable lazy nudges, authenticated worker route, and optional live smoke
   test. Phase 4 remains incomplete. No timestamp requests or commits were made.
+
+**Completed 2026-11-20 — approved for Phase 5.**
+
+- The OTS adapter checks the SHA-256 file operation and manifest digest, requires a calendar
+  attestation on submission, and verifies the Bitcoin Merkle root through the configured Esplora
+  service before recording height and time. A Node worker isolates the library's output and
+  stops network calls on timeout. The deployment archive includes the worker entry point.
+- The adapter calls the library's `verifyTimestamp` on the exact upgraded bytes. The higher-level
+  `verify` would request further calendar upgrades while verifying. Failed explorer verification
+  retains the upgraded bytes, original submission time and a retryable error.
+- Immediate finish, cron and poll-specific nudges share fenced operations. Discovery visits up to
+  20 eligible polls per tick. Released failures rotate behind untouched work. Lazy admission persists
+  for ten minutes across worker restarts. Phase 6 will supply the initial delivery handler.
+- Production startup rejects a simulated provider and missing bearer. The built server returned
+  401 for an unauthenticated POST, 405 for GET and 200 with counts for an authenticated empty POST.
+  It recovered an eligible disposable poll and stored 805 bytes of real pending proof for root
+  `e97870d3759f28fe65d41c54bf660a5fe54f3eb47bf7d9fe92532e418af025eb`. The stored proof
+  contains pending attestations from Alice, Bob, Finney and Catallaxy.
+- Two opt-in smoke runs each submitted a fresh random digest to public calendars and verified
+  the upstream `hello-world.txt.ots` fixture at Bitcoin height 358391 via Blockstream Esplora.
+  The second smoke also requested an immediate upgrade for
+  `e07b441714184140704df21f69e1f14acede2e2f28e0d938621fa8e660d64cc5`; it remained pending.
+  The historical fixture is the only Bitcoin confirmation observed in these checks.
+- Offline tests use retained pending/confirmed fixtures, loopback calendars and a loopback explorer.
+  They cover unsuccessful submissions, timeouts, incorrect digests and Merkle roots, unavailable
+  explorers, malformed/simulated proofs and retention of upgraded bytes. PostgreSQL tests cover
+  concurrent takeover, missing seals and anchors, due upgrades, and lazy admission after restart.
+- Final checks passed with 4,314 offline unit tests, 45 disposable PostgreSQL tests, full source/test
+  typechecking, scoped ESLint/Prettier, Prisma generation, migrations and a production build.
+  The two live tests are gated out of the regular suite. No production rollout occurred. The
+  weighted receipt, authorized export and standalone CLI acceptance path spans subsequent phases.
 
 ## Phase 5 — Authorized exports and standalone CLI — NOT STARTED
 
@@ -548,20 +579,20 @@ actual standalone CLI build/run commands. Skipped database/live checks are not p
 
 At each phase boundary, update this record:
 
-| Phase | Completed       | Failing test observed                                  | Passing checks/evidence                                                                                         | Review status        |
-| ----- | --------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | -------------------- |
-| 1     | Yes, 2026-10-26 | Yes; client usage, type contracts and regression tests | 99 domain / 3,430 total tests; 13 compile rejections; types, lint, format, browser bundle, independent fixtures | Accepted for Phase 2 |
-| 2     | Yes, 2026-10-26 | Yes; domain, SQL, concurrency and privacy regressions  | 3,445 unit + 22 PostgreSQL tests; types, Prisma, lint, format                                                   | Awaiting user review |
-| 3     | No              | —                                                      | —                                                                                                               | Not started          |
-| 4     | No              | —                                                      | —                                                                                                               | Not started          |
-| 5     | No              | —                                                      | —                                                                                                               | Not started          |
-| 6     | No              | —                                                      | —                                                                                                               | Not started          |
-| 7     | No              | —                                                      | —                                                                                                               | Not started          |
-| 8     | No              | —                                                      | —                                                                                                               | Not started          |
-| 9     | No              | —                                                      | —                                                                                                               | Not started          |
+| Phase | Completed       | Failing test observed                                              | Passing checks/evidence                                                                                             | Review status        |
+| ----- | --------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| 1     | Yes, 2026-10-26 | Yes; client usage, type contracts and regression tests             | 99 domain / 3,430 total tests; 13 compile rejections; types, lint, format, browser bundle, independent fixtures     | Accepted for Phase 2 |
+| 2     | Yes, 2026-10-26 | Yes; domain, SQL, concurrency and privacy regressions              | 3,445 unit + 22 PostgreSQL tests; types, Prisma, lint, format                                                       | Continued to Phase 3 |
+| 3     | Yes, 2026-11-11 | Yes, snapshot, idempotency, fencing and zero-share cases           | 4,273 unit and 40 PostgreSQL checks at the phase boundary, followed by zero-share regressions                       | Continued to Phase 4 |
+| 4     | Yes, 2026-11-20 | Yes, provider, startup, recovery, lazy lease and route regressions | 4,314 unit and 45 PostgreSQL checks, live calendars, historical Bitcoin proof, built server, types, lint and format | Approved for Phase 5 |
+| 5     | No              | —                                                                  | —                                                                                                                   | Not started          |
+| 6     | No              | —                                                                  | —                                                                                                                   | Not started          |
+| 7     | No              | —                                                                  | —                                                                                                                   | Not started          |
+| 8     | No              | —                                                                  | —                                                                                                                   | Not started          |
+| 9     | No              | —                                                                  | —                                                                                                                   | Not started          |
 
 ## Unresolved questions
 
-None requiring a product decision before Phase 3. The four review decisions are settled in design
+No unresolved product decisions. The four review decisions are settled in design
 §18. If implementation exposes a format or guarantee change, record it and resolve it before coding
 past that boundary; do not silently resurrect the superseded plan's choices.

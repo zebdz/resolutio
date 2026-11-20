@@ -899,11 +899,12 @@ model ReportPoll {
 
 // Operational ownership, independent of immutable seal contents and anchor state.
 model SealWorkClaim {
-  pollId       String   @id @map("poll_id")
+  pollId       String    @id @map("poll_id")
   owner        String
-  leaseUntil   DateTime @map("lease_until")
-  fencingToken BigInt   @map("fencing_token")
-  poll         Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  leaseUntil   DateTime  @map("lease_until")
+  fencingToken BigInt    @map("fencing_token")
+  lastNudgedAt DateTime? @map("last_nudged_at")
+  poll         Poll      @relation(fields: [pollId], references: [id], onDelete: Cascade)
 
   @@index([leaseUntil])
   @@map("seal_work_claims")

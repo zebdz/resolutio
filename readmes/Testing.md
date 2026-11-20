@@ -126,3 +126,20 @@ yarn run build             # Includes prebuild (format + unit tests + lint)
 ```
 
 The prebuild only runs **unit tests** (fast) to keep the build process quick. Run E2E tests separately before major deployments! 🚀
+
+### Timestamp provider checks
+
+The ordinary suite exercises the real OTS codec with retained pending and Bitcoin proofs,
+loopback calendars and a loopback Esplora server. The database suite exercises recovery
+using fresh worker instances against the same disposable PostgreSQL state.
+
+This command also submits a fresh random digest, requests its first upgrade and verifies the
+historical `hello-world.txt.ots` proof against a public Bitcoin explorer.
+
+```bash
+OTS_LIVE_TEST=1 yarn vitest run --maxWorkers=1 src/infrastructure/anchor
+```
+
+The fresh submission and historical confirmation are independent. The live test prints the
+fresh digest and its observed upgrade status. Calendar and explorer endpoints can be set through
+`OTS_CALENDAR_URLS` and `OTS_ESPLORA_URL`.

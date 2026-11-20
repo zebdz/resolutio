@@ -438,3 +438,40 @@ it('seals zero-share source ownership without removing the voter or changing the
     })
   ).toBe(1);
 });
+
+it('recovers interrupted seal, submission and due upgrade from stored state with fresh workers', async () => {
+  const { createSealRecovery } =
+    await import('@/infrastructure/anchor/createSealRecovery');
+  const { readAnchorConfig } =
+    await import('@/infrastructure/anchor/anchorProviderFactory');
+  const f = await fixture();
+  const config = expectSuccess(readAnchorConfig({ NODE_ENV: 'test' }));
+  const restarted = () => createSealRecovery(db.prisma, config);
+  const completed = expectSuccess(await restarted().nudge(f.command.pollId));
+  expect(completed).toBe('submitted');
+  const saved = await db.prisma.pollSeal.findUniqueOrThrow({
+    where: { pollId: f.command.pollId },
+  });
+  expect(saved.rootDigest).toHaveLength(64);
+  expect(expectSuccess(await restarted().nudge(f.command.pollId))).toBe('idle');
+
+  const orphan = await fixture();
+  expectSuccess(await orphan.useCase.execute(orphan.command));
+  expect(expectSuccess(await restarted().nudge(orphan.command.pollId))).toBe(
+    'submitted'
+  );
+  await db.pool.query(
+    "UPDATE seal_anchors SET next_attempt_at=submitted_at+interval '1 millisecond' WHERE poll_id=$1",
+    [orphan.command.pollId]
+  );
+  expect(expectSuccess(await restarted().nudge(orphan.command.pollId))).toBe(
+    'busy'
+  );
+  const tick = expectSuccess(await restarted().execute());
+  expect(tick.pending).toBeGreaterThanOrEqual(1);
+  expect(
+    await db.prisma.sealAnchor.count({
+      where: { pollId: orphan.command.pollId },
+    })
+  ).toBe(1);
+});

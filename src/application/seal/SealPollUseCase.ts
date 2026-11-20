@@ -26,6 +26,7 @@ export interface SealPollCommand {
   readonly pollId: PollId;
   readonly owner: SealWorkOwner;
   readonly lease: SealLeaseSeconds;
+  readonly source?: 'lazy';
 }
 export class SealPollUseCase {
   constructor(
@@ -38,7 +39,8 @@ export class SealPollUseCase {
     const acquired = await this.work.acquire(
       command.pollId,
       command.owner,
-      command.lease
+      command.lease,
+      command.source
     );
 
     if (!acquired.success) {

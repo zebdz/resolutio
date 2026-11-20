@@ -22,7 +22,7 @@ afterAll(async () => {
   await db?.close();
 });
 
-async function fixture() {
+async function fixture(finishedAt: Date | null = new Date()) {
   const stamp = randomUUID();
   const user = await db.prisma.user.create({
     data: {
@@ -45,7 +45,7 @@ async function fixture() {
       startDate: new Date(),
       endDate: new Date(),
       state: 'FINISHED',
-      finishedAt: new Date(),
+      finishedAt,
     },
   });
 
@@ -148,4 +148,59 @@ it('checks expiry after waiting for the row lock', async () => {
     success: false,
     error: 'seal.errors.claimLost',
   });
+});
+
+it('allows only one lazy nudge in ten minutes across workers and restarts', async () => {
+  const pollId = await fixture();
+  const repo = new PrismaSealWorkRepository(db.prisma);
+  const claim = expectSuccess(
+    await repo.acquire(pollId, owner, duration, 'lazy')
+  );
+
+  if (!claim) {
+    return expect.unreachable();
+  }
+
+  expectSuccess(await repo.release(claim));
+  const restarted = new PrismaSealWorkRepository(db.prisma);
+  expect(
+    expectSuccess(await restarted.acquire(pollId, other, duration, 'lazy'))
+  ).toBeNull();
+  const cron = expectSuccess(await restarted.acquire(pollId, other, duration));
+
+  if (!cron) {
+    return expect.unreachable();
+  }
+
+  expectSuccess(await restarted.release(cron));
+  await db.pool.query(
+    "UPDATE seal_work_claims SET last_nudged_at = CURRENT_TIMESTAMP - interval '10 minutes' WHERE poll_id = $1",
+    [pollId]
+  );
+  expect(
+    expectSuccess(await restarted.acquire(pollId, other, duration, 'lazy'))
+  ).not.toBeNull();
+});
+
+it('discovers eligible missing seals and rotates a failed attempt behind untouched polls', async () => {
+  const first = await fixture();
+  const second = await fixture();
+  const historic = await fixture(null);
+  const repo = new PrismaSealWorkRepository(db.prisma);
+  expect(expectSuccess(await repo.discover(1, historic))).toEqual([]);
+  expect(expectSuccess(await repo.discover(1, second))).toEqual([
+    { pollId: second, kind: 'seal' },
+  ]);
+  const claim = expectSuccess(await repo.acquire(first, owner, duration));
+
+  if (!claim) {
+    return expect.unreachable();
+  }
+
+  expect(expectSuccess(await repo.discover(1, first))).toEqual([]);
+  expectSuccess(await repo.release(claim));
+  const items = expectSuccess(await repo.discover(100));
+  expect(items.findIndex((i) => i.pollId === second)).toBeLessThan(
+    items.findIndex((i) => i.pollId === first)
+  );
 });

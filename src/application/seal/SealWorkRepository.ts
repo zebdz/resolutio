@@ -30,7 +30,20 @@ export interface SealWorkRepository {
   acquire(
     pollId: PollId,
     owner: SealWorkOwner,
-    duration: SealLeaseSeconds
+    duration: SealLeaseSeconds,
+    source?: 'lazy'
   ): Promise<Result<SealWorkClaim | null, SealWorkFailure>>;
   release(claim: SealWorkClaim): Promise<Result<boolean, SealWorkFailure>>;
+}
+
+export const recoveryItem = z.object({
+  pollId: PollId.schema,
+  kind: z.enum(['seal', 'anchor']),
+});
+export type RecoveryItem = z.infer<typeof recoveryItem>;
+export interface SealRecoveryReader {
+  discover(
+    limit: number,
+    pollId?: PollId
+  ): Promise<Result<RecoveryItem[], SealWorkFailure>>;
 }

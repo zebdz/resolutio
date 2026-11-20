@@ -354,7 +354,7 @@ export function refreshedAnchor(
   return {
     ...previous,
     pendingProof: pendingProof(evidence, previous.provider, rootDigest),
-    lastError: null,
+    lastError: evidence.verificationError ?? null,
     nextAttemptAt: afterMinutes(at, 10),
   };
 }

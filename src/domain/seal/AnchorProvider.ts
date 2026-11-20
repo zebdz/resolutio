@@ -13,6 +13,7 @@ import {
 export type AnchorProviderName = 'opentimestamps' | 'stub';
 export type PendingAnchorEvidence = {
   kind: 'pending' | 'simulated';
+  verificationError?: AnchorFailureCode;
   rootDigest: Digest;
   proof: AnchorProof;
 };

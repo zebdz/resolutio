@@ -166,6 +166,7 @@ jobs:
             prisma/ \
             public/ \
             messages/ \
+            src/infrastructure/anchor/ots-worker.mjs \
             build/version-helper.ts \
             package.json \
             next.config.ts \

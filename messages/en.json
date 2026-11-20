@@ -2422,6 +2422,9 @@
     "errors": {
       "claimLost": "This sealing work is now owned by another worker or its lease expired.",
       "notFound": "No sealed record exists for this poll.",
+      "anchorSubmissionFailed": "The timestamp calendars did not accept the submission.",
+      "anchorUpgradeFailed": "The timestamp calendars could not be reached for a proof upgrade.",
+      "anchorVerificationFailed": "Bitcoin proof verification is pending.",
       "providerMismatch": "The saved anchor uses a different timestamp provider."
     }
   }

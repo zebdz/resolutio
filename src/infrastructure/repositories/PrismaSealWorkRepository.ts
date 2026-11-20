@@ -3,6 +3,8 @@
 import { PrismaClient, Prisma } from '@/generated/prisma/client';
 import {
   SealWorkRepository,
+  SealRecoveryReader,
+  recoveryItem,
   SealWorkClaim,
   SealWorkOwner,
   SealLeaseSeconds,
@@ -21,24 +23,30 @@ const storedClaim = z.object({
     .transform((d) => d.toISOString())
     .pipe(UtcTimestamp.schema),
 });
-export class PrismaSealWorkRepository implements SealWorkRepository {
+export class PrismaSealWorkRepository
+  implements SealWorkRepository, SealRecoveryReader
+{
   constructor(private readonly prisma: PrismaClient) {}
   async acquire(
     pollId: PollId,
     owner: SealWorkOwner,
-    duration: SealLeaseSeconds
+    duration: SealLeaseSeconds,
+    source?: 'lazy'
   ): ReturnType<SealWorkRepository['acquire']> {
     let rows: unknown;
 
     try {
       rows = await this.prisma.$queryRaw`
-        INSERT INTO seal_work_claims (poll_id, owner, lease_until, fencing_token)
-        VALUES (${pollId}, ${owner}, clock_timestamp() + make_interval(secs => ${duration}::double precision), 1)
+        INSERT INTO seal_work_claims (poll_id, owner, lease_until, fencing_token,last_nudged_at)
+        VALUES (${pollId}, ${owner}, clock_timestamp() + make_interval(secs => ${duration}::double precision), 1, CASE WHEN ${source === 'lazy'} THEN clock_timestamp() END)
         ON CONFLICT (poll_id) DO UPDATE SET
           owner = EXCLUDED.owner,
           lease_until = clock_timestamp() + make_interval(secs => ${duration}::double precision),
+          last_nudged_at = COALESCE(EXCLUDED.last_nudged_at,seal_work_claims.last_nudged_at),
           fencing_token = seal_work_claims.fencing_token + 1
-        WHERE seal_work_claims.lease_until <= clock_timestamp()
+        WHERE seal_work_claims.lease_until <= clock_timestamp() AND
+          (EXCLUDED.last_nudged_at IS NULL OR seal_work_claims.last_nudged_at IS NULL OR
+           seal_work_claims.last_nudged_at <= clock_timestamp() - interval '10 minutes')
         RETURNING poll_id, owner, lease_until, fencing_token
       `;
     } catch {
@@ -63,6 +71,32 @@ export class PrismaSealWorkRepository implements SealWorkRepository {
           }
         : null
     );
+  }
+  async discover(
+    limit: number,
+    pollId?: PollId
+  ): ReturnType<SealRecoveryReader['discover']> {
+    // Released or expired attempts rotate behind untouched work, even if sealing failed.
+    try {
+      const rows = await this.prisma.$queryRaw`
+        SELECT p.id AS "pollId", CASE WHEN s.poll_id IS NULL THEN 'seal' ELSE 'anchor' END AS kind
+        FROM polls p LEFT JOIN poll_seals s ON s.poll_id=p.id
+        LEFT JOIN seal_anchors a ON a.poll_id=s.poll_id AND a.status <> 'SUPERSEDED'
+        LEFT JOIN seal_work_claims c ON c.poll_id=p.id
+        WHERE p.state='FINISHED' AND p.finished_at IS NOT NULL
+        AND (${pollId ?? null}::text IS NULL OR p.id=${pollId ?? null})
+        AND (c.lease_until IS NULL OR c.lease_until <= CURRENT_TIMESTAMP)
+        AND (a.id IS NULL OR a.next_attempt_at <= CURRENT_TIMESTAMP)
+        ORDER BY c.lease_until NULLS FIRST,p.finished_at,p.id LIMIT ${limit}
+      `;
+      const result = recoveryItem.array().safeParse(rows);
+
+      return result.success
+        ? success(result.data)
+        : failure('common.errors.unexpected');
+    } catch {
+      return failure('common.errors.unexpected');
+    }
   }
   async release(
     claim: SealWorkClaim

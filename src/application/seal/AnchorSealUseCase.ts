@@ -20,6 +20,7 @@ export interface AnchorSealCommand {
   readonly pollId: PollId;
   readonly owner: SealWorkOwner;
   readonly lease: SealLeaseSeconds;
+  readonly source?: 'lazy';
 }
 export type AnchorWorkOutcome =
   | 'busy'
@@ -48,7 +49,8 @@ export class AnchorSealUseCase {
     const acquired = await this.work.acquire(
       command.pollId,
       command.owner,
-      command.lease
+      command.lease,
+      command.source
     );
 
     if (!acquired.success) {
