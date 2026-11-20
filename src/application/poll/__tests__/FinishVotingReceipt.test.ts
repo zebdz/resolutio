@@ -125,6 +125,13 @@ it.each(['failure', 'throw'])(
           : vi.fn().mockResolvedValue(failure('cleanup unavailable')),
     };
     const now = new Date(snapshot.votes[0].castAt);
+    const secrets = {
+      generate: vi
+        .fn()
+        .mockReturnValueOnce(snapshot.receiptSecret)
+        .mockReturnValue(ReceiptSecret.parse('ce'.repeat(32))),
+    };
+    const mail = { receipt: vi.fn().mockRejectedValue(new Error('transport')) };
     const useCase = new FinishVotingUseCase(
       { getPollById: async () => success(poll) } as any,
       participants as any,
@@ -133,9 +140,10 @@ it.each(['failure', 'throw'])(
       { findById: async () => null } as any,
       {} as any,
       {} as any,
-      { generate: () => snapshot.receiptSecret },
+      secrets,
       ids,
-      { now: () => Instant.fromDate(now) }
+      { now: () => Instant.fromDate(now) },
+      mail
     );
     const result = await useCase.execute({
       pollId: 'poll-1',
@@ -149,8 +157,21 @@ it.each(['failure', 'throw'])(
     }
 
     expect(result.value.receipt.receiptSecret).toBe(snapshot.receiptSecret);
+    expect(mail.receipt).toHaveBeenCalledOnce();
+    expect(result.value.emailStatus).toBe('failed');
     expect(participants.castVotes).toHaveBeenCalledOnce();
     expect(participants.castVotes.mock.calls[0][1][0].createdAt).toEqual(now);
     expect(participants.castVotes.mock.calls[0][1][0].id).toBe('assigned-1');
+    // A concurrent writer gets the same winning snapshot under the database lock.
+    const competing = await useCase.execute({
+      pollId: 'poll-1',
+      userId: 'user-1',
+      willingToSignProtocol: true,
+    });
+    expect(competing).toMatchObject({
+      success: true,
+      value: { canonicalReceipt: result.value.canonicalReceipt },
+    });
+    expect(mail.receipt).toHaveBeenCalledOnce();
   }
 );

@@ -297,6 +297,19 @@ function serializeContent(source: NotificationContent): NotificationContent {
         },
       };
     case 'poll_finished':
+      if (source.body === 'notification.types.pollFinished.sealedBody') {
+        return {
+          type: source.type,
+          title: source.title,
+          body: source.body,
+          data: {
+            pollId: source.data.pollId,
+            pollTitle: source.data.pollTitle,
+            rootDigest: source.data.rootDigest,
+          },
+        };
+      }
+
       return {
         type: source.type,
         title: source.title,

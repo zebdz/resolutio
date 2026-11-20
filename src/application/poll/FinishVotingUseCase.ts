@@ -1,5 +1,5 @@
 /** Coordinates ballot acceptance and owner-only receipt replay. Repositories
- * enforce the cutoff under lock; cleanup is best effort after commit. */
+ * enforce the cutoff under lock. Cleanup and receipt mail run after commit. */
 import { SealDomainCode } from '../../domain/seal/SealDomainCodes';
 import { PollWriteFailure } from '../../domain/poll/PollWriteFailure';
 import { VotingWeight } from '@/domain/poll/VotingWeight';
@@ -16,7 +16,11 @@ import {
 import { Clock, IdGenerator } from '@/application/shared/EntityCreation';
 import { PollType } from '@/domain/poll/PollType';
 import { ReceiptSecretGenerator } from './ReceiptSecretGenerator';
-import { VoteReceiptView, voteReceiptView } from './VoteReceiptView';
+import {
+  VoteReceiptView,
+  voteReceiptView,
+  ReceiptEmailStatus,
+} from './VoteReceiptView';
 import { Vote } from '../../domain/poll/Vote';
 import { PollParticipant } from '../../domain/poll/PollParticipant';
 import { ParticipantWeightHistory } from '../../domain/poll/ParticipantWeightHistory';
@@ -53,7 +57,12 @@ export class FinishVotingUseCase {
     private userRepository: UserRepository,
     private receiptSecretGenerator: ReceiptSecretGenerator,
     private ids: IdGenerator,
-    private clock: Clock
+    private clock: Clock,
+    private readonly mail?: {
+      receipt(
+        view: Extract<VoteReceiptView, { kind: 'original' }>
+      ): Promise<ReceiptEmailStatus>;
+    }
   ) {}
 
   async execute(
@@ -321,8 +330,7 @@ export class FinishVotingUseCase {
       return committed;
     }
 
-    // Cleanup is outside the committed ballot boundary. Email will follow the
-    // same rule in Phase 6: its failure cannot encourage another cast.
+    // Cleanup is outside the committed ballot boundary.
     try {
       const cleanup = await this.draftRepository.deleteUserDrafts(
         pollId,
@@ -336,6 +344,30 @@ export class FinishVotingUseCase {
       console.error('Failed to delete vote drafts after commit');
     }
 
-    return voteReceiptView(committed.value);
+    const view = voteReceiptView(committed.value);
+
+    // Concurrent retries receive the winner's snapshot and independently generated secret.
+    if (
+      !view.success ||
+      view.value.kind !== 'original' ||
+      view.value.receipt.receiptSecret !== secret ||
+      !this.mail
+    ) {
+      return view;
+    }
+
+    let emailStatus: ReceiptEmailStatus;
+
+    try {
+      emailStatus = await this.mail.receipt(view.value);
+    } catch {
+      emailStatus = 'failed';
+    }
+
+    if (emailStatus === 'failed') {
+      console.error('Vote receipt email failed after commit');
+    }
+
+    return success({ ...view.value, emailStatus });
   }
 }

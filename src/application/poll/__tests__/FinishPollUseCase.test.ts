@@ -1,3 +1,4 @@
+import { Digest } from '@/domain/seal/SealValues';
 /** Verifies Finish Poll behavior through application ports.
  * Notification doubles return explicit append outcomes, matching the production writer. */
 import { PollPeriod } from '@/domain/poll/PollPeriod';
@@ -199,6 +200,34 @@ describe('FinishPollUseCase', () => {
       await useCase.execute({ pollId: poll.id, userId: 'admin-1' })
     ).toEqual(success(undefined));
     expect(finishedHandler.handle).toHaveBeenCalledOnce();
+  });
+
+  it('saves the sealed notification before attempting bundle mail and preserves finish on mail failure', async () => {
+    const digest = Digest.parse('12'.repeat(32));
+    let observed: unknown;
+    const deliver = vi.fn(async () => {
+      observed = savedNotifications[0]?.data;
+
+      return failure('common.errors.unexpected' as const);
+    });
+    const finish = new FinishPollUseCase(
+      pollRepository as PollRepository,
+      draftRepository as DraftRepository,
+      organizationRepository as OrganizationRepository,
+      userRepository as UserRepository,
+      notificationRepository as NotificationRepository,
+      participantRepository as ParticipantRepository,
+      boardRepository as BoardRepository,
+      pollFixtureIds,
+      pollFixtureClock,
+      [finishedHandler],
+      { digest: async () => success(digest), deliver }
+    );
+    expect(
+      await finish.execute({ pollId: poll.id, userId: 'admin-1' })
+    ).toEqual(success(undefined));
+    expect(deliver).toHaveBeenCalledOnce();
+    expect(observed).toMatchObject({ rootDigest: digest });
   });
 
   it('does not dispatch an event when saving the finish fails', async () => {

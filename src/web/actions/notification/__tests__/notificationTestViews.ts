@@ -6,7 +6,9 @@ import type { NotificationSnapshot } from '@/domain/notification/Notification';
 
 export const notificationSamples = NotificationContent.options.map(
   (schema): NotificationSnapshot => {
-    const kind = schema.unwrap().shape.type.value;
+    const alternative = schema.unwrap();
+    const kind = ('shape' in alternative ? alternative : alternative.options[0])
+      .shape.type.value;
     const key = kind.replace(/_([a-z])/g, (_, letter: string) =>
       letter.toUpperCase()
     );

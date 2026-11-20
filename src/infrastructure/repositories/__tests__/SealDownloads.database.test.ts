@@ -1,5 +1,14 @@
 /** Four real HTTP handlers with disposable PostgreSQL and a controlled session identity.
- * Exercise weighted cast-time evidence, membership loss, actual policy gates and a clean CLI process. */
+ * Exercise weighted receipts, permission gates, independent verification and restart-safe mail delivery. */
+import { createBundleDelivery } from '@/infrastructure/email/createBundleDelivery';
+import { PrismaBundleDelivery } from '../PrismaBundleDelivery';
+import { EmailAddress } from '@/domain/user/EmailAddress';
+import { StubEmailSender } from '@/infrastructure/email/StubEmailSender';
+import { BundleDelivery } from '@/application/seal/BundleDelivery';
+import { SealExports } from '@/application/seal/SealExports';
+import { createEvidenceMail } from '@/infrastructure/email/createEvidenceMail';
+import { PrismaSealReader } from '../PrismaSealReader';
+import { PrismaSealPermissions } from '../PrismaSealPermissions';
 import { beforeAll, afterAll, it, expect, vi } from 'vitest';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -101,7 +110,7 @@ const get = (kind: keyof typeof handlers, pollId: string) =>
     params: Promise.resolve({ pollId }),
   });
 
-async function finishPoll(anonymous: boolean, open: boolean) {
+async function finishBallots(anonymous: boolean, open: boolean) {
   const createdAt = new Date('2026-01-01T00:00:00Z'),
     castAt = new Date('2026-01-02T00:00:00Z'),
     finishedAt = new Date('2026-01-03T00:00:00Z');
@@ -174,6 +183,12 @@ async function finishPoll(anonymous: boolean, open: boolean) {
 
   expectSuccess(aggregate.finish(PollInstant.parse(finishedAt.toISOString())));
   expectSuccess(await polls.updatePoll(aggregate));
+
+  return { id: poll.id, original };
+}
+
+async function finishPoll(anonymous: boolean, open: boolean) {
+  const poll = await finishBallots(anonymous, open);
   const seal = expectSuccess(
     await new SealPollUseCase(
       new PrismaSealWorkRepository(db.prisma),
@@ -189,7 +204,7 @@ async function finishPoll(anonymous: boolean, open: boolean) {
     throw Error('Missing fixture seal');
   }
 
-  return { id: poll.id, manifest: seal.seal.manifestBytes, original };
+  return { ...poll, manifest: seal.seal.manifestBytes };
 }
 
 it.each([
@@ -389,4 +404,332 @@ it('serves the public commitment even when a private section cannot be rehydrate
   });
   viewer = null;
   expect(await (await get('manifest', second.id)).text()).toBe(manifest);
+});
+
+const deliveryConfig = expectSuccess(
+  readAnchorConfig({ NODE_ENV: 'test', ANCHOR_PROVIDER: 'stub' })
+);
+const confirmVoter = () =>
+  db.prisma.user.update({
+    where: { id: 'voter' },
+    data: { email: 'voter@example.org', emailConfirmedAt: new Date() },
+  });
+
+it('discovers the first bundle after delayed submission and claims it once across workers', async () => {
+  const f = await finishPoll(true, false);
+  const pollId = SealId.parse(f.id);
+  const sender = { send: vi.fn().mockResolvedValue({ success: true }) };
+  const worker = () => createBundleDelivery(db.prisma, sender);
+  await confirmVoter();
+  expect(expectSuccess(await worker().recover(20, pollId))).toBe(0);
+  const anchored = await createSealRecovery(db.prisma, deliveryConfig).process({
+    kind: 'anchor',
+    pollId,
+  });
+  expect(expectSuccess(anchored)).toBe('submitted');
+  await Promise.all([
+    worker().recover(20, pollId),
+    worker().recover(20, pollId),
+  ]);
+  expect(sender.send).toHaveBeenCalledTimes(1);
+  expect(expectSuccess(await worker().recover(20, pollId))).toBe(0);
+  const [message] = sender.send.mock.calls[0];
+  const [bundle, proof] = message.attachments;
+  expect(bundle.filename).toBe('bundle.json');
+  expect(proof.filename).toBe(f.id + '.ots');
+  expect(
+    verifyEvidence({
+      bundle: bundle.content,
+      proof: proof.content,
+      receipt: f.original,
+    })
+  ).toMatchObject({
+    success: true,
+    value: {
+      ballot: 'originalReceiptMatches',
+      labels: 'unavailable',
+      timestamp: 'simulated',
+    },
+  });
+  expect(message.text).not.toContain('Weighted decision');
+  expect(bundle.content).not.toContain('other-voter');
+  expect(bundle.content).not.toContain('receiptSecret');
+  expect(
+    await db.prisma.sealBundleDelivery.findUniqueOrThrow({
+      where: { pollId_userId: { pollId, userId: 'voter' } },
+    })
+  ).toMatchObject({ status: 'SENT' });
+});
+
+it('leaves unsent work pending while an address is unconfirmed and uses current permissions and address on recovery', async () => {
+  const f = await finishPoll(false, false);
+  const pollId = SealId.parse(f.id);
+  const sender = { send: vi.fn().mockResolvedValue({ success: true }) };
+  const store = new PrismaBundleDelivery(db.prisma);
+  const who = { id: 'voter' };
+  await db.prisma.user.update({
+    where: who,
+    data: { email: 'old@example.org', emailConfirmedAt: new Date() },
+  });
+  expect(
+    expectSuccess(
+      await createSealRecovery(db.prisma, deliveryConfig, sender).process({
+        kind: 'anchor',
+        pollId,
+      })
+    )
+  ).toBe('submitted');
+  const [key] = expectSuccess(await store.discover(20, pollId));
+  await db.prisma.user.update({
+    where: who,
+    data: { email: 'new@example.org', emailConfirmedAt: null },
+  });
+  expect(
+    expectSuccess(
+      await store.claim(key, {
+        address: EmailAddress.create('old@example.org'),
+        language: 'ru',
+      })
+    )
+  ).toBe(false);
+  expect(
+    expectSuccess(
+      await createBundleDelivery(db.prisma, sender).recover(20, pollId)
+    )
+  ).toBe(0);
+  await db.prisma.user.update({
+    where: who,
+    data: { emailConfirmedAt: new Date() },
+  });
+  await db.prisma.organizationAdminUser.create({
+    data: { organizationId: 'org', userId: 'voter' },
+  });
+
+  try {
+    expect(
+      expectSuccess(
+        await createBundleDelivery(db.prisma, sender).recover(20, pollId)
+      )
+    ).toBe(1);
+    const message = sender.send.mock.calls[0][0];
+    expect(message.to.getValue()).toBe('new@example.org');
+    const b = JSON.parse(message.attachments[0].content);
+    expect(Object.keys(b).sort()).toEqual([
+      'leaves',
+      'manifest',
+      'poll',
+      'rootDigest',
+    ]);
+    expect(
+      b.leaves.every(
+        (v: { preimage: { userId: string } }) => v.preimage.userId === 'voter'
+      )
+    ).toBe(true);
+    expect(message.text).toContain('Weighted decision');
+    expect(message.attachments[0].content).not.toContain('phone-voter');
+  } finally {
+    await db.prisma.organizationAdminUser.delete({
+      where: {
+        organizationId_userId: { organizationId: 'org', userId: 'voter' },
+      },
+    });
+  }
+});
+
+it.each(['before SMTP', 'during SMTP', 'after acceptance'] as const)(
+  'marks a lost worker %s UNKNOWN and rejects late completion',
+  async (point) => {
+    const f = await finishPoll(true, false);
+    const pollId = SealId.parse(f.id);
+    await confirmVoter();
+    const send = vi.fn().mockResolvedValue({ success: true });
+    await createSealRecovery(db.prisma, deliveryConfig, { send }).process({
+      kind: 'anchor',
+      pollId,
+    });
+    const store = new PrismaBundleDelivery(db.prisma);
+    const [key] = expectSuccess(await store.discover(20, pollId));
+    // Hold the original worker at one of the actual handoff boundaries.
+    let release!: () => void;
+    let signal!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const reached = new Promise<void>((resolve) => {
+      signal = resolve;
+    });
+
+    const hold = async () => {
+      signal();
+      await held;
+    };
+
+    if (point === 'before SMTP') {
+      const claim = store.claim.bind(store);
+      vi.spyOn(store, 'claim').mockImplementation(async (...args) => {
+        expect(expectSuccess(await claim(...args))).toBe(true);
+        await hold();
+
+        // The process died here. It never returned the claim to its caller.
+        return { success: false, error: 'common.errors.unexpected' };
+      });
+    } else if (point === 'during SMTP') {
+      send.mockImplementationOnce(async () => {
+        await hold();
+
+        return { success: true };
+      });
+    } else {
+      const complete = store.complete.bind(store);
+      vi.spyOn(store, 'complete').mockImplementation(async (...args) => {
+        await hold();
+
+        return complete(...args);
+      });
+    }
+
+    const original = new BundleDelivery(
+      store,
+      createEvidenceMail(db.prisma, { send }),
+      new SealExports(
+        new PrismaSealReader(db.prisma),
+        new PrismaSealPermissions(db.prisma)
+      )
+    );
+    const running = original.recover(20, pollId);
+    await reached;
+    await db.prisma.sealBundleDelivery.update({
+      where: { pollId_userId: key },
+      data: { attemptStartedAt: new Date(Date.now() - 11 * 60000) },
+    });
+    const before = send.mock.calls.length;
+    expect(
+      expectSuccess(
+        await createBundleDelivery(db.prisma, { send }).recover(20, pollId)
+      )
+    ).toBe(0);
+    release();
+    await running;
+    expect(send).toHaveBeenCalledTimes(before);
+    expect(expectSuccess(await store.complete(key, 'SENT'))).toBe(false);
+    expect(
+      await db.prisma.sealBundleDelivery.findUniqueOrThrow({
+        where: { pollId_userId: key },
+      })
+    ).toMatchObject({ status: 'UNKNOWN', lastError: 'attemptExpired' });
+  }
+);
+
+it.each([
+  ['FAILED', false],
+  ['UNKNOWN', true],
+] as const)(
+  'keeps a transport outcome %s terminal across later scans',
+  async (status, uncertain) => {
+    const f = await finishPoll(true, false);
+    const pollId = SealId.parse(f.id);
+    const sender = {
+      send: vi.fn().mockResolvedValue({ success: false, uncertain }),
+    };
+    await confirmVoter();
+    // Re-enter the production immediate path after a restart with an already saved seal.
+    const immediate = createSealRecovery(db.prisma, deliveryConfig, sender);
+    await immediate.process({ kind: 'seal', pollId });
+    await immediate.deliverForPoll(pollId);
+    expect(sender.send).toHaveBeenCalledTimes(1);
+    expect(
+      expectSuccess(
+        await createBundleDelivery(db.prisma, sender).recover(20, pollId)
+      )
+    ).toBe(0);
+    expect(sender.send).toHaveBeenCalledTimes(1);
+    expect(
+      await db.prisma.sealBundleDelivery.findUniqueOrThrow({
+        where: { pollId_userId: { pollId, userId: 'voter' } },
+      })
+    ).toMatchObject({ status });
+  }
+);
+
+it('keeps the first bundle pending until an attachment transport is configured', async () => {
+  const f = await finishPoll(true, false);
+  const pollId = SealId.parse(f.id);
+  await confirmVoter();
+  const immediate = createSealRecovery(
+    db.prisma,
+    deliveryConfig,
+    new StubEmailSender()
+  );
+  await immediate.process({ kind: 'seal', pollId });
+  await immediate.deliverForPoll(pollId);
+  expect(
+    await db.prisma.sealBundleDelivery.findUniqueOrThrow({
+      where: { pollId_userId: { pollId, userId: 'voter' } },
+    })
+  ).toMatchObject({ status: 'PENDING' });
+  const sender = { send: vi.fn().mockResolvedValue({ success: true }) };
+  expect(
+    expectSuccess(
+      await createBundleDelivery(db.prisma, sender).recover(20, pollId)
+    )
+  ).toBe(1);
+});
+
+it('recovers a finished poll with no seal and delivers a verifiable first bundle in the cron batch', async () => {
+  const f = await finishBallots(true, false);
+  await confirmVoter();
+  expect(
+    await db.prisma.pollSeal.findUnique({ where: { pollId: f.id } })
+  ).toBeNull();
+  const send = vi.fn().mockResolvedValue({ success: true });
+  const restart = () => createSealRecovery(db.prisma, deliveryConfig, { send });
+  const result = expectSuccess(await restart().execute());
+  expect(result.deliveries).toBeGreaterThan(0);
+  const messages = () =>
+    send.mock.calls
+      .map(([m]) => m)
+      .filter((m) => m.attachments[1].filename === f.id + '.ots');
+  expect(messages()).toHaveLength(1);
+  const [bundle, proof] = messages()[0].attachments;
+  expect(
+    verifyEvidence({
+      bundle: bundle.content,
+      proof: proof.content,
+      receipt: f.original,
+    })
+  ).toMatchObject({
+    success: true,
+    value: { ballot: 'originalReceiptMatches', timestamp: 'simulated' },
+  });
+  await restart().execute();
+  expect(messages()).toHaveLength(1);
+});
+
+it('rotates pending preparation work so an unreadable record cannot block later recipients', async () => {
+  const f = await finishPoll(true, false),
+    pollId = SealId.parse(f.id);
+  await confirmVoter();
+  await db.prisma.user.update({
+    where: { id: 'other-voter' },
+    data: { email: 'second@example.org', emailConfirmedAt: new Date() },
+  });
+
+  try {
+    await createSealRecovery(
+      db.prisma,
+      deliveryConfig,
+      new StubEmailSender()
+    ).process({ kind: 'anchor', pollId });
+    const store = new PrismaBundleDelivery(db.prisma);
+    const [first] = expectSuccess(await store.discover(1, pollId));
+    // A worker stops before claiming its prepared message. Next scan must make progress.
+    const [second] = expectSuccess(await store.discover(1, pollId));
+    expect(first.userId).not.toBe(second.userId);
+    expect(expectSuccess(await store.discover(1, pollId))).toEqual([first]);
+  } finally {
+    await db.prisma.user.update({
+      where: { id: 'other-voter' },
+      data: { emailConfirmedAt: null },
+    });
+  }
 });

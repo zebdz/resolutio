@@ -1172,6 +1172,7 @@
         "body": "\"{pollTitle}\" was returned to you by an administrator"
       },
       "pollFinished": {
+        "sealedBody": "Voting has ended for {pollTitle}. Sealed record: {rootDigest}.",
         "title": "Poll has ended",
         "body": "Voting has ended for \"{pollTitle}\""
       },
@@ -2405,6 +2406,14 @@
     "externalImageBlocked": "External image not allowed — upload it via the attachment uploader instead."
   },
   "email": {
+    "voteReceipt": {
+      "subject": "Vote receipt",
+      "body": "Poll: {title}\nCast at {time}\n{choices}\nReceipt code: {code}\nKeep the original receipt.json to compare your ballot after sealing.\n{url}"
+    },
+    "sealBundle": {
+      "subject": "Your sealed ballot",
+      "body": "{title}\nSealed at {time}\nSHA-256: {digest}\n{status, select, pending {The timestamp is pending. Confirmation usually takes hours and depends on the public calendars.} simulated {Simulated timestamp.} bitcoin {Bitcoin timestamp confirmed.} other {Timestamp status unavailable.}}\n{url}"
+    },
     "otp": {
       "phoneConfirmation": {
         "subject": "Your Resolutio confirmation code",

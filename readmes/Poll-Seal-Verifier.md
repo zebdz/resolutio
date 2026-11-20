@@ -16,6 +16,11 @@ see current results, they can authenticate labels using a previously saved canon
 A missing seal or unavailable public proof returns HTTP 404. Private downloads require a session
 and return HTTP 403 when access is denied.
 
+A voter with a confirmed email can also receive the original `receipt.json` at cast time. Once a
+proof is available, a separate email carries `bundle.json` and `<pollId>.ots`. The bundle includes
+the manifest and the canonical poll labels the voter may see at delivery time. Verify those files
+with `--receipt`, `--bundle` and `--proof`. Keep the original receipt private.
+
 ## Run the standalone verifier
 
 From the repository with its locked dependencies installed, build the distributable. This example

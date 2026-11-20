@@ -155,3 +155,13 @@ OTS_LIVE_TEST=1 yarn test:poll-db --maxWorkers=1 SealDownloads.database
 
 The [standalone verifier guide](Poll-Seal-Verifier.md) includes the exported fixture and exact
 Python OpenTimestamps commands.
+
+The same disposable suite exercises first-bundle recovery, simultaneous workers, changed confirmed
+addresses, revoked label access and interrupted SMTP handoffs. It captures mail in process.
+The receipt tests check the exact cast-time attachment and both language templates. Run them with
+SMTP disabled.
+
+```sh
+SMTP_HOST= yarn vitest run --maxWorkers=1 EvidenceMail FinishVotingReceipt NodemailerEmailSender
+SMTP_HOST= yarn test:poll-db --maxWorkers=1 SealDownloads.database
+```

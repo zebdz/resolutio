@@ -1,3 +1,4 @@
+import { Digest } from '@/domain/seal/SealValues';
 /** Verifies Notify Poll Finished behavior through application ports.
  * Notification doubles return explicit append outcomes, matching the production writer. */
 import { PollId } from '@/domain/shared/EntityIds';
@@ -185,6 +186,22 @@ describe('NotifyPollFinishedUseCase', () => {
     const userIds = saved.map((n) => n.userId);
     expect(userIds).toContain('user-1');
     expect(userIds).toContain('user-2');
+  });
+
+  it('adds the sealed body and digest when the seal is available', async () => {
+    participantRepo.setParticipants('poll-1', [
+      createParticipant('poll-1', 'user-1'),
+    ]);
+    const rootDigest = Digest.parse('aa'.repeat(32));
+    await useCase.execute({
+      pollId: PollId.parse('poll-1'),
+      pollTitle: 'Budget Vote',
+      rootDigest,
+    });
+    expect(notifRepo.getSavedBatch()[0]).toMatchObject({
+      body: 'notification.types.pollFinished.sealedBody',
+      data: { rootDigest },
+    });
   });
 
   it('should not create notifications when no participants', async () => {

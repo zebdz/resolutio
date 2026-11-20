@@ -1,4 +1,6 @@
 /** Wire durable poll-recovery entry points to PostgreSQL and the selected provider. */
+import { createBundleDelivery } from '../email/createBundleDelivery';
+import { createEmailSenderFromEnv } from '../email/emailSenderFactory';
 import { PrismaClient } from '@/generated/prisma/client';
 import { AnchorSealUseCase } from '@/application/seal/AnchorSealUseCase';
 import { SealPollUseCase } from '@/application/seal/SealPollUseCase';
@@ -17,7 +19,8 @@ import {
 
 export function createSealRecovery(
   prisma: PrismaClient,
-  config = requiredAnchorConfig()
+  config = requiredAnchorConfig(),
+  sender = createEmailSenderFromEnv()
 ) {
   const provider = createAnchorProvider(config);
   // One claim can cover an upgrade followed by a separate verification deadline.
@@ -26,11 +29,14 @@ export function createSealRecovery(
   const tx = new PrismaSealingTransaction(prisma);
   const ids = new CryptoIdGenerator();
 
+  const deliveries = createBundleDelivery(prisma, sender);
+
   return new UpgradeAnchorsUseCase(
     work,
     new SealPollUseCase(work, tx),
     new AnchorSealUseCase(work, tx, provider, ids, new SystemClock()),
     ids,
-    SealLeaseSeconds.parse(duration)
+    SealLeaseSeconds.parse(duration),
+    (limit, pollId) => deliveries.recover(limit, pollId)
   );
 }

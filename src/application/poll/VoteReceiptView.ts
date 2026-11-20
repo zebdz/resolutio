@@ -5,8 +5,14 @@ import { ReceiptData, VoteReceipt } from '@/domain/seal/VoteReceipt';
 import { SealDomainCode } from '@/domain/seal/SealDomainCodes';
 import { Result, success } from '@/domain/shared/Result';
 
+export type ReceiptEmailStatus = 'sent' | 'unconfirmed' | 'failed';
 export type VoteReceiptView =
-  | { kind: 'original'; receipt: ReceiptData; canonicalReceipt: string }
+  | {
+      kind: 'original';
+      receipt: ReceiptData;
+      canonicalReceipt: string;
+      emailStatus?: ReceiptEmailStatus;
+    }
   | { kind: 'legacy' };
 
 export function voteReceiptView(

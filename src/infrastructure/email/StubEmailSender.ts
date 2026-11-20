@@ -11,7 +11,13 @@ import type {
  * StubSmsOtpDeliveryChannel.
  */
 export class StubEmailSender implements EmailSender {
+  readonly previewOnly = true;
   async send(message: EmailMessage): Promise<EmailSendResult> {
+    if (message.attachments?.length) {
+      // Receipt and proof messages carry private ballot data. Never preview them.
+      return { success: false };
+    }
+
     console.info(
       `[StubEmailSender] to=${message.to.getValue()} subject=${message.subject}\n${message.text}`
     );

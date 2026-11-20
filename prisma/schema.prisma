@@ -74,6 +74,7 @@ model User {
   emailConfirmedAt      DateTime? @map("email_confirmed_at")
 
   // Relations
+  sealBundleDeliveries        SealBundleDelivery[]
   sessions                    Session[]
   organizationsOwned          Organization[]
   memberships                 OrganizationUser[]
@@ -912,17 +913,18 @@ model SealWorkClaim {
 
 /// Canonical record bytes are immutable; mutation trigger lives in the migration.
 model PollSeal {
+  deliveries      SealBundleDelivery[]
   anchors         SealAnchor[]
-  pollId          String       @id @map("poll_id")
-  rootDigest      String       @unique @map("root_digest")
+  pollId          String               @id @map("poll_id")
+  rootDigest      String               @unique @map("root_digest")
   manifest        String
-  sectionPoll     String       @map("section_poll")
-  sectionTallies  String       @map("section_tallies")
-  sectionRegister String       @map("section_register")
-  sectionSigners  String       @map("section_signers")
+  sectionPoll     String               @map("section_poll")
+  sectionTallies  String               @map("section_tallies")
+  sectionRegister String               @map("section_register")
+  sectionSigners  String               @map("section_signers")
   votes           Json
-  sealedAt        DateTime     @map("sealed_at")
-  poll            Poll         @relation(fields: [pollId], references: [id], onDelete: Restrict)
+  sealedAt        DateTime             @map("sealed_at")
+  poll            Poll                 @relation(fields: [pollId], references: [id], onDelete: Restrict)
 
   @@map("poll_seals")
 }
@@ -947,4 +949,22 @@ model SealAnchor {
 
   @@index([nextAttemptAt], map: "seal_anchors_due")
   @@map("seal_anchors")
+}
+
+/// Durable one-time SMTP handoff. State and timestamp combinations are checked by SQL.
+model SealBundleDelivery {
+  pollId           String    @map("poll_id")
+  userId           String    @map("user_id")
+  status           String    @default("PENDING")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  lastSelectedAt   DateTime? @map("last_selected_at")
+  attemptStartedAt DateTime? @map("attempt_started_at")
+  completedAt      DateTime? @map("completed_at")
+  lastError        String?   @map("last_error")
+  seal             PollSeal  @relation(fields: [pollId], references: [pollId], onDelete: Restrict)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([pollId, userId])
+  @@index([status, attemptStartedAt, createdAt], map: "seal_bundle_delivery_work")
+  @@map("seal_bundle_deliveries")
 }

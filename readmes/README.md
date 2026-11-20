@@ -7,7 +7,7 @@ this index does not require loading every reference or historical plan.
 
 | Feature                    | Design                                                       | Implementation plan                                        | Status           |
 | -------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- | ---------------- |
-| Poll sealing and anchoring | [Approved design](2026-09-11-poll-seal-and-anchor-design.md) | [Phased plan](../plans/2026-09-15-poll-seal-and-anchor.md) | Phase 5 approved |
+| Poll sealing and anchoring | [Approved design](2026-09-11-poll-seal-and-anchor-design.md) | [Phased plan](../plans/2026-09-15-poll-seal-and-anchor.md) | Phase 6 approved |
 
 Visual walkthrough: [Poll seal and anchor flow](poll-seal-and-anchor-flow.html) — lifecycle,
 record commitments, access rules, recovery and verification.

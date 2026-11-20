@@ -71,7 +71,10 @@ it('serializes a plain poll event without private source fields', () => {
     data: { pollId: 'poll-1', pollTitle: ' Poll ' },
   });
 
-  if (content.type !== 'poll_finished') {
+  if (
+    content.type !== 'poll_finished' ||
+    content.body !== 'notification.types.pollFinished.body'
+  ) {
     return expect.unreachable();
   }
 
@@ -99,4 +102,18 @@ it('serializes a plain poll event without private source fields', () => {
   expect(Object.getPrototypeOf(view.data)).toBe(Object.prototype);
   expect(view.data).not.toBe(source.data);
   expect(view.createdAt).not.toBe(createdAt);
+});
+
+it('keeps the validated digest when serializing a sealed finish notification', () => {
+  const sample = notificationSamples.find((s) => s.type === 'poll_finished')!;
+  const digest = '12'.repeat(32);
+  const content = NotificationContent.parse({
+    ...sample,
+    body: 'notification.types.pollFinished.sealedBody',
+    data: { ...sample.data, rootDigest: digest },
+  });
+  expect(serializeNotification({ ...sample, ...content })).toMatchObject({
+    body: 'notification.types.pollFinished.sealedBody',
+    data: { rootDigest: digest },
+  });
 });

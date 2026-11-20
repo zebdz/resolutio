@@ -19,7 +19,8 @@ import {
 
 type Outcome = Result<AnchorWorkOutcome, AnchorWorkFailure | SealPollFailure>;
 type DeliveryRecovery = (
-  limit: number
+  limit: number,
+  pollId?: PollId
 ) => Promise<Result<number, SealWorkFailure>>;
 const batchLimit = 20;
 export class UpgradeAnchorsUseCase {
@@ -77,6 +78,10 @@ export class UpgradeAnchorsUseCase {
     }
 
     return success(counts);
+  }
+
+  async deliverForPoll(pollId: PollId) {
+    return this.deliveries ? this.deliveries(batchLimit, pollId) : success(0);
   }
 
   async nudge(pollId: PollId): Promise<Outcome> {

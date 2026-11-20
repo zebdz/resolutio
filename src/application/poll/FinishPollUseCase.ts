@@ -1,5 +1,6 @@
 /** Authorizes finishing with a validated cutoff instant, commits through the guarded
  * repository, then performs cleanup/notifications and explicit event handlers independently. */
+import { Digest } from '@/domain/seal/SealValues';
 import { PollFinishedHandler } from './PollFinishedHandler';
 import { Clock, IdGenerator } from '../shared/EntityCreation';
 import { PollInstant } from '../../domain/poll/PollValues';
@@ -32,7 +33,15 @@ export class FinishPollUseCase {
     private boardRepository: BoardRepository,
     private ids: IdGenerator,
     private clock: Clock,
-    private readonly finishedHandlers: readonly PollFinishedHandler[]
+    private readonly finishedHandlers: readonly PollFinishedHandler[],
+    private readonly evidence?: {
+      digest(id: PollId): Promise<Result<Digest | null, string>>;
+      deliver(
+        id: PollId
+      ): Promise<
+        Result<number, 'common.errors.unexpected' | 'seal.errors.claimLost'>
+      >;
+    }
   ) {}
 
   async execute(
@@ -126,27 +135,6 @@ export class FinishPollUseCase {
       console.error('Failed to delete poll drafts after finish');
     }
 
-    // Notify participants
-    const notifyUseCase = new NotifyPollFinishedUseCase({
-      notificationRepository: this.notificationRepository,
-      ids: this.ids,
-      clock: this.clock,
-      participantRepository: this.participantRepository,
-    });
-    await notifyUseCase
-      .execute({ pollId: poll.id, pollTitle: poll.title })
-      .then((outcome) => {
-        if (!outcome.success) {
-          console.error(
-            'Notification delivery failed (NotifyPollFinishedUseCase):',
-            outcome.error
-          );
-        }
-      })
-      .catch((err) => {
-        console.error('Failed to send poll finished notifications:', err);
-      });
-
     for (const event of events) {
       for (const handler of this.finishedHandlers) {
         try {
@@ -159,6 +147,58 @@ export class FinishPollUseCase {
           // A crashed handler cannot undo the finish or suppress other handlers.
           console.error('PollFinished handler unexpectedly failed');
         }
+      }
+    }
+
+    let rootDigest: Digest | undefined;
+
+    if (this.evidence) {
+      try {
+        const published = await this.evidence.digest(poll.id);
+
+        if (published.success) {
+          rootDigest = published.value ?? undefined;
+        } else {
+          console.error(
+            'Unable to read finish notification digest',
+            published.error
+          );
+        }
+      } catch {
+        console.error('Unable to read finish notification digest');
+      }
+    }
+
+    // Notify participants
+    const notifyUseCase = new NotifyPollFinishedUseCase({
+      notificationRepository: this.notificationRepository,
+      ids: this.ids,
+      clock: this.clock,
+      participantRepository: this.participantRepository,
+    });
+    await notifyUseCase
+      .execute({ pollId: poll.id, pollTitle: poll.title, rootDigest })
+      .then((outcome) => {
+        if (!outcome.success) {
+          console.error(
+            'Notification delivery failed (NotifyPollFinishedUseCase):',
+            outcome.error
+          );
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to send poll finished notifications:', err);
+      });
+
+    if (this.evidence && rootDigest) {
+      try {
+        const delivered = await this.evidence.deliver(poll.id);
+
+        if (!delivered.success) {
+          console.error('Initial bundle delivery failed', delivered.error);
+        }
+      } catch {
+        console.error('Initial bundle delivery interrupted');
       }
     }
 

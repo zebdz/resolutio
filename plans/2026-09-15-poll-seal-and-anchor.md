@@ -3,7 +3,7 @@
 **Created:** 2026-09-15  
 **Revised:** 2026-11-20
 
-**Status:** Phases 1–5 complete locally on `blockchain`. Phase 4 committed as `742e49b`. Phase 5 approved. Phases 6–9 pending.
+**Status:** Phases 1–6 complete locally on `blockchain`. Phase 5 committed as `ae1a2c8`. Phase 6 approved. Phases 7–9 pending.
 
 **Source of truth:** [approved design](../readmes/2026-09-11-poll-seal-and-anchor-design.md), committed as `8653fa9`.
 This revision replaces the earlier task list and its conflicting format refinements and golden vectors.
@@ -64,7 +64,7 @@ for parallel implementation.
 | 3     | Consistent immutable sealing and post-commit dispatch     | 1–2             | Complete           |
 | 4     | Real anchoring and durable recovery                       | 3               | Complete; approved |
 | 5     | Authorized exports and standalone verifier CLI            | 1, 3–4          | Complete, approved |
-| 6     | Receipt emails and recoverable first bundle delivery      | 2, 4–5          | Not started        |
+| 6     | Receipt emails and recoverable first bundle delivery      | 2, 4–5          | Complete, approved |
 | 7     | Hosted receipt and verification flows                     | 5–6             | Not started        |
 | 8     | Frozen final results and all three PDFs                   | 3, 5, 7         | Not started        |
 | 9     | Rollout rehearsal, operational checks and release handoff | 1–8             | Not started        |
@@ -461,7 +461,7 @@ receipt-code-only checks. Mark complete, record evidence, stop for review.
   typechecking, scoped lint and formatting, migrations and a production build. The opt-in
   calendar submission was exercised separately. No production deployment occurred.
 
-## Phase 6 — Receipt and bundle delivery — NOT STARTED
+## Phase 6 — Receipt and bundle delivery — COMPLETE
 
 **Outcome:** voters receive their cast-time receipt; the first usable proof can trigger a first bundle
 email even after delayed sealing or submission. Ambiguous sends are not silently retried.
@@ -472,24 +472,48 @@ locale messages and matching tests.
 
 **Work and tests first:**
 
-- [ ] Extend email attachments and localized plain-text/HTML templates. Attach the exact versioned
+- [x] Extend email attachments and localized plain-text/HTML templates. Attach the exact versioned
       cast-time `receipt.json`; email failure leaves the committed on-screen receipt available.
-- [ ] Add unique `(sealId, userId)` delivery records with `PENDING`, `SENDING`, `SENT`, `FAILED` and
+- [x] Add unique `(sealId, userId)` delivery records with `PENDING`, `SENDING`, `SENT`, `FAILED` and
       `UNKNOWN`. Discover missing initial deliveries once a usable proof exists. Confirm current
       recipient eligibility/email and authorized label data when preparing a send.
-- [ ] Atomically claim pending delivery before external email I/O. Record success/failure; expired
+- [x] Atomically claim pending delivery before external email I/O. Record success/failure; expired
       interrupted sends become `UNKNOWN`. Never automatically resend `SENT`, `FAILED` or `UNKNOWN`.
       Test concurrent workers and crashes before send, during send and before persisting success.
-- [ ] Send only manifest, own leaves/paths, authorized canonical label data and proof. Even an
+- [x] Send only manifest, own leaves/paths, authorized canonical label data and proof. Even an
       administrator's participant bundle excludes the signer list, others' preimages and receipt
       secrets. Reuse the export assembler instead of a separate permissive email mapper.
-- [ ] Complete the fourth recovery scan and test first delivery after sealing/submission recovery,
+- [x] Complete the fourth recovery scan and test first delivery after sealing/submission recovery,
       changed email status and uniqueness across repeated scans.
-- [ ] Add the optional root digest to finish notifications without suppressing the notification when
+- [x] Add the optional root digest to finish notifications without suppressing the notification when
       sealing fails. Use the existing `notification.types.<type>.<field>` localization resolver.
 
 **Acceptance:** attachment/privacy tests and real database delivery-state tests pass; delayed first
 send works while failed/ambiguous sends remain terminal. Mark complete, record evidence, stop for review.
+
+**Completed locally 2026-11-20. Approved.**
+
+- A successful fresh cast prepares the original receipt from the winning committed snapshot. A
+  concurrent replay returns the same receipt. The confirmed voter receives the original JSON bytes
+  with localized text and escaped HTML. Mail failure preserves the successful vote and its receipt.
+- The authenticated recovery batch and the immediate finish path share the delivery service. It
+  discovers voters from sealed leaves, prepares their existing owner-only export, then claims the
+  handoff in PostgreSQL while rechecking the confirmed address and language. A missing SMTP
+  configuration leaves the first bundle pending. Batches rotate pending preparation so one unreadable
+  record cannot indefinitely occupy a delivery slot. The development preview never logs private ballots.
+- The migration uses the seal's actual primary key, `poll_id`, with `user_id` as the second key.
+  A lost handoff expires after **10 minutes** and becomes `UNKNOWN`. Accepted, explicitly rejected
+  and ambiguous handoffs are terminal. The first-bundle count measures SMTP acceptance.
+- Finish notifications use the persisted digest when available and the existing results link.
+  Notification persistence precedes bundle mail so mail latency cannot delay that write.
+- The new tests use a disposable database, simulated timestamps and in-process email capture.
+  English and Russian receipts, the paired JSON/OTS attachments, concurrent workers, recovery after
+  delayed sealing and interrupted SMTP handoffs are covered. Two authenticated loopback requests
+  to the built cron endpoint discovered one pending delivery with SMTP disabled. No SMTP handoff
+  or fresh public-calendar submission occurred in this phase. Hosted receipt and verification
+  pages are scheduled for Phase 7.
+- The production build, full typecheck, Prisma validation/generation, disposable migrations, scoped
+  lint/format, 4,374 offline unit tests and 61 disposable PostgreSQL tests passed.
 
 ## Phase 7 — Hosted receipts and verification — NOT STARTED
 
@@ -605,17 +629,17 @@ actual standalone CLI build/run commands. Skipped database/live checks are not p
 
 At each phase boundary, update this record:
 
-| Phase | Completed       | Failing test observed                                                              | Passing checks/evidence                                                                                                 | Review status        |
-| ----- | --------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| 1     | Yes, 2026-10-26 | Yes; client usage, type contracts and regression tests                             | 99 domain / 3,430 total tests; 13 compile rejections; types, lint, format, browser bundle, independent fixtures         | Accepted for Phase 2 |
-| 2     | Yes, 2026-10-26 | Yes; domain, SQL, concurrency and privacy regressions                              | 3,445 unit + 22 PostgreSQL tests; types, Prisma, lint, format                                                           | Continued to Phase 3 |
-| 3     | Yes, 2026-11-11 | Yes, snapshot, idempotency, fencing and zero-share cases                           | 4,273 unit and 40 PostgreSQL checks at the phase boundary, followed by zero-share regressions                           | Continued to Phase 4 |
-| 4     | Yes, 2026-11-20 | Yes, provider, startup, recovery, lazy lease and route regressions                 | 4,314 unit and 45 PostgreSQL checks, live calendars, historical Bitcoin proof, built server, types, lint and format     | Approved for Phase 5 |
-| 5     | Yes, 2026-11-20 | Yes, own proof, imported evidence, tally consistency and public manifest isolation | 4,366 unit and 51 PostgreSQL tests, real submission, historical OTS verification, built HTTP downloads and isolated CLI | Approved for Phase 6 |
-| 6     | No              | —                                                                                  | —                                                                                                                       | Not started          |
-| 7     | No              | —                                                                                  | —                                                                                                                       | Not started          |
-| 8     | No              | —                                                                                  | —                                                                                                                       | Not started          |
-| 9     | No              | —                                                                                  | —                                                                                                                       | Not started          |
+| Phase | Completed       | Failing test observed                                                                                | Passing checks/evidence                                                                                                 | Review status        |
+| ----- | --------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| 1     | Yes, 2026-10-26 | Yes; client usage, type contracts and regression tests                                               | 99 domain / 3,430 total tests; 13 compile rejections; types, lint, format, browser bundle, independent fixtures         | Accepted for Phase 2 |
+| 2     | Yes, 2026-10-26 | Yes; domain, SQL, concurrency and privacy regressions                                                | 3,445 unit + 22 PostgreSQL tests; types, Prisma, lint, format                                                           | Continued to Phase 3 |
+| 3     | Yes, 2026-11-11 | Yes, snapshot, idempotency, fencing and zero-share cases                                             | 4,273 unit and 40 PostgreSQL checks at the phase boundary, followed by zero-share regressions                           | Continued to Phase 4 |
+| 4     | Yes, 2026-11-20 | Yes, provider, startup, recovery, lazy lease and route regressions                                   | 4,314 unit and 45 PostgreSQL checks, live calendars, historical Bitcoin proof, built server, types, lint and format     | Approved for Phase 5 |
+| 5     | Yes, 2026-11-20 | Yes, own proof, imported evidence, tally consistency and public manifest isolation                   | 4,366 unit and 51 PostgreSQL tests, real submission, historical OTS verification, built HTTP downloads and isolated CLI | Approved for Phase 6 |
+| 6     | Yes, 2026-11-20 | Yes, receipt attachments, delivery claims, expired handoffs, fair discovery and sealed notifications | 4,374 unit and 61 PostgreSQL tests, isolated mail capture, types, production build and loopback cron                    | Approved             |
+| 7     | No              | —                                                                                                    | —                                                                                                                       | Not started          |
+| 8     | No              | —                                                                                                    | —                                                                                                                       | Not started          |
+| 9     | No              | —                                                                                                    | —                                                                                                                       | Not started          |
 
 ## Unresolved questions
 

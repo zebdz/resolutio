@@ -2,6 +2,9 @@
 
 /** Poll actions authenticate/rate-limit requests, wire application ports to Prisma
  * adapters and translate results for clients. Finish dispatches sealing only after commit. */
+import { PrismaSealReader } from '@/infrastructure/repositories/PrismaSealReader';
+import { PollId as SealPollId } from '@/domain/seal/SealValues';
+import { success } from '@/domain/shared/Result';
 import { createSealRecovery } from '@/infrastructure/anchor/createSealRecovery';
 import { SealFinishedPollHandler } from '@/application/seal/SealFinishedPollHandler';
 import { PageNumber, PageSize } from '@/domain/shared/Pagination';
@@ -241,7 +244,18 @@ const finishPollUseCase = new FinishPollUseCase(
   boardRepository,
   ids,
   clock,
-  [new SealFinishedPollHandler(() => createSealRecovery(prisma))]
+  [new SealFinishedPollHandler(() => createSealRecovery(prisma))],
+  {
+    digest: async (id) => {
+      const seal = await new PrismaSealReader(prisma).findPublishedByPollId(
+        SealPollId.parse(id)
+      );
+
+      return seal.success ? success(seal.value?.rootDigest ?? null) : seal;
+    },
+    deliver: (id) =>
+      createSealRecovery(prisma).deliverForPoll(SealPollId.parse(id)),
+  }
 );
 const previewPollWeightConfigUseCase = new PreviewPollWeightConfigUseCase(
   pollRepository,

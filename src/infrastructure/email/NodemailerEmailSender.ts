@@ -37,6 +37,7 @@ export class NodemailerEmailSender implements EmailSender {
         subject: message.subject,
         text: message.text,
         html: message.html,
+        attachments: message.attachments,
       });
 
       // No backdoorPreview: echoing a live code back to the caller (and thence
@@ -45,12 +46,23 @@ export class NodemailerEmailSender implements EmailSender {
     } catch (error) {
       // Deliberately logs neither the body nor the subject — the body contains
       // a live OTP.
-      console.error(
-        'NodemailerEmailSender send failed:',
-        error instanceof Error ? error.message : error
-      );
+      const smtp = error as { command?: string; responseCode?: number } | null;
+      console.error('NodemailerEmailSender send failed');
+      // A failure before DATA or a negative SMTP reply establishes non-acceptance.
+      // A lost final reply may follow a successful handoff.
+      const rejected =
+        (smtp?.responseCode ?? 0) >= 400 ||
+        [
+          'CONN',
+          'EHLO',
+          'HELO',
+          'STARTTLS',
+          'AUTH',
+          'MAIL FROM',
+          'RCPT TO',
+        ].includes(smtp?.command ?? '');
 
-      return { success: false };
+      return { success: false, uncertain: !rejected };
     }
   }
 }

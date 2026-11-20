@@ -1,5 +1,6 @@
 /** Closed notification alternatives bind each event kind to its localization keys
  * and validated payload references. Presentation text snapshots remain plain text. */
+import { Digest } from '../seal/SealValues';
 import { z } from 'zod';
 import {
   OrganizationId,
@@ -366,12 +367,26 @@ export const NotificationContent = z.discriminatedUnion('type', [
     })
     .readonly(),
   z
-    .object({
-      type: z.literal('poll_finished'),
-      title: z.literal('notification.types.pollFinished.title'),
-      body: z.literal('notification.types.pollFinished.body'),
-      data: z.object({ pollId: PollId, pollTitle: z.string() }).readonly(),
-    })
+    .discriminatedUnion('body', [
+      z.object({
+        type: z.literal('poll_finished'),
+        title: z.literal('notification.types.pollFinished.title'),
+        body: z.literal('notification.types.pollFinished.body'),
+        data: z.object({ pollId: PollId, pollTitle: z.string() }).readonly(),
+      }),
+      z.object({
+        type: z.literal('poll_finished'),
+        title: z.literal('notification.types.pollFinished.title'),
+        body: z.literal('notification.types.pollFinished.sealedBody'),
+        data: z
+          .object({
+            pollId: PollId,
+            pollTitle: z.string(),
+            rootDigest: Digest.schema,
+          })
+          .readonly(),
+      }),
+    ])
     .readonly(),
   z
     .object({

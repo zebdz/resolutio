@@ -2,6 +2,7 @@
 
 /** Authenticated voting entry points. Receipt output belongs only to the session
  * user; result projections strip unauthorized voter/contact data before returning. */
+import { createEvidenceMail } from '@/infrastructure/email/createEvidenceMail';
 import { PollId, BoardId, OrganizationId } from '@/domain/shared/EntityIds';
 import {
   CryptoIdGenerator,
@@ -78,7 +79,8 @@ const finishVotingUseCase = new FinishVotingUseCase(
   userRepository,
   new CryptoReceiptSecretGenerator(),
   ids,
-  clock
+  clock,
+  createEvidenceMail(prisma)
 );
 const getUserVotingProgressUseCase = new GetUserVotingProgressUseCase(
   pollRepository,

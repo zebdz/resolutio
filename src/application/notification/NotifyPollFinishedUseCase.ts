@@ -1,5 +1,6 @@
 /** Builds poll finished notifications with explicit creation identity/time.
- * Construction and storage failures return Results; an empty audience succeeds. */
+ * An available seal digest selects the sealed message. Construction and storage failures return Results; an empty audience succeeds. */
+import { Digest } from '@/domain/seal/SealValues';
 import {
   success,
   failure,
@@ -30,6 +31,7 @@ export class NotifyPollFinishedUseCase {
   async execute(input: {
     pollId: PollId;
     pollTitle: string;
+    rootDigest?: Digest;
   }): Promise<Result<void, NotificationDeliveryFailure>> {
     const { pollId, pollTitle } = input;
 
@@ -53,8 +55,15 @@ export class NotifyPollFinishedUseCase {
             userId: p.userId,
             type: 'poll_finished',
             title: 'notification.types.pollFinished.title',
-            body: 'notification.types.pollFinished.body',
-            data: { pollId, pollTitle },
+            ...(input.rootDigest
+              ? {
+                  body: 'notification.types.pollFinished.sealedBody' as const,
+                  data: { pollId, pollTitle, rootDigest: input.rootDigest },
+                }
+              : {
+                  body: 'notification.types.pollFinished.body' as const,
+                  data: { pollId, pollTitle },
+                }),
           },
           entityCreation(NotificationId, this.deps.ids, this.deps.clock)
         )
