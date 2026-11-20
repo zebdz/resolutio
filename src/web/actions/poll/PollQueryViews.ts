@@ -1,5 +1,6 @@
 /** Plain poll read payloads shared by actions and their page/list consumers.
  * Snapshot brands retain meaning in TypeScript; Dates and scalar wire values are unchanged. */
+import type { SealSummary } from '@/application/seal/SealSummary';
 import type { PollSnapshot } from '@/domain/poll/Poll';
 import type { ResultCount } from '@/domain/shared/Pagination';
 
@@ -9,6 +10,7 @@ export type UserPollView = PollSnapshot & {
 };
 
 export type PollListItem = UserPollView & {
+  seal?: SealSummary;
   organizationName: string;
   isOrgArchived: boolean;
   boardName: string;

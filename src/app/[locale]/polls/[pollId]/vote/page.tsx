@@ -1,8 +1,9 @@
-/** Loads an authorized plain voting view; public previews and eligibility remain separately gated. */
+/** Serves the authorized ballot form or the owner’s saved receipt. Public visitors get only open-poll previews. */
 import { getLocale, getTranslations } from 'next-intl/server';
 
 import {
   getUserVotingProgressAction,
+  getMyVoteReceiptAction,
   canUserVoteAction,
 } from '@/src/web/actions/poll/vote';
 import { getCurrentUser } from '@/web/lib/session';
@@ -13,6 +14,7 @@ import {
 } from '@/infrastructure/index';
 import { GetOpenPollPreviewUseCase } from '@/application/poll/GetOpenPollPreviewUseCase';
 import { PublicOpenPollPreview } from '@/src/web/components/polls/PublicOpenPollPreview';
+import { VoteReceiptPanel } from '@/web/components/seal/VoteReceiptPanel';
 import VotingInterface from '@/src/web/components/polls/voting/VotingInterface';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { Link } from '@/src/i18n/routing';
@@ -79,6 +81,24 @@ export default async function VotePage({ params }: VotePageProps) {
   }
 
   if (!canVoteResult.data.canVote) {
+    const receipt = await getMyVoteReceiptAction(pollId);
+
+    if (!receipt.success) {
+      return (
+        <AuthenticatedLayout>
+          <p role="alert">{receipt.error}</p>
+        </AuthenticatedLayout>
+      );
+    }
+
+    if (receipt.data) {
+      return (
+        <AuthenticatedLayout>
+          <VoteReceiptPanel view={receipt.data} />
+        </AuthenticatedLayout>
+      );
+    }
+
     return (
       <AuthenticatedLayout>
         <div className="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-900/20">

@@ -1,15 +1,15 @@
 'use client';
 
-/** Edits local ballot selections from the server's authorized plain voting view. */
+/** Edits authorized ballot selections and presents the owner’s cast receipt on completion. */
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
+import type { VoteReceiptView } from '@/application/poll/VoteReceiptView';
+import { VoteReceiptPanel } from '@/web/components/seal/VoteReceiptPanel';
 import { useTranslations } from 'next-intl';
 import {
   submitDraftAction,
   finishVotingAction,
 } from '@/src/web/actions/poll/vote';
-import { Button } from '@/src/web/components/catalyst/button';
 import { Switch, SwitchField } from '@/src/web/components/catalyst/switch';
 import { Label, Description } from '@/src/web/components/catalyst/fieldset';
 import VotingQuestion from './VotingQuestion';
@@ -40,7 +40,7 @@ export default function VotingInterface({
   isPropertyBased,
 }: VotingInterfaceProps) {
   const t = useTranslations('poll.voting');
-  const router = useRouter();
+  const [receipt, setReceipt] = useState<VoteReceiptView | null>(null);
 
   // Group questions by page
   const questionsByPage = poll.questions.reduce<Record<number, Question[]>>(
@@ -172,7 +172,7 @@ export default function VotingInterface({
 
       if (result.success) {
         toast.success(t('votingComplete'));
-        router.push('/polls');
+        setReceipt(result.data);
       } else {
         toast.error(result.error);
       }
@@ -186,6 +186,14 @@ export default function VotingInterface({
   const isFirstPage = currentPage === pages[0];
   const isLastPage = currentPage === pages[pages.length - 1];
   const canFinish = answeredQuestions === totalQuestions && !isSaving;
+
+  if (receipt) {
+    return (
+      <div tabIndex={-1} ref={(node) => node?.focus()}>
+        <VoteReceiptPanel view={receipt} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -1,5 +1,6 @@
 /** Compose evidence mail from a confirmed address and the recipient's current
  * language. Query only contact fields and build links from the deployment origin. */
+import { SITE_ORIGIN } from '@/infrastructure/shared/siteOrigin';
 import { PrismaClient } from '@/generated/prisma/client';
 import { EmailAddress } from '@/domain/user/EmailAddress';
 import { Language } from '@/domain/user/UserValues';
@@ -41,6 +42,6 @@ export function createEvidenceMail(
     recipients,
     new NextIntlEmailTemplateRenderer(),
     sender,
-    process.env.NEXT_PUBLIC_API_URL ?? 'https://resolutio.site'
+    SITE_ORIGIN
   );
 }

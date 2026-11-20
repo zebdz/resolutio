@@ -3,6 +3,7 @@
 /** Poll actions authenticate/rate-limit requests, wire application ports to Prisma
  * adapters and translate results for clients. Finish dispatches sealing only after commit. */
 import { PrismaSealReader } from '@/infrastructure/repositories/PrismaSealReader';
+import { readSealSummaries } from '@/infrastructure/repositories/PrismaSealSummaries';
 import { PollId as SealPollId } from '@/domain/seal/SealValues';
 import { success } from '@/domain/shared/Result';
 import { createSealRecovery } from '@/infrastructure/anchor/createSealRecovery';
@@ -1773,10 +1774,20 @@ export async function searchPollsAction(
       };
     }
 
+    const seals = await readSealSummaries(
+      prisma.pollSeal,
+      result.value.polls.filter((p) => p.isFinished()).map((p) => p.id)
+    );
+
+    if (!seals.success) {
+      return { success: false, error: await translateErrorCode(seals.error) };
+    }
+
     // Enrich with canVote + hasFinishedVoting + org/board names
     const enriched = await Promise.all(
       result.value.polls.map(async (poll) => {
         const pollJson = poll.toJSON();
+        const seal = seals.value.get(poll.id);
 
         // Org + board names
         const org = await prisma.organization.findUnique({
@@ -1811,6 +1822,7 @@ export async function searchPollsAction(
 
         return {
           ...pollJson,
+          ...(seal && { seal }),
           organizationName: org?.name ?? '',
           isOrgArchived: !!org?.archivedAt,
           boardName: board?.name ?? '',

@@ -1,6 +1,7 @@
 /** Voting progress actions preserve authorization failures and return only plain nested DTOs.
  * Real aggregates expose accidental class/extra-field returns that loose fixtures would hide. */
 import { beforeEach, expect, it, vi } from 'vitest';
+import { BallotSnapshot } from '@/domain/poll/BallotSnapshot';
 import { Poll } from '@/domain/poll/Poll';
 import { Question } from '@/domain/poll/Question';
 import { Answer } from '@/domain/poll/Answer';
@@ -9,8 +10,9 @@ import { PollState } from '@/domain/poll/PollState';
 import { QuestionCount } from '@/domain/poll/QuestionValues';
 import type { GetUserVotingProgressResult } from '@/application/poll/GetUserVotingProgressUseCase';
 
-const { execute, currentUser, rateLimit } = vi.hoisted(() => ({
+const { execute, currentUser, rateLimit, getCastBallot } = vi.hoisted(() => ({
   execute: vi.fn(),
+  getCastBallot: vi.fn(),
   currentUser: vi.fn(),
   rateLimit: vi.fn(),
 }));
@@ -22,7 +24,9 @@ vi.mock('@/application/poll/GetUserVotingProgressUseCase', () => ({
 vi.mock('@/infrastructure/index', () => ({
   prisma: {},
   PrismaPollRepository: class {},
-  PrismaParticipantRepository: class {},
+  PrismaParticipantRepository: class {
+    getCastBallot = getCastBallot;
+  },
   PrismaVoteRepository: class {},
   PrismaDraftRepository: class {},
   PrismaOrganizationRepository: class {},
@@ -37,7 +41,8 @@ vi.mock('next-intl/server', () => ({
 vi.mock('@/web/actions/utils/translateErrorCode', () => ({
   translateErrorCode: async (code: string) => `translated:${code}`,
 }));
-const { getUserVotingProgressAction } = await import('../poll/vote');
+const { getUserVotingProgressAction, getMyVoteReceiptAction } =
+  await import('../poll/vote');
 
 function progress(anonymous = false): GetUserVotingProgressResult {
   const createdAt = new Date('2026-01-01');
@@ -170,4 +175,59 @@ it('requires a session before loading progress', async () => {
     error: 'unauthorized',
   });
   expect(execute).not.toHaveBeenCalled();
+});
+
+it('reloads only the session owner’s frozen ballot as plain canonical evidence', async () => {
+  const snapshot = BallotSnapshot.parse({
+    version: 1,
+    pollId: 'poll-1',
+    userId: 'viewer',
+    receiptSecret: 'ca'.repeat(32),
+    pollTitle: 'At cast',
+    votes: [
+      {
+        questionId: 'q-1',
+        answerId: 'a-1',
+        weight: '2.500000',
+        castAt: '2026-11-20T08:00:00.000Z',
+        questionText: 'At cast?',
+        answerText: 'Yes',
+      },
+    ],
+  });
+  getCastBallot.mockResolvedValue({
+    success: true,
+    value: { kind: 'original', snapshot },
+  });
+  const result = await getMyVoteReceiptAction('poll-1');
+
+  expect(getCastBallot).toHaveBeenCalledWith('poll-1', 'viewer');
+  expect(result).toMatchObject({
+    success: true,
+    data: {
+      kind: 'original',
+      receipt: { pollTitle: 'At cast', userId: 'viewer' },
+    },
+  });
+
+  if (!result.success || result.data?.kind !== 'original') {
+    throw new Error('Expected session owner’s receipt');
+  }
+
+  expect(JSON.parse(result.data.canonicalReceipt)).toEqual(result.data.receipt);
+  expect(result.data).not.toHaveProperty('emailStatus');
+});
+
+it('requires a session or returns no evidence when the viewer did not cast', async () => {
+  currentUser.mockResolvedValueOnce(null);
+  expect(await getMyVoteReceiptAction('poll-1')).toMatchObject({
+    success: false,
+  });
+  expect(getCastBallot).not.toHaveBeenCalled();
+  getCastBallot.mockResolvedValue({ success: true, value: null });
+  expect(await getMyVoteReceiptAction('poll-1')).toEqual({
+    success: true,
+    data: null,
+  });
+  expect(getCastBallot).toHaveBeenCalledWith('poll-1', 'viewer');
 });

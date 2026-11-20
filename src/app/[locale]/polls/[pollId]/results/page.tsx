@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/web/lib/session';
 import { getPollResultsAction } from '@/src/web/actions/poll/vote';
 import { getPollByIdAction } from '@/src/web/actions/poll/poll';
 import { listReportsAction } from '@/web/actions/report/report';
+import { ResultsSeal } from '@/web/components/seal/ResultsSeal';
 import PollResults from '@/src/web/components/polls/results/PollResults';
 import { WeightConfigLabel } from '@/src/web/components/polls/results/WeightConfigLabel';
 import { Heading } from '@/src/web/components/catalyst/heading';
@@ -164,6 +165,14 @@ export default async function ResultsPage({ params }: ResultsPageProps) {
           showAggregation={showAggregation}
         />
       </div>
+
+      {poll.state === 'FINISHED' && (
+        <ResultsSeal
+          pollId={poll.id}
+          userId={user.id}
+          finishedAt={poll.finishedAt ?? null}
+        />
+      )}
 
       <PollResults
         results={serializedResults}

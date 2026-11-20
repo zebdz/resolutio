@@ -58,6 +58,21 @@ The membership store suite verifies that renewal clears rejection metadata witho
 membership row or creation time, and invitation acceptance preserves prior rejection history.
 Run `yarn prisma:generate` after schema changes before running these tests.
 
+### Poll seal browser rehearsal
+
+Use the disposable PostgreSQL instance above. Apply migrations to its public schema and install
+the Playwright Chromium browser once. The rehearsal starts a separate loopback server on port
+55441 with simulated timestamps and SMTP disabled. It writes synthetic accounts, sessions and a
+weighted poll. The browser uses fresh contexts and checks the retained receipt against the CLI.
+
+```bash
+export POLL_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:55439/resolutio_seal_test
+DATABASE_URL="$POLL_TEST_DATABASE_URL" yarn prisma migrate deploy
+yarn playwright install chromium
+systemd-run --user --scope -p MemoryMax=12G -p MemorySwapMax=1G -- \
+  taskset -c 0-3 yarn test:seal-browser
+```
+
 ### 2. **E2E Tests** (End-to-End with Playwright)
 
 These test your entire application from a user's perspective, running in a real browser. They simulate real user interactions like clicking buttons, filling forms, and navigating pages.

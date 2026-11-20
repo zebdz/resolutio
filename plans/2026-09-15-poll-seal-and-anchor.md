@@ -3,7 +3,7 @@
 **Created:** 2026-09-15  
 **Revised:** 2026-11-20
 
-**Status:** Phases 1–6 complete locally on `blockchain`. Phase 5 committed as `ae1a2c8`. Phase 6 approved. Phases 7–9 pending.
+**Status:** Phases 1–7 complete locally on `blockchain`. Phase 7 approved. Phases 8–9 pending.
 
 **Source of truth:** [approved design](../readmes/2026-09-11-poll-seal-and-anchor-design.md), committed as `8653fa9`.
 This revision replaces the earlier task list and its conflicting format refinements and golden vectors.
@@ -57,17 +57,17 @@ The design determines behavior; this plan determines implementation order and re
 Phases run in this order. The dependencies indicate the contracts each phase extends, not permission
 for parallel implementation.
 
-| Phase | Reviewable result                                         | Depends on      | Status             |
-| ----- | --------------------------------------------------------- | --------------- | ------------------ |
-| 1     | Canonical record, receipts and cryptographic domain       | Approved design | Complete           |
-| 2     | Atomic voting cutoff and reproducible cast-time receipts  | 1               | Complete           |
-| 3     | Consistent immutable sealing and post-commit dispatch     | 1–2             | Complete           |
-| 4     | Real anchoring and durable recovery                       | 3               | Complete; approved |
-| 5     | Authorized exports and standalone verifier CLI            | 1, 3–4          | Complete, approved |
-| 6     | Receipt emails and recoverable first bundle delivery      | 2, 4–5          | Complete, approved |
-| 7     | Hosted receipt and verification flows                     | 5–6             | Not started        |
-| 8     | Frozen final results and all three PDFs                   | 3, 5, 7         | Not started        |
-| 9     | Rollout rehearsal, operational checks and release handoff | 1–8             | Not started        |
+| Phase | Reviewable result                                         | Depends on      | Status               |
+| ----- | --------------------------------------------------------- | --------------- | -------------------- |
+| 1     | Canonical record, receipts and cryptographic domain       | Approved design | Complete             |
+| 2     | Atomic voting cutoff and reproducible cast-time receipts  | 1               | Complete             |
+| 3     | Consistent immutable sealing and post-commit dispatch     | 1–2             | Complete             |
+| 4     | Real anchoring and durable recovery                       | 3               | Complete; approved   |
+| 5     | Authorized exports and standalone verifier CLI            | 1, 3–4          | Complete, approved   |
+| 6     | Receipt emails and recoverable first bundle delivery      | 2, 4–5          | Complete, approved   |
+| 7     | Hosted receipt and verification flows                     | 5–6             | Approved for Phase 8 |
+| 8     | Frozen final results and all three PDFs                   | 3, 5, 7         | Not started          |
+| 9     | Rollout rehearsal, operational checks and release handoff | 1–8             | Not started          |
 
 ## Phase 1 — Canonical record and cryptographic domain — COMPLETE
 
@@ -515,7 +515,7 @@ send works while failed/ambiguous sends remain terminal. Mark complete, record e
 - The production build, full typecheck, Prisma validation/generation, disposable migrations, scoped
   lint/format, 4,374 offline unit tests and 61 disposable PostgreSQL tests passed.
 
-## Phase 7 — Hosted receipts and verification — NOT STARTED
+## Phase 7 — Hosted receipts and verification — COMPLETE
 
 **Outcome:** the voter can save an original receipt and later distinguish original-ballot verification
 from weaker inclusion checks; public visitors see commitments without private record contents.
@@ -526,26 +526,53 @@ public `/verify/[pollId]` and voter `/polls/[pollId]/verify-my-vote` pages, resu
 
 **Work and tests first:**
 
-- [ ] Return a plain owner-only receipt DTO from the action; show copy/download, original answer
+- [x] Return a plain owner-only receipt DTO from the action; show copy/download, original answer
       labels/hashes, delivery outcome and confirm-email prompt. Cover reload/replay and successful
       voting despite cleanup/email failure.
-- [ ] Build public status, digest, five section commitments, proof/manifest downloads, block data
+- [x] Build public status, digest, five section commitments, proof/manifest downloads, block data
       and the tested independent-verification recipe. Public HTML and client props contain no poll
       title, organization name, participants, signer contents or receipt secret.
-- [ ] Reuse the shared verification core for authorized section checks and voter receipt imports.
+- [x] Reuse the shared verification core for authorized section checks and voter receipt imports.
       Imported receipts and secrets stay local. Clearly label original-receipt success, current-record
       inclusion only, unavailable evidence, unverified labels and pending Bitcoin confirmation.
-- [ ] Resolve sealed labels only after validating authorized/imported canonical poll data. Test that
+- [x] Resolve sealed labels only after validating authorized/imported canonical poll data. Test that
       loss of results access does not reveal that section through the voter page or client props.
-- [ ] Add status badges, copyable digests and links on cards/results. Batch lightweight status reads
+- [x] Add status badges, copyable digests and links on cards/results. Batch lightweight status reads
       for lists; avoid loading full sealed records once per card. Lazy nudges use Phase 4's worker.
-- [ ] Verify English/Russian copy, mobile layout, keyboard operation and accessible feedback.
+- [x] Verify English/Russian copy, mobile layout, keyboard operation and accessible feedback.
       Add browser coverage for a complete vote → receipt → seal → import flow and privacy failures,
       using an isolated test browser profile and clearly simulated anchoring where appropriate.
 
 **Acceptance:** browser verification agrees with the CLI on shared fixtures; no unsupported claim is
 shown for code-only, pending or simulated checks. Run affected web tests, typecheck and lint.
 Mark complete, record evidence, stop for review.
+
+**Implementation evidence, 2026-11-20**
+
+- Voters can download the original receipt after casting and retrieve their saved copy after a
+  reload. The browser and standalone CLI share ballot verification rules. Both distinguish a
+  matching original receipt from inclusion checked with the current record or a code.
+- Public rendering reads the five commitments and anchor metadata. The voter page initially
+  renders only a poll ID. A private, uncached HTTP endpoint checks the signed-in voter and
+  current disclosure permissions before returning evidence. This prevents React development
+  diagnostics from including private query results in the streamed page. Public views request
+  a throttled recovery check after hydration. Scheduled recovery also serves visits without JavaScript.
+- The weighted `poll1` fixture's published timestamp upgraded to Bitcoin block **976744**
+  (2026-11-20 15:25:27 UTC). The earlier disposable poll's proof upgraded to **976737**
+  (14:25:06 UTC). The application checked both through Blockstream Esplora. The independent
+  Python OpenTimestamps client checked both manifests and their binary digests through a remote
+  Bitcoin RPC node, and rejected a file containing the digest as hex text. The standalone CLI
+  reports the upgraded proof as requiring independent Bitcoin verification. No new calendar
+  submission was needed.
+- Production Chromium verified the weighted original, block badge, lazy recovery and revoked
+  label access. The browser rehearsal caught a delivery discovery failure in PostgreSQL. Prisma bound a
+  nested SQL fragment as a timestamp. Both discovery and handoff completion now bind scalar minutes. SMTP stayed disabled.
+- Two anonymous voters cast separate weighted ballots in Chromium. The owner saved and reloaded
+  the receipt, verified it offline, rejected a changed receipt and checked inclusion using the code.
+  The CLI agreed from a clean directory. Guest, voter and revoked-access HTML and JSON withheld
+  unauthorized data. English/Russian, mobile and keyboard checks passed.
+- 4,414 offline tests passed (two opt-in live tests skipped). All 61 disposable PostgreSQL tests,
+  the production build, full typecheck, scoped ESLint and formatting passed.
 
 ## Phase 8 — Frozen results and protocols — NOT STARTED
 
@@ -569,6 +596,9 @@ Mark complete, record evidence, stop for review.
 - [ ] Change live names, titles, organizations, boards, holdings, willingness and phones after seal;
       assert final displayed/PDF data remains frozen and access remains policy-correct. Also verify
       the no-seal fallback and authorized signer route independently of client-side hiding.
+      Check raw HTML, Flight and JSON responses for withheld identities, phones and sections in
+      both development and production builds. React development diagnostics can include intermediate
+      query results even when component props contain only an authorized view.
 
 **Acceptance:** all three PDF inputs agree with the saved canonical sections; privacy and frozen-data
 regressions pass. Inspect representative English/Russian PDFs. Mark complete, record evidence, stop
@@ -629,17 +659,17 @@ actual standalone CLI build/run commands. Skipped database/live checks are not p
 
 At each phase boundary, update this record:
 
-| Phase | Completed       | Failing test observed                                                                                | Passing checks/evidence                                                                                                 | Review status        |
-| ----- | --------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| 1     | Yes, 2026-10-26 | Yes; client usage, type contracts and regression tests                                               | 99 domain / 3,430 total tests; 13 compile rejections; types, lint, format, browser bundle, independent fixtures         | Accepted for Phase 2 |
-| 2     | Yes, 2026-10-26 | Yes; domain, SQL, concurrency and privacy regressions                                                | 3,445 unit + 22 PostgreSQL tests; types, Prisma, lint, format                                                           | Continued to Phase 3 |
-| 3     | Yes, 2026-11-11 | Yes, snapshot, idempotency, fencing and zero-share cases                                             | 4,273 unit and 40 PostgreSQL checks at the phase boundary, followed by zero-share regressions                           | Continued to Phase 4 |
-| 4     | Yes, 2026-11-20 | Yes, provider, startup, recovery, lazy lease and route regressions                                   | 4,314 unit and 45 PostgreSQL checks, live calendars, historical Bitcoin proof, built server, types, lint and format     | Approved for Phase 5 |
-| 5     | Yes, 2026-11-20 | Yes, own proof, imported evidence, tally consistency and public manifest isolation                   | 4,366 unit and 51 PostgreSQL tests, real submission, historical OTS verification, built HTTP downloads and isolated CLI | Approved for Phase 6 |
-| 6     | Yes, 2026-11-20 | Yes, receipt attachments, delivery claims, expired handoffs, fair discovery and sealed notifications | 4,374 unit and 61 PostgreSQL tests, isolated mail capture, types, production build and loopback cron                    | Approved             |
-| 7     | No              | —                                                                                                    | —                                                                                                                       | Not started          |
-| 8     | No              | —                                                                                                    | —                                                                                                                       | Not started          |
-| 9     | No              | —                                                                                                    | —                                                                                                                       | Not started          |
+| Phase | Completed       | Failing test observed                                                                                | Passing checks/evidence                                                                                                  | Review status        |
+| ----- | --------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------- |
+| 1     | Yes, 2026-10-26 | Yes; client usage, type contracts and regression tests                                               | 99 domain / 3,430 total tests; 13 compile rejections; types, lint, format, browser bundle, independent fixtures          | Accepted for Phase 2 |
+| 2     | Yes, 2026-10-26 | Yes; domain, SQL, concurrency and privacy regressions                                                | 3,445 unit + 22 PostgreSQL tests; types, Prisma, lint, format                                                            | Continued to Phase 3 |
+| 3     | Yes, 2026-11-11 | Yes, snapshot, idempotency, fencing and zero-share cases                                             | 4,273 unit and 40 PostgreSQL checks at the phase boundary, followed by zero-share regressions                            | Continued to Phase 4 |
+| 4     | Yes, 2026-11-20 | Yes, provider, startup, recovery, lazy lease and route regressions                                   | 4,314 unit and 45 PostgreSQL checks, live calendars, historical Bitcoin proof, built server, types, lint and format      | Approved for Phase 5 |
+| 5     | Yes, 2026-11-20 | Yes, own proof, imported evidence, tally consistency and public manifest isolation                   | 4,366 unit and 51 PostgreSQL tests, real submission, historical OTS verification, built HTTP downloads and isolated CLI  | Approved for Phase 6 |
+| 6     | Yes, 2026-11-20 | Yes, receipt attachments, delivery claims, expired handoffs, fair discovery and sealed notifications | 4,374 unit and 61 PostgreSQL tests, isolated mail capture, types, production build and loopback cron                     | Approved             |
+| 7     | Yes, 2026-11-20 | Yes, cast receipt, initial bundle queue, label revocation and private data in streamed pages         | 4,414 unit and 61 PostgreSQL checks, two-voter Chromium/CLI rehearsal, real Bitcoin blocks 976737 and 976744, full build | Approved for Phase 8 |
+| 8     | No              | —                                                                                                    | —                                                                                                                        | Not started          |
+| 9     | No              | —                                                                                                    | —                                                                                                                        | Not started          |
 
 ## Unresolved questions
 

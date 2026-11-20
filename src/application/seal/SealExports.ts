@@ -2,6 +2,7 @@
  * Viewer permissions are resolved on the server. Only sealed votes establish own-proof eligibility. */
 import { PollSealRepository } from '@/domain/seal/PollSealRepository';
 import { PollId, UserId, Digest } from '@/domain/seal/SealValues';
+import { publicAnchorStatus } from './SealSummary';
 import { SealAnchor } from '@/domain/seal/SealAnchor';
 import { SealPersistenceFailureCode } from '@/domain/seal/SealPersistenceFailureCode';
 import { MerkleTree } from '@/domain/seal/MerkleTree';
@@ -30,28 +31,6 @@ export interface SealExportReader extends Pick<
   findPublishedByPollId(
     pollId: PollId
   ): Promise<Result<PublishedSeal | null, SealPersistenceFailureCode>>;
-}
-
-function publicAnchor(anchor: SealAnchor | null) {
-  if (!anchor) {
-    return { kind: 'awaitingSubmission' } as const;
-  }
-
-  if (anchor.status === 'CONFIRMED') {
-    return {
-      kind: 'bitcoin',
-      height: anchor.bitcoinHeight,
-      time: anchor.bitcoinTime,
-    } as const;
-  }
-
-  if (anchor.status === 'FAILED') {
-    return { kind: 'failed', provider: anchor.provider } as const;
-  }
-
-  return {
-    kind: anchor.provider === 'stub' ? 'simulated' : 'pending',
-  } as const;
 }
 
 export class SealExports {
@@ -93,7 +72,7 @@ export class SealExports {
     return success({
       manifest: seal.manifest,
       rootDigest: seal.rootDigest,
-      status: publicAnchor(seal.anchor),
+      status: publicAnchorStatus(seal.anchor),
     });
   }
   async proof(pollId: PollId) {

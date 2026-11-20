@@ -1,4 +1,5 @@
 /** Server report view resolves validated references and serializes only authorized content. */
+import { SITE_ORIGIN } from '@/infrastructure/shared/siteOrigin';
 import { OrganizationId, UserId } from '@/domain/shared/EntityIds';
 import { PageSize } from '@/domain/shared/Pagination';
 import { getLocale, getTranslations } from 'next-intl/server';
@@ -24,8 +25,6 @@ import { ArrowLeftIcon } from '@heroicons/react/20/solid';
 import { stripMarkdownToPlainText } from '@/application/shared/StripMarkdownToPlainText';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { redirectLocalized } from '@/web/lib/redirectLocalized';
-
-const SITE_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? 'https://resolutio.site';
 
 const orgRepo = new PrismaOrganizationRepository(prisma);
 const userRepo = new PrismaUserRepository(prisma);

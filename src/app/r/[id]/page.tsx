@@ -1,3 +1,4 @@
+import { SITE_ORIGIN } from '@/infrastructure/shared/siteOrigin';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { setRequestLocale } from 'next-intl/server';
@@ -17,8 +18,6 @@ import { ResolveReportVisibilityService } from '@/application/report/ResolveRepo
 import { GetReportForViewerUseCase } from '@/application/report/GetReportForViewerUseCase';
 import { serializeReport } from '@/web/actions/report/serializeReport';
 import { stripMarkdownToPlainText } from '@/application/shared/StripMarkdownToPlainText';
-
-const SITE_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? 'https://resolutio.site';
 
 const reportRepo = new PrismaReportRepository(prisma);
 const attachmentRepo = new PrismaReportAttachmentRepository(prisma);

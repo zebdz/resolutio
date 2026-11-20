@@ -176,7 +176,7 @@ function checkBallot(
       codes.SEAL_INVALID_BUNDLE
     );
 
-    return 'notChecked' as const;
+    return { kind: 'notChecked' } as const;
   }
 
   const { leaves } = bundle;
@@ -230,9 +230,12 @@ function checkBallot(
   }
 
   if (files.receipt === undefined) {
-    return files.code === undefined
-      ? ('includedLeaves' as const)
-      : ('codeMatchesCurrentRecord' as const);
+    return {
+      kind:
+        files.code === undefined
+          ? 'includedLeaves'
+          : 'codeMatchesCurrentRecord',
+    } as const;
   }
 
   const receipt = VoteReceipt.parse(files.receipt);
@@ -266,67 +269,114 @@ function checkBallot(
     );
   }
 
-  return 'originalReceiptMatches' as const;
+  return { kind: 'originalReceiptMatches', receipt: data } as const;
+}
+
+function checkEvidence(files: EvidenceFiles) {
+  const bundle =
+    files.bundle === undefined ? undefined : decode(bundleSchema, files.bundle);
+  const disclosure =
+    files.sections === undefined
+      ? undefined
+      : decode(sectionsSchema, files.sections);
+  const bytes = files.manifest ?? bundle?.manifest ?? disclosure?.manifest;
+  requireSeal(bytes !== undefined, codes.SEAL_INVALID_BUNDLE);
+  const manifest = readManifest(bytes);
+  const rootDigest = hashText(bytes);
+
+  for (const doc of [bundle, disclosure]) {
+    requireSeal(
+      doc === undefined ||
+        (doc.manifest === bytes && doc.rootDigest === rootDigest),
+      codes.SEAL_MANIFEST_MISMATCH
+    );
+  }
+
+  const { poll, verifiedSections } = checkSections(
+    manifest,
+    disclosure?.sections,
+    [bundle?.poll, files.poll]
+  );
+
+  if (bundle && disclosure?.sections.votes) {
+    const voter = bundle.leaves[0].preimage.userId;
+    const own = disclosure.sections.votes.filter(
+      (v) => v.preimage.userId === voter
+    );
+    requireSeal(
+      own.length === bundle.leaves.length &&
+        own.every((v, i) => v.hash === bundle.leaves[i].hash),
+      codes.SEAL_INVALID_BUNDLE
+    );
+  }
+
+  const ballot = checkBallot(manifest, bundle, files, poll);
+  const proof =
+    files.proof === undefined
+      ? undefined
+      : inspectTimestamp(files.proof, rootDigest);
+
+  if (proof && !proof.success) {
+    requireSeal(false, proof.error);
+  }
+
+  const report = {
+    pollId: manifest.pollId,
+    rootDigest,
+    verifiedSections,
+    ballot: ballot.kind,
+    labels: poll ? ('verified' as const) : ('unavailable' as const),
+    timestamp: proof?.value ?? ('notProvided' as const),
+  };
+
+  return { bundle, poll, ballot, report };
 }
 
 export function verifyEvidence(files: EvidenceFiles) {
+  return sealResult(() => checkEvidence(files).report);
+}
+
+/** Render only the voter’s checked paths and choices. Original receipt text is
+ * a cast-time claim until the corresponding canonical poll section is verified. */
+export function verifyVoteEvidence(files: EvidenceFiles & { bundle: string }) {
   return sealResult(() => {
-    const bundle =
-      files.bundle === undefined
-        ? undefined
-        : decode(bundleSchema, files.bundle);
-    const disclosure =
-      files.sections === undefined
-        ? undefined
-        : decode(sectionsSchema, files.sections);
-    const bytes = files.manifest ?? bundle?.manifest ?? disclosure?.manifest;
-    requireSeal(bytes !== undefined, codes.SEAL_INVALID_BUNDLE);
-    const manifest = readManifest(bytes);
-    const rootDigest = hashText(bytes);
-
-    for (const doc of [bundle, disclosure]) {
-      requireSeal(
-        doc === undefined ||
-          (doc.manifest === bytes && doc.rootDigest === rootDigest),
-        codes.SEAL_MANIFEST_MISMATCH
-      );
-    }
-
-    const { poll, verifiedSections } = checkSections(
-      manifest,
-      disclosure?.sections,
-      [bundle?.poll, files.poll]
+    const { report, bundle, ballot, poll } = checkEvidence(files);
+    requireSeal(
+      bundle && ballot.kind !== 'notChecked',
+      codes.SEAL_INVALID_BUNDLE
     );
+    const choices = bundle.leaves.map(({ preimage, hash }, index) => {
+      const { questionId, answerId, weight } = preimage;
+      const question = poll?.questions.find((q) => q.id === questionId);
+      const answer = question?.answers.find((a) => a.id === answerId);
+      const claim =
+        ballot.kind === 'originalReceiptMatches'
+          ? ballot.receipt.leaves[index]
+          : undefined;
+      const labels =
+        question && answer
+          ? {
+              kind: 'sealed' as const,
+              question: question.text,
+              answer: answer.text,
+            }
+          : claim
+            ? {
+                kind: 'receipt' as const,
+                question: claim.questionText,
+                answer: claim.answerText,
+              }
+            : { kind: 'unavailable' as const };
 
-    if (bundle && disclosure?.sections.votes) {
-      const voter = bundle.leaves[0].preimage.userId;
-      const own = disclosure.sections.votes.filter(
-        (v) => v.preimage.userId === voter
-      );
-      requireSeal(
-        own.length === bundle.leaves.length &&
-          own.every((v, i) => v.hash === bundle.leaves[i].hash),
-        codes.SEAL_INVALID_BUNDLE
-      );
-    }
+      return {
+        questionId,
+        answerId,
+        weight: weight.toDecimalString(),
+        hash,
+        labels,
+      };
+    });
 
-    const ballot = checkBallot(manifest, bundle, files, poll);
-    const proof =
-      files.proof === undefined
-        ? undefined
-        : inspectTimestamp(files.proof, rootDigest);
-
-    if (proof && !proof.success) {
-      requireSeal(false, proof.error);
-    }
-
-    return {
-      pollId: manifest.pollId,
-      rootDigest,
-      verifiedSections,
-      ballot,
-      labels: poll ? ('verified' as const) : ('unavailable' as const),
-      timestamp: proof?.value ?? ('notProvided' as const),
-    };
+    return { ...report, ballot: ballot.kind, choices };
   });
 }

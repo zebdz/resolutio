@@ -20,6 +20,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
+    "test:seal-browser": "yarn build:seal-verifier && playwright test --config playwright.seal.config.ts",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "prisma:generate": "prisma generate",

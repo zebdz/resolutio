@@ -8,6 +8,8 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import { PencilIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { SealStatusBadge } from '@/web/components/seal/SealStatusBadge';
+import { CopyDigest } from '@/web/components/seal/CopyDigest';
 import { PollStateBadge } from '@/src/web/components/polls/PollStateBadge';
 import { stripMarkdownToPlainText } from '@/application/shared/StripMarkdownToPlainText';
 import {
@@ -291,6 +293,20 @@ export function PollCard({
           </h3>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <PollStateBadge state={poll.state} />
+            {poll.state === 'FINISHED' && (
+              <Link
+                className="cursor-pointer underline"
+                href={`/verify/${poll.id}`}
+              >
+                <SealStatusBadge
+                  status={
+                    poll.seal?.status ?? {
+                      kind: poll.finishedAt ? 'sealing' : 'unsealed',
+                    }
+                  }
+                />
+              </Link>
+            )}
             {isOpenPoll && (
               <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-sky-700 bg-sky-100 dark:text-sky-300 dark:bg-sky-900/40 rounded-full">
                 {t('type.openBadge')}
@@ -321,6 +337,8 @@ export function PollCard({
             )}
           </div>
         </div>
+
+        {poll.seal && <CopyDigest digest={poll.seal.rootDigest} />}
 
         {/* Organization and board */}
         <div className="text-xs text-zinc-500 dark:text-zinc-400">

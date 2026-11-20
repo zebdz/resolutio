@@ -21,6 +21,23 @@ proof is available, a separate email carries `bundle.json` and `<pollId>.ots`. T
 the manifest and the canonical poll labels the voter may see at delivery time. Verify those files
 with `--receipt`, `--bundle` and `--proof`. Keep the original receipt private.
 
+## Check in the browser
+
+After submitting your ballot, choose **Download receipt.json** and keep that copy. The vote page
+also lets you reopen the receipt later. For a cast-time comparison, use the file you saved or the
+attachment you received when you voted.
+
+Open `/{locale}/verify/{pollId}` to inspect the public digest, five commitments and timestamp.
+**Check available evidence** checks the manifest and available proof. If you have results access,
+it also checks your permitted sections. You can select your own saved sections file instead.
+
+Sign in and open `/{locale}/polls/{pollId}/verify-my-vote`. Choose **Compare my original receipt**,
+select your saved file, and press **Verify my vote**. The browser reads the file locally. The result
+shows whether your selections and weights match, whether their labels match the sealed poll, and
+what the timestamp establishes. **Check current inclusion only** checks the choices presented in
+your current proof bundle using your code when available. Use the standalone verifier below to
+repeat the check independently of the hosted page.
+
 ## Run the standalone verifier
 
 From the repository with its locked dependencies installed, build the distributable. This example
@@ -89,3 +106,21 @@ Two calendars reported published transactions awaiting six confirmations. Separa
 verified the upstream `hello-world.txt.ots` fixture at Bitcoin block **358391**. The hex-text file
 failed in all three cases. For those chain checks the client used `--bitcoin-node` with a local
 HTTP bridge to PublicNode's HTTPS Bitcoin RPC. That run trusted PublicNode's chain data.
+
+Later that day, two calendars upgraded both the disposable poll and the weighted fixture. The
+application adapter verified the disposable poll at block **976737** (14:25:06 UTC) and the weighted
+fixture at block **976744** (15:25:27 UTC) through Blockstream Esplora. The Python client
+independently verified both blocks through PublicNode. Both exact-file and raw-digest verification passed. The
+hex-text negative control failed as expected. Both live checks used remote chain data.
+
+The weighted fixture includes the upgraded proof as `manifest.bitcoin.ots`. From the example
+directory above, run these commands to repeat the local check and the Bitcoin check:
+
+```sh
+node verify-seal.mjs --manifest manifest.json --bundle bundle.json \
+  --receipt receipt.json --sections sections.json --proof manifest.bitcoin.ots
+ots --no-cache verify -f manifest.json manifest.bitcoin.ots
+```
+
+The offline command reports `bitcoinAttestationUnverified`. The second command uses your
+configured Bitcoin node and should identify block **976744**.

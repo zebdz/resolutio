@@ -9,7 +9,10 @@ import {
   SystemClock,
 } from '@/infrastructure/shared/SystemEntityCreation';
 import { CryptoReceiptSecretGenerator } from '@/infrastructure/repositories/CryptoReceiptSecretGenerator';
-import { VoteReceiptView } from '@/application/poll/VoteReceiptView';
+import {
+  VoteReceiptView,
+  voteReceiptView,
+} from '@/application/poll/VoteReceiptView';
 import { getTranslations } from 'next-intl/server';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { SubmitDraftUseCase } from '@/application/poll/SubmitDraftUseCase';
@@ -299,6 +302,56 @@ export async function finishVotingAction(
       error: t('unexpected'),
     };
   }
+}
+
+/** Reads only the authenticated voter's committed snapshot, including after the poll closes. */
+export async function getMyVoteReceiptAction(
+  rawPollId: string
+): Promise<ActionResult<VoteReceiptView | null>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.unauthorized'),
+    };
+  }
+
+  const pollId = PollId.safeParse(rawPollId);
+
+  if (!pollId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const ballot = await participantRepository.getCastBallot(
+    pollId.data,
+    user.id
+  );
+
+  if (!ballot.success) {
+    return { success: false, error: await translateErrorCode(ballot.error) };
+  }
+
+  if (!ballot.value) {
+    return { success: true, data: null };
+  }
+
+  const view = voteReceiptView(ballot.value);
+
+  if (!view.success) {
+    return { success: false, error: await translateErrorCode(view.error) };
+  }
+
+  return { success: true, data: view.value };
 }
 
 /**

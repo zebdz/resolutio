@@ -1,6 +1,6 @@
 /** PostgreSQL recovery queue for the first proof email. Claims recheck the current
  * confirmed address. A terminal or expired handoff never becomes pending again. */
-import { PrismaClient, Prisma } from '@/generated/prisma/client';
+import { PrismaClient } from '@/generated/prisma/client';
 import {
   BundleDeliveryStore,
   DeliveryKey,
@@ -10,7 +10,9 @@ import { Recipient } from '@/application/seal/EvidenceMail';
 import { PollId } from '@/domain/seal/SealValues';
 import { success, failure } from '@/domain/shared/Result';
 
-const expiry = Prisma.sql`clock_timestamp() - interval '10 minutes'`;
+// Next dev can load the client and query from separate Prisma runtimes.
+// Interpolate the scalar duration so PostgreSQL always receives a native interval.
+const handoffMinutes = 10;
 export class PrismaBundleDelivery implements BundleDeliveryStore {
   constructor(private readonly db: PrismaClient) {}
   async discover(
@@ -22,7 +24,7 @@ export class PrismaBundleDelivery implements BundleDeliveryStore {
         await tx.$executeRaw`
           WITH expired AS (
             SELECT poll_id, user_id FROM seal_bundle_deliveries
-            WHERE status = 'SENDING' AND attempt_started_at <= ${expiry}
+            WHERE status = 'SENDING' AND attempt_started_at <= clock_timestamp() - make_interval(mins => ${handoffMinutes}::int)
               AND (${pollId ?? null}::text IS NULL OR poll_id = ${pollId ?? null})
             ORDER BY attempt_started_at, poll_id, user_id LIMIT ${limit} FOR UPDATE SKIP LOCKED
           )
@@ -98,7 +100,7 @@ export class PrismaBundleDelivery implements BundleDeliveryStore {
       const count = await this.db.$executeRaw`
         UPDATE seal_bundle_deliveries SET status = ${outcome}, completed_at = clock_timestamp(), last_error = ${error}
         WHERE poll_id = ${key.pollId} AND user_id = ${key.userId}
-          AND status = 'SENDING' AND attempt_started_at > ${expiry}`;
+          AND status = 'SENDING' AND attempt_started_at > clock_timestamp() - make_interval(mins => ${handoffMinutes}::int)`;
 
       return success(count === 1);
     } catch {

@@ -1,7 +1,7 @@
 # Poll seal and blockchain anchor — design
 
 **Date:** 2026-09-11
-**Status:** Approved design. Phases 1–6 complete locally as of 2026-11-20. Phase 6 approved. Phases 7–9 and production rollout remain pending.
+**Status:** Approved design. Phases 1–7 complete locally as of 2026-11-20. Phase 7 approved. Phases 8–9 and production rollout remain pending.
 **Reviewed:** 2026-10-25 against the current implementation
 
 ## 1. Problem
@@ -633,6 +633,14 @@ Ops note: restrict the route to `127.0.0.1` in nginx.
 | `src/app/api/polls/[pollId]/seal/proof/route.ts`          | `GET`, public; confirmed proof if present, else pending; `application/octet-stream`, `<pollId>.ots`.                                                                                                                                                                                                                                                                                                                         |
 | `src/app/api/polls/[pollId]/seal/sections/route.ts`       | `GET`, session required; `GetSealSectionsUseCase`; 403 on refusal.                                                                                                                                                                                                                                                                                                                                                           |
 | `src/app/api/polls/[pollId]/seal/my-proof/route.ts`       | `GET`, session required; `GetVoteProofUseCase`; JSON bundle download.                                                                                                                                                                                                                                                                                                                                                        |
+
+The hosted implementation keeps database work for private evidence outside React rendering.
+The public page selects only the manifest, digest, block metadata and proof availability. After
+hydration, `/api/polls/[pollId]/seal/access` returns the current viewer's download capability and
+can schedule a throttled recovery check. A browser with JavaScript disabled can read and download
+public commitments while cron continues recovery. The voter page loads its filtered proof and
+stored code through `/api/polls/[pollId]/seal/voter-check`. Both endpoints use private, uncached
+responses. This boundary also protects private fields from React's development diagnostics.
 
 ### 10.2 Changed
 
