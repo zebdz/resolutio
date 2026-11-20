@@ -1,21 +1,27 @@
 /** Builds a printable poll-results protocol from authorized plain DTOs.
  * Question kinds retain domain vocabulary; translated labels remain display text. */
+import { leadingAnswer, printWeight } from '@/web/lib/protocolWeight';
+import { protocolPageFooter } from './sealFooter';
 import type { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
 import type { QuestionType } from '@/src/domain/poll/QuestionType';
 
 export interface PdfAnswerData {
+  answerId?: string;
   answerText: string;
   voteCount: number;
   weightedVotes: number;
+  exactWeight?: string;
   percentage: number;
 }
 
 export interface PdfQuestionData {
+  winningAnswerId?: string | null;
   questionText: string;
   questionDetails: string | null;
   questionType: QuestionType;
   totalVotes: number;
   totalWeight: number;
+  exactTotalWeight?: string;
   answers: PdfAnswerData[];
 }
 
@@ -29,7 +35,9 @@ export interface PdfInputData {
   totalParticipants: number;
   votedParticipants: number;
   totalWeight: number;
+  exactTotalWeight?: string;
   weightOfVoted: number;
+  exactWeightOfVoted?: string;
   questions: PdfQuestionData[];
 }
 
@@ -68,24 +76,6 @@ export interface PdfTranslations {
   multipleChoice: string;
 }
 
-function determineWinner(
-  answers: PdfAnswerData[],
-  questionType: QuestionType
-): PdfAnswerData | null {
-  if (questionType !== 'single-choice') {
-    return null;
-  }
-
-  if (answers.length === 0) {
-    return null;
-  }
-
-  const maxWeight = Math.max(...answers.map((a) => a.weightedVotes));
-  const top = answers.filter((a) => a.weightedVotes === maxWeight);
-
-  return top.length === 1 ? top[0] : null;
-}
-
 function buildQuestionSection(
   question: PdfQuestionData,
   index: number,
@@ -98,7 +88,12 @@ function buildQuestionSection(
 
   const questionTitle = t.questionNumber.replace('{number}', String(index + 1));
 
-  const winner = determineWinner(question.answers, question.questionType);
+  const winner = leadingAnswer(
+    question.questionType,
+    question.answers,
+    (answer) => answer.weightedVotes,
+    question.winningAnswerId
+  );
 
   const headerItems: Content[] = [
     {
@@ -115,7 +110,7 @@ function buildQuestionSection(
   }
 
   headerItems.push({
-    text: `${t.questionType}: ${typeLabel}  |  ${t.votedOnQuestion}: ${question.totalVotes}  |  ${t.weightOfVotedOnQuestion}: ${question.totalWeight.toFixed(2)}`,
+    text: `${t.questionType}: ${typeLabel}  |  ${t.votedOnQuestion}: ${question.totalVotes}  |  ${t.weightOfVotedOnQuestion}: ${printWeight(question.totalWeight, question.exactTotalWeight)}`,
     style: 'questionMeta',
   });
 
@@ -138,13 +133,16 @@ function buildQuestionSection(
   ];
 
   const tableRows = question.answers.map((answer, i) => {
-    const isWinner = winner && answer.answerText === winner.answerText;
+    const isWinner = winner === answer;
 
     return [
       { text: String(i + 1), alignment: 'center' as const },
       { text: answer.answerText },
       { text: String(answer.voteCount), alignment: 'center' as const },
-      { text: answer.weightedVotes.toFixed(2), alignment: 'center' as const },
+      {
+        text: printWeight(answer.weightedVotes, answer.exactWeight),
+        alignment: 'center' as const,
+      },
       {
         text: answer.percentage.toFixed(2) + '%',
         alignment: 'center' as const,
@@ -176,7 +174,8 @@ function buildQuestionSection(
 
 export function buildPdfDocumentDefinition(
   data: PdfInputData,
-  t: PdfTranslations
+  t: PdfTranslations,
+  evidence?: Content
 ): TDocumentDefinitions {
   const content: Content[] = [];
 
@@ -256,13 +255,13 @@ export function buildPdfDocumentDefinition(
       {
         text: [
           { text: `${t.totalWeight}: `, bold: true },
-          String(data.totalWeight),
+          printWeight(data.totalWeight, data.exactTotalWeight),
         ],
       },
       {
         text: [
           { text: `${t.weightOfVoted}: `, bold: true },
-          String(data.weightOfVoted),
+          printWeight(data.weightOfVoted, data.exactWeightOfVoted),
         ],
       },
     ],
@@ -274,20 +273,10 @@ export function buildPdfDocumentDefinition(
     content.push(buildQuestionSection(q, i, t));
   });
 
-  // Reserve space at bottom of last page for signatures
-  // A4: 841.89pt height, 40pt margins → content bottom at y=801.89
-  // Signatures block ~170pt → starts at y=632
-  const signaturesHeight = 170;
-  const signaturesY = 632;
-
+  // Keep the signature lines together in the flow above the verification footer.
   content.push({
-    text: ' ',
-    margin: [0, signaturesHeight, 0, 0] as [number, number, number, number],
-  });
-
-  // Signatures pinned to bottom of last page
-  content.push({
-    absolutePosition: { x: 40, y: signaturesY },
+    unbreakable: true,
+    margin: [0, 16, 0, 8],
     stack: [
       {
         text: t.signaturesAndStamps,
@@ -313,7 +302,7 @@ export function buildPdfDocumentDefinition(
         margin: [0, 0, 0, 0] as [number, number, number, number],
       },
     ],
-  } as any);
+  });
 
   return {
     content,
@@ -345,33 +334,7 @@ export function buildPdfDocumentDefinition(
         fontSize: 9,
       },
     },
-    footer: (currentPage: number, pageCount: number) => {
-      const pageText = t.pageOf
-        .replace('{current}', String(currentPage))
-        .replace('{total}', String(pageCount));
-
-      const dateText = t.generatedOn.replace(
-        '{date}',
-        new Date().toISOString().split('T')[0]
-      );
-
-      return {
-        columns: [
-          {
-            text: pageText,
-            alignment: 'left' as const,
-            margin: [40, 0, 0, 0] as [number, number, number, number],
-          },
-          {
-            text: dateText,
-            alignment: 'right' as const,
-            margin: [0, 0, 40, 0] as [number, number, number, number],
-          },
-        ],
-        fontSize: 8,
-        color: '#888888',
-      };
-    },
+    ...protocolPageFooter(t, evidence),
   };
 }
 

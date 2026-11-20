@@ -940,8 +940,8 @@
         "questionNumber": "Question {number}",
         "questionType": "Type",
         "questionDetails": "Details",
-        "votedOnQuestion": "Voted",
-        "weightOfVotedOnQuestion": "Weight",
+        "votedOnQuestion": "Selections",
+        "weightOfVotedOnQuestion": "Total selection weight",
         "answerNumber": "#",
         "answerText": "Answer",
         "votes": "Votes",
@@ -2436,6 +2436,12 @@
     }
   },
   "seal": {
+    "pdf": {
+      "digest": "Poll record SHA-256",
+      "coverage": "Compare this PDF with the sealed poll record. An edited PDF can carry the same record digest.",
+      "verifyAt": "Verify the record",
+      "preliminary": "Preliminary results · Poll has not been sealed."
+    },
     "errors": {
       "claimLost": "This sealing work is now owned by another worker or its lease expired.",
       "notFound": "No sealed record exists for this poll.",

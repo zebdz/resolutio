@@ -1,7 +1,7 @@
 # Poll seal and blockchain anchor — design
 
 **Date:** 2026-09-11
-**Status:** Approved design. Phases 1–7 complete locally as of 2026-11-20. Phase 7 approved. Phases 8–9 and production rollout remain pending.
+**Status:** Approved design. Phases 1–8 complete locally as of 2026-11-20. Phase 9 rollout rehearsal in progress.
 **Reviewed:** 2026-10-25 against the current implementation
 
 ## 1. Problem

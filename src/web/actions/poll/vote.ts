@@ -18,8 +18,9 @@ import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { SubmitDraftUseCase } from '@/application/poll/SubmitDraftUseCase';
 import { FinishVotingUseCase } from '@/application/poll/FinishVotingUseCase';
 import { GetUserVotingProgressUseCase } from '@/application/poll/GetUserVotingProgressUseCase';
-import { GetPollResultsUseCase } from '@/application/poll/GetPollResultsUseCase';
-import { PollResultsView, serializePollResults } from './PollResultsView';
+import { readPollResults } from '@/web/lib/readPollResults';
+import { resultsViewerAccess } from '@/web/lib/resultsViewerAccess';
+import type { PollResultsView } from './PollResultsView';
 import {
   VotingProgressView,
   serializeVotingProgress,
@@ -93,14 +94,6 @@ const getUserVotingProgressUseCase = new GetUserVotingProgressUseCase(
   userRepository,
   organizationRepository
 );
-const getPollResultsUseCase = new GetPollResultsUseCase(
-  pollRepository,
-  participantRepository,
-  voteRepository,
-  organizationRepository,
-  userRepository
-);
-
 // Schema for draft submission
 const SubmitDraftSchema = z.object({
   pollId: z.string(),
@@ -390,11 +383,16 @@ export async function getPollResultsAction(
       };
     }
 
-    // Execute use case
-    const result = await getPollResultsUseCase.execute({
-      pollId,
-      userId: user.id,
-    });
+    const access = await resultsViewerAccess(user);
+
+    if (!access.success) {
+      return {
+        success: false,
+        error: await translateErrorCode(access.error.code),
+      };
+    }
+
+    const result = await readPollResults(pollId, user.id);
 
     if (!result.success) {
       return {
@@ -403,9 +401,12 @@ export async function getPollResultsAction(
       };
     }
 
+    const { results, canViewVoterNames, canViewSignWillingness } =
+      result.value.data;
+
     return {
       success: true,
-      data: serializePollResults(result.value),
+      data: { results, canViewVoterNames, canViewSignWillingness },
     };
   } catch (error) {
     console.error('Get poll results error:', error);

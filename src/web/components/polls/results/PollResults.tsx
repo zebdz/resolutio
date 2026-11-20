@@ -1,8 +1,10 @@
 'use client';
 
-/** Renders the authorized plain results view supplied by the server action. */
+/** Render the current viewer’s results. Frozen tallies retain exact weight strings
+ * and the winner determined from the sealed record before display rounding. */
 
 import { useState } from 'react';
+import { printWeight, leadingAnswer } from '@/web/lib/protocolWeight';
 import { useTranslations } from 'next-intl';
 import { Badge } from '@/src/web/components/catalyst/badge';
 import VoterBreakdownDialog from './VoterBreakdownDialog';
@@ -15,6 +17,10 @@ import type {
   AnswerResult,
   PollResultsData,
 } from '@/web/actions/poll/PollResultsView';
+
+function displayWeight(value: number, exact?: string) {
+  return exact === undefined ? value.toFixed(2) : printWeight(value, exact);
+}
 
 interface PollResultsProps {
   results: PollResultsData;
@@ -103,8 +109,11 @@ export default function PollResults({
               </div>
               <div className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-white">
                 {buildingTotal > 0
-                  ? `${results.totalWeight.toFixed(2)} / ${buildingTotal.toFixed(2)}`
-                  : results.totalWeight.toFixed(2)}
+                  ? `${displayWeight(results.totalWeight, results.exactTotalWeight)} / ${buildingTotal.toFixed(2)}`
+                  : displayWeight(
+                      results.totalWeight,
+                      results.exactTotalWeight
+                    )}
               </div>
               {buildingTotal > 0 && (
                 <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
@@ -145,24 +154,12 @@ export default function PollResults({
 
         {/* Question results */}
         {results.questions.map((question) => {
-          const winner = (() => {
-            if (question.questionType !== 'single-choice') {
-              return null;
-            }
-
-            if (question.answers.length === 0) {
-              return null;
-            }
-
-            const maxVotes = Math.max(
-              ...question.answers.map((a) => a.weightedVotes)
-            );
-            const topAnswers = question.answers.filter(
-              (a) => a.weightedVotes === maxVotes
-            );
-
-            return topAnswers.length === 1 ? topAnswers[0] : null;
-          })();
+          const winner = leadingAnswer(
+            question.questionType,
+            question.answers,
+            (answer) => answer.weightedVotes,
+            question.winningAnswerId
+          );
 
           return (
             <div
@@ -178,12 +175,19 @@ export default function PollResults({
                     {t('votes')}: {question.totalVotes}
                   </span>
                   <span>
-                    {t('voteWeight')}: {question.totalWeight.toFixed(2)}
+                    {t('voteWeight')}:{' '}
+                    {displayWeight(
+                      question.totalWeight,
+                      question.exactTotalWeight
+                    )}
                   </span>
                   {buildingTotal > 0 && (
                     <span>
                       {t('participation')}:{' '}
-                      {question.participantWeight.toFixed(2)}{' '}
+                      {displayWeight(
+                        question.participantWeight,
+                        question.exactParticipantWeight
+                      )}{' '}
                       {`(${((question.participantWeight / buildingTotal) * 100).toFixed(2)}% ${t('ofBuilding')})`}
                     </span>
                   )}
@@ -221,7 +225,11 @@ export default function PollResults({
                           </div>
                           <div className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
                             {answer.voteCount} {t('votes')} (
-                            {answer.weightedVotes.toFixed(2)} {t('voteWeight')})
+                            {displayWeight(
+                              answer.weightedVotes,
+                              answer.exactWeight
+                            )}{' '}
+                            {t('voteWeight')})
                           </div>
                         </div>
                         <div className="text-2xl font-semibold text-zinc-900 dark:text-white">

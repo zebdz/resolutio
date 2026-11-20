@@ -1,5 +1,10 @@
 /** Poll application failures retain known domain, boundary and adapter codes.
  * A single widened operation would allow the invalid client assignment below. */
+import type { GetSealedProtocolUseCase } from '@/application/seal/GetSealedProtocolUseCase';
+import type {
+  PollId as ApplicationPollId,
+  UserId as ApplicationUserId,
+} from '@/domain/shared/EntityIds';
 import { ActivatePollUseCase } from '../../../application/poll/ActivatePollUseCase';
 import { AddPollAttachmentUseCase } from '../../../application/poll/AddPollAttachmentUseCase';
 import { AddQuestionUseCase } from '../../../application/poll/AddQuestionUseCase';
@@ -61,3 +66,12 @@ type FailureOf<T> = T extends { success: false; error: infer E } ? E : never;
 type OperationFailure = FailureOf<Awaited<ReturnType<Operations['execute']>>>;
 // @ts-expect-error Arbitrary messages cannot cross a poll application contract.
 const arbitraryError: OperationFailure = 'arbitrary failure';
+
+declare const protocols: GetSealedProtocolUseCase;
+declare const applicationPollId: ApplicationPollId;
+declare const applicationUserId: ApplicationUserId;
+protocols.execute(applicationPollId, applicationUserId, 'page');
+// @ts-expect-error Protocol reads require the correct poll and viewer identities.
+protocols.execute(applicationUserId, applicationPollId, 'page');
+// @ts-expect-error Validate an external poll ID before reading sealed data.
+protocols.execute('poll1', applicationUserId, 'namedPdf');

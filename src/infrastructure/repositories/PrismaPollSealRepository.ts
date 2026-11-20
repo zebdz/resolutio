@@ -20,6 +20,18 @@ export class PrismaPollSealRepository
   ) {
     super(tx);
   }
+  protected override queryFailure(error: unknown) {
+    // The transaction owner retries conflicts with a fresh repeatable-read snapshot.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      ['P2002', 'P2034'].includes(error.code)
+    ) {
+      throw error;
+    }
+
+    return super.queryFailure(error);
+  }
+
   async save(seal: PollSeal): ReturnType<PollSealRepository['save']> {
     if (seal.pollId !== this.claim.pollId) {
       return failure(Failure.parse('seal.errors.claimLost'));

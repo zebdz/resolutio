@@ -15,10 +15,20 @@ import {
 } from '@/domain/poll/ResultTallies';
 import type { GetPollResultsResult } from '@/application/poll/GetPollResultsUseCase';
 
-const { execute, currentUser, rateLimit } = vi.hoisted(() => ({
-  execute: vi.fn(),
-  currentUser: vi.fn(),
-  rateLimit: vi.fn(),
+const { execute, source, currentUser, rateLimit, moderation } = vi.hoisted(
+  () => ({
+    execute: vi.fn(),
+    source: vi.fn(),
+    moderation: vi.fn(),
+    currentUser: vi.fn(),
+    rateLimit: vi.fn(),
+  })
+);
+vi.mock('@/application/user/getUserModerationAccess', () => ({
+  getUserModerationAccess: moderation,
+}));
+vi.mock('@/infrastructure/seal/getSealedProtocol', () => ({
+  getSealedProtocol: { execute: source },
 }));
 vi.mock('@/application/poll/GetPollResultsUseCase', () => ({
   GetPollResultsUseCase: class {
@@ -116,7 +126,21 @@ function results(names = false, signers = false): GetPollResultsResult {
 beforeEach(() => {
   vi.clearAllMocks();
   rateLimit.mockResolvedValue(null);
-  currentUser.mockResolvedValue({ id: UserId.parse('viewer') });
+  source.mockResolvedValue({
+    success: true,
+    value: {
+      kind: 'live',
+      coverage: 'unsealed',
+      canViewVoterNames: true,
+      canViewSignWillingness: true,
+    },
+  });
+  currentUser.mockResolvedValue({
+    id: UserId.parse('viewer'),
+    isConfirmed: () => true,
+    privacySetupCompleted: true,
+  });
+  moderation.mockResolvedValue({ success: true, value: 'allowed' });
 });
 
 it('removes voter details and signing contacts before returning to a direct caller', async () => {
@@ -206,4 +230,128 @@ it('checks rate limits and authentication before loading results', async () => {
     error: 'unauthorized',
   });
   expect(execute).not.toHaveBeenCalled();
+});
+
+it('uses the sealed snapshot for direct callers after live results change', async () => {
+  const frozen = {
+    pollId: 'poll-1',
+    totalParticipants: 0,
+    totalWeight: 0,
+    votedParticipants: 0,
+    questions: [],
+    protocolSignWillingness: [],
+  };
+  source.mockResolvedValue({
+    success: true,
+    value: {
+      kind: 'sealed',
+      data: {
+        results: frozen,
+        canViewVoterNames: false,
+        canViewSignWillingness: false,
+      },
+    },
+  });
+  execute.mockResolvedValue({ success: true, value: results() });
+  const result = await getPollResultsAction('poll-1');
+  expect(result).toEqual({
+    success: true,
+    data: {
+      results: frozen,
+      canViewVoterNames: false,
+      canViewSignWillingness: false,
+    },
+  });
+  expect(execute).not.toHaveBeenCalled();
+});
+
+it('rejects a viewer whose access is revoked during live joins', async () => {
+  source.mockResolvedValueOnce({
+    success: true,
+    value: { kind: 'live', coverage: 'preliminary' },
+  });
+  source.mockResolvedValueOnce({
+    success: false,
+    error: 'domain.poll.pollResultsNotOrgMember',
+  });
+  execute.mockResolvedValue({ success: true, value: results(true, true) });
+  const result = await getPollResultsAction('poll-1');
+  expect(result.success).toBe(false);
+  expect(JSON.stringify(result)).not.toContain('+79001234567');
+});
+
+it('redacts signing contacts when a former admin retains access to the live results', async () => {
+  source.mockResolvedValueOnce({
+    success: true,
+    value: {
+      kind: 'live',
+      coverage: 'preliminary',
+      canViewVoterNames: true,
+      canViewSignWillingness: true,
+    },
+  });
+  source.mockResolvedValueOnce({
+    success: true,
+    value: {
+      kind: 'live',
+      coverage: 'preliminary',
+      canViewVoterNames: true,
+      canViewSignWillingness: false,
+    },
+  });
+  execute.mockResolvedValue({ success: true, value: results(true, true) });
+  const result = await getPollResultsAction('poll-1');
+  expect(result.success).toBe(true);
+  expect(JSON.stringify(result)).not.toContain('+79001234567');
+  expect(JSON.stringify(result)).toContain('Person Private');
+});
+
+it('applies the account and moderation gates to a direct results action', async () => {
+  moderation.mockResolvedValue({ success: true, value: 'blocked' });
+  execute.mockResolvedValue({ success: true, value: results(true, true) });
+  const result = await getPollResultsAction('poll-1');
+  expect(result.success).toBe(false);
+  expect(source).not.toHaveBeenCalled();
+  expect(execute).not.toHaveBeenCalled();
+});
+
+it('switches to the sealed snapshot when sealing finishes during the live read', async () => {
+  source.mockResolvedValueOnce({
+    success: true,
+    value: {
+      kind: 'live',
+      coverage: 'sealing',
+      canViewVoterNames: true,
+      canViewSignWillingness: true,
+    },
+  });
+  const frozen = {
+    pollId: 'poll-1',
+    totalParticipants: 0,
+    totalWeight: 0,
+    votedParticipants: 0,
+    questions: [],
+    protocolSignWillingness: [],
+  };
+  source.mockResolvedValueOnce({
+    success: true,
+    value: {
+      kind: 'sealed',
+      data: {
+        canViewVoterNames: false,
+        canViewSignWillingness: false,
+        results: frozen,
+      },
+    },
+  });
+  execute.mockResolvedValue({ success: true, value: results(true, true) });
+  const result = await getPollResultsAction('poll-1');
+  expect(result).toEqual({
+    success: true,
+    data: {
+      results: frozen,
+      canViewVoterNames: false,
+      canViewSignWillingness: false,
+    },
+  });
 });

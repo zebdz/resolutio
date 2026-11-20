@@ -112,7 +112,8 @@ test('save a weighted ballot, seal it, and check its retained evidence independe
     };
 
     const owner = await authenticated(voter);
-    await owner.goto(voteUrl);
+    const votePage = await owner.goto(voteUrl);
+    expect(votePage?.status()).toBe(200);
     await owner.getByRole('radio', { name: answer }).check();
     await owner
       .getByRole('button', { name: 'Finish Voting', exact: true })

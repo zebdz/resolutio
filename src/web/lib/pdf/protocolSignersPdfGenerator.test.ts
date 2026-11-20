@@ -1,3 +1,4 @@
+/** Checks the consent-gated signer lists and record footer in printable signing protocols. */
 import { describe, it, expect } from 'vitest';
 import {
   buildProtocolSignersPdfDefinition,
@@ -75,6 +76,24 @@ function findTables(content: any): any[] {
 }
 
 describe('buildProtocolSignersPdfDefinition', () => {
+  it('prints the provided record verification footer on every page', () => {
+    const doc = buildProtocolSignersPdfDefinition(makeData(), t, {
+      text: 'record evidence',
+    });
+
+    for (const page of [1, 2]) {
+      const footer =
+        typeof doc.footer === 'function'
+          ? doc.footer(page, 2, {
+              width: 595,
+              height: 842,
+              orientation: 'portrait',
+            })
+          : doc.footer;
+      expect(JSON.stringify(footer)).toContain('record evidence');
+    }
+  });
+
   it('willing table has a phone column with the localized header', () => {
     const doc = buildProtocolSignersPdfDefinition(makeData(), t);
     const [willingTable] = findTables(doc.content);

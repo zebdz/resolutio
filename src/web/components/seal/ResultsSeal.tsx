@@ -1,51 +1,44 @@
-/** Results viewers can open their permitted sections and voters can inspect their own ballot. */
-import { getTranslations } from 'next-intl/server';
+'use client';
+
+/** The badge and downloads follow the same source as the displayed results. */
+import { useTranslations } from 'next-intl';
 import { Link } from '@/src/i18n/routing';
-import { prisma } from '@/infrastructure/database/prisma';
-import { readSealSummaries } from '@/infrastructure/repositories/PrismaSealSummaries';
-import type { PollId, UserId } from '@/domain/shared/EntityIds';
+import type { PollId } from '@/domain/shared/EntityIds';
+import type { ResultsCoverage } from '@/web/components/polls/results/ResultsPageView';
 import { SealStatusBadge } from './SealStatusBadge';
 import { CopyDigest } from './CopyDigest';
 
-export async function ResultsSeal({
+export function ResultsSeal({
   pollId,
-  userId,
-  finishedAt,
+  coverage,
 }: {
   pollId: PollId;
-  userId: UserId;
-  finishedAt: Date | null;
+  coverage: ResultsCoverage;
 }) {
-  const [t, summaries, vote] = await Promise.all([
-    getTranslations('sealStatus'),
-    readSealSummaries(prisma.pollSeal, [pollId]),
-    prisma.vote.findFirst({
-      where: { userId, question: { pollId } },
-      select: { id: true },
-    }),
-  ]);
-  const link = 'cursor-pointer text-sky-700 underline dark:text-sky-300';
+  const t = useTranslations('sealStatus');
 
-  if (!summaries.success) {
-    return <p role="alert">{t('unavailable')}</p>;
+  if (coverage.kind === 'preliminary') {
+    return null;
   }
 
-  const seal = summaries.value.get(pollId);
+  const link = 'cursor-pointer text-sky-700 underline dark:text-sky-300';
+  const status =
+    coverage.kind === 'sealed' ? coverage.seal.status : { kind: coverage.kind };
 
   return (
     <section
       aria-label={t('record')}
       className="mb-6 space-y-3 rounded-lg border border-zinc-200 p-4 dark:border-zinc-700"
     >
-      <SealStatusBadge
-        status={seal?.status ?? { kind: finishedAt ? 'sealing' : 'unsealed' }}
-      />
-      {seal && <CopyDigest digest={seal.rootDigest} />}
+      <SealStatusBadge status={status} />
+      {coverage.kind === 'sealed' && (
+        <CopyDigest digest={coverage.seal.rootDigest} />
+      )}
       <div className="flex flex-wrap gap-4 text-sm">
         <Link className={link} href={`/verify/${pollId}`}>
           {t('record')}
         </Link>
-        {seal && (
+        {coverage.kind === 'sealed' && (
           <a
             className={link}
             href={`/api/polls/${pollId}/seal/sections`}
@@ -54,7 +47,7 @@ export async function ResultsSeal({
             {t('download')}
           </a>
         )}
-        {seal && vote && (
+        {coverage.kind === 'sealed' && coverage.hasOwnVote && (
           <Link className={link} href={`/polls/${pollId}/verify-my-vote`}>
             {t('myVote')}
           </Link>

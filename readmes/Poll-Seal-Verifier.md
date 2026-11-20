@@ -38,6 +38,18 @@ what the timestamp establishes. **Check current inclusion only** checks the choi
 your current proof bundle using your code when available. Use the standalone verifier below to
 repeat the check independently of the hosted page.
 
+## Check a results PDF
+
+The results, named voting protocol and signers PDFs print the poll digest and a verification URL
+when a sealed record exists. Scan the QR or open the printed URL. Compare the digest, then compare
+the document's questions, weights and totals with the sections you are authorized to download.
+Authorized named exports also include the saved register and voting choices. The signers section
+requires administrator access.
+
+The digest authenticates the underlying poll record. A PDF can be edited while retaining its
+original footer, so comparing the displayed contents matters. A preliminary, sealing-pending or
+historically unsealed PDF has no record digest to verify.
+
 ## Run the standalone verifier
 
 From the repository with its locked dependencies installed, build the distributable. This example

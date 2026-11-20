@@ -37,24 +37,48 @@ function anchorData(a: AnchorRow) {
 
 export class PrismaSealReader implements SealExportReader {
   constructor(protected readonly tx: Prisma.TransactionClient) {}
+  /** Called only for a rejected Prisma query. Decoding runs outside this
+   * handler, so a programming error during projection remains observable. */
+  protected queryFailure(error: unknown) {
+    if (
+      !(
+        error instanceof Prisma.PrismaClientKnownRequestError ||
+        error instanceof Prisma.PrismaClientUnknownRequestError ||
+        error instanceof Prisma.PrismaClientInitializationError
+      )
+    ) {
+      throw error;
+    }
+
+    return failure(Failure.parse('common.errors.unexpected'));
+  }
+
   async findPublishedByPollId(
     pollId: PollId
   ): ReturnType<SealExportReader['findPublishedByPollId']> {
-    const row = await this.tx.pollSeal.findUnique({
-      where: { pollId },
-      select: {
-        manifest: true,
-        rootDigest: true,
-        sealedAt: true,
-        anchors: { where: { status: { not: 'SUPERSEDED' } }, take: 1 },
-      },
-    });
+    const result = await this.tx.pollSeal
+      .findUnique({
+        where: { pollId },
+        select: {
+          manifest: true,
+          rootDigest: true,
+          sealedAt: true,
+          anchors: { where: { status: { not: 'SUPERSEDED' } }, take: 1 },
+        },
+      })
+      .then(success, (error: unknown) => this.queryFailure(error));
+
+    if (!result.success) {
+      return result;
+    }
+
+    const row = result.value;
 
     if (!row) {
       return success(null);
     }
 
-    const result = sealResult(() => {
+    const checked = sealResult(() => {
       const manifest = readManifest(row.manifest);
       const digest = hashText(row.manifest);
       requireSeal(
@@ -72,7 +96,7 @@ export class PrismaSealReader implements SealExportReader {
       };
     });
 
-    return result.success ? result : failure(Failure.parse(result.error));
+    return checked.success ? checked : failure(Failure.parse(checked.error));
   }
   async findByPollId(
     pollId: PollId
@@ -87,10 +111,20 @@ export class PrismaSealReader implements SealExportReader {
   private async load(
     where: Prisma.PollSealWhereUniqueInput
   ): ReturnType<PollSealRepository['findByPollId']> {
-    const row = await this.tx.pollSeal.findUnique({
-      where,
-      include: { anchors: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] } },
-    });
+    const result = await this.tx.pollSeal
+      .findUnique({
+        where,
+        include: {
+          anchors: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+        },
+      })
+      .then(success, (error: unknown) => this.queryFailure(error));
+
+    if (!result.success) {
+      return result;
+    }
+
+    const row = result.value;
 
     if (!row) {
       return success(null);

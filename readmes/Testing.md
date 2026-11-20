@@ -61,9 +61,11 @@ Run `yarn prisma:generate` after schema changes before running these tests.
 ### Poll seal browser rehearsal
 
 Use the disposable PostgreSQL instance above. Apply migrations to its public schema and install
-the Playwright Chromium browser once. The rehearsal starts a separate loopback server on port
-55441 with simulated timestamps and SMTP disabled. It writes synthetic accounts, sessions and a
-weighted poll. The browser uses fresh contexts and checks the retained receipt against the CLI.
+the Playwright Chromium browser once. Install Poppler's `pdftotext` for PDF assertions.
+The rehearsal starts a loopback server on port 55441 with simulated timestamps and SMTP disabled.
+It checks a saved ballot in Chromium and the standalone CLI, then compares the rendered results
+and English/Russian PDF downloads with the sealed record after live metadata changes. The protocol
+tests cover member and administrator access, revoked access, raw HTML, Flight and JSON.
 
 ```bash
 export POLL_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:55439/resolutio_seal_test
@@ -71,6 +73,18 @@ DATABASE_URL="$POLL_TEST_DATABASE_URL" yarn prisma migrate deploy
 yarn playwright install chromium
 systemd-run --user --scope -p MemoryMax=12G -p MemorySwapMax=1G -- \
   taskset -c 0-3 yarn test:seal-browser
+```
+
+To exercise the same frozen protocol tests against a local production build, build the app first
+with the test database and an explicit provider. The browser configuration keeps calendar traffic
+on loopback and SMTP disabled. No external keys are required.
+
+```bash
+systemd-run --user --scope -p MemoryMax=20G -p MemorySwapMax=2G -- \
+  taskset -c 0-3 env CIRCLE_NODE_TOTAL=4 DATABASE_URL="$POLL_TEST_DATABASE_URL" \
+  ANCHOR_PROVIDER=opentimestamps ANCHOR_POLLER_SECRET=seal-browser-test yarn build
+systemd-run --user --scope -p MemoryMax=8G -p MemorySwapMax=1G -- \
+  taskset -c 0-3 env SEAL_BROWSER_SERVER=production yarn test:seal-browser
 ```
 
 ### 2. **E2E Tests** (End-to-End with Playwright)

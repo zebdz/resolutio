@@ -1,3 +1,4 @@
+/** Checks printed poll totals, per-answer weights, winners, localized metadata and record verification. */
 import { describe, it, expect } from 'vitest';
 import {
   buildPdfDocumentDefinition,
@@ -134,6 +135,34 @@ function flattenContent(node: any): any[] {
 }
 
 describe('buildPdfDocumentDefinition', () => {
+  it('retains millionths in reported weighted selections', () => {
+    const data = makeData();
+    data.questions[0].totalWeight = 0.000001;
+    data.questions[0].answers[0].weightedVotes = 0.000001;
+    const rendered = stringify(
+      buildPdfDocumentDefinition(data, baseTranslations).content
+    );
+    expect(rendered).toContain('0.000001');
+  });
+
+  it('prints the provided record verification footer on every page', () => {
+    const doc = buildPdfDocumentDefinition(makeData(), baseTranslations, {
+      text: 'record evidence',
+    });
+
+    for (const page of [1, 2]) {
+      const footer =
+        typeof doc.footer === 'function'
+          ? doc.footer(page, 2, {
+              width: 595,
+              height: 842,
+              orientation: 'portrait',
+            })
+          : doc.footer;
+      expect(JSON.stringify(footer)).toContain('record evidence');
+    }
+  });
+
   it('includes poll title in content', () => {
     const data = makeData();
     const doc = buildPdfDocumentDefinition(data, baseTranslations);

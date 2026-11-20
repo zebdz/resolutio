@@ -3,7 +3,7 @@
 **Created:** 2026-09-15  
 **Revised:** 2026-11-20
 
-**Status:** Phases 1–7 complete locally on `blockchain`. Phase 7 approved. Phases 8–9 pending.
+**Status:** Phases 1–8 complete locally on `blockchain`. Phase 9 in progress. Final review requested after all phases.
 
 **Source of truth:** [approved design](../readmes/2026-09-11-poll-seal-and-anchor-design.md), committed as `8653fa9`.
 This revision replaces the earlier task list and its conflicting format refinements and golden vectors.
@@ -66,8 +66,8 @@ for parallel implementation.
 | 5     | Authorized exports and standalone verifier CLI            | 1, 3–4          | Complete, approved   |
 | 6     | Receipt emails and recoverable first bundle delivery      | 2, 4–5          | Complete, approved   |
 | 7     | Hosted receipt and verification flows                     | 5–6             | Approved for Phase 8 |
-| 8     | Frozen final results and all three PDFs                   | 3, 5, 7         | Not started          |
-| 9     | Rollout rehearsal, operational checks and release handoff | 1–8             | Not started          |
+| 8     | Frozen final results and all three PDFs                   | 3, 5, 7         | Complete             |
+| 9     | Rollout rehearsal, operational checks and release handoff | 1–8             | In progress          |
 
 ## Phase 1 — Canonical record and cryptographic domain — COMPLETE
 
@@ -574,7 +574,7 @@ Mark complete, record evidence, stop for review.
 - 4,414 offline tests passed (two opt-in live tests skipped). All 61 disposable PostgreSQL tests,
   the production build, full typecheck, scoped ESLint and formatting passed.
 
-## Phase 8 — Frozen results and protocols — NOT STARTED
+## Phase 8 — Frozen results and protocols — COMPLETE
 
 **Outcome:** final covered results and all three PDFs describe the same immutable record.
 
@@ -584,16 +584,16 @@ Mark complete, record evidence, stop for review.
 
 **Work and tests first:**
 
-- [ ] Map stored `poll`/`tallies`/`register` sections into final results and named protocol inputs.
+- [x] Map stored `poll`/`tallies`/`register` sections into final results and named protocol inputs.
       Use frozen organization/board/user/holding values; current policy still controls access.
-- [ ] Build the admin-only signers protocol from stored `poll` plus `signers`. Include willing
+- [x] Build the admin-only signers protocol from stored `poll` plus `signers`. Include willing
       voters' consented phones and declining voters' names only; preserve missing-decision semantics.
-- [ ] Define explicit fallback states: active exports remain preliminary; eligible finished polls
+- [x] Define explicit fallback states: active exports remain preliminary; eligible finished polls
       awaiting a seal show sealing pending/unsealed; legacy finished polls remain unsealed. Never
       pair live covered contents with a footer claiming a saved seal covers them.
-- [ ] Share the footer's digest, anchor status, URL and QR across generators. Explain record
+- [x] Share the footer's digest, anchor status, URL and QR across generators. Explain record
       verification without claiming the PDF bytes are authenticated.
-- [ ] Change live names, titles, organizations, boards, holdings, willingness and phones after seal;
+- [x] Change live names, titles, organizations, boards, holdings, willingness and phones after seal;
       assert final displayed/PDF data remains frozen and access remains policy-correct. Also verify
       the no-seal fallback and authorized signer route independently of client-side hiding.
       Check raw HTML, Flight and JSON responses for withheld identities, phones and sections in
@@ -604,7 +604,31 @@ Mark complete, record evidence, stop for review.
 regressions pass. Inspect representative English/Russian PDFs. Mark complete, record evidence, stop
 for review.
 
-## Phase 9 — Rollout rehearsal and release handoff — NOT STARTED
+**Implementation evidence, 2026-11-20**
+
+- The regression downloaded an actual PDF after changing the live title, board and answers.
+  It initially printed all the changed values. The results view and three PDF routes now use
+  the validated v1 record when present. An unavailable or invalid record fails the request.
+  Live results recheck access and seal availability after reading mutable data.
+- Exact six-place totals determine the winner even when JavaScript numbers round two totals
+  to the same value. Multi-choice turnout counts each voter once. The sealed page omits the
+  whole-building denominator and any incomplete property-label list, which v1 did not store.
+- The HTML and Flight response contains the results shell. The browser loads its private view
+  after hydration. The ordinary member of an anonymous poll receives totals. A named member can
+  read the frozen register and holdings. Only the current administrator can read saved signer
+  contacts. A missing decision is omitted and a declining voter is listed without a phone.
+- A disposable PostgreSQL rehearsal changed names, phone, signing decisions, poll text, board,
+  organization and holdings after sealing. It checked both locales and all three PDF downloads,
+  live preliminary/sealing/legacy fallbacks, named and anonymous results, and revocation of
+  membership and administrator access. The six printed QR codes resolved to the matching
+  locale and poll. A four-page sample also kept its digest and readable QR on interior pages.
+- The footer identifies the underlying record. Comparing the PDF contents with that record is
+  necessary because an edited PDF can keep the original footer. This phase used local test
+  data and disabled SMTP. Real Bitcoin evidence for the weighted fixture is recorded in Phase 7.
+
+- Validation passed 4,466 unit tests, 61 database checks, types, production build, three development browser flows and two production browser flows.
+
+## Phase 9 — Rollout rehearsal and release handoff — IN PROGRESS
 
 **Outcome:** a tested release procedure covers migrations, backfill, all writers, recovery and
 independent verification. Production deployment is a separate explicit action.
@@ -659,17 +683,17 @@ actual standalone CLI build/run commands. Skipped database/live checks are not p
 
 At each phase boundary, update this record:
 
-| Phase | Completed       | Failing test observed                                                                                | Passing checks/evidence                                                                                                  | Review status        |
-| ----- | --------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | -------------------- |
-| 1     | Yes, 2026-10-26 | Yes; client usage, type contracts and regression tests                                               | 99 domain / 3,430 total tests; 13 compile rejections; types, lint, format, browser bundle, independent fixtures          | Accepted for Phase 2 |
-| 2     | Yes, 2026-10-26 | Yes; domain, SQL, concurrency and privacy regressions                                                | 3,445 unit + 22 PostgreSQL tests; types, Prisma, lint, format                                                            | Continued to Phase 3 |
-| 3     | Yes, 2026-11-11 | Yes, snapshot, idempotency, fencing and zero-share cases                                             | 4,273 unit and 40 PostgreSQL checks at the phase boundary, followed by zero-share regressions                            | Continued to Phase 4 |
-| 4     | Yes, 2026-11-20 | Yes, provider, startup, recovery, lazy lease and route regressions                                   | 4,314 unit and 45 PostgreSQL checks, live calendars, historical Bitcoin proof, built server, types, lint and format      | Approved for Phase 5 |
-| 5     | Yes, 2026-11-20 | Yes, own proof, imported evidence, tally consistency and public manifest isolation                   | 4,366 unit and 51 PostgreSQL tests, real submission, historical OTS verification, built HTTP downloads and isolated CLI  | Approved for Phase 6 |
-| 6     | Yes, 2026-11-20 | Yes, receipt attachments, delivery claims, expired handoffs, fair discovery and sealed notifications | 4,374 unit and 61 PostgreSQL tests, isolated mail capture, types, production build and loopback cron                     | Approved             |
-| 7     | Yes, 2026-11-20 | Yes, cast receipt, initial bundle queue, label revocation and private data in streamed pages         | 4,414 unit and 61 PostgreSQL checks, two-voter Chromium/CLI rehearsal, real Bitcoin blocks 976737 and 976744, full build | Approved for Phase 8 |
-| 8     | No              | —                                                                                                    | —                                                                                                                        | Not started          |
-| 9     | No              | —                                                                                                    | —                                                                                                                        | Not started          |
+| Phase | Completed       | Failing test observed                                                                                | Passing checks/evidence                                                                                                  | Review status          |
+| ----- | --------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------- |
+| 1     | Yes, 2026-10-26 | Yes; client usage, type contracts and regression tests                                               | 99 domain / 3,430 total tests; 13 compile rejections; types, lint, format, browser bundle, independent fixtures          | Accepted for Phase 2   |
+| 2     | Yes, 2026-10-26 | Yes; domain, SQL, concurrency and privacy regressions                                                | 3,445 unit + 22 PostgreSQL tests; types, Prisma, lint, format                                                            | Continued to Phase 3   |
+| 3     | Yes, 2026-11-11 | Yes, snapshot, idempotency, fencing and zero-share cases                                             | 4,273 unit and 40 PostgreSQL checks at the phase boundary, followed by zero-share regressions                            | Continued to Phase 4   |
+| 4     | Yes, 2026-11-20 | Yes, provider, startup, recovery, lazy lease and route regressions                                   | 4,314 unit and 45 PostgreSQL checks, live calendars, historical Bitcoin proof, built server, types, lint and format      | Approved for Phase 5   |
+| 5     | Yes, 2026-11-20 | Yes, own proof, imported evidence, tally consistency and public manifest isolation                   | 4,366 unit and 51 PostgreSQL tests, real submission, historical OTS verification, built HTTP downloads and isolated CLI  | Approved for Phase 6   |
+| 6     | Yes, 2026-11-20 | Yes, receipt attachments, delivery claims, expired handoffs, fair discovery and sealed notifications | 4,374 unit and 61 PostgreSQL tests, isolated mail capture, types, production build and loopback cron                     | Approved               |
+| 7     | Yes, 2026-11-20 | Yes, cast receipt, initial bundle queue, label revocation and private data in streamed pages         | 4,414 unit and 61 PostgreSQL checks, two-voter Chromium/CLI rehearsal, real Bitcoin blocks 976737 and 976744, full build | Approved for Phase 8   |
+| 8     | Yes, 2026-11-20 | Yes, downloaded PDF included changed live data                                                       | 4,466 unit and 61 database tests, three development and two production browser flows, six QR codes                       | Final review requested |
+| 9     | No              | —                                                                                                    | —                                                                                                                        | Not started            |
 
 ## Unresolved questions
 

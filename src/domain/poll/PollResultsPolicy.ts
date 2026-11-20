@@ -69,7 +69,7 @@ function canViewSignWillingness(facts: ResultsViewerFacts): boolean {
  * generator marks such a document preliminary.
  */
 function canExportProtocol(
-  poll: Poll,
+  poll: Pick<Poll, 'isOpen' | 'isActive' | 'isAnonymous' | 'isFinished'>,
   facts: ResultsViewerFacts
 ): Result<void, PollDomainCode> {
   const readable = canViewResults(poll, facts);
@@ -90,7 +90,7 @@ function canExportProtocol(
 }
 
 function canExportNamedProtocol(
-  poll: Poll,
+  poll: Pick<Poll, 'isOpen' | 'isActive' | 'isAnonymous' | 'isFinished'>,
   facts: ResultsViewerFacts
 ): Result<void, PollDomainCode> {
   if (poll.isAnonymous()) {

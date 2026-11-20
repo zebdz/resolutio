@@ -821,7 +821,7 @@
     <header class="masthead">
       <div class="wrap">
         <div class="brand">RESOLUTIO</div>
-        <div class="meta">Architecture field guide<br />26 October 2026</div>
+        <div class="meta">Architecture field guide<br />20 November 2026</div>
       </div>
     </header>
     <div class="hero wrap">
@@ -838,9 +838,9 @@
       <div class="status">
         <strong>Implementation checkpoint</strong
         ><span
-          >Phase 1’s pure domain is complete, awaiting review. The end-to-end
-          flow below is the intended design; transactions, live anchoring,
-          delivery and verification interfaces remain to be implemented.</span
+          >The browser and offline CLI verify saved ballots. The results page
+          and final PDFs now read the sealed record. Production rollout is
+          pending.</span
         >
       </div>
     </div>
@@ -1095,10 +1095,9 @@
               </div>
               <h3>Check the record; render covered results from it.</h3>
               <p>
-                A standalone CLI checks local exported files first. Hosted
-                checks follow. An original receipt enables comparison with the
-                cast-time ballot; a code alone checks inclusion in the current
-                supplied record.
+                The standalone CLI and the browser both check exported evidence.
+                The original receipt lets a voter compare their cast-time ballot
+                with the supplied record. A code alone checks current inclusion.
               </p>
               <div class="artifact">
                 <strong
@@ -1638,47 +1637,47 @@ empty tree = SHA-256("")</pre
           <h2 id="delivery-title">Where implementation stands</h2>
         </div>
         <p class="section-intro">
-          Snapshot as of 26 October 2026. Phase 1 supplies the pure algorithms
-          and domain rules; it does not yet make this workflow live. Each later
-          phase ends at a review gate.
+          Local implementation on the blockchain branch as of 20 November 2026.
+          The implementation plan records the tests and review status for each
+          phase.
         </p>
         <ol class="phase-grid">
           <li class="done">
-            <small>01 / Complete · awaiting review</small
+            <small>01 / Complete</small
             ><strong
               >Canonical records, receipts &amp; cryptographic domain</strong
             >
           </li>
-          <li class="next">
-            <small>02 / Next · not started</small
+          <li class="done">
+            <small>02 / Complete</small
             ><strong>Atomic voting cutoff &amp; reproducible receipts</strong>
           </li>
-          <li>
-            <small>03 / Not started</small
+          <li class="done">
+            <small>03 / Complete</small
             ><strong>Consistent immutable sealing &amp; dispatch</strong>
           </li>
-          <li>
-            <small>04 / Not started</small
+          <li class="done">
+            <small>04 / Complete</small
             ><strong>Real anchoring &amp; durable recovery</strong>
           </li>
-          <li>
-            <small>05 / Not started</small
+          <li class="done">
+            <small>05 / Complete</small
             ><strong>Authorized exports &amp; standalone CLI</strong>
           </li>
-          <li>
-            <small>06 / Not started</small
+          <li class="done">
+            <small>06 / Complete</small
             ><strong>Receipt emails &amp; first bundle delivery</strong>
           </li>
-          <li>
-            <small>07 / Not started</small
+          <li class="done">
+            <small>07 / Complete</small
             ><strong>Hosted receipt &amp; verification flows</strong>
           </li>
-          <li>
-            <small>08 / Not started</small
+          <li class="next">
+            <small>08 / Complete</small
             ><strong>Frozen final results &amp; all three PDFs</strong>
           </li>
           <li>
-            <small>09 / Not started</small
+            <small>09 / In progress</small
             ><strong>Rollout rehearsal &amp; release handoff</strong>
           </li>
         </ol>

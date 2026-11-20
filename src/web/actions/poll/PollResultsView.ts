@@ -8,7 +8,7 @@ import type {
   AnswerId,
   UserId,
 } from '@/domain/shared/EntityIds';
-import type { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import type { TotalWeight } from '@/domain/seal/SealValues';
 import type { VotingWeight } from '@/domain/poll/VotingWeight';
 import {
   ParticipantCount,
@@ -23,9 +23,10 @@ import { User } from '@/domain/user/User';
 
 export interface AnswerResult {
   answerId: AnswerId;
-  answerText: AnswerText;
+  answerText: string;
   voteCount: VoteCount;
   weightedVotes: TotalVotingWeight;
+  exactWeight?: TotalWeight;
   percentage: VotingPercentage;
   voters: {
     userId: UserId;
@@ -36,11 +37,15 @@ export interface AnswerResult {
 
 interface QuestionResult {
   questionId: QuestionId;
-  questionText: QuestionText;
+  /** Saved tallies resolve exact decimal ties before display rounding. */
+  winningAnswerId?: AnswerId | null;
+  questionText: string;
   questionType: QuestionType;
   totalVotes: VoteCount;
   totalWeight: TotalVotingWeight;
+  exactTotalWeight?: TotalWeight;
   participantWeight: TotalVotingWeight;
+  exactParticipantWeight?: TotalWeight;
   answers: AnswerResult[];
 }
 
@@ -59,6 +64,7 @@ export interface PollResultsData {
   pollId: PollId;
   totalParticipants: ParticipantCount;
   totalWeight: TotalVotingWeight;
+  exactTotalWeight?: TotalWeight;
   votedParticipants: ParticipantCount;
   questions: QuestionResult[];
   protocolSignWillingness: ProtocolSignWillingnessEntry[];
