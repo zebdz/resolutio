@@ -1,4 +1,4 @@
-// Local scheduler client. Load the bearer from the private site environment.
+// Local scheduler client. Emit timestamped JSON summaries for the superadmin log.
 // Fixed loopback destination and disabled redirects keep it off the public network.
 import 'dotenv/config';
 
@@ -50,22 +50,39 @@ async function run() {
   return { counts };
 }
 
+function log(level, data) {
+  const line = JSON.stringify({
+    timestamp: new Date().toISOString(),
+    source: 'cron',
+    level,
+    ...data,
+  });
+
+  if (level === 'error') {
+    console.error(line);
+  } else {
+    console.log(line);
+  }
+}
+
 try {
   const result = await run();
 
   if (result.error) {
-    console.error(result.error);
+    log('error', { error: result.error });
     process.exitCode = 1;
   } else {
-    console.log(JSON.stringify(result.counts));
+    const failed = result.counts.errors > 0 || result.counts.failed > 0;
+    log(failed ? 'error' : 'info', result.counts);
 
-    if (result.counts.errors || result.counts.failed) {
+    if (failed) {
       process.exitCode = 1;
     }
   }
 } catch {
-  console.error(
-    'Poll seal worker failed. Check service status and bearer configuration.'
-  );
+  log('error', {
+    error:
+      'Poll seal worker failed. Check service status and bearer configuration.',
+  });
   process.exitCode = 1;
 }

@@ -6,7 +6,7 @@ import pg from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '@/generated/prisma/client';
 
-export async function pollDatabase() {
+export async function pollDatabase(timeZone?: 'Europe/Moscow') {
   const connectionString = process.env.POLL_TEST_DATABASE_URL;
 
   if (!connectionString) {
@@ -31,7 +31,9 @@ export async function pollDatabase() {
   await admin.query(`CREATE SCHEMA "${schema}"`);
   const pool = new pg.Pool({
     connectionString,
-    options: `-c search_path=${schema}`,
+    options: [`-c search_path=${schema}`, timeZone && `-c timezone=${timeZone}`]
+      .filter(Boolean)
+      .join(' '),
     application_name: schema,
     max: 6,
   });

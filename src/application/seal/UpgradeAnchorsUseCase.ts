@@ -22,6 +22,20 @@ type DeliveryRecovery = (
   limit: number,
   pollId?: PollId
 ) => Promise<Result<number, SealWorkFailure>>;
+export interface SealRecoveryIssue {
+  readonly pollId?: PollId;
+  readonly operation:
+    | RecoveryItem['kind']
+    | 'discover'
+    | 'deliveries'
+    | 'nudge';
+  readonly code:
+    | AnchorWorkFailure
+    | SealPollFailure
+    | 'seal.errors.anchorSubmissionFailed';
+}
+
+type ReportIssue = (issue: SealRecoveryIssue) => void | Promise<void>;
 const batchLimit = 20;
 export class UpgradeAnchorsUseCase {
   constructor(
@@ -33,10 +47,15 @@ export class UpgradeAnchorsUseCase {
     private readonly deliveries?: DeliveryRecovery
   ) {}
 
-  async execute() {
+  async execute(
+    reportIssue: ReportIssue = (issue) =>
+      console.error('Seal recovery failed', issue)
+  ) {
     const items = await this.reader.discover(batchLimit);
 
     if (!items.success) {
+      await reportIssue({ operation: 'discover', code: items.error });
+
       return items;
     }
 
@@ -52,18 +71,32 @@ export class UpgradeAnchorsUseCase {
     };
 
     for (const item of items.value) {
-      try {
-        const result = await this.process(item);
+      let result: Outcome;
 
-        if (result.success) {
-          counts[result.value]++;
-        } else {
-          counts.errors++;
-          console.error('Seal recovery failed', item.pollId, result.error);
-        }
+      try {
+        result = await this.process(item);
       } catch {
+        result = { success: false, error: 'common.errors.unexpected' };
+      }
+
+      if (!result.success) {
         counts.errors++;
-        console.error('Unexpected seal recovery failure', item.pollId);
+        await reportIssue({
+          pollId: item.pollId,
+          operation: item.kind,
+          code: result.error,
+        });
+        continue;
+      }
+
+      counts[result.value]++;
+
+      if (result.value === 'failed') {
+        await reportIssue({
+          pollId: item.pollId,
+          operation: 'anchor',
+          code: 'seal.errors.anchorSubmissionFailed',
+        });
       }
     }
 
@@ -71,6 +104,8 @@ export class UpgradeAnchorsUseCase {
       const delivered = await this.deliveries(batchLimit);
 
       if (!delivered.success) {
+        await reportIssue({ operation: 'deliveries', code: delivered.error });
+
         return delivered;
       }
 

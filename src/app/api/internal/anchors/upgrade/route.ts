@@ -1,4 +1,5 @@
 /** Authenticated cron entry point. Return batch counts without leaking poll or proof data. */
+import { writeSealRecoveryIssue } from '@/infrastructure/logs/sealWorkerLog';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { createSealRecovery } from '@/infrastructure/anchor/createSealRecovery';
 import { prisma } from '@/infrastructure/database/prisma';
@@ -45,7 +46,9 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
-  const result = await createSealRecovery(prisma, config.value).execute();
+  const result = await createSealRecovery(prisma, config.value).execute(
+    (issue) => writeSealRecoveryIssue('cron', issue)
+  );
 
   return result.success
     ? Response.json(result.value)

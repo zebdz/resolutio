@@ -13,6 +13,12 @@ Hardcoded known log sources, all paths relative to app root (`process.cwd()`):
 ```typescript
 const LOG_SOURCES = [
   { id: 'deploy', path: 'deploy.log', label: 'Deploy Log' },
+  {
+    id: 'seal-worker',
+    path: 'seal-worker.log',
+    label: 'seal-worker.log',
+    json: true,
+  },
   { id: 'sms', path: 'logs/sms-ru.log', label: 'SMS Log', json: true },
   {
     id: 'sms-error',

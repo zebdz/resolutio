@@ -1,4 +1,5 @@
 /** Disclose only the viewer's download capability. Keep session reads and recovery outside the React render. */
+import { writeSealRecoveryIssue } from '@/infrastructure/logs/sealWorkerLog';
 import { after } from 'next/server';
 import { PollId, UserId } from '@/domain/seal/SealValues';
 import { getCurrentUser } from '@/web/lib/session';
@@ -23,7 +24,11 @@ export async function GET(
       const result = await createSealRecovery(prisma).nudge(poll.data);
 
       if (!result.success) {
-        console.error('Seal recovery failed', poll.data, result.error);
+        await writeSealRecoveryIssue('page', {
+          pollId: poll.data,
+          operation: 'nudge',
+          code: result.error,
+        });
       }
     });
   }

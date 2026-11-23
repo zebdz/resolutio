@@ -76,6 +76,7 @@ export class PrismaSealWorkRepository
     limit: number,
     pollId?: PollId
   ): ReturnType<SealRecoveryReader['discover']> {
+    // Anchor deadlines are stored as UTC timestamps without a zone.
     // Released or expired attempts rotate behind untouched work, even if sealing failed.
     try {
       const rows = await this.prisma.$queryRaw`
@@ -86,7 +87,7 @@ export class PrismaSealWorkRepository
         WHERE p.state='FINISHED' AND p.finished_at IS NOT NULL
         AND (${pollId ?? null}::text IS NULL OR p.id=${pollId ?? null})
         AND (c.lease_until IS NULL OR c.lease_until <= CURRENT_TIMESTAMP)
-        AND (a.id IS NULL OR a.next_attempt_at <= CURRENT_TIMESTAMP)
+        AND (a.id IS NULL OR a.next_attempt_at <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))
         ORDER BY c.lease_until NULLS FIRST,p.finished_at,p.id LIMIT ${limit}
       `;
       const result = recoveryItem.array().safeParse(rows);
