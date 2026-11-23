@@ -11,13 +11,18 @@ export interface AIModelInfo {
 }
 
 export const LEGAL_CHECK_MODEL: AIModelInfo = {
-  key: AIModelKey.parse('deepseek'),
-  modelId: ProviderModelId.parse('deepseek-chat'),
-  displayName: 'DeepSeek V3',
+  key: AIModelKey.parse('deepseek-flash'),
+  modelId: ProviderModelId.parse('deepseek-flash'),
+  displayName: 'DeepSeek V4.1 Flash',
 };
 
 const historicalModels: readonly AIModelInfo[] = [
   LEGAL_CHECK_MODEL,
+  {
+    key: AIModelKey.parse('deepseek'),
+    modelId: ProviderModelId.parse('deepseek-chat'),
+    displayName: 'DeepSeek V3',
+  },
   {
     key: AIModelKey.parse('google'),
     modelId: ProviderModelId.parse('gemini-2.5-flash'),
@@ -25,9 +30,12 @@ const historicalModels: readonly AIModelInfo[] = [
   },
 ];
 
-export const AVAILABLE_MODEL_KEYS: readonly AIModelKey[] = [
-  LEGAL_CHECK_MODEL.key,
-];
+// Older open browser tabs still submit the original provider key.
+export function resolveLegalCheckModel(key: unknown): AIModelKey | undefined {
+  return key === LEGAL_CHECK_MODEL.key || key === 'deepseek'
+    ? LEGAL_CHECK_MODEL.key
+    : undefined;
+}
 
 export function getAIModelInfo(key: string): AIModelInfo | undefined {
   return historicalModels.find((model) => model.key === key);

@@ -20,10 +20,8 @@ import {
 } from '@/infrastructure/index';
 import { PrismaLegalCheckRepository } from '@/infrastructure/repositories/PrismaLegalCheckRepository';
 import { PrismaSystemSettingRepository } from '@/infrastructure/repositories/PrismaSystemSettingRepository';
-import {
-  AIProviderAdapter,
-  AVAILABLE_MODELS,
-} from '@/infrastructure/ai/AIProviderAdapter';
+import { AIProviderAdapter } from '@/infrastructure/ai/AIProviderAdapter';
+import { resolveLegalCheckModel } from '@/application/ai/modelRegistry';
 import { AnalyzePollLegalityUseCase } from '@/application/ai/AnalyzePollLegalityUseCase';
 import { legalAnalysisResultSchema } from '@/application/ai/legalAnalysisSchema';
 import { LegalCheck } from '@/domain/ai/LegalCheck';
@@ -84,9 +82,9 @@ export async function POST(
     );
   }
 
-  const model = typeof body.model === 'string' ? body.model : '';
+  const model = resolveLegalCheckModel(body?.model);
 
-  if (!AVAILABLE_MODELS.some((key) => key === model)) {
+  if (!model) {
     return NextResponse.json(
       { error: await translateErrorCode(AIErrors.INVALID_MODEL) },
       { status: 400 }

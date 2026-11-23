@@ -82,3 +82,31 @@ it('rejects Gemini for new checks while preserving its historical display name',
   expect(mocks.validate).not.toHaveBeenCalled();
   expect(mocks.generate).not.toHaveBeenCalled();
 });
+
+it.each(['deepseek', 'deepseek-flash'])(
+  'routes %s to the current Flash model and preserves earlier analysis labels',
+  async (model) => {
+    const { LEGAL_CHECK_MODEL, getAIModelInfo } =
+      await import('@/application/ai/modelRegistry');
+    const { getDeepSeekModel } =
+      await import('@/infrastructure/ai/providers/deepseek');
+    expect(getDeepSeekModel().modelId).toBe('deepseek-flash');
+    expect(LEGAL_CHECK_MODEL.displayName).toBe('DeepSeek V4.1 Flash');
+    expect(getAIModelInfo('deepseek')?.displayName).toBe('DeepSeek V3');
+    mocks.validate.mockResolvedValue({
+      success: false,
+      error: AIErrors.POLL_NOT_FOUND,
+    });
+    await POST(
+      new NextRequest('http://localhost/api/polls/poll-1/legal-check', {
+        method: 'POST',
+        body: JSON.stringify({ model }),
+      }),
+      { params: Promise.resolve({ pollId: 'poll-1' }) }
+    );
+    expect(mocks.validate).toHaveBeenCalledWith(
+      expect.objectContaining({ model: LEGAL_CHECK_MODEL.key })
+    );
+    expect(LEGAL_CHECK_MODEL.key).not.toBe('deepseek');
+  }
+);
