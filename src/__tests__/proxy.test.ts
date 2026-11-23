@@ -1,16 +1,6 @@
+/** Exercise request limits, HTTPS enforcement and locale redirects at the public proxy boundary. */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
-
-// Mock next-intl/middleware before importing proxy
-vi.mock('next-intl/middleware', () => ({
-  default: () => {
-    return async () => {
-      const { NextResponse } = await import('next/server');
-
-      return NextResponse.next();
-    };
-  },
-}));
 
 vi.mock('../i18n/routing', () => ({
   routing: { locales: ['en', 'ru'], defaultLocale: 'ru' },
@@ -266,6 +256,24 @@ describe('proxy middleware https enforcement', () => {
       'https://localhost:3000/en/login?next=1'
     );
   });
+
+  it.each(['https://resolutio.site', 'https://beta.resolutio.site'])(
+    'production: sends the post-save polls redirect to %s behind a loopback proxy',
+    async (origin) => {
+      vi.stubEnv('NODE_ENV', 'production');
+      vi.stubEnv('NEXT_PUBLIC_APP_URL', origin);
+      const request = makeRequest('/polls?view=mine', {
+        forwardedProto: 'https',
+      });
+      request.headers.set('accept-language', 'en');
+      const response = await middleware(request);
+
+      expect(response.status).toBe(307);
+      expect(response.headers.get('location')).toBe(
+        origin + '/en/polls?view=mine'
+      );
+    }
+  );
 
   it('production: leaves https requests alone', async () => {
     vi.stubEnv('NODE_ENV', 'production');

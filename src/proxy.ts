@@ -1,3 +1,5 @@
+/** Apply locale routing, access limits and HTTPS redirects at the application
+ * boundary. Browser redirects use the public origin configured for this site. */
 import { NextRequest, NextResponse } from 'next/server';
 import createMiddleware from 'next-intl/middleware';
 import { routing } from './i18n/routing';
@@ -96,7 +98,7 @@ function captureReturnTo(
   return response;
 }
 
-export default async function middleware(request: NextRequest) {
+async function routeRequest(request: NextRequest) {
   const httpsRedirect = redirectToHttps(request);
 
   if (httpsRedirect) {
@@ -210,6 +212,27 @@ export default async function middleware(request: NextRequest) {
   }
 
   return captureReturnTo(request, await intlMiddleware(request));
+}
+
+export default async function middleware(request: NextRequest) {
+  const response = await routeRequest(request);
+  const location = response.headers.get('location');
+  const site = process.env.NEXT_PUBLIC_APP_URL;
+
+  if (process.env.NODE_ENV === 'production' && site && location) {
+    // Next.js constructs the request URL from its loopback listener behind nginx.
+    const destination = new URL(location, request.url);
+
+    if (destination.host === request.nextUrl.host) {
+      const publicUrl = new URL(site);
+      publicUrl.pathname = destination.pathname;
+      publicUrl.search = destination.search;
+      publicUrl.hash = destination.hash;
+      response.headers.set('location', publicUrl.href);
+    }
+  }
+
+  return response;
 }
 
 export const config = {

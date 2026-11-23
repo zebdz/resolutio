@@ -151,7 +151,7 @@ jobs:
           for name in DATABASE_URL ANCHOR_POLLER_SECRET TURNSTILE_SECRET_KEY OTP_CODE_SECRET OTP_EXPIRY_MINUTES OTP_MAX_ATTEMPTS SMS_RU_API_ID SMS_RU_TEST_MODE SMS_RU_MAX_COST_RUBLES DEEPSEEK_API_KEY GOOGLE_GENERATIVE_AI_KEY DADATA_API_KEY SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASSWORD SMTP_FROM PORT; do
             printf '%s=%s\n' "$name" "${!name}" >> "$runtime_env"
           done
-          printf 'ANCHOR_PROVIDER=opentimestamps\nNEXT_PUBLIC_API_URL=%s\n' "$SITE_URL" >> "$runtime_env"
+          printf 'ANCHOR_PROVIDER=opentimestamps\nNEXT_PUBLIC_API_URL=%s\nNEXT_PUBLIC_APP_URL=%s\n' "$SITE_URL" "$SITE_URL" >> "$runtime_env"
           for name in OTS_CALENDAR_URLS OTS_ESPLORA_URL OTS_TIMEOUT_MS; do
             if [[ -n "${!name}" ]]; then printf '%s=%s\n' "$name" "${!name}" >> "$runtime_env"; fi
           done
