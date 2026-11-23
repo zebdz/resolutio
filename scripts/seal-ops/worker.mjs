@@ -1,9 +1,10 @@
-// Local scheduler client. Emit timestamped JSON summaries for the superadmin log.
+// Local scheduler client. Log dated counts and affected poll IDs for the superadmin.
 // Fixed loopback destination and disabled redirects keep it off the public network.
 import 'dotenv/config';
+import { z } from 'zod';
 
 const port = process.env.PORT ?? '3000';
-const fields = [
+const outcomes = [
   'submitted',
   'confirmed',
   'pending',
@@ -11,8 +12,12 @@ const fields = [
   'idle',
   'busy',
   'errors',
-  'deliveries',
 ];
+const fields = [...outcomes, 'deliveries'];
+const pollGroups = z.partialRecord(
+  z.enum(outcomes),
+  z.array(z.string().regex(/^[A-Za-z0-9_-]{1,256}$/))
+);
 
 async function run() {
   if (
@@ -47,7 +52,21 @@ async function run() {
     return { error: 'Invalid worker counts' };
   }
 
-  return { counts };
+  // A server on the preceding release returns counts alone.
+  if (body.pollIds === undefined) {
+    return { counts };
+  }
+
+  const ids = pollGroups.safeParse(body.pollIds);
+
+  if (
+    !ids.success ||
+    outcomes.some((key) => (ids.data[key]?.length ?? 0) !== counts[key])
+  ) {
+    return { error: 'Invalid worker poll IDs' };
+  }
+
+  return { counts, pollIds: ids.data };
 }
 
 function log(level, data) {
@@ -73,7 +92,10 @@ try {
     process.exitCode = 1;
   } else {
     const failed = result.counts.errors > 0 || result.counts.failed > 0;
-    log(failed ? 'error' : 'info', result.counts);
+    log(failed ? 'error' : 'info', {
+      ...result.counts,
+      pollIds: result.pollIds,
+    });
 
     if (failed) {
       process.exitCode = 1;
