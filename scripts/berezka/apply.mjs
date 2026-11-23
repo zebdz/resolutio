@@ -1,6 +1,7 @@
 /** Stage private blobs in independently committed batches. Recheck identities under write locks
  * and publish all native accounts, governance and verified historical records in one transaction. */
 import { publishNative, restoreQuestionOwners } from './native-import.mjs';
+import { newAccountContact } from './matching.mjs';
 import { prepareImport } from './project.mjs';
 import { readFile } from 'node:fs/promises';
 import { join, extname } from 'node:path';
@@ -87,6 +88,7 @@ async function publish(db, data, match) {
     const u = users.get(d.legacyId);
 
     if (d.action === 'create') {
+      const contact = newAccountContact(u, d);
       const [last, first, middle] = u.name.split('(')[0].trim().split(/\s+/);
       await db.query(
         `insert into users(id,first_name,last_name,middle_name,phone_number,password,nickname,email,
@@ -98,12 +100,12 @@ async function publish(db, data, match) {
           first,
           last,
           middle ?? null,
-          '+7' + u.phone,
+          contact.phone,
           'bcrypt:' + u.password,
           d.nickname,
-          u.email?.trim().toLowerCase() || null,
+          contact.email,
           asUtc(u.created_at),
-          u.id !== 117,
+          u.id !== 117 && !d.createContact,
         ]
       );
     }

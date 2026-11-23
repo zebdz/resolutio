@@ -19,10 +19,6 @@ vi.mock('@/infrastructure/index', () => ({
     }
   },
 }));
-vi.mock('@/infrastructure/ai/AIProviderAdapter', () => ({
-  AIProviderAdapter: class {},
-  AVAILABLE_MODELS: ['deepseek'],
-}));
 vi.mock('@/infrastructure/ai/AILogger', () => ({ AILogger: class {} }));
 vi.mock('ai', () => ({
   generateText: mocks.generate,
@@ -65,3 +61,24 @@ it.each([
     expect(mocks.generate).not.toHaveBeenCalled();
   }
 );
+
+it('rejects Gemini for new checks while preserving its historical display name', async () => {
+  const { getAIModelInfo } = await import('@/application/ai/modelRegistry');
+  expect(getAIModelInfo('google')?.displayName).toBe('Gemini 2.5 Flash');
+  const request = new NextRequest(
+    'http://localhost/api/polls/poll-1/legal-check',
+    {
+      method: 'POST',
+      body: JSON.stringify({ model: 'google' }),
+    }
+  );
+  const response = await POST(request, {
+    params: Promise.resolve({ pollId: 'poll-1' }),
+  });
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({
+    error: 'translated:' + AIErrors.INVALID_MODEL,
+  });
+  expect(mocks.validate).not.toHaveBeenCalled();
+  expect(mocks.generate).not.toHaveBeenCalled();
+});

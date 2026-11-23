@@ -38,7 +38,12 @@ it('continues past a rejected seal and scans for deliveries even when anchors ar
   });
   expect(result).toMatchObject({
     success: true,
-    value: { idle: 1, errors: 1, deliveries: 2 },
+    value: {
+      idle: 1,
+      errors: 1,
+      deliveries: 2,
+      pollIds: { idle: [ready], errors: [broken] },
+    },
   });
   expect(anchor.execute).toHaveBeenCalledOnce();
   reader.discover.mockResolvedValueOnce(success([]));

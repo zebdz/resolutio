@@ -1,5 +1,5 @@
 /** Reconcile durable gaps between finishing, sealing, anchoring and first delivery.
- * Each item uses the same fenced operations as immediate finish and poll-specific nudges. */
+ * Report each processed poll under its outcome in the private scheduler summary. */
 import { success, Result } from '@/domain/shared/Result';
 import { PollId } from '@/domain/seal/SealValues';
 import { IdGenerator } from '@/application/shared/EntityCreation';
@@ -70,6 +70,8 @@ export class UpgradeAnchorsUseCase {
       deliveries: 0,
     };
 
+    const pollIds: Partial<Record<AnchorWorkOutcome | 'errors', PollId[]>> = {};
+
     for (const item of items.value) {
       let result: Outcome;
 
@@ -79,8 +81,11 @@ export class UpgradeAnchorsUseCase {
         result = { success: false, error: 'common.errors.unexpected' };
       }
 
+      const outcome = result.success ? result.value : 'errors';
+      counts[outcome]++;
+      (pollIds[outcome] ??= []).push(item.pollId);
+
       if (!result.success) {
-        counts.errors++;
         await reportIssue({
           pollId: item.pollId,
           operation: item.kind,
@@ -88,8 +93,6 @@ export class UpgradeAnchorsUseCase {
         });
         continue;
       }
-
-      counts[result.value]++;
 
       if (result.value === 'failed') {
         await reportIssue({
@@ -112,7 +115,7 @@ export class UpgradeAnchorsUseCase {
       counts.deliveries = delivered.value;
     }
 
-    return success(counts);
+    return success({ ...counts, pollIds });
   }
 
   async deliverForPoll(pollId: PollId) {

@@ -2,6 +2,7 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { z } from 'zod';
 import { matchAccounts } from './matching.mjs';
 
 export const packageDigest =
@@ -65,6 +66,24 @@ export async function readPackage(dir) {
   return { data };
 }
 
+// A contact correction applies only to a newly created account. Source evidence stays intact.
+const accountId = z.string().regex(/^[A-Za-z0-9_-]{1,256}$/);
+const reviewedPhone = z.string().regex(/^\+7[0-9]{10}$/);
+const overrideSchema = z.union([
+  z.null(),
+  accountId,
+  z.strictObject({
+    action: z.literal('reuse'),
+    targetId: accountId,
+    confirmedPhone: reviewedPhone,
+  }),
+  z.strictObject({
+    action: z.literal('create'),
+    phone: reviewedPhone,
+    email: z.null(),
+  }),
+]);
+
 export async function preflight(db, data, overrides) {
   const users = data.rows.users;
 
@@ -72,11 +91,7 @@ export async function preflight(db, data, overrides) {
     !overrides ||
     Array.isArray(overrides) ||
     typeof overrides !== 'object' ||
-    Object.values(overrides).some(
-      (v) =>
-        v !== null &&
-        (typeof v !== 'string' || !/^[A-Za-z0-9_-]{1,256}$/.test(v))
-    )
+    Object.values(overrides).some((v) => !overrideSchema.safeParse(v).success)
   ) {
     return { error: 'Invalid overrides object' };
   }
@@ -101,6 +116,7 @@ export async function preflight(db, data, overrides) {
   let persisted = {};
   let imported = false;
   const invalidMappings = new Set();
+  const effectiveOverrides = { ...overrides };
 
   if (schema.rows[0].accounts) {
     const mappings = await db.query(
@@ -126,6 +142,24 @@ export async function preflight(db, data, overrides) {
         const a = approved.get(u.id),
           m = actual.get(u.id);
 
+        const correction = overrides[u.id];
+
+        if (
+          correction?.action === 'create' &&
+          correction.phone !== a?.createContact?.phone
+        ) {
+          invalidMappings.add(u.id);
+        }
+
+        if (
+          a?.createContact &&
+          (correction == null ||
+            correction === 'create' ||
+            correction === m?.user_id)
+        ) {
+          effectiveOverrides[u.id] = { action: 'create', ...a.createContact };
+        }
+
         if (
           !m ||
           !a ||
@@ -143,7 +177,12 @@ export async function preflight(db, data, overrides) {
   }
 
   const collision = orgs.rows.some((org) => org.id !== orgId || !imported);
-  const decisions = matchAccounts(users, accounts.rows, persisted, overrides);
+  const decisions = matchAccounts(
+    users,
+    accounts.rows,
+    persisted,
+    effectiveOverrides
+  );
 
   for (const d of decisions) {
     if (invalidMappings.has(d.legacyId)) {

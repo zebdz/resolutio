@@ -18,8 +18,9 @@ it('logs a dated run summary on idle ticks and a dated error on HTTP failures', 
     deliveries: 0,
   };
   let status = 200;
+  let body: object = counts;
   const server = createServer((_req, res) =>
-    res.writeHead(status).end(JSON.stringify(counts))
+    res.writeHead(status).end(JSON.stringify(body))
   );
   server.listen(0, '127.0.0.1');
 
@@ -45,6 +46,28 @@ it('logs a dated run summary on idle ticks and a dated error on HTTP failures', 
       timestamp: expect.stringMatching(/Z$/),
       level: 'info',
       source: 'cron',
+    });
+    const pollIds = {
+      submitted: ['poll-1'],
+      pending: ['poll-2'],
+      confirmed: ['poll-3'],
+    };
+    body = { ...counts, submitted: 1, pending: 1, confirmed: 1, pollIds };
+    expect(JSON.parse((await run()).stdout)).toMatchObject({
+      pollIds,
+      level: 'info',
+    });
+    body = {
+      ...counts,
+      failed: 1,
+      errors: 1,
+      pollIds: { failed: ['poll-4'], errors: ['poll-5'] },
+    };
+    await expect(run()).rejects.toMatchObject({
+      code: 1,
+      stderr: expect.stringContaining(
+        '"pollIds":{"failed":["poll-4"],"errors":["poll-5"]}'
+      ),
     });
     status = 503;
     await expect(run()).rejects.toMatchObject({

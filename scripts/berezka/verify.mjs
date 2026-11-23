@@ -256,24 +256,27 @@ export async function verify(db, data, { publishing = false } = {}) {
       u.allow_find_by_phone,ad.one_line,ad.street,ad.city,ad.country,ad.is_private_house,u.nickname,u.language
       from users u left join addresses ad on ad.user_id=u.id join berezka.accounts a on a.user_id=u.id where a.created order by a.legacy_id`);
     const originals = new Map(rows.users.map((u) => [u.id, u]));
-    const nicknames = new Map(initial.map((d) => [d.legacyId, d.nickname]));
+    const decisions = new Map(initial.map((d) => [d.legacyId, d]));
 
     for (const p of profiles.rows) {
       const u = originals.get(p.legacy_id);
+      const decision = decisions.get(p.legacy_id);
+      const correction = decision.createContact;
       const full = [p.last_name, p.first_name, p.middle_name]
         .filter(Boolean)
         .join(' ');
 
       if (
         full !== u.name.split('(')[0].trim().replace(/\s+/g, ' ') ||
-        p.phone_number !== '+7' + u.phone ||
-        p.email !== (u.email?.trim().toLowerCase() || null) ||
+        p.phone_number !== (correction?.phone ?? '+7' + u.phone) ||
+        p.email !==
+          (correction ? null : u.email?.trim().toLowerCase() || null) ||
         p.email_confirmed_at !== null ||
-        Boolean(p.confirmed_at) !== (u.id !== 117) ||
+        Boolean(p.confirmed_at) !== (u.id !== 117 && !correction) ||
         p.password !== 'bcrypt:' + u.password ||
         p.consent_given_at !== null ||
         p.language !== 'ru' ||
-        p.nickname !== nicknames.get(u.id) ||
+        p.nickname !== decision.nickname ||
         !p.allow_find_by_address ||
         !p.allow_find_by_name ||
         !p.allow_find_by_phone ||

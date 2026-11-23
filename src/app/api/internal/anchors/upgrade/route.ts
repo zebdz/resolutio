@@ -1,4 +1,4 @@
-/** Authenticated cron entry point. Return batch counts without leaking poll or proof data. */
+/** Authenticated cron entry point. Return batch counts and poll IDs by outcome for the private scheduler log. */
 import { writeSealRecoveryIssue } from '@/infrastructure/logs/sealWorkerLog';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { createSealRecovery } from '@/infrastructure/anchor/createSealRecovery';

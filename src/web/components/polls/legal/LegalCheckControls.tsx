@@ -1,12 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+/** Run a poll legality check with the configured model and show its name before submission. */
 import { useTranslations } from 'next-intl';
 import { ShieldCheckIcon } from '@heroicons/react/24/outline';
 import { Button } from '@/src/web/components/catalyst/button';
-import { Select } from '@/src/web/components/catalyst/select';
-import { Field, Label } from '@/src/web/components/catalyst/fieldset';
-import { AI_MODELS } from '@/application/ai/modelRegistry';
+import { LEGAL_CHECK_MODEL } from '@/application/ai/modelRegistry';
 
 interface LegalCheckControlsProps {
   isAnalyzing: boolean;
@@ -29,27 +27,18 @@ export function LegalCheckControls({
   onCheckLegality,
 }: LegalCheckControlsProps) {
   const t = useTranslations('legalCheck');
-  const [model, setModel] = useState<string>(AI_MODELS[0].key);
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-      <Field className="sm:w-44">
-        <Label className="text-sm">{t('selectModel')}</Label>
-        <Select
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          disabled={isAnalyzing || !canRun}
-        >
-          {AI_MODELS.map((m) => (
-            <option key={m.key} value={m.key}>
-              {m.displayName}
-            </option>
-          ))}
-        </Select>
-      </Field>
+      <div className="text-sm">
+        <div className="text-zinc-500 dark:text-zinc-400">
+          {t('selectModel')}
+        </div>
+        <div className="font-medium">{LEGAL_CHECK_MODEL.displayName}</div>
+      </div>
       <Button
         color="amber"
-        onClick={() => onCheckLegality(model)}
+        onClick={() => onCheckLegality(LEGAL_CHECK_MODEL.key)}
         disabled={isAnalyzing || hasUnsavedChanges || !canRun}
       >
         <ShieldCheckIcon data-slot="icon" />
