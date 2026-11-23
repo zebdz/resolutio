@@ -152,3 +152,46 @@ test('plans a missing unconfirmed source email for reuse without overwriting an 
     false
   );
 });
+
+test('separates crossed contacts with an explicitly reviewed new phone and empty email', () => {
+  const other = {
+    ...source,
+    id: 2,
+    name: 'Other Person',
+    phone: '9990005678',
+    email: null,
+  };
+  const existing = { ...target, full_name: other.name };
+  const correction = { action: 'create', phone: '+79990005678', email: null };
+  const [created, reused] = matchAccounts(
+    [source, other],
+    [existing],
+    {},
+    { 1: correction, 2: existing.id }
+  );
+  assert.equal(created.action, 'create');
+  assert.deepEqual(created.createContact, {
+    phone: correction.phone,
+    email: null,
+  });
+  assert.equal(reused.targetId, existing.id);
+  assert.equal(reused.addSourceEmail, false);
+  assert.equal(created.candidates[0].byEmail, true);
+});
+
+test('reviews a placeholder owner against the independently confirmed destination phone and account', () => {
+  const placeholder = { ...source, id: 117, phone: '1234567890' };
+  const options = {
+    117: {
+      action: 'reuse',
+      targetId: target.id,
+      confirmedPhone: target.phone_number,
+    },
+  };
+  const decide = (account) =>
+    matchAccounts([placeholder], [account], {}, options)[0].action;
+  assert.equal(decide(target), 'reuse');
+  assert.equal(decide({ ...target, confirmed_at: null }), 'review');
+  assert.equal(decide({ ...target, phone_number: '+79990005678' }), 'review');
+  assert.equal(decide({ ...target, id: 'wrong' }), 'review');
+});

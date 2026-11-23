@@ -96,6 +96,7 @@ export function matchAccounts(users, targets, persisted = {}, overrides = {}) {
   }
 
   const ids = new Set(targets.map((t) => t.id));
+  const occupiedPhones = new Set(targets.map((t) => phone(t.phone_number)));
   const nicknames = new Set(targets.map((t) => normalize(t.nickname)));
   const sources = new Map(users.map((u) => [u.id, u]));
 
@@ -103,7 +104,19 @@ export function matchAccounts(users, targets, persisted = {}, overrides = {}) {
     const { legacyId, candidates } = decision;
     const saved = persisted[legacyId];
     const override = overrides[legacyId];
-    const chosen = saved ?? override;
+    const corrected = override?.action === 'create';
+
+    if (corrected) {
+      decision.createContact = { phone: override.phone, email: null };
+    }
+
+    const reviewedReuse = override?.action === 'reuse';
+    const requested = corrected
+      ? 'create'
+      : reviewedReuse
+        ? override.targetId
+        : override;
+    const chosen = saved ?? requested;
 
     if (chosen !== undefined && chosen !== null) {
       decision.action = 'review';
@@ -111,9 +124,9 @@ export function matchAccounts(users, targets, persisted = {}, overrides = {}) {
 
       if (
         saved &&
-        override &&
-        override !== saved &&
-        !(override === 'create' && saved === 'berezka-user-' + legacyId)
+        requested &&
+        requested !== saved &&
+        !(requested === 'create' && saved === 'berezka-user-' + legacyId)
       ) {
         continue;
       }
@@ -121,14 +134,25 @@ export function matchAccounts(users, targets, persisted = {}, overrides = {}) {
       if (
         !saved &&
         chosen === 'create' &&
-        !candidates.some((c) => c.byPhone || c.byEmail)
+        (corrected
+          ? legacyId !== 117 && !occupiedPhones.has(override.phone)
+          : !candidates.some((c) => c.byPhone || c.byEmail))
       ) {
         decision.action = 'create';
       } else if (ids.has(chosen)) {
         const account = targets.find((t) => t.id === chosen);
 
         if (
+          reviewedReuse &&
+          (!account.confirmed_at ||
+            phone(account.phone_number) !== override.confirmedPhone)
+        ) {
+          continue;
+        }
+
+        if (
           !saved &&
+          !reviewedReuse &&
           legacyId === 117 &&
           (account.confirmed_at ||
             phone(account.phone_number) !== phone(sources.get(legacyId).phone))
@@ -172,12 +196,14 @@ export function matchAccounts(users, targets, persisted = {}, overrides = {}) {
     if (decision.action === 'reuse') {
       const target = accountsById.get(decision.targetId);
       decision.addSourceEmail = Boolean(
+        !decision.createContact &&
         !target.email &&
         user.email &&
         !occupiedEmails.has(normalize(user.email))
       );
     }
 
+    const contact = newAccountContact(user, decision);
     const keys =
       decision.action === 'reuse'
         ? [
@@ -188,8 +214,8 @@ export function matchAccounts(users, targets, persisted = {}, overrides = {}) {
           ]
         : decision.action === 'create'
           ? [
-              'phone:' + phone(user.phone),
-              ...(user.email ? ['email:' + normalize(user.email)] : []),
+              'phone:' + contact.phone,
+              ...(contact.email ? ['email:' + normalize(contact.email)] : []),
             ]
           : [];
 
@@ -212,4 +238,13 @@ export function matchAccounts(users, targets, persisted = {}, overrides = {}) {
   }
 
   return decisions;
+}
+
+export function newAccountContact(user, decision) {
+  return (
+    decision.createContact ?? {
+      phone: phone(user.phone),
+      email: user.email?.trim().toLowerCase() || null,
+    }
+  );
 }
