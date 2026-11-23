@@ -34,10 +34,16 @@ vi.mock('next-intl', () => ({
   useFormatter: () => ({ dateTime: () => '' }),
 }));
 vi.mock('@/src/i18n/routing', () => ({
-  Link: ({ href, children }: { href: string; children: React.ReactNode }) => (
-    <a href={href}>{children}</a>
+  usePathname: () => '/verify/poll1',
+  Link: ({
+    locale,
+    href,
+    ...props
+  }: React.ComponentProps<'a'> & { locale?: string }) => (
+    <a {...props} href={locale ? '/' + locale + href : href} />
   ),
 }));
+
 const { default: Page } = await import('../page');
 const record = {
   manifest: fixture.record.manifest,
@@ -51,6 +57,16 @@ beforeEach(() => {
   mocks.publicRecord.mockResolvedValue(success(record));
   mocks.user.mockResolvedValue(null);
   mocks.nudge.mockResolvedValue(success('idle'));
+});
+
+it('gives public visitors home, sign-in and language navigation without looking up a session', async () => {
+  const html = renderToStaticMarkup(await Page({ params }));
+  const header = html.match(/<header\b[^>]*>([\s\S]*?)<\/header>/)?.[1];
+  expect(header).toContain('href="/"');
+  expect(header).toContain('href="/login"');
+  expect(header).toContain('Русский');
+  expect(header).not.toContain('href="/account"');
+  expect(mocks.user).not.toHaveBeenCalled();
 });
 
 it('displays five commitments, independent commands and public downloads without requesting private records', async () => {
@@ -117,7 +133,8 @@ it('leaves unpublished poll details private without resolving private recovery r
     error: 'seal.errors.notFound',
   });
   const html = renderToStaticMarkup(await Page({ params }));
-  expect(html).toContain('missing');
-  expect(html).not.toContain('poll1');
+  const content = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)?.[1];
+  expect(content).toContain('missing');
+  expect(content).not.toContain('poll1');
   expect(mocks.after).not.toHaveBeenCalled();
 });

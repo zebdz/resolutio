@@ -201,7 +201,14 @@ test('save a weighted ballot, seal it, and check its retained evidence independe
       owner.request.get(publicUrl, { headers: { accept: 'text/html' } }),
     ]);
     await page.goto(publicUrl);
+    await expect(
+      page.getByRole('banner').getByRole('link', { name: 'Sign In' })
+    ).toHaveAttribute('href', '/en/login');
+    await owner.setViewportSize({ width: 1280, height: 800 });
     await owner.goto(publicUrl);
+    await expect(
+      owner.getByRole('banner').getByRole('link', { name: voter.firstName })
+    ).toHaveAttribute('href', '/en/account');
     await page.waitForLoadState('networkidle');
     const forbidden = [
       title,
@@ -261,11 +268,17 @@ test('save a weighted ballot, seal it, and check its retained evidence independe
         () => document.documentElement.scrollWidth <= window.innerWidth
       )
     ).toBe(true);
-    await page.goto('/ru/verify/' + poll.id);
+    await page
+      .getByRole('banner')
+      .getByRole('link', { name: 'Switch to Русский' })
+      .click();
+    await expect(page).toHaveURL('/ru/verify/' + poll.id);
     await expect(
       page.getByText('Тестовая метка времени', { exact: true })
     ).toBeVisible();
     expect((await page.request.get(api + 'my-proof')).status()).toBe(403);
+    await page.goto(privateUrl);
+    await expect(page).toHaveURL('/en/login');
 
     for (const [route, file] of [
       ['manifest', 'manifest.json'],
@@ -310,6 +323,14 @@ test('save a weighted ballot, seal it, and check its retained evidence independe
       timestamp: 'simulated',
     });
     await owner.goto(privateUrl);
+    await owner.setViewportSize({ width: 390, height: 844 });
+    await owner.getByRole('button', { name: 'Open navigation' }).click();
+    await expect(
+      owner
+        .getByRole('dialog')
+        .getByRole('link', { name: 'Polls', exact: true })
+    ).toHaveAttribute('href', '/en/polls');
+    await owner.getByRole('button', { name: 'Close navigation' }).click();
     await owner.waitForLoadState('networkidle');
     const requests: Request[] = [];
     owner.on('request', (request) => requests.push(request));

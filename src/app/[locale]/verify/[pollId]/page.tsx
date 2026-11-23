@@ -9,6 +9,7 @@ import { readPublicSeal } from '@/infrastructure/repositories/PrismaSealSummarie
 import { SealStatusBadge } from '@/web/components/seal/SealStatusBadge';
 import { CopyDigest } from '@/web/components/seal/CopyDigest';
 import { PublicSealActions } from '@/web/components/seal/PublicSealActions';
+import { VerificationLayout } from '@/web/components/seal/VerificationLayout';
 import { Heading, Subheading } from '@/web/components/catalyst/heading';
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +37,7 @@ export default async function VerifyPage({
     const missing = published.error === 'seal.errors.notFound';
 
     return (
-      <main className="mx-auto max-w-3xl space-y-4 px-4 py-8">
+      <VerificationLayout>
         <Heading>{t('title')}</Heading>
         <p role={missing ? 'status' : 'alert'}>
           {t(missing ? 'missing' : 'loadError')}
@@ -50,7 +51,7 @@ export default async function VerifyPage({
             recover
           />
         )}
-      </main>
+      </VerificationLayout>
     );
   }
 
@@ -59,7 +60,7 @@ export default async function VerifyPage({
   const sections = readManifest(manifest).sections;
 
   return (
-    <main className="mx-auto max-w-3xl space-y-6 px-4 py-8 text-zinc-900 dark:text-zinc-100 sm:px-6">
+    <VerificationLayout>
       <header className="space-y-2">
         <Heading>{t('title')}</Heading>
         <SealStatusBadge status={status} />
@@ -111,6 +112,6 @@ export default async function VerifyPage({
         recover={status.kind !== 'bitcoin'}
         record={{ manifest, rootDigest, proofAvailable }}
       />
-    </main>
+    </VerificationLayout>
   );
 }

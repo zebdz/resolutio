@@ -153,8 +153,8 @@
       "voting": "Voting",
       "publicQuestions": "Public Questions",
       "governance": "Governance & Oversight Bodies",
-      "users": "Users",
-      "documents": "Documents"
+      "voteProof": "Your vote comes with proof",
+      "resultProtection": "Results protected by blockchain"
     }
   },
   "home": {
@@ -1342,6 +1342,7 @@
     }
   },
   "navbar": {
+    "unavailable": "Account navigation is temporarily unavailable.",
     "logo": "ROOO \"NOMOS (Law & Order)\"",
     "logoText": "Decision Making Platform",
     "home": "Home",

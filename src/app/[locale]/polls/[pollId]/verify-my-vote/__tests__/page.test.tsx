@@ -10,6 +10,14 @@ vi.mock('@/web/components/seal/VoterEvidenceLoader', () => ({
 vi.mock('next-intl/server', () => ({
   getTranslations: async () => (k: string) => k,
 }));
+vi.mock('next-intl', () => ({
+  useTranslations: () => (key: string) => key,
+  useLocale: () => 'en',
+}));
+vi.mock('@/src/i18n/routing', () => ({
+  usePathname: () => '/polls/poll1/verify-my-vote',
+  Link: (props: React.ComponentProps<'a'>) => <a {...props} />,
+}));
 import Page from '../page';
 
 it('renders a session-independent shell and sends only the poll ID to its client', async () => {
@@ -18,6 +26,7 @@ it('renders a session-independent shell and sends only the poll ID to its client
     await Page({ params: Promise.resolve({ pollId: 'poll1', locale: 'en' }) })
   );
   expect(mocks.session).not.toHaveBeenCalled();
+  expect(html).toMatch(/<header\b[^>]*>[\s\S]*?<nav\b/);
   expect(html).toContain('checking access');
   expect(mocks.loader.mock.calls[0][0]).toEqual({ pollId: 'poll1' });
 });

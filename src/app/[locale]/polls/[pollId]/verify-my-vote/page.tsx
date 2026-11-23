@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { PollId } from '@/domain/seal/SealValues';
 import { Heading } from '@/web/components/catalyst/heading';
 import { VoterEvidenceLoader } from '@/web/components/seal/VoterEvidenceLoader';
+import { VerificationLayout } from '@/web/components/seal/VerificationLayout';
 
 export default async function VerifyMyVotePage({
   params,
@@ -21,9 +22,9 @@ export default async function VerifyMyVotePage({
   const t = await getTranslations({ locale, namespace: 'sealPrivate' });
 
   return (
-    <main className="mx-auto max-w-3xl space-y-5 px-4 py-8 sm:px-6">
+    <VerificationLayout>
       <Heading>{t('title')}</Heading>
       <VoterEvidenceLoader key={poll.data} pollId={poll.data} />
-    </main>
+    </VerificationLayout>
   );
 }
