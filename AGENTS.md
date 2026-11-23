@@ -49,6 +49,9 @@ A service (web app) that would allow people to unite in organizations, vote, and
 
 - DB: PostgreSQL
 - ORM: Prisma
+- Production uses `resolutio_runtime` in `DATABASE_URL` for the site and `reso` in `MIGRATION_DATABASE_URL` for migrations. Keep the schema-owner credential out of the running app.
+- Review runtime privileges with each migration. Existing table-level grants usually cover added columns. When the app needs access to a new object or a new operation, include explicit least-privilege grants for the site's runtime role in the rollout and verify them as that role before serving traffic. For example, a read-only lookup needs `SELECT`; an insert using a new sequence may also need `USAGE` on that sequence.
+- Keep submitted ballots (`votes`) and `poll_seals` append-only for the runtime role. Grant only `SELECT` and `INSERT` on those tables. Preserve protection against column updates, deletion, truncation, triggers and owner-role access. Run `node scripts/seal-ops/rollout.mjs check-runtime` with the runtime credential. [Runtime grants and rollout checks](readmes/Poll-Seal-Rollout.md)
 - Tables use `@@map` (e.g. `organizations`, not `"Organization"`) and columns use `@map` (e.g. `archived_at`, not `"archivedAt"`). Always check `prisma/schema.prisma` for actual DB names when writing raw SQL.
 - `Prisma.empty` is broken in `$queryRaw` tagged templates (Prisma v7) — it corrupts parameter numbering. Use separate query branches instead of conditional SQL fragments.
 - `Prisma.join` works fine for `NOT IN` clauses inside `$queryRaw` tagged templates.
