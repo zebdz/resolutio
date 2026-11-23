@@ -1,3 +1,4 @@
+/** Allowlisted local files for the superadmin log viewer and its archives. */
 import fs from 'fs';
 import path from 'path';
 
@@ -8,7 +9,15 @@ export interface LogSource {
   json: boolean;
 }
 
+export const sealWorkerLog = {
+  id: 'seal-worker',
+  path: 'seal-worker.log',
+  label: 'seal-worker.log',
+  json: true,
+};
+
 export const LOG_SOURCES: LogSource[] = [
+  sealWorkerLog,
   { id: 'deploy', path: 'deploy.log', label: 'Deploy Log', json: false },
   { id: 'sms', path: 'logs/sms-ru.log', label: 'SMS Log', json: true },
   {

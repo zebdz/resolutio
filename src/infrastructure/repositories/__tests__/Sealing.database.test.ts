@@ -15,12 +15,12 @@ import {
   SealWorkOwner,
   SealLeaseSeconds,
 } from '@/application/seal/SealWorkRepository';
-import { PollId } from '@/domain/seal/SealValues';
+import { PollId, UtcTimestamp } from '@/domain/seal/SealValues';
 import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
 
 let db: Awaited<ReturnType<typeof pollDatabase>>;
 beforeAll(async () => {
-  db = await pollDatabase();
+  db = await pollDatabase('Europe/Moscow');
 }, 30000);
 afterAll(async () => {
   await db?.close();
@@ -168,6 +168,25 @@ async function fixture() {
     transaction,
   };
 }
+
+it('allows immediate timestamp submission with a non-UTC database session', async () => {
+  const { useCase, command } = await fixture();
+  const before = Date.now();
+  const result = expectSuccess(await useCase.execute(command));
+
+  if (result.status !== 'sealed') {
+    return expect.unreachable();
+  }
+
+  const now = new Date();
+  expect(result.seal.anchorWork(UtcTimestamp.fromDate(now))).toEqual({
+    success: true,
+    value: { kind: 'submit', previous: null },
+  });
+  expect(Date.parse(result.seal.manifest.sealedAt)).toBeGreaterThanOrEqual(
+    before
+  );
+});
 
 it('captures late metadata, archived definitions, exact weights and historical holdings once', async () => {
   const f = await fixture();

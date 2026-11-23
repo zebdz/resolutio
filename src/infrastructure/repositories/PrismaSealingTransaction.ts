@@ -37,9 +37,11 @@ export class PrismaSealingTransaction implements SealingTransaction {
               return failure(Failure.parse(locked.error));
             }
 
+            // Return a UTC timestamp without an offset: the pg adapter otherwise
+            // relabels the session's local timestamptz clock reading as UTC.
             const [clock] = await tx.$queryRaw<
               { at: Date }[]
-            >`SELECT clock_timestamp() AS at`;
+            >`SELECT clock_timestamp() AT TIME ZONE 'UTC' AS at`;
             const result = await work({
               snapshot: new PrismaPollRecordSnapshotReader(tx),
               seals: new PrismaPollSealRepository(tx, claim),
