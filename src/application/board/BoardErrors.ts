@@ -7,3 +7,10 @@ export const BoardErrors = {
   NOT_MEMBER: 'board.errors.notMember',
   LEAVE_FAILED: 'board.errors.leaveFailed',
 } as const;
+
+export type BoardError = (typeof BoardErrors)[keyof typeof BoardErrors];
+export type BoardUseCaseError =
+  | BoardError
+  | import('@/domain/board/Board').BoardFailure
+  | import('../organization/OrganizationErrors').OrganizationError
+  | 'common.errors.validationFailed';

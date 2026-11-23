@@ -1,3 +1,21 @@
+/** Application client regressions exercise typed question/answer creation and editing.
+ * Raw requests remain transport values; fixtures supply deterministic identity/time. */
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { BoardId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { PollId } from '@/domain/shared/EntityIds';
+import { QuestionId, AnswerId } from '@/domain/shared/EntityIds';
+import { questionClock } from './questionTestValues';
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DeleteQuestionUseCase } from '../DeleteQuestionUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -22,36 +40,42 @@ describe('DeleteQuestionUseCase', () => {
   beforeEach(() => {
     // Create a poll
     const pollResult = Poll.create(
-      'Test Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'user-1',
-      new Date('2026-01-15'),
-      new Date('2026-02-15')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
-    poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    poll = expectSuccess(pollResult);
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      id: 'poll-1',
+    });
 
     // Create a question
     const questionResult = Question.create(
-      'Question to delete',
-      'poll-1',
-      1,
-      0,
+      QuestionText.parse('Question to delete'),
+      PollId.parse('poll-1'),
+      testCreation(QuestionId, 'question-1'),
+      PageNumber.parse(1),
+      SortOrder.parse(0),
       'single-choice'
     );
-    question = questionResult.value;
-    (question as any).props.id = 'question-1';
+    question = expectSuccess(questionResult);
 
     // Mock repositories
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
     };
 
     questionRepository = {
       getQuestionById: vi.fn().mockResolvedValue(success(question)),
-      deleteQuestion: vi.fn().mockResolvedValue(success(undefined)),
+      updateQuestion: vi.fn().mockResolvedValue(success(undefined)),
     };
 
     voteRepository = {
@@ -66,7 +90,8 @@ describe('DeleteQuestionUseCase', () => {
       pollRepository as PollRepository,
       questionRepository as QuestionRepository,
       voteRepository as VoteRepository,
-      userRepository as UserRepository
+      userRepository as UserRepository,
+      questionClock
     );
   });
 
@@ -77,9 +102,7 @@ describe('DeleteQuestionUseCase', () => {
     });
 
     expect(result.success).toBe(true);
-    expect(questionRepository.deleteQuestion).toHaveBeenCalledWith(
-      'question-1'
-    );
+    expect(questionRepository.updateQuestion).toHaveBeenCalledWith(question);
   });
 
   it('should fail when question not found', async () => {
@@ -93,7 +116,7 @@ describe('DeleteQuestionUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.QUESTION_NOT_FOUND);
+    expect(expectFailure(result)).toBe(PollErrors.QUESTION_NOT_FOUND);
   });
 
   it('should fail when user is not poll creator', async () => {
@@ -103,25 +126,27 @@ describe('DeleteQuestionUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.NOT_POLL_CREATOR);
+    expect(expectFailure(result)).toBe(PollErrors.NOT_POLL_CREATOR);
   });
 
   it('should fail when poll is active', async () => {
     // Activate poll (need question with answer)
     const questionForActivation = Question.create(
-      'Temp Question',
-      'poll-1',
-      1,
-      0,
+      QuestionText.parse('Temp Question'),
+      PollId.parse('poll-1'),
+      testCreation(QuestionId, 'question-1'),
+      PageNumber.parse(1),
+      SortOrder.parse(0),
       'single-choice'
     );
     const tempAnswer = Answer.create(
-      'Temp Answer',
-      1,
-      questionForActivation.value.id
+      AnswerText.parse('Temp Answer'),
+      SortOrder.parse(1),
+      expectSuccess(questionForActivation).id,
+      testCreation(AnswerId, 'answer-1')
     );
-    questionForActivation.value.addAnswer(tempAnswer.value);
-    poll.addQuestion(questionForActivation.value);
+    expectSuccess(questionForActivation).addAnswer(expectSuccess(tempAnswer));
+    poll.addQuestion(expectSuccess(questionForActivation));
     poll.submitToAdmin();
     poll.takeSnapshot();
     poll.activate();
@@ -132,7 +157,7 @@ describe('DeleteQuestionUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.CANNOT_MODIFY_ACTIVE);
+    expect(expectFailure(result)).toBe(PollErrors.CANNOT_MODIFY_ACTIVE);
   });
 
   it('should fail when poll has votes', async () => {
@@ -144,7 +169,7 @@ describe('DeleteQuestionUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.CANNOT_MODIFY_HAS_VOTES);
+    expect(expectFailure(result)).toBe(PollErrors.CANNOT_MODIFY_HAS_VOTES);
   });
 
   describe('superadmin authorization', () => {
@@ -157,9 +182,7 @@ describe('DeleteQuestionUseCase', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(questionRepository.deleteQuestion).toHaveBeenCalledWith(
-        'question-1'
-      );
+      expect(questionRepository.updateQuestion).toHaveBeenCalledWith(question);
     });
 
     it('should reject non-creator non-superadmin', async () => {
@@ -169,7 +192,7 @@ describe('DeleteQuestionUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollErrors.NOT_POLL_CREATOR);
+      expect(expectFailure(result)).toBe(PollErrors.NOT_POLL_CREATOR);
     });
   });
 });

@@ -1,4 +1,6 @@
 // Token-specific errors only. For org/admin errors, reuse OrganizationErrors.
+import { JoinTokenDomainCode } from '../../domain/organization/JoinTokenDomainCodes';
+import { OrganizationUseCaseFailure } from './OrganizationErrors';
 export const JoinTokenErrors = {
   NOT_FOUND: 'joinToken.errors.notFound',
   EXPIRED: 'joinToken.errors.expired',
@@ -7,3 +9,8 @@ export const JoinTokenErrors = {
 
 export type JoinTokenError =
   (typeof JoinTokenErrors)[keyof typeof JoinTokenErrors];
+
+export type JoinTokenUseCaseFailure =
+  | JoinTokenError
+  | JoinTokenDomainCode
+  | OrganizationUseCaseFailure;

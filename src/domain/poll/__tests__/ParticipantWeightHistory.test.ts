@@ -1,3 +1,13 @@
+/** Audit record clients supply identity/time and preserve historical weight details.
+ * Stored Date values are detached when reconstituted into immutable domain state. */
+import { VotingWeight } from '@/domain/poll/VotingWeight';
+import {
+  ParticipantWeightHistoryId,
+  ParticipantId,
+  PollId,
+  UserId,
+} from '../../shared/EntityIds';
+import { testCreation } from '../../shared/__tests__/creation';
 import { describe, it, expect } from 'vitest';
 import { ParticipantWeightHistory } from '../ParticipantWeightHistory';
 import { SharedDomainCodes } from '../../shared/SharedDomainCodes';
@@ -7,12 +17,13 @@ describe('ParticipantWeightHistory Domain', () => {
   describe('create', () => {
     it('should create history with all data', () => {
       const result = ParticipantWeightHistory.create(
-        'participant-1',
-        'poll-1',
-        'user-1',
-        1.0,
-        2.5,
-        'admin-1',
+        ParticipantId.parse('participant-1'),
+        PollId.parse('poll-1'),
+        UserId.parse('user-1'),
+        VotingWeight.parse(1.0),
+        VotingWeight.parse(2.5),
+        UserId.parse('admin-1'),
+        testCreation(ParticipantWeightHistoryId, 'history-1'),
         'Property reassessment'
       );
 
@@ -32,12 +43,13 @@ describe('ParticipantWeightHistory Domain', () => {
 
     it('should create history without reason', () => {
       const result = ParticipantWeightHistory.create(
-        'participant-1',
-        'poll-1',
-        'user-1',
-        1.0,
-        2.5,
-        'admin-1'
+        ParticipantId.parse('participant-1'),
+        PollId.parse('poll-1'),
+        UserId.parse('user-1'),
+        VotingWeight.parse(1.0),
+        VotingWeight.parse(2.5),
+        UserId.parse('admin-1'),
+        testCreation(ParticipantWeightHistoryId, 'history-1')
       );
 
       expect(result.success).toBe(true);
@@ -49,12 +61,13 @@ describe('ParticipantWeightHistory Domain', () => {
 
     it('should create history with null reason explicitly', () => {
       const result = ParticipantWeightHistory.create(
-        'participant-1',
-        'poll-1',
-        'user-1',
-        1.0,
-        2.5,
-        'admin-1',
+        ParticipantId.parse('participant-1'),
+        PollId.parse('poll-1'),
+        UserId.parse('user-1'),
+        VotingWeight.parse(1.0),
+        VotingWeight.parse(2.5),
+        UserId.parse('admin-1'),
+        testCreation(ParticipantWeightHistoryId, 'history-1'),
         null
       );
 
@@ -68,17 +81,19 @@ describe('ParticipantWeightHistory Domain', () => {
 
   describe('profanity check', () => {
     const mockProfanityChecker: ProfanityChecker = {
+      findProfaneWords: () => [],
       containsProfanity: (text: string) => text.includes('badword'),
     };
 
     it('should reject reason with profanity', () => {
       const result = ParticipantWeightHistory.create(
-        'participant-1',
-        'poll-1',
-        'user-1',
-        1.0,
-        2.5,
-        'admin-1',
+        ParticipantId.parse('participant-1'),
+        PollId.parse('poll-1'),
+        UserId.parse('user-1'),
+        VotingWeight.parse(1.0),
+        VotingWeight.parse(2.5),
+        UserId.parse('admin-1'),
+        testCreation(ParticipantWeightHistoryId, 'history-1'),
         'badword reason',
         mockProfanityChecker
       );
@@ -91,12 +106,13 @@ describe('ParticipantWeightHistory Domain', () => {
 
     it('should pass clean reason with profanityChecker', () => {
       const result = ParticipantWeightHistory.create(
-        'participant-1',
-        'poll-1',
-        'user-1',
-        1.0,
-        2.5,
-        'admin-1',
+        ParticipantId.parse('participant-1'),
+        PollId.parse('poll-1'),
+        UserId.parse('user-1'),
+        VotingWeight.parse(1.0),
+        VotingWeight.parse(2.5),
+        UserId.parse('admin-1'),
+        testCreation(ParticipantWeightHistoryId, 'history-1'),
         'Clean reason',
         mockProfanityChecker
       );
@@ -105,12 +121,13 @@ describe('ParticipantWeightHistory Domain', () => {
 
     it('should pass null reason with profanityChecker', () => {
       const result = ParticipantWeightHistory.create(
-        'participant-1',
-        'poll-1',
-        'user-1',
-        1.0,
-        2.5,
-        'admin-1',
+        ParticipantId.parse('participant-1'),
+        PollId.parse('poll-1'),
+        UserId.parse('user-1'),
+        VotingWeight.parse(1.0),
+        VotingWeight.parse(2.5),
+        UserId.parse('admin-1'),
+        testCreation(ParticipantWeightHistoryId, 'history-1'),
         null,
         mockProfanityChecker
       );
@@ -119,12 +136,13 @@ describe('ParticipantWeightHistory Domain', () => {
 
     it('should pass without profanityChecker (backward compat)', () => {
       const result = ParticipantWeightHistory.create(
-        'participant-1',
-        'poll-1',
-        'user-1',
-        1.0,
-        2.5,
-        'admin-1',
+        ParticipantId.parse('participant-1'),
+        PollId.parse('poll-1'),
+        UserId.parse('user-1'),
+        VotingWeight.parse(1.0),
+        VotingWeight.parse(2.5),
+        UserId.parse('admin-1'),
+        testCreation(ParticipantWeightHistoryId, 'history-1'),
         'Any reason'
       );
       expect(result.success).toBe(true);
@@ -155,7 +173,7 @@ describe('ParticipantWeightHistory Domain', () => {
       expect(history.newWeight).toBe(2.5);
       expect(history.changedBy).toBe('admin-1');
       expect(history.reason).toBe('Correcting initial weight');
-      expect(history.changedAt).toBe(changedAt);
+      expect(history.changedAt).toEqual(changedAt);
     });
   });
 });

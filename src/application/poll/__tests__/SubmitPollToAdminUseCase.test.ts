@@ -1,3 +1,20 @@
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import {
+  pollFixtureCreation,
+  pollFixtureIds,
+  pollFixtureClock,
+} from '@/application/poll/__tests__/pollFixtureCreation';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { QuestionId, AnswerId, PollId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SubmitPollToAdminUseCase } from '../SubmitPollToAdminUseCase';
 import { ReturnPollToDraftUseCase } from '../ReturnPollToDraftUseCase';
@@ -19,26 +36,46 @@ const ADMIN = 'admin-1';
 const OUTSIDER = 'nobody-1';
 
 function makePoll(withQuestion = true): Poll {
-  const poll = Poll.create(
-    'Test Poll',
-    'Test Description',
-    'org-1',
-    null,
-    AUTHOR,
-    new Date('2026-01-01'),
-    new Date('2026-02-01')
-  ).value;
-  (poll as any).props.id = 'poll-1';
+  let poll = expectSuccess(
+    Poll.create(
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      null,
+      UserId.parse(AUTHOR),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-01'), new Date('2026-02-01'))
+      ),
+      testCreation(PollId, 'poll-1')
+    )
+  );
+  poll = Poll.reconstitute({
+    ...poll.toJSON(),
+    questions: poll.questions,
+    id: 'poll-1',
+  });
 
   if (withQuestion) {
-    const question = Question.create(
-      'Question 1',
-      poll.id,
-      1,
-      1,
-      'single-choice'
-    ).value;
-    question.addAnswer(Answer.create('Answer 1', 1, question.id).value);
+    const question = expectSuccess(
+      Question.create(
+        QuestionText.parse('Question 1'),
+        poll.id,
+        pollFixtureCreation(QuestionId),
+        PageNumber.parse(1),
+        SortOrder.parse(1),
+        'single-choice'
+      )
+    );
+    question.addAnswer(
+      expectSuccess(
+        Answer.create(
+          AnswerText.parse('Answer 1'),
+          SortOrder.parse(1),
+          question.id,
+          pollFixtureCreation(AnswerId)
+        )
+      )
+    );
     poll.addQuestion(question);
   }
 
@@ -57,7 +94,7 @@ describe('SubmitPollToAdminUseCase', () => {
     poll = makePoll();
 
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
       updatePoll: vi.fn().mockResolvedValue(success(undefined)),
     };
 
@@ -86,7 +123,9 @@ describe('SubmitPollToAdminUseCase', () => {
       pollRepository as PollRepository,
       organizationRepository as OrganizationRepository,
       userRepository as UserRepository,
-      notificationRepository as NotificationRepository
+      notificationRepository as NotificationRepository,
+      pollFixtureIds,
+      pollFixtureClock
     );
   });
 
@@ -104,7 +143,7 @@ describe('SubmitPollToAdminUseCase', () => {
     const result = await useCase.execute({ pollId: 'poll-1', userId: ADMIN });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.NOT_AUTHORIZED);
+    expect(expectFailure(result)).toBe(PollErrors.NOT_AUTHORIZED);
     expect(poll.state).toBe(PollState.DRAFT);
   });
 
@@ -115,7 +154,7 @@ describe('SubmitPollToAdminUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.NOT_AUTHORIZED);
+    expect(expectFailure(result)).toBe(PollErrors.NOT_AUTHORIZED);
   });
 
   it('allows a superadmin acting for the author', async () => {
@@ -129,12 +168,14 @@ describe('SubmitPollToAdminUseCase', () => {
 
   it('refuses a poll with nothing to vote on', async () => {
     poll = makePoll(false);
-    pollRepository.getPollById = vi.fn().mockResolvedValue(success(poll));
+    pollRepository.getPollById = vi
+      .fn()
+      .mockImplementation(async () => success(poll));
 
     const result = await useCase.execute({ pollId: 'poll-1', userId: AUTHOR });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_NO_QUESTIONS);
+    expect(expectFailure(result)).toBe(PollDomainCodes.POLL_NO_QUESTIONS);
   });
 
   it('notifies the org admins, but not the author', async () => {
@@ -168,7 +209,7 @@ describe('SubmitPollToAdminUseCase', () => {
     const result = await useCase.execute({ pollId: 'poll-1', userId: AUTHOR });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.ORGANIZATION_ARCHIVED);
+    expect(expectFailure(result)).toBe(PollErrors.ORGANIZATION_ARCHIVED);
   });
 });
 
@@ -185,7 +226,7 @@ describe('ReturnPollToDraftUseCase', () => {
     poll.submitToAdmin();
 
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
       updatePoll: vi.fn().mockResolvedValue(success(undefined)),
     };
 
@@ -202,7 +243,9 @@ describe('ReturnPollToDraftUseCase', () => {
       pollRepository as PollRepository,
       organizationRepository as OrganizationRepository,
       userRepository as UserRepository,
-      notificationRepository as NotificationRepository
+      notificationRepository as NotificationRepository,
+      pollFixtureIds,
+      pollFixtureClock
     );
   });
 
@@ -229,7 +272,7 @@ describe('ReturnPollToDraftUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.NOT_AUTHORIZED);
+    expect(expectFailure(result)).toBe(PollErrors.NOT_AUTHORIZED);
     expect(poll.state).toBe(PollState.SUBMITTED);
   });
 
@@ -239,7 +282,7 @@ describe('ReturnPollToDraftUseCase', () => {
     const result = await useCase.execute({ pollId: 'poll-1', userId: AUTHOR });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_SUBMITTED);
+    expect(expectFailure(result)).toBe(PollDomainCodes.POLL_MUST_BE_SUBMITTED);
     expect(poll.state).toBe(PollState.READY);
   });
 

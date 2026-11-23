@@ -1,3 +1,17 @@
+/** Decodes external report commands before authorization and domain behavior.
+ * Identity/time dependencies keep persistence and lifecycle changes deterministic. */
+import { PollWriteFailure } from '../../domain/poll/PollWriteFailure';
+import { ReportUseCaseFailure } from './ReportErrors';
+import { z } from 'zod';
+import {
+  ReportId,
+  OrganizationId,
+  UserId,
+  BoardId,
+  PollId,
+  ReportAttachmentId,
+} from '../../domain/shared/EntityIds';
+import { Clock, IdGenerator, entityCreation } from '../shared/EntityCreation';
 import { Result, failure } from '../../domain/shared/Result';
 import { ReportRepository } from '../../domain/report/ReportRepository';
 import { ReportDomainCodes } from '../../domain/report/ReportDomainCodes';
@@ -6,22 +20,22 @@ import { ReportErrors } from './ReportErrors';
 import { canPollSatisfyReportAudience } from './canPollSatisfyReportAudience';
 
 export interface OrgRepoForAttachPoll {
-  isUserAdmin(userId: string, orgId: string): Promise<boolean>;
+  isUserAdmin(userId: UserId, orgId: OrganizationId): Promise<boolean>;
 }
 
 export interface UserRepoForAttachPoll {
-  isSuperAdmin(userId: string): Promise<boolean>;
+  isSuperAdmin(userId: UserId): Promise<boolean>;
 }
 
 export interface PollRepoForAttachPoll {
-  getPollById(pollId: string): Promise<
+  getPollById(pollId: PollId): Promise<
     Result<
       {
-        organizationId: string;
-        boardId: string | null;
+        organizationId: OrganizationId;
+        boardId: BoardId | null;
         state: PollState;
       } | null,
-      string
+      PollWriteFailure
     >
   >;
 }
@@ -37,11 +51,23 @@ export class AttachPollUseCase {
     private reports: ReportRepository,
     private orgs: OrgRepoForAttachPoll,
     private users: UserRepoForAttachPoll,
-    private polls: PollRepoForAttachPoll
+    private polls: PollRepoForAttachPoll,
+    private clock: Clock
   ) {}
 
-  async execute(input: AttachPollInput): Promise<Result<void, string>> {
-    const lookup = await this.reports.findByIdWithRelations(input.reportId);
+  async execute(
+    input: AttachPollInput
+  ): Promise<Result<void, ReportUseCaseFailure | PollWriteFailure>> {
+    const decoded = z
+      .object({ reportId: ReportId, callerId: UserId, pollId: PollId })
+      .safeParse(input);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const command = { ...input, ...decoded.data };
+    const lookup = await this.reports.findByIdWithRelations(command.reportId);
 
     if (!lookup.success) {
       return failure(lookup.error);
@@ -53,18 +79,20 @@ export class AttachPollUseCase {
 
     const report = lookup.value;
 
-    const isAuthor = report.createdById === input.callerId;
+    const isAuthor = report.createdById === command.callerId;
     const isAdmin =
       !isAuthor &&
-      (await this.orgs.isUserAdmin(input.callerId, report.organizationId));
+      (await this.orgs.isUserAdmin(command.callerId, report.organizationId));
     const isSuper =
-      !isAuthor && !isAdmin && (await this.users.isSuperAdmin(input.callerId));
+      !isAuthor &&
+      !isAdmin &&
+      (await this.users.isSuperAdmin(command.callerId));
 
     if (!isAuthor && !isAdmin && !isSuper) {
       return failure(ReportErrors.NOT_AUTHOR_OR_ADMIN);
     }
 
-    const pollLookup = await this.polls.getPollById(input.pollId);
+    const pollLookup = await this.polls.getPollById(command.pollId);
 
     if (!pollLookup.success) {
       return failure(pollLookup.error);
@@ -80,7 +108,7 @@ export class AttachPollUseCase {
       return failure(ReportDomainCodes.REPORT_POLL_AUDIENCE_TOO_NARROW);
     }
 
-    const domainResult = report.attachPoll(input.pollId);
+    const domainResult = report.attachPoll(command.pollId, this.clock.now());
 
     if (!domainResult.success) {
       return failure(domainResult.error);

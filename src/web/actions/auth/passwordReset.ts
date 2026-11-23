@@ -1,5 +1,14 @@
 'use server';
 
+/** Composes authentication ports at the server boundary; domain code receives explicit time and randomness. */
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
+import { CryptoOtpCodeGenerator } from '@/infrastructure/auth/CryptoOtpCodeGenerator';
+import { CaptchaChallenge } from '@/domain/auth/AuthValues';
+import { otpExpiryMinutesFromEnv } from '@/infrastructure/auth/otpConfiguration';
+
 import { getTranslations } from 'next-intl/server';
 import { RequestPasswordResetUseCase } from '@/application/auth/RequestPasswordResetUseCase';
 import { ResetPasswordWithOtpUseCase } from '@/application/auth/ResetPasswordWithOtpUseCase';
@@ -31,14 +40,18 @@ const captchaVerifier = new TurnstileCaptchaVerifier(
 );
 
 const requestPasswordResetUseCase = new RequestPasswordResetUseCase({
+  clock: new SystemClock(),
+  ids: new CryptoIdGenerator(),
+  otpCodeGenerator: new CryptoOtpCodeGenerator(),
   userRepository,
   otpRepository,
   deliveryChannel: createEmailDeliveryChannelFromEnv(),
   otpCodeHasher,
-  expiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '10', 10),
+  expiryMinutes: otpExpiryMinutesFromEnv(),
 });
 
 const resetPasswordWithOtpUseCase = new ResetPasswordWithOtpUseCase({
+  clock: new SystemClock(),
   userRepository,
   otpRepository,
   sessionRepository,
@@ -61,10 +74,17 @@ async function captchaRejection(
     return { success: false, error: tOtp('captchaFailed') };
   }
 
-  if (captchaToken && !(await captchaVerifier.verify(captchaToken, clientIp))) {
-    const tOtp = await getTranslations('otp.errors');
+  if (captchaToken) {
+    const challenge = CaptchaChallenge.safeParse({
+      token: captchaToken,
+      clientIp,
+    });
 
-    return { success: false, error: tOtp('captchaFailed') };
+    if (!challenge.success || !(await captchaVerifier.verify(challenge.data))) {
+      const tOtp = await getTranslations('otp.errors');
+
+      return { success: false, error: tOtp('captchaFailed') };
+    }
   }
 
   return null;

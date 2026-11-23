@@ -1,3 +1,7 @@
+/** Known invitation application failures are translated at the presentation boundary.
+ * Operations that coordinate other contexts extend this union explicitly. */
+import { InvitationDomainCode } from '../../domain/invitation/InvitationDomainCodes';
+
 export const InvitationErrors = {
   NOT_FOUND: 'invitation.errors.notFound',
   NOT_PENDING: 'invitation.errors.notPending',
@@ -18,3 +22,8 @@ export const InvitationErrors = {
 
 export type InvitationError =
   (typeof InvitationErrors)[keyof typeof InvitationErrors];
+
+export type InvitationUseCaseFailure =
+  | InvitationError
+  | InvitationDomainCode
+  | 'common.errors.validationFailed';

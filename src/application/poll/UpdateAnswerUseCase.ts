@@ -1,3 +1,9 @@
+/** UpdateAnswer decodes raw request identities and position units before invoking core ports.
+ * Authorization and persistence are coordinated here; entity invariants stay in the domain. */
+import { SortOrder, parseAnswerText } from '@/domain/poll/QuestionValues';
+import { PollDomainCodes } from '@/domain/poll/PollDomainCodes';
+import { z } from 'zod';
+import { AnswerId, UserId } from '@/domain/shared/EntityIds';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { QuestionRepository } from '../../domain/poll/QuestionRepository';
@@ -5,7 +11,7 @@ import { AnswerRepository } from '../../domain/poll/AnswerRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 
 export interface UpdateAnswerInput {
   answerId: string;
@@ -13,6 +19,8 @@ export interface UpdateAnswerInput {
   text?: string;
   order?: number;
 }
+
+const request = z.object({ answerId: AnswerId, userId: UserId });
 
 export class UpdateAnswerUseCase {
   constructor(
@@ -24,7 +32,17 @@ export class UpdateAnswerUseCase {
     private profanityChecker?: ProfanityChecker
   ) {}
 
-  async execute(input: UpdateAnswerInput): Promise<Result<void, string>> {
+  async execute(
+    rawInput: UpdateAnswerInput
+  ): Promise<Result<void, PollUseCaseFailure>> {
+    const decoded = request.safeParse(rawInput);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawInput, ...decoded.data };
+
     // Get the answer
     const answerResult = await this.answerRepository.getAnswerById(
       input.answerId
@@ -103,7 +121,13 @@ export class UpdateAnswerUseCase {
 
     // Update answer properties
     if (input.text !== undefined) {
-      const textResult = answer.updateText(input.text, this.profanityChecker);
+      const text = parseAnswerText(input.text);
+
+      if (!text.success) {
+        return text;
+      }
+
+      const textResult = answer.updateText(text.value, this.profanityChecker);
 
       if (!textResult.success) {
         return failure(textResult.error);
@@ -111,7 +135,13 @@ export class UpdateAnswerUseCase {
     }
 
     if (input.order !== undefined) {
-      const orderResult = answer.updateOrder(input.order);
+      const order = SortOrder.safeParse(input.order);
+
+      if (!order.success) {
+        return failure(PollDomainCodes.ANSWER_INVALID_ORDER);
+      }
+
+      const orderResult = answer.updateOrder(order.data);
 
       if (!orderResult.success) {
         return failure(orderResult.error);

@@ -1,8 +1,12 @@
+/** Join-link application boundary validates external values before invoking
+ * domain behavior and typed authorization/persistence ports. */
+import { JoinTokenId } from '../../domain/shared/EntityIds';
+import { UserId } from '../../domain/shared/EntityIds';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { JoinTokenRepository } from '../../domain/organization/JoinTokenRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { JoinTokenErrors } from './JoinTokenErrors';
+import { JoinTokenErrors, JoinTokenUseCaseFailure } from './JoinTokenErrors';
 import { OrganizationErrors } from './OrganizationErrors';
 
 export interface ReactivateJoinTokenDependencies {
@@ -15,9 +19,24 @@ export class ReactivateJoinTokenUseCase {
   constructor(private deps: ReactivateJoinTokenDependencies) {}
 
   async execute(
-    tokenId: string,
-    actorUserId: string
-  ): Promise<Result<void, string>> {
+    rawTokenId: string,
+    rawActorUserId: string
+  ): Promise<Result<void, JoinTokenUseCaseFailure>> {
+    const parsedTokenId = JoinTokenId.safeParse(rawTokenId);
+
+    if (!parsedTokenId.success) {
+      return failure(JoinTokenErrors.NOT_FOUND);
+    }
+
+    const tokenId = parsedTokenId.data;
+    const parsedActorUserId = UserId.safeParse(rawActorUserId);
+
+    if (!parsedActorUserId.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
+    }
+
+    const actorUserId = parsedActorUserId.data;
+
     // 1. Find token
     const token = await this.deps.joinTokenRepository.findById(tokenId);
 

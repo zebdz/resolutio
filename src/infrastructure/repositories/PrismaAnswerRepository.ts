@@ -1,4 +1,9 @@
-import { PrismaClient } from '@/generated/prisma/client';
+/** Maps answer aggregates to Prisma without replacing identity or time.
+ * Persisted scalar fields are validated by aggregate reconstitution. */
+import { AnswerId, QuestionId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
+import { AnswerRepositoryFailure } from '@/domain/poll/AnswerRepository';
+import { PrismaClient, Prisma } from '@/generated/prisma/client';
 import { Answer } from '../../domain/poll/Answer';
 import { AnswerRepository } from '../../domain/poll/AnswerRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
@@ -6,10 +11,15 @@ import { Result, success, failure } from '../../domain/shared/Result';
 export class PrismaAnswerRepository implements AnswerRepository {
   constructor(private prisma: PrismaClient) {}
 
-  async createAnswer(answer: Answer): Promise<Result<Answer, string>> {
+  async createAnswer(
+    answer: Answer
+  ): Promise<Result<Answer, AnswerRepositoryFailure>> {
     try {
       const created = await this.prisma.answer.create({
         data: {
+          id: answer.id,
+          createdAt: answer.createdAt,
+          archivedAt: answer.archivedAt,
           text: answer.text,
           order: answer.order,
           questionId: answer.questionId,
@@ -25,8 +35,8 @@ export class PrismaAnswerRepository implements AnswerRepository {
   }
 
   async getAnswerById(
-    answerId: string
-  ): Promise<Result<Answer | null, string>> {
+    answerId: AnswerId
+  ): Promise<Result<Answer | null, AnswerRepositoryFailure>> {
     try {
       const answer = await this.prisma.answer.findUnique({
         where: { id: answerId },
@@ -45,8 +55,8 @@ export class PrismaAnswerRepository implements AnswerRepository {
   }
 
   async getAnswersByQuestionId(
-    questionId: string
-  ): Promise<Result<Answer[], string>> {
+    questionId: QuestionId
+  ): Promise<Result<Answer[], AnswerRepositoryFailure>> {
     try {
       const answers = await this.prisma.answer.findMany({
         where: {
@@ -64,7 +74,9 @@ export class PrismaAnswerRepository implements AnswerRepository {
     }
   }
 
-  async updateAnswer(answer: Answer): Promise<Result<void, string>> {
+  async updateAnswer(
+    answer: Answer
+  ): Promise<Result<void, AnswerRepositoryFailure>> {
     try {
       await this.prisma.answer.update({
         where: { id: answer.id },
@@ -83,11 +95,14 @@ export class PrismaAnswerRepository implements AnswerRepository {
     }
   }
 
-  async deleteAnswer(answerId: string): Promise<Result<void, string>> {
+  async deleteAnswer(
+    answerId: AnswerId,
+    at: Instant
+  ): Promise<Result<void, AnswerRepositoryFailure>> {
     try {
       await this.prisma.answer.update({
         where: { id: answerId },
-        data: { archivedAt: new Date() },
+        data: { archivedAt: Instant.toDate(at) },
       });
 
       return success(undefined);
@@ -98,7 +113,7 @@ export class PrismaAnswerRepository implements AnswerRepository {
     }
   }
 
-  private toDomainAnswer(prismaData: any): Answer {
+  private toDomainAnswer(prismaData: Prisma.AnswerGetPayload<object>): Answer {
     return Answer.reconstitute({
       id: prismaData.id,
       text: prismaData.text,

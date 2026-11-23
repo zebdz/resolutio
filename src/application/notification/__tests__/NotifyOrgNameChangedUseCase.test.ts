@@ -1,3 +1,5 @@
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import { notificationTestInputs } from '@/application/notification/__tests__/notificationTestValues';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NotifyOrgNameChangedUseCase } from '../NotifyOrgNameChangedUseCase';
 import { Organization } from '../../../domain/organization/Organization';
@@ -72,6 +74,7 @@ describe('NotifyOrgNameChangedUseCase', () => {
     orgRepo = new MockOrganizationRepository();
     notificationRepo = new MockNotificationRepository();
     useCase = new NotifyOrgNameChangedUseCase({
+      ...notificationTestInputs,
       organizationRepository: orgRepo as unknown as OrganizationRepository,
       notificationRepository:
         notificationRepo as unknown as NotificationRepository,
@@ -93,7 +96,7 @@ describe('NotifyOrgNameChangedUseCase', () => {
     orgRepo.setAcceptedMembers('org-1', ['user-1', 'user-2', 'user-3']);
 
     await useCase.execute({
-      organizationId: 'org-1',
+      organizationId: OrganizationId.parse('org-1'),
       oldName: 'Old Name',
       newName: 'New Name',
     });
@@ -128,7 +131,7 @@ describe('NotifyOrgNameChangedUseCase', () => {
     orgRepo.setAcceptedMembers('org-1', []);
 
     await useCase.execute({
-      organizationId: 'org-1',
+      organizationId: OrganizationId.parse('org-1'),
       oldName: 'Old Name',
       newName: 'New Name',
     });
@@ -138,7 +141,7 @@ describe('NotifyOrgNameChangedUseCase', () => {
 
   it('should not send notifications when org not found', async () => {
     await useCase.execute({
-      organizationId: 'nonexistent',
+      organizationId: OrganizationId.parse('nonexistent'),
       oldName: 'Old Name',
       newName: 'New Name',
     });
@@ -161,7 +164,7 @@ describe('NotifyOrgNameChangedUseCase', () => {
     orgRepo.setAcceptedMembers('org-1', ['user-1']);
 
     await useCase.execute({
-      organizationId: 'org-1',
+      organizationId: OrganizationId.parse('org-1'),
       oldName: 'Old Name',
       newName: 'New Name',
     });

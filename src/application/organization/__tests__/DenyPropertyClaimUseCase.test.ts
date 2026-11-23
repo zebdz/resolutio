@@ -1,3 +1,13 @@
+/** Property/claim boundary regressions exercise authorized flows with explicit
+ * creation inputs while keeping raw persistence fixtures distinct from domain values. */
+import {
+  propertyTestCreation,
+  propertyTestInstant,
+  submitTestClaim,
+} from './propertyTestValues';
+import { UserId, AssetId, PropertyId } from '../../../domain/shared/EntityIds';
+import { Instant } from '../../../domain/shared/Instant';
+import { ClaimDenialReason } from '../../../domain/organization/PropertyValues';
 import { describe, it, expect } from 'vitest';
 import { DenyPropertyClaimUseCase } from '../DenyPropertyClaimUseCase';
 import { PropertyClaim } from '../../../domain/organization/PropertyClaim';
@@ -5,7 +15,7 @@ import { OrganizationDomainCodes } from '../../../domain/organization/Organizati
 import { success } from '../../../domain/shared/Result';
 
 const claim = (() => {
-  const r = PropertyClaim.submit('org-1', 'u-1', 'a-1');
+  const r = submitTestClaim('org-1', 'u-1', 'a-1');
 
   if (!r.success) {
     throw new Error('setup');
@@ -18,16 +28,22 @@ describe('DenyPropertyClaimUseCase', () => {
   it('denies with reason and notifies', async () => {
     let notified = 0;
     const uc = new DenyPropertyClaimUseCase({
+      ...propertyTestCreation(),
       claimRepository: {
         findById: async () => success(claim),
         update: async () => success(undefined),
       } as any,
       organizationRepository: { isUserAdmin: async () => true } as any,
       userRepository: { isSuperAdmin: async () => false } as any,
-      profanityChecker: { containsProfanity: () => false },
+      profanityChecker: {
+        findProfaneWords: () => [],
+        containsProfanity: () => false,
+      },
       notifyDenied: {
         execute: async () => {
           notified++;
+
+          return success(undefined);
         },
       } as any,
     });
@@ -43,7 +59,7 @@ describe('DenyPropertyClaimUseCase', () => {
 
   it('rejects empty reason', async () => {
     const fresh = (() => {
-      const r = PropertyClaim.submit('org-1', 'u-1', 'a-1');
+      const r = submitTestClaim('org-1', 'u-1', 'a-1');
 
       if (!r.success) {
         throw new Error('setup');
@@ -52,14 +68,18 @@ describe('DenyPropertyClaimUseCase', () => {
       return r.value;
     })();
     const uc = new DenyPropertyClaimUseCase({
+      ...propertyTestCreation(),
       claimRepository: {
         findById: async () => success(fresh),
         update: async () => success(undefined),
       } as any,
       organizationRepository: { isUserAdmin: async () => true } as any,
       userRepository: { isSuperAdmin: async () => false } as any,
-      profanityChecker: { containsProfanity: () => false },
-      notifyDenied: { execute: async () => {} } as any,
+      profanityChecker: {
+        findProfaneWords: () => [],
+        containsProfanity: () => false,
+      },
+      notifyDenied: { execute: async () => success(undefined) } as any,
     });
     const r = await uc.execute({
       claimId: fresh.id,

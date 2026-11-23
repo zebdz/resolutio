@@ -1,11 +1,35 @@
+/** Parent-link request aggregate uses an explicit decision state and caller-provided
+ * IDs/time. Persistence metadata is validated, and Date projections are detached. */
 import { Result, success, failure } from '../shared/Result';
-import { JoinParentRequestDomainCodes } from './JoinParentRequestDomainCodes';
+import {
+  JoinParentRequestDomainCode,
+  JoinParentRequestDomainCodes,
+} from './JoinParentRequestDomainCodes';
 import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
-import { SharedDomainCodes } from '../shared/SharedDomainCodes';
+import {
+  SharedDomainCode,
+  SharedDomainCodes,
+} from '../shared/SharedDomainCodes';
+import {
+  OrganizationId,
+  UserId,
+  JoinParentRequestId,
+} from '../shared/EntityIds';
+import { EntityCreation } from '../shared/EntityCreation';
+import { Instant } from '../shared/Instant';
+import {
+  JoinParentRequestMessage,
+  JoinParentRejectionReason,
+  JoinParentDecision,
+  parseJoinParentMessage,
+  parseJoinParentRejectionReason,
+} from './JoinParentRequestValues';
+export {
+  JOIN_PARENT_REQUEST_MESSAGE_MAX_LENGTH,
+  REJECTION_REASON_MAX_LENGTH,
+} from './JoinParentRequestValues';
 
-export const JOIN_PARENT_REQUEST_MESSAGE_MAX_LENGTH = 500;
-export const REJECTION_REASON_MAX_LENGTH = 500;
-
+/** Plain serialization representation retains the existing API field names. */
 export interface JoinParentRequestProps {
   id: string;
   childOrgId: string;
@@ -19,132 +43,171 @@ export interface JoinParentRequestProps {
   handledAt: Date | null;
 }
 
+export type RawJoinParentRequestProps = Omit<
+  JoinParentRequestProps,
+  'status'
+> & { status: string };
+export interface CreateJoinParentRequestProps {
+  readonly childOrgId: OrganizationId;
+  readonly parentOrgId: OrganizationId;
+  readonly requestingAdminId: UserId;
+  readonly message: JoinParentRequestMessage;
+}
+interface JoinParentRequestState extends CreateJoinParentRequestProps {
+  readonly id: JoinParentRequestId;
+  readonly createdAt: Instant;
+  decision: JoinParentDecision;
+}
+type JoinParentRequestFailure = JoinParentRequestDomainCode | SharedDomainCode;
 export class JoinParentRequest {
-  private constructor(private props: JoinParentRequestProps) {}
-
+  private constructor(private props: JoinParentRequestState) {}
   public static create(
-    childOrgId: string,
-    parentOrgId: string,
-    requestingAdminId: string,
-    message: string,
+    props: CreateJoinParentRequestProps,
+    creation: EntityCreation<JoinParentRequestId>,
     profanityChecker?: ProfanityChecker
-  ): Result<JoinParentRequest, string> {
-    if (!message || message.trim().length === 0) {
-      return failure(JoinParentRequestDomainCodes.MESSAGE_EMPTY);
+  ): Result<JoinParentRequest, JoinParentRequestFailure> {
+    const message = parseJoinParentMessage(props.message);
+
+    if (!message.success) {
+      return message;
     }
 
-    if (message.length > JOIN_PARENT_REQUEST_MESSAGE_MAX_LENGTH) {
-      return failure(JoinParentRequestDomainCodes.MESSAGE_TOO_LONG);
-    }
-
-    if (profanityChecker?.containsProfanity(message.trim())) {
+    if (profanityChecker?.containsProfanity(message.value)) {
       return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
-    const request = new JoinParentRequest({
-      id: '',
-      childOrgId,
-      parentOrgId,
-      requestingAdminId,
-      handlingAdminId: null,
-      message: message.trim(),
-      status: 'pending',
-      rejectionReason: null,
-      createdAt: new Date(),
-      handledAt: null,
+    return success(
+      new JoinParentRequest({
+        id: JoinParentRequestId.parse(creation.id),
+        childOrgId: OrganizationId.parse(props.childOrgId),
+        parentOrgId: OrganizationId.parse(props.parentOrgId),
+        requestingAdminId: UserId.parse(props.requestingAdminId),
+        message: message.value,
+        createdAt: Instant.parse(creation.now),
+        decision: JoinParentDecision.parse({
+          status: 'pending',
+          handlingAdminId: null,
+          handledAt: null,
+          rejectionReason: null,
+        }),
+      })
+    );
+  }
+  public static reconstitute(
+    props: RawJoinParentRequestProps
+  ): JoinParentRequest {
+    return new JoinParentRequest({
+      id: JoinParentRequestId.parse(props.id),
+      childOrgId: OrganizationId.parse(props.childOrgId),
+      parentOrgId: OrganizationId.parse(props.parentOrgId),
+      requestingAdminId: UserId.parse(props.requestingAdminId),
+      message: JoinParentRequestMessage.parse(props.message),
+      createdAt: Instant.fromDate(props.createdAt),
+      decision: JoinParentDecision.parse({
+        status: props.status,
+        handlingAdminId: props.handlingAdminId,
+        handledAt:
+          props.handledAt === null ? null : Instant.fromDate(props.handledAt),
+        rejectionReason: props.rejectionReason,
+      }),
     });
-
-    return success(request);
   }
-
-  public static reconstitute(props: JoinParentRequestProps): JoinParentRequest {
-    return new JoinParentRequest(props);
-  }
-
-  public get id(): string {
+  public get id(): JoinParentRequestId {
     return this.props.id;
   }
-
-  public get childOrgId(): string {
+  public get childOrgId(): OrganizationId {
     return this.props.childOrgId;
   }
-
-  public get parentOrgId(): string {
+  public get parentOrgId(): OrganizationId {
     return this.props.parentOrgId;
   }
-
-  public get requestingAdminId(): string {
+  public get requestingAdminId(): UserId {
     return this.props.requestingAdminId;
   }
-
-  public get handlingAdminId(): string | null {
-    return this.props.handlingAdminId;
+  public get handlingAdminId(): UserId | null {
+    return this.props.decision.handlingAdminId;
   }
-
-  public get message(): string {
+  public get message(): JoinParentRequestMessage {
     return this.props.message;
   }
-
-  public get status(): 'pending' | 'accepted' | 'rejected' {
-    return this.props.status;
+  public get status(): JoinParentDecision['status'] {
+    return this.props.decision.status;
   }
-
-  public get rejectionReason(): string | null {
-    return this.props.rejectionReason;
+  public get decision(): JoinParentDecision {
+    return this.props.decision;
   }
-
+  public get rejectionReason(): JoinParentRejectionReason | null {
+    return this.props.decision.rejectionReason;
+  }
   public get createdAt(): Date {
-    return this.props.createdAt;
+    return Instant.toDate(this.props.createdAt);
   }
-
   public get handledAt(): Date | null {
-    return this.props.handledAt;
+    return this.props.decision.handledAt === null
+      ? null
+      : Instant.toDate(this.props.decision.handledAt);
   }
-
   public isPending(): boolean {
-    return this.props.status === 'pending';
+    return this.status === 'pending';
   }
-
-  public accept(adminId: string): Result<void, string> {
+  public accept(
+    adminId: UserId,
+    at: Instant
+  ): Result<void, JoinParentRequestDomainCode> {
     if (!this.isPending()) {
       return failure(JoinParentRequestDomainCodes.NOT_PENDING);
     }
 
-    this.props.status = 'accepted';
-    this.props.handlingAdminId = adminId;
-    this.props.handledAt = new Date();
+    this.props.decision = JoinParentDecision.parse({
+      status: 'accepted',
+      handlingAdminId: adminId,
+      handledAt: at,
+      rejectionReason: null,
+    });
 
     return success(undefined);
   }
-
   public reject(
-    adminId: string,
-    reason: string,
+    adminId: UserId,
+    reason: JoinParentRejectionReason,
+    at: Instant,
     profanityChecker?: ProfanityChecker
-  ): Result<void, string> {
+  ): Result<void, JoinParentRequestFailure> {
     if (!this.isPending()) {
       return failure(JoinParentRequestDomainCodes.NOT_PENDING);
     }
 
-    if (!reason || reason.trim().length === 0) {
-      return failure(JoinParentRequestDomainCodes.REJECTION_REASON_REQUIRED);
+    const parsed = parseJoinParentRejectionReason(reason);
+
+    if (!parsed.success) {
+      return parsed;
     }
 
-    if (profanityChecker?.containsProfanity(reason.trim())) {
+    if (profanityChecker?.containsProfanity(parsed.value)) {
       return failure(SharedDomainCodes.CONTAINS_PROFANITY);
     }
 
-    this.props.status = 'rejected';
-    this.props.handlingAdminId = adminId;
-    this.props.rejectionReason = reason.trim();
-    this.props.handledAt = new Date();
+    this.props.decision = JoinParentDecision.parse({
+      status: 'rejected',
+      handlingAdminId: adminId,
+      handledAt: at,
+      rejectionReason: parsed.value,
+    });
 
     return success(undefined);
   }
-
   public toJSON(): JoinParentRequestProps {
     return {
-      ...this.props,
+      id: this.id,
+      childOrgId: this.childOrgId,
+      parentOrgId: this.parentOrgId,
+      requestingAdminId: this.requestingAdminId,
+      handlingAdminId: this.handlingAdminId,
+      message: this.message,
+      status: this.status,
+      rejectionReason: this.rejectionReason,
+      createdAt: this.createdAt,
+      handledAt: this.handledAt,
     };
   }
 }

@@ -1,9 +1,13 @@
+/** Poll application boundary validates requests, invokes domain behavior and
+ * preserves known failure codes across authorization and persistence ports. */
+import { z } from 'zod';
+import { PollId, UserId } from '../../domain/shared/EntityIds';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 
 interface DeactivatePollCommand {
   pollId: string;
@@ -18,7 +22,19 @@ export class DeactivatePollUseCase {
     private boardRepository: BoardRepository
   ) {}
 
-  async execute(command: DeactivatePollCommand): Promise<Result<void, string>> {
+  async execute(
+    rawRequest: DeactivatePollCommand
+  ): Promise<Result<void, PollUseCaseFailure>> {
+    const decoded = z
+      .object({ pollId: PollId, userId: UserId })
+      .safeParse(rawRequest);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const command = { ...rawRequest, ...decoded.data };
+
     // Get the poll
     const pollResult = await this.pollRepository.getPollById(command.pollId);
 

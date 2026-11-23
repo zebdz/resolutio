@@ -1,3 +1,5 @@
+/** Mail contracts retain validated addresses and serialize only inside the delivery adapter. */
+import { EmailAddress } from '@/domain/user/EmailAddress';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createEmailSenderFromEnv } from '../emailSenderFactory';
 import { StubEmailSender } from '../StubEmailSender';
@@ -35,7 +37,7 @@ describe('StubEmailSender', () => {
     const logged = vi.spyOn(console, 'info').mockImplementation(() => {});
 
     const result = await new StubEmailSender().send({
-      to: 'ivan@mail.ru',
+      to: EmailAddress.create('ivan@mail.ru'),
       subject: 'Код',
       text: 'Ваш код: 123456',
     });

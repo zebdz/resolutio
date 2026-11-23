@@ -1,3 +1,7 @@
+import { QuestionId, PollId, UserId } from '@/domain/shared/EntityIds';
+import { LegalIssueCount, AIModelKey } from '@/domain/ai/LegalAnalysis';
+import { LegalCheckId } from '@/domain/shared/EntityIds';
+import { testCreation } from '@/domain/shared/__tests__/creation';
 import { describe, it, expect } from 'vitest';
 import { LegalCheck } from '../LegalCheck';
 import type {
@@ -7,7 +11,7 @@ import type {
 
 const sampleAnnotations: LegalAnnotation[] = [
   {
-    questionId: 'q-1',
+    questionId: QuestionId.parse('q-1'),
     answerId: null,
     severity: 'danger',
     issue: 'Discriminatory question',
@@ -17,7 +21,7 @@ const sampleAnnotations: LegalAnnotation[] = [
 ];
 
 const sampleSummary: LegalAnalysisSummary = {
-  totalIssues: 1,
+  totalIssues: LegalIssueCount.parse(1),
   overallRisk: 'high',
   recommendation: 'Remove or rephrase discriminatory content.',
 };
@@ -25,13 +29,16 @@ const sampleSummary: LegalAnalysisSummary = {
 describe('LegalCheck', () => {
   describe('create', () => {
     it('should create a LegalCheck with valid data', () => {
-      const result = LegalCheck.create({
-        pollId: 'poll-1',
-        model: 'deepseek',
-        annotations: sampleAnnotations,
-        summary: sampleSummary,
-        checkedBy: 'user-1',
-      });
+      const result = LegalCheck.create(
+        {
+          pollId: PollId.parse('poll-1'),
+          model: AIModelKey.parse('deepseek'),
+          annotations: sampleAnnotations,
+          summary: sampleSummary,
+          checkedBy: UserId.parse('user-1'),
+        },
+        testCreation(LegalCheckId, 'check-1')
+      );
 
       expect(result.success).toBe(true);
 
@@ -48,41 +55,52 @@ describe('LegalCheck', () => {
     });
 
     it('should fail if pollId is empty', () => {
-      const result = LegalCheck.create({
-        pollId: '',
-        model: 'deepseek',
-        annotations: sampleAnnotations,
-        summary: sampleSummary,
-        checkedBy: 'user-1',
-      });
+      const result = LegalCheck.create(
+        {
+          // @ts-expect-error Deliberately invalid external input exercises runtime defense.
+          pollId: '',
+          model: AIModelKey.parse('deepseek'),
+          annotations: sampleAnnotations,
+          summary: sampleSummary,
+          checkedBy: UserId.parse('user-1'),
+        },
+        testCreation(LegalCheckId, 'check-1')
+      );
 
       expect(result.success).toBe(false);
     });
 
     it('should fail if checkedBy is empty', () => {
-      const result = LegalCheck.create({
-        pollId: 'poll-1',
-        model: 'deepseek',
-        annotations: sampleAnnotations,
-        summary: sampleSummary,
-        checkedBy: '',
-      });
+      const result = LegalCheck.create(
+        {
+          pollId: PollId.parse('poll-1'),
+          model: AIModelKey.parse('deepseek'),
+          annotations: sampleAnnotations,
+          summary: sampleSummary,
+          // @ts-expect-error Deliberately invalid external input exercises runtime defense.
+          checkedBy: '',
+        },
+        testCreation(LegalCheckId, 'check-1')
+      );
 
       expect(result.success).toBe(false);
     });
 
     it('should handle empty annotations (no issues found)', () => {
-      const result = LegalCheck.create({
-        pollId: 'poll-1',
-        model: 'deepseek',
-        annotations: [],
-        summary: {
-          totalIssues: 0,
-          overallRisk: 'low',
-          recommendation: 'No issues found.',
+      const result = LegalCheck.create(
+        {
+          pollId: PollId.parse('poll-1'),
+          model: AIModelKey.parse('deepseek'),
+          annotations: [],
+          summary: {
+            totalIssues: LegalIssueCount.parse(0),
+            overallRisk: 'low',
+            recommendation: 'No issues found.',
+          },
+          checkedBy: UserId.parse('user-1'),
         },
-        checkedBy: 'user-1',
-      });
+        testCreation(LegalCheckId, 'check-1')
+      );
 
       expect(result.success).toBe(true);
 

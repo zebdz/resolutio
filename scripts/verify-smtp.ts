@@ -6,9 +6,10 @@
  *   npx tsx scripts/verify-smtp.ts you@example.com
  *
  * Reads SMTP_* from .env. Nothing is written to the database and no OTP is
- * issued — this only exercises the transport.
+ * issued — this only exercises the transport with a validated recipient address.
  */
 import 'dotenv/config';
+import { EmailAddress } from '../src/domain/user/EmailAddress';
 import { createEmailSenderFromEnv } from '../src/infrastructure/email/emailSenderFactory';
 import { StubEmailSender } from '../src/infrastructure/email/StubEmailSender';
 
@@ -78,7 +79,7 @@ async function main() {
 
   const stamp = new Date().toISOString();
   const result = await sender.send({
-    to: recipient,
+    to: EmailAddress.create(recipient),
     subject: `Resolutio SMTP test ${stamp}`,
     text:
       `This is a test message from scripts/verify-smtp.ts.\n\n` +

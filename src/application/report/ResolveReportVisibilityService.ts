@@ -1,20 +1,22 @@
+/** Resolves report access from typed identity references and authoritative memberships. */
+import { UserId, OrganizationId, BoardId } from '../../domain/shared/EntityIds';
 import { Report } from '../../domain/report/Report';
 import { ReportVisibility } from '../../domain/report/ReportVisibility';
 
 export interface OrgRepoForVisibility {
-  isUserExactMember(userId: string, orgId: string): Promise<boolean>;
-  isUserAdmin(userId: string, orgId: string): Promise<boolean>;
-  getAncestorIds(orgId: string): Promise<string[]>;
-  getDescendantIds(orgId: string): Promise<string[]>;
-  getFullTreeOrgIds(orgId: string): Promise<string[]>;
+  isUserExactMember(userId: UserId, orgId: OrganizationId): Promise<boolean>;
+  isUserAdmin(userId: UserId, orgId: OrganizationId): Promise<boolean>;
+  getAncestorIds(orgId: OrganizationId): Promise<OrganizationId[]>;
+  getDescendantIds(orgId: OrganizationId): Promise<OrganizationId[]>;
+  getFullTreeOrgIds(orgId: OrganizationId): Promise<OrganizationId[]>;
 }
 
 export interface BoardRepoForVisibility {
-  isUserMember(userId: string, boardId: string): Promise<boolean>;
+  isUserMember(userId: UserId, boardId: BoardId): Promise<boolean>;
 }
 
 export interface UserRepoForVisibility {
-  isSuperAdmin(userId: string): Promise<boolean>;
+  isSuperAdmin(userId: UserId): Promise<boolean>;
 }
 
 export class ResolveReportVisibilityService {
@@ -24,7 +26,7 @@ export class ResolveReportVisibilityService {
     private users: UserRepoForVisibility
   ) {}
 
-  async canRead(report: Report, viewerId: string | null): Promise<boolean> {
+  async canRead(report: Report, viewerId: UserId | null): Promise<boolean> {
     // Overrides (logged-in only): author, admin, superadmin always read.
     if (viewerId) {
       if (report.createdById === viewerId) {

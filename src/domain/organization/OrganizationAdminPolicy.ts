@@ -1,5 +1,9 @@
+import { UserId } from '../shared/EntityIds';
 import { Result, success, failure } from '../shared/Result';
-import { OrganizationDomainCodes } from './OrganizationDomainCodes';
+import {
+  OrganizationDomainCode,
+  OrganizationDomainCodes,
+} from './OrganizationDomainCodes';
 
 /**
  * Domain policy for an organization's admin invariant: an organization must
@@ -18,9 +22,9 @@ export class OrganizationAdminPolicy {
    * admin, removal touches no admin role, so the invariant cannot be violated.
    */
   static ensureCanRemoveAdmin(
-    currentAdminUserIds: string[],
-    targetUserId: string
-  ): Result<void, string> {
+    currentAdminUserIds: readonly UserId[],
+    targetUserId: UserId
+  ): Result<void, OrganizationDomainCode> {
     const targetIsAdmin = currentAdminUserIds.includes(targetUserId);
 
     if (targetIsAdmin && currentAdminUserIds.length <= 1) {

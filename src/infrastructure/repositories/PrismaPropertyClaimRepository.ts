@@ -1,12 +1,25 @@
+/** Claim adapter validates stored lifecycle columns and preserves supplied
+ * identity/time for ordinary and atomic claim-plus-attachment writes. */
+import { FirstName, LastName, MiddleName } from '../../domain/user/UserValues';
+import {
+  OrganizationId,
+  PropertyId,
+  PropertyClaimId,
+  AssetId,
+  UserId,
+} from '../../domain/shared/EntityIds';
+import {
+  AssetName,
+  PropertyName,
+  ExternalOwnerLabel,
+} from '../../domain/organization/PropertyValues';
 import { PrismaClient } from '@/generated/prisma/client';
 import { Result, success, failure } from '../../domain/shared/Result';
-import {
-  PropertyClaim,
-  PropertyClaimStatus,
-} from '../../domain/organization/PropertyClaim';
+import { PropertyClaim } from '../../domain/organization/PropertyClaim';
 import { PropertyClaimAttachment } from '../../domain/organization/PropertyClaimAttachment';
 import {
   PropertyClaimRepository,
+  PropertyClaimRepositoryError,
   PendingClaimListRow,
   MyClaimListRow,
 } from '../../domain/organization/PropertyClaimRepository';
@@ -14,10 +27,14 @@ import {
 export class PrismaPropertyClaimRepository implements PropertyClaimRepository {
   constructor(private prisma: PrismaClient) {}
 
-  async save(claim: PropertyClaim): Promise<Result<PropertyClaim, string>> {
+  async save(
+    claim: PropertyClaim
+  ): Promise<Result<PropertyClaim, PropertyClaimRepositoryError>> {
     try {
       const created = await this.prisma.propertyClaim.create({
         data: {
+          id: claim.id,
+          createdAt: claim.createdAt,
           organizationId: claim.organizationId,
           userId: claim.userId,
           assetId: claim.assetId,
@@ -30,18 +47,20 @@ export class PrismaPropertyClaimRepository implements PropertyClaimRepository {
 
       return success(this.toEntity(created));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async saveWithOptionalAttachment(input: {
     claim: PropertyClaim;
     attachment?: { entity: PropertyClaimAttachment; bytes: Buffer };
-  }): Promise<Result<PropertyClaim, string>> {
+  }): Promise<Result<PropertyClaim, PropertyClaimRepositoryError>> {
     try {
       const created = await this.prisma.$transaction(async (tx) => {
         const claimRow = await tx.propertyClaim.create({
           data: {
+            id: input.claim.id,
+            createdAt: input.claim.createdAt,
             organizationId: input.claim.organizationId,
             userId: input.claim.userId,
             assetId: input.claim.assetId,
@@ -60,6 +79,8 @@ export class PrismaPropertyClaimRepository implements PropertyClaimRepository {
           new Uint8Array(ab).set(input.attachment.bytes);
           await tx.propertyClaimAttachment.create({
             data: {
+              id: input.attachment.entity.id,
+              createdAt: input.attachment.entity.createdAt,
               claimId: claimRow.id,
               fileName: input.attachment.entity.fileName,
               mimeType: input.attachment.entity.mimeType,
@@ -74,11 +95,13 @@ export class PrismaPropertyClaimRepository implements PropertyClaimRepository {
 
       return success(this.toEntity(created));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
-  async update(claim: PropertyClaim): Promise<Result<void, string>> {
+  async update(
+    claim: PropertyClaim
+  ): Promise<Result<void, PropertyClaimRepositoryError>> {
     try {
       await this.prisma.propertyClaim.update({
         where: { id: claim.id },
@@ -92,23 +115,25 @@ export class PrismaPropertyClaimRepository implements PropertyClaimRepository {
 
       return success(undefined);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
-  async findById(id: string): Promise<Result<PropertyClaim | null, string>> {
+  async findById(
+    id: PropertyClaimId
+  ): Promise<Result<PropertyClaim | null, PropertyClaimRepositoryError>> {
     try {
       const row = await this.prisma.propertyClaim.findUnique({ where: { id } });
 
       return success(row ? this.toEntity(row) : null);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findPendingForAsset(
-    assetId: string
-  ): Promise<Result<PropertyClaim[], string>> {
+    assetId: AssetId
+  ): Promise<Result<PropertyClaim[], PropertyClaimRepositoryError>> {
     try {
       const rows = await this.prisma.propertyClaim.findMany({
         where: { assetId, status: 'PENDING' },
@@ -117,14 +142,14 @@ export class PrismaPropertyClaimRepository implements PropertyClaimRepository {
 
       return success(rows.map((r) => this.toEntity(r)));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findLatestDecidedForUserAndAsset(
-    userId: string,
-    assetId: string
-  ): Promise<Result<PropertyClaim | null, string>> {
+    userId: UserId,
+    assetId: AssetId
+  ): Promise<Result<PropertyClaim | null, PropertyClaimRepositoryError>> {
     try {
       const row = await this.prisma.propertyClaim.findFirst({
         where: {
@@ -137,13 +162,13 @@ export class PrismaPropertyClaimRepository implements PropertyClaimRepository {
 
       return success(row ? this.toEntity(row) : null);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findPendingForOrg(
-    organizationId: string
-  ): Promise<Result<PendingClaimListRow[], string>> {
+    organizationId: OrganizationId
+  ): Promise<Result<PendingClaimListRow[], PropertyClaimRepositoryError>> {
     try {
       const rows = await this.prisma.propertyClaim.findMany({
         where: { organizationId, status: 'PENDING' },
@@ -165,24 +190,32 @@ export class PrismaPropertyClaimRepository implements PropertyClaimRepository {
       return success(
         rows.map((r) => ({
           claim: this.toEntity(r),
-          claimantFirstName: r.user.firstName,
-          claimantLastName: r.user.lastName,
-          claimantMiddleName: r.user.middleName,
-          assetName: r.asset.name,
-          propertyId: r.asset.propertyId,
-          propertyName: r.asset.property.name,
-          externalOwnerLabel: r.asset.ownerships[0]?.externalOwnerLabel ?? null,
+          claimantFirstName: FirstName.parse(r.user.firstName),
+          claimantLastName: LastName.parse(r.user.lastName),
+          claimantMiddleName:
+            r.user.middleName === null
+              ? null
+              : MiddleName.parse(r.user.middleName),
+          assetName: AssetName.parse(r.asset.name),
+          propertyId: PropertyId.parse(r.asset.propertyId),
+          propertyName: PropertyName.parse(r.asset.property.name),
+          externalOwnerLabel:
+            r.asset.ownerships.length > 0
+              ? ExternalOwnerLabel.parse(
+                  r.asset.ownerships[0].externalOwnerLabel
+                )
+              : null,
         }))
       );
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findMyClaimsForProperty(
-    userId: string,
-    propertyId: string
-  ): Promise<Result<MyClaimListRow[], string>> {
+    userId: UserId,
+    propertyId: PropertyId
+  ): Promise<Result<MyClaimListRow[], PropertyClaimRepositoryError>> {
     try {
       const rows = await this.prisma.propertyClaim.findMany({
         where: {
@@ -196,17 +229,17 @@ export class PrismaPropertyClaimRepository implements PropertyClaimRepository {
       return success(
         rows.map((r) => ({
           claim: this.toEntity(r),
-          assetName: r.asset.name,
+          assetName: AssetName.parse(r.asset.name),
         }))
       );
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findPendingForAssets(
-    assetIds: string[]
-  ): Promise<Result<PropertyClaim[], string>> {
+    assetIds: AssetId[]
+  ): Promise<Result<PropertyClaim[], PropertyClaimRepositoryError>> {
     try {
       if (assetIds.length === 0) {
         return success([]);
@@ -218,22 +251,22 @@ export class PrismaPropertyClaimRepository implements PropertyClaimRepository {
 
       return success(rows.map((r) => this.toEntity(r)));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async getOrgAdminUserIds(
-    organizationId: string
-  ): Promise<Result<string[], string>> {
+    organizationId: OrganizationId
+  ): Promise<Result<UserId[], PropertyClaimRepositoryError>> {
     try {
       const rows = await this.prisma.organizationAdminUser.findMany({
         where: { organizationId },
         select: { userId: true },
       });
 
-      return success(rows.map((r) => r.userId));
+      return success(rows.map((r) => UserId.parse(r.userId)));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -253,7 +286,7 @@ export class PrismaPropertyClaimRepository implements PropertyClaimRepository {
       organizationId: row.organizationId,
       userId: row.userId,
       assetId: row.assetId,
-      status: row.status as PropertyClaimStatus,
+      status: row.status,
       deniedReason: row.deniedReason,
       decidedBy: row.decidedBy,
       decidedAt: row.decidedAt,

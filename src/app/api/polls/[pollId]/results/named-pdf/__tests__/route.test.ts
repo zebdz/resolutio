@@ -7,9 +7,19 @@ import type { NextRequest } from 'next/server';
 import { PollDomainCodes } from '@/domain/poll/PollDomainCodes';
 
 const mockGetCurrentUser = vi.fn();
+const mockViewerAccess = vi.fn();
 const mockExecute = vi.fn();
+const mockReadProtocol = vi.fn();
 const mockBuildPdf = vi.fn();
 const mockGeneratePdfBuffer = vi.fn();
+
+vi.mock('@/infrastructure/seal/getSealedProtocol', () => ({
+  getSealedProtocol: { execute: mockReadProtocol },
+}));
+
+vi.mock('@/web/lib/resultsViewerAccess', () => ({
+  resultsViewerAccess: mockViewerAccess,
+}));
 
 vi.mock('@/web/lib/session', () => ({
   getCurrentUser: mockGetCurrentUser,
@@ -84,9 +94,88 @@ function successValue(overrides: Record<string, unknown> = {}) {
 describe('GET /api/polls/[pollId]/results/named-pdf', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockViewerAccess.mockResolvedValue({ success: true, value: undefined });
+    mockReadProtocol.mockResolvedValue({
+      success: true,
+      value: { kind: 'live', coverage: 'unsealed' },
+    });
     mockGetCurrentUser.mockResolvedValue({ id: 'user-1' });
     mockBuildPdf.mockReturnValue({ content: [] });
     mockGeneratePdfBuffer.mockResolvedValue(Buffer.from('pdf'));
+  });
+
+  it('exports the sealed register and cites its source without querying live voters', async () => {
+    const data = {
+      pollTitle: 'Frozen title',
+      register: [{ fullName: 'Frozen voter' }],
+    };
+    const seal = { rootDigest: 'f'.repeat(64), status: { kind: 'pending' } };
+    mockReadProtocol.mockResolvedValue({
+      success: true,
+      value: { kind: 'sealed', data, seal },
+    });
+
+    const response = await GET(makeRequest(), { params: params() });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toContain('no-store');
+    expect(mockExecute).not.toHaveBeenCalled();
+    expect(mockBuildPdf.mock.calls[0][0]).toEqual(data);
+    expect(JSON.stringify(mockBuildPdf.mock.calls[0][2])).toContain(
+      seal.rootDigest
+    );
+  });
+
+  it('uses the frozen contents when the seal arrives during a live read', async () => {
+    const frozen = { pollTitle: 'Frozen register', register: [] };
+    const seal = { rootDigest: 'b'.repeat(64), status: { kind: 'simulated' } };
+    mockReadProtocol
+      .mockResolvedValueOnce({
+        success: true,
+        value: { kind: 'live', coverage: 'sealing' },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        value: { kind: 'sealed', seal, data: frozen },
+      });
+    mockExecute.mockResolvedValue(successValue());
+
+    const response = await GET(makeRequest(), { params: params() });
+
+    expect(response.status).toBe(200);
+    expect(mockBuildPdf.mock.calls[0][0]).toEqual(frozen);
+    expect(JSON.stringify(mockBuildPdf.mock.calls[0][2])).toContain(
+      seal.rootDigest
+    );
+  });
+
+  it('refuses to fall back to live rows after a failed seal read', async () => {
+    mockReadProtocol.mockResolvedValue({
+      success: false,
+      error: 'common.errors.unexpected',
+    });
+
+    const response = await GET(makeRequest(), { params: params() });
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get('cache-control')).toContain('no-store');
+    expect(mockExecute).not.toHaveBeenCalled();
+    expect(mockBuildPdf).not.toHaveBeenCalled();
+  });
+
+  it('enforces the account gate before reading sealed or live private rows', async () => {
+    mockViewerAccess.mockResolvedValue({
+      success: false,
+      error: { code: 'seal.errors.forbidden', status: 403, next: '/blocked' },
+    });
+    mockExecute.mockResolvedValue(successValue());
+
+    const response = await GET(makeRequest(), { params: params() });
+
+    expect(response.status).toBe(403);
+    expect(mockReadProtocol).not.toHaveBeenCalled();
+    expect(mockExecute).not.toHaveBeenCalled();
+    expect(mockBuildPdf).not.toHaveBeenCalled();
   });
 
   it('401s an anonymous visitor without touching the use case', async () => {

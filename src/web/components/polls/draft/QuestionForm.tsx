@@ -1,6 +1,6 @@
 'use client';
 
-import { useLayoutEffect, useRef } from 'react';
+import { useLayoutEffect, useRef, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   DndContext,
@@ -36,6 +36,7 @@ interface Answer {
 }
 
 interface QuestionFormProps {
+  children?: ReactNode;
   questionId: string;
   text: string;
   details?: string;
@@ -65,6 +66,7 @@ export function QuestionForm({
   onAnswersChange,
   disabled = false,
   fieldErrors,
+  children,
 }: QuestionFormProps) {
   const t = useTranslations('poll');
 
@@ -194,6 +196,8 @@ export function QuestionForm({
           <p className="text-sm text-red-600">{fieldErrors.details[0]}</p>
         )}
       </Field>
+
+      {children}
 
       {/* Answers */}
       <Field>

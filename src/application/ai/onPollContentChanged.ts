@@ -1,3 +1,4 @@
+import { PollId } from '@/domain/shared/EntityIds';
 import type { LegalCheckRepository } from '@/domain/ai/LegalCheckRepository';
 
 /**
@@ -8,7 +9,7 @@ import type { LegalCheckRepository } from '@/domain/ai/LegalCheckRepository';
  * No-op if the poll has no legal check.
  */
 export async function onPollContentChanged(
-  pollId: string,
+  pollId: PollId,
   legalCheckRepo: Pick<LegalCheckRepository, 'markStale'>
 ): Promise<void> {
   await legalCheckRepo.markStale(pollId);

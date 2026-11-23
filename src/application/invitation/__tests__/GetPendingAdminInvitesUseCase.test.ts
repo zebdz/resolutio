@@ -1,3 +1,5 @@
+/** Verifies Get Pending Admin Invites behavior through typed core ports.
+ * User persistence doubles exclude obsolete moderation methods; access uses the checked moderation port. */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GetPendingAdminInvitesUseCase } from '../GetPendingAdminInvitesUseCase';
 import { InvitationRepository } from '../../../domain/invitation/InvitationRepository';
@@ -70,13 +72,17 @@ class MockOrganizationRepository implements OrganizationRepository {
   async findByParentId(): Promise<Organization[]> {
     return [];
   }
-  async getAncestorIds(): Promise<string[]> {
+  async getAncestorIds(): ReturnType<OrganizationRepository['getAncestorIds']> {
     return [];
   }
-  async getDescendantIds(): Promise<string[]> {
+  async getDescendantIds(): ReturnType<
+    OrganizationRepository['getDescendantIds']
+  > {
     return [];
   }
-  async getFullTreeOrgIds(): Promise<string[]> {
+  async getFullTreeOrgIds(): ReturnType<
+    OrganizationRepository['getFullTreeOrgIds']
+  > {
     return [];
   }
   async isUserMember(): Promise<boolean> {
@@ -100,7 +106,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   async update(org: Organization): Promise<Organization> {
     return org;
   }
-  async findAcceptedMemberUserIdsIncludingDescendants(): Promise<string[]> {
+  async findAcceptedMemberUserIdsIncludingDescendants(): ReturnType<
+    OrganizationRepository['findAcceptedMemberUserIdsIncludingDescendants']
+  > {
     return [];
   }
   async removeUserFromOrganization(): Promise<void> {}
@@ -116,16 +124,25 @@ class MockOrganizationRepository implements OrganizationRepository {
   async getHierarchyTree(): Promise<any> {
     return {
       ancestors: [],
-      tree: { id: '', name: '', memberCount: 0, children: [] },
+      tree: {
+        id: 'org-fixture',
+        name: 'Fixture organization',
+        memberCount: 0,
+        children: [],
+      },
     };
   }
-  async findAdminUserIds(): Promise<string[]> {
+  async findAdminUserIds(): ReturnType<
+    OrganizationRepository['findAdminUserIds']
+  > {
     return [];
   }
   async setParentId(): Promise<void> {}
   async addAdmin(): Promise<void> {}
   async removeAdmin(): Promise<void> {}
-  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+  async searchByNameFuzzy(): ReturnType<
+    OrganizationRepository['searchByNameFuzzy']
+  > {
     return [];
   }
   async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
@@ -133,7 +150,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
   async findUsersWithMultipleMembershipsInOrgs(
     _orgIds: string[]
-  ): Promise<string[]> {
+  ): ReturnType<
+    OrganizationRepository['findUsersWithMultipleMembershipsInOrgs']
+  > {
     return [];
   }
   async setAllowMultiTreeMembership(
@@ -150,6 +169,33 @@ class MockOrganizationRepository implements OrganizationRepository {
     }
 
     this.adminRoles.get(orgId)!.add(userId);
+  }
+
+  async isUserExactMember(
+    ..._args: Parameters<OrganizationRepository['isUserExactMember']>
+  ): ReturnType<OrganizationRepository['isUserExactMember']> {
+    throw new Error('Unexpected test repository call: isUserExactMember');
+  }
+  async getAdminUserIds(
+    ..._args: Parameters<OrganizationRepository['getAdminUserIds']>
+  ): ReturnType<OrganizationRepository['getAdminUserIds']> {
+    throw new Error('Unexpected test repository call: getAdminUserIds');
+  }
+  async findAcceptedMemberUserIdsForOrgs(
+    ..._args: Parameters<
+      OrganizationRepository['findAcceptedMemberUserIdsForOrgs']
+    >
+  ): ReturnType<OrganizationRepository['findAcceptedMemberUserIdsForOrgs']> {
+    throw new Error(
+      'Unexpected test repository call: findAcceptedMemberUserIdsForOrgs'
+    );
+  }
+  async removeMemberFromOrganization(
+    ..._args: Parameters<OrganizationRepository['removeMemberFromOrganization']>
+  ): ReturnType<OrganizationRepository['removeMemberFromOrganization']> {
+    throw new Error(
+      'Unexpected test repository call: removeMemberFromOrganization'
+    );
   }
 }
 
@@ -188,21 +234,17 @@ class MockUserRepository implements UserRepository {
   async isSuperAdmin(userId: string): Promise<boolean> {
     return this.superAdmins.has(userId);
   }
-  async isUserBlocked(): Promise<boolean> {
-    return false;
-  }
-  async blockUser(): Promise<void> {}
-  async unblockUser(): Promise<void> {}
-  async getBlockStatus(): Promise<null> {
-    return null;
-  }
+
   async deleteAddress(): Promise<void> {}
-  async getBlockedUserIds(): Promise<string[]> {
-    return [];
-  }
 
   addSuperAdmin(userId: string): void {
     this.superAdmins.add(userId);
+  }
+
+  async findByEmail(
+    ..._args: Parameters<UserRepository['findByEmail']>
+  ): ReturnType<UserRepository['findByEmail']> {
+    throw new Error('Unexpected test repository call: findByEmail');
   }
 }
 

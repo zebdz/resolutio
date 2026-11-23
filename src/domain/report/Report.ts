@@ -1,27 +1,57 @@
+/** Report aggregate owns editable content, publication history and audience scope.
+ * Validated values are retained; callers supply identity/time and receive detached dates. */
+import { z } from 'zod';
 import { Result, success, failure } from '../shared/Result';
+import { EntityCreation } from '../shared/EntityCreation';
+import {
+  ReportId,
+  OrganizationId,
+  UserId,
+  BoardId,
+  PollId,
+  ReportAttachmentId,
+} from '../shared/EntityIds';
+import { Instant } from '../shared/Instant';
 import { ProfanityChecker } from '../shared/profanity/ProfanityChecker';
-import { SharedDomainCodes } from '../shared/SharedDomainCodes';
-import { ReportDomainCodes } from './ReportDomainCodes';
+import {
+  SharedDomainCode,
+  SharedDomainCodes,
+} from '../shared/SharedDomainCodes';
+import { ReportDomainCode, ReportDomainCodes } from './ReportDomainCodes';
 import { ReportVisibility, isPublicVisibility } from './ReportVisibility';
 import { validateAttachmentRefs } from '../shared/attachments/validateAttachmentRefs';
+import { REPORT_ATTACHMENT_API_PREFIX } from '../shared/attachments/AttachmentReferenceScope';
 
-export const REPORT_TITLE_MAX_LENGTH = 200;
-export const REPORT_BODY_MAX_LENGTH = 50_000;
+import {
+  ReportTitle,
+  ReportBody,
+  REPORT_TITLE_MAX_LENGTH,
+  REPORT_BODY_MAX_LENGTH,
+} from './ReportValues';
+export {
+  REPORT_TITLE_MAX_LENGTH,
+  REPORT_BODY_MAX_LENGTH,
+} from './ReportValues';
+export type ReportFailure =
+  | ReportDomainCode
+  | SharedDomainCode
+  | `${typeof SharedDomainCodes.CONTAINS_PROFANITY_WITH_WORDS}?words=${string}`;
 
 // Path prefix for inline attachment refs in report bodies and the download
 // route that serves them.
-export const REPORT_ATTACHMENT_API_PREFIX = '/api/report-attachments';
+export { REPORT_ATTACHMENT_API_PREFIX };
 
 export type ReportState = 'DRAFT' | 'PUBLISHED';
 
-export interface ReportProps {
+/** Raw storage/serialization shape, decoded by reconstitute. */
+export interface ReportData {
   id: string;
   organizationId: string;
   createdById: string;
   title: string;
   body: string;
-  visibility: ReportVisibility;
-  state: ReportState;
+  visibility: string;
+  state: string;
   publishedById: string | null;
   lastPublishedAt: Date | null;
   notifyAudience: boolean;
@@ -34,27 +64,158 @@ export interface ReportProps {
 }
 
 export interface CreateReportInput {
-  title: string;
-  body: string;
-  organizationId: string;
-  createdById: string;
+  title: ReportTitle;
+  body: ReportBody;
+  organizationId: OrganizationId;
+  createdById: UserId;
   visibility: ReportVisibility;
-  boardIds: string[];
+  boardIds: BoardId[];
   profanityChecker?: ProfanityChecker;
   stripMarkdownToPlainText?: (md: string) => string;
 }
 
-export class Report {
-  private constructor(private props: ReportProps) {}
+type ReportPublication =
+  | {
+      state: 'DRAFT';
+      publishedById: null;
+      lastPublishedAt: Instant | null;
+      notifyAudience: false;
+    }
+  | {
+      state: 'PUBLISHED';
+      publishedById: UserId;
+      lastPublishedAt: Instant;
+      notifyAudience: boolean;
+    };
+type ReportAudience =
+  | {
+      visibility: typeof ReportVisibility.WITHIN_BOARDS;
+      boardIds: [BoardId, ...BoardId[]];
+    }
+  | {
+      visibility: Exclude<
+        ReportVisibility,
+        typeof ReportVisibility.WITHIN_BOARDS
+      >;
+      boardIds: [];
+    };
+interface ReportProps {
+  readonly id: ReportId;
+  readonly organizationId: OrganizationId;
+  readonly createdById: UserId;
+  title: ReportTitle;
+  body: ReportBody;
+  publication: ReportPublication;
+  audience: ReportAudience;
+  readonly createdAt: Instant;
+  updatedAt: Instant;
+  archivedAt: Instant | null;
+  pollIds: PollId[];
+  attachmentIds: ReportAttachmentId[];
+}
 
-  static create(input: CreateReportInput): Result<Report, string> {
-    const titleCheck = validateTitle(input.title, input.profanityChecker);
+function audience(
+  visibility: ReportVisibility,
+  boardIds: readonly BoardId[]
+): ReportAudience {
+  const validated = z.enum(ReportVisibility).parse(visibility);
+
+  return validated === ReportVisibility.WITHIN_BOARDS
+    ? {
+        visibility: validated,
+        boardIds: z.tuple([BoardId]).rest(BoardId).parse(boardIds),
+      }
+    : { visibility: validated, boardIds: [] };
+}
+
+export class Report {
+  private props: ReportProps;
+  private constructor(data: ReportData) {
+    try {
+      if (
+        data.visibility !== ReportVisibility.WITHIN_BOARDS &&
+        data.boardIds.length !== 0
+      ) {
+        throw new Error();
+      }
+
+      const lastPublishedAt =
+        data.lastPublishedAt === null
+          ? null
+          : Instant.fromDate(data.lastPublishedAt);
+      let publication: ReportPublication;
+
+      if (data.state === 'DRAFT') {
+        if (data.publishedById !== null || data.notifyAudience !== false) {
+          throw new Error();
+        }
+
+        publication = {
+          state: 'DRAFT',
+          publishedById: null,
+          notifyAudience: false,
+          lastPublishedAt,
+        };
+      } else if (data.state === 'PUBLISHED' && lastPublishedAt !== null) {
+        const notifyAudience = z.boolean().parse(data.notifyAudience);
+
+        if (
+          isPublicVisibility(z.enum(ReportVisibility).parse(data.visibility)) &&
+          notifyAudience
+        ) {
+          throw new Error();
+        }
+
+        publication = {
+          state: 'PUBLISHED',
+          publishedById: UserId.parse(data.publishedById),
+          lastPublishedAt,
+          notifyAudience,
+        };
+      } else {
+        throw new Error();
+      }
+
+      this.props = {
+        id: ReportId.parse(data.id),
+        organizationId: OrganizationId.parse(data.organizationId),
+        createdById: UserId.parse(data.createdById),
+        title: ReportTitle.parse(data.title),
+        body: ReportBody.parse(data.body),
+        publication,
+        audience: audience(
+          z.enum(ReportVisibility).parse(data.visibility),
+          data.boardIds.map((id) => BoardId.parse(id))
+        ),
+        createdAt: Instant.fromDate(data.createdAt),
+        updatedAt: Instant.fromDate(data.updatedAt),
+        archivedAt:
+          data.archivedAt === null ? null : Instant.fromDate(data.archivedAt),
+        pollIds: data.pollIds.map((id) => PollId.parse(id)),
+        attachmentIds: data.attachmentIds.map((id) =>
+          ReportAttachmentId.parse(id)
+        ),
+      };
+    } catch {
+      throw new Error(ReportDomainCodes.REPORT_INVALID_DATA);
+    }
+  }
+
+  static create(
+    input: CreateReportInput,
+    creation: EntityCreation<ReportId>
+  ): Result<Report, ReportFailure> {
+    if (!z.enum(ReportVisibility).safeParse(input.visibility).success) {
+      return failure(ReportDomainCodes.REPORT_INVALID_VISIBILITY);
+    }
+
+    const titleCheck = parseReportTitle(input.title, input.profanityChecker);
 
     if (!titleCheck.success) {
       return failure(titleCheck.error);
     }
 
-    const bodyCheck = validateBody(
+    const bodyCheck = parseReportBody(
       input.body,
       input.profanityChecker,
       input.stripMarkdownToPlainText
@@ -68,13 +229,12 @@ export class Report {
     // is automatically foreign.
     const refCheck = validateAttachmentRefs(
       input.body,
-      REPORT_ATTACHMENT_API_PREFIX,
-      [],
+      { apiPrefix: REPORT_ATTACHMENT_API_PREFIX, ownIds: [] },
       ReportDomainCodes.REPORT_BODY_INVALID_ATTACHMENT_REF
     );
 
     if (!refCheck.success) {
-      return failure(refCheck.error);
+      return failure(ReportDomainCodes.REPORT_BODY_INVALID_ATTACHMENT_REF);
     }
 
     if (
@@ -84,15 +244,15 @@ export class Report {
       return failure(ReportDomainCodes.REPORT_BOARDS_EMPTY);
     }
 
-    const now = new Date();
+    const now = Instant.toDate(Instant.parse(creation.now));
 
     return success(
       new Report({
-        id: '',
+        id: ReportId.parse(creation.id),
         organizationId: input.organizationId,
         createdById: input.createdById,
-        title: input.title.trim(),
-        body: input.body,
+        title: titleCheck.value,
+        body: bodyCheck.value,
         visibility: input.visibility,
         state: 'DRAFT',
         publishedById: null,
@@ -111,7 +271,7 @@ export class Report {
     );
   }
 
-  static reconstitute(props: ReportProps): Report {
+  static reconstitute(props: ReportData): Report {
     return new Report(props);
   }
 
@@ -131,31 +291,35 @@ export class Report {
     return this.props.body;
   }
   get visibility() {
-    return this.props.visibility;
+    return this.props.audience.visibility;
   }
   get state() {
-    return this.props.state;
+    return this.props.publication.state;
   }
   get publishedById() {
-    return this.props.publishedById;
+    return this.props.publication.publishedById;
   }
   get lastPublishedAt() {
-    return this.props.lastPublishedAt;
+    return this.props.publication.lastPublishedAt === null
+      ? null
+      : Instant.toDate(this.props.publication.lastPublishedAt);
   }
   get notifyAudience() {
-    return this.props.notifyAudience;
+    return this.props.publication.notifyAudience;
   }
   get createdAt() {
-    return this.props.createdAt;
+    return Instant.toDate(this.props.createdAt);
   }
   get updatedAt() {
-    return this.props.updatedAt;
+    return Instant.toDate(this.props.updatedAt);
   }
   get archivedAt() {
-    return this.props.archivedAt;
+    return this.props.archivedAt === null
+      ? null
+      : Instant.toDate(this.props.archivedAt);
   }
   get boardIds() {
-    return [...this.props.boardIds];
+    return [...this.props.audience.boardIds];
   }
   get pollIds() {
     return [...this.props.pollIds];
@@ -165,45 +329,63 @@ export class Report {
   }
 
   isDraft(): boolean {
-    return this.props.state === 'DRAFT';
+    return this.props.publication.state === 'DRAFT';
   }
   isPublished(): boolean {
-    return this.props.state === 'PUBLISHED';
+    return this.props.publication.state === 'PUBLISHED';
   }
   isArchived(): boolean {
     return this.props.archivedAt !== null;
   }
 
+  /** Shared content-edit policy also lets request decoding retain lifecycle precedence. */
+  canEditContent(): Result<void, ReportFailure> {
+    return this.isDraft()
+      ? success(undefined)
+      : failure(ReportDomainCodes.REPORT_CANNOT_EDIT_PUBLISHED);
+  }
+
   updateTitle(
-    newTitle: string,
+    newTitle: ReportTitle,
+    at: Instant,
     profanityChecker?: ProfanityChecker
-  ): Result<void, string> {
-    if (!this.isDraft()) {
-      return failure(ReportDomainCodes.REPORT_CANNOT_EDIT_PUBLISHED);
+  ): Result<void, ReportFailure> {
+    const editable = this.canEditContent();
+
+    if (!editable.success) {
+      return editable;
     }
 
-    const v = validateTitle(newTitle, profanityChecker);
+    const v = parseReportTitle(newTitle, profanityChecker);
 
     if (!v.success) {
       return failure(v.error);
     }
 
-    this.props.title = newTitle.trim();
-    this.props.updatedAt = new Date();
+    const now = Instant.parse(at);
+    this.props.title = v.value;
+    this.props.updatedAt = now;
 
     return success(undefined);
   }
 
   updateBody(
-    newBody: string,
+    newBody: ReportBody,
+    at: Instant,
     profanityChecker?: ProfanityChecker,
     stripMarkdownToPlainText?: (md: string) => string
-  ): Result<void, string> {
-    if (!this.isDraft()) {
-      return failure(ReportDomainCodes.REPORT_CANNOT_EDIT_PUBLISHED);
+  ): Result<void, ReportFailure> {
+    const editable = this.canEditContent();
+
+    if (!editable.success) {
+      return editable;
     }
 
-    const v = validateBody(newBody, profanityChecker, stripMarkdownToPlainText);
+    const v = parseReportBody(
+      newBody,
+      profanityChecker,
+      stripMarkdownToPlainText
+    );
 
     if (!v.success) {
       return failure(v.error);
@@ -211,27 +393,35 @@ export class Report {
 
     const refCheck = validateAttachmentRefs(
       newBody,
-      REPORT_ATTACHMENT_API_PREFIX,
-      this.props.attachmentIds,
+      {
+        apiPrefix: REPORT_ATTACHMENT_API_PREFIX,
+        ownIds: this.props.attachmentIds,
+      },
       ReportDomainCodes.REPORT_BODY_INVALID_ATTACHMENT_REF
     );
 
     if (!refCheck.success) {
-      return failure(refCheck.error);
+      return failure(ReportDomainCodes.REPORT_BODY_INVALID_ATTACHMENT_REF);
     }
 
-    this.props.body = newBody;
-    this.props.updatedAt = new Date();
+    const now = Instant.parse(at);
+    this.props.body = v.value;
+    this.props.updatedAt = now;
 
     return success(undefined);
   }
 
   setVisibility(
     visibility: ReportVisibility,
-    boardIds: string[]
-  ): Result<void, string> {
+    boardIds: BoardId[],
+    at: Instant
+  ): Result<void, ReportFailure> {
     if (!this.isDraft()) {
       return failure(ReportDomainCodes.REPORT_CANNOT_EDIT_PUBLISHED);
+    }
+
+    if (!z.enum(ReportVisibility).safeParse(visibility).success) {
+      return failure(ReportDomainCodes.REPORT_INVALID_VISIBILITY);
     }
 
     if (
@@ -241,67 +431,83 @@ export class Report {
       return failure(ReportDomainCodes.REPORT_BOARDS_EMPTY);
     }
 
-    this.props.visibility = visibility;
-    this.props.boardIds =
-      visibility === ReportVisibility.WITHIN_BOARDS ? [...boardIds] : [];
-    this.props.updatedAt = new Date();
+    const now = Instant.parse(at);
+    this.props.audience = audience(visibility, boardIds);
+    this.props.updatedAt = now;
 
     return success(undefined);
   }
 
-  attachPoll(pollId: string): Result<void, string> {
+  attachPoll(pollId: PollId, at: Instant): Result<void, ReportFailure> {
     if (!this.isDraft()) {
       return failure(ReportDomainCodes.REPORT_CANNOT_EDIT_PUBLISHED);
     }
 
-    if (!this.props.pollIds.includes(pollId)) {
-      this.props.pollIds.push(pollId);
+    const now = Instant.parse(at);
+    const validatedPollId = PollId.parse(pollId);
+
+    if (!this.props.pollIds.includes(validatedPollId)) {
+      this.props.pollIds.push(validatedPollId);
     }
 
-    this.props.updatedAt = new Date();
+    this.props.updatedAt = now;
 
     return success(undefined);
   }
 
-  detachPoll(pollId: string): Result<void, string> {
+  detachPoll(pollId: PollId, at: Instant): Result<void, ReportFailure> {
     if (!this.isDraft()) {
       return failure(ReportDomainCodes.REPORT_CANNOT_EDIT_PUBLISHED);
     }
 
-    this.props.pollIds = this.props.pollIds.filter((p) => p !== pollId);
-    this.props.updatedAt = new Date();
-
-    return success(undefined);
-  }
-
-  attachAttachment(attachmentId: string): Result<void, string> {
-    if (!this.isDraft()) {
-      return failure(ReportDomainCodes.REPORT_CANNOT_EDIT_PUBLISHED);
-    }
-
-    this.props.attachmentIds.push(attachmentId);
-    this.props.updatedAt = new Date();
-
-    return success(undefined);
-  }
-
-  detachAttachment(attachmentId: string): Result<void, string> {
-    if (!this.isDraft()) {
-      return failure(ReportDomainCodes.REPORT_CANNOT_EDIT_PUBLISHED);
-    }
-
-    this.props.attachmentIds = this.props.attachmentIds.filter(
-      (a) => a !== attachmentId
+    const now = Instant.parse(at);
+    const validatedPollId = PollId.parse(pollId);
+    this.props.pollIds = this.props.pollIds.filter(
+      (p) => p !== validatedPollId
     );
-    this.props.updatedAt = new Date();
+    this.props.updatedAt = now;
+
+    return success(undefined);
+  }
+
+  attachAttachment(
+    attachmentId: ReportAttachmentId,
+    at: Instant
+  ): Result<void, ReportFailure> {
+    if (!this.isDraft()) {
+      return failure(ReportDomainCodes.REPORT_CANNOT_EDIT_PUBLISHED);
+    }
+
+    const now = Instant.parse(at);
+    this.props.attachmentIds.push(ReportAttachmentId.parse(attachmentId));
+    this.props.updatedAt = now;
+
+    return success(undefined);
+  }
+
+  detachAttachment(
+    attachmentId: ReportAttachmentId,
+    at: Instant
+  ): Result<void, ReportFailure> {
+    if (!this.isDraft()) {
+      return failure(ReportDomainCodes.REPORT_CANNOT_EDIT_PUBLISHED);
+    }
+
+    const now = Instant.parse(at);
+    const validatedAttachmentId = ReportAttachmentId.parse(attachmentId);
+    this.props.attachmentIds = this.props.attachmentIds.filter(
+      (a) => a !== validatedAttachmentId
+    );
+    this.props.updatedAt = now;
 
     return success(undefined);
   }
 
   publish(
-    publishedById: string,
-    notifyAudience: boolean
-  ): Result<void, string> {
+    publishedById: UserId,
+    notifyAudience: boolean,
+    at: Instant
+  ): Result<void, ReportFailure> {
     if (this.isArchived()) {
       return failure(ReportDomainCodes.REPORT_ARCHIVED);
     }
@@ -310,19 +516,21 @@ export class Report {
       return failure(ReportDomainCodes.REPORT_MUST_BE_DRAFT);
     }
 
-    const now = new Date();
-    this.props.state = 'PUBLISHED';
-    this.props.publishedById = publishedById;
-    this.props.lastPublishedAt = now;
-    this.props.notifyAudience = isPublicVisibility(this.props.visibility)
-      ? false
-      : notifyAudience;
+    const now = Instant.parse(at);
+    this.props.publication = {
+      state: 'PUBLISHED',
+      publishedById: UserId.parse(publishedById),
+      lastPublishedAt: now,
+      notifyAudience: isPublicVisibility(this.visibility)
+        ? false
+        : notifyAudience,
+    };
     this.props.updatedAt = now;
 
     return success(undefined);
   }
 
-  downgradeToDraft(): Result<void, string> {
+  downgradeToDraft(at: Instant): Result<void, ReportFailure> {
     if (this.isArchived()) {
       return failure(ReportDomainCodes.REPORT_ARCHIVED);
     }
@@ -331,20 +539,24 @@ export class Report {
       return failure(ReportDomainCodes.REPORT_MUST_BE_PUBLISHED);
     }
 
-    this.props.state = 'DRAFT';
-    this.props.publishedById = null;
-    this.props.notifyAudience = false;
-    this.props.updatedAt = new Date();
+    const now = Instant.parse(at);
+    this.props.publication = {
+      state: 'DRAFT',
+      publishedById: null,
+      notifyAudience: false,
+      lastPublishedAt: this.props.publication.lastPublishedAt,
+    };
+    this.props.updatedAt = now;
 
     return success(undefined);
   }
 
-  archive(): Result<void, string> {
+  archive(at: Instant): Result<void, ReportFailure> {
     if (this.isArchived()) {
       return failure(ReportDomainCodes.REPORT_ALREADY_ARCHIVED);
     }
 
-    this.props.archivedAt = new Date();
+    this.props.archivedAt = Instant.parse(at);
     this.props.updatedAt = this.props.archivedAt;
 
     return success(undefined);
@@ -354,7 +566,7 @@ export class Report {
 // Compose a profanity error code, embedding the specific offending words as
 // a URL-encoded query suffix when they're available so the UI message can
 // quote them back to the user.
-function profanityErrorCode(words: string[]): string {
+function profanityErrorCode(words: string[]): ReportFailure {
   if (words.length === 0) {
     return SharedDomainCodes.CONTAINS_PROFANITY;
   }
@@ -364,11 +576,12 @@ function profanityErrorCode(words: string[]): string {
   return `${SharedDomainCodes.CONTAINS_PROFANITY_WITH_WORDS}?words=${encoded}`;
 }
 
-function validateTitle(
-  title: string,
+/** Raw author input is decoded with the same policy used by aggregate mutations. */
+export function parseReportTitle(
+  title: unknown,
   profanityChecker?: ProfanityChecker
-): Result<void, string> {
-  if (!title || title.trim().length === 0) {
+): Result<ReportTitle, ReportFailure> {
+  if (typeof title !== 'string' || title.trim().length === 0) {
     return failure(ReportDomainCodes.REPORT_TITLE_EMPTY);
   }
 
@@ -382,15 +595,15 @@ function validateTitle(
     );
   }
 
-  return success(undefined);
+  return success(ReportTitle.parse(title.trim()));
 }
 
-function validateBody(
-  body: string,
+export function parseReportBody(
+  body: unknown,
   profanityChecker?: ProfanityChecker,
   stripMarkdownToPlainText?: (md: string) => string
-): Result<void, string> {
-  if (!body || body.trim().length === 0) {
+): Result<ReportBody, ReportFailure> {
+  if (typeof body !== 'string' || body.trim().length === 0) {
     return failure(ReportDomainCodes.REPORT_BODY_EMPTY);
   }
 
@@ -410,5 +623,5 @@ function validateBody(
     }
   }
 
-  return success(undefined);
+  return success(ReportBody.parse(body));
 }

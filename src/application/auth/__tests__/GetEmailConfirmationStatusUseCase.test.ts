@@ -1,3 +1,12 @@
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { Seconds } from '@/domain/auth/AuthValues';
+import { OtpCount, OtpDestination } from '@/domain/otp/OtpValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
+import {
+  authTestDependencies,
+  authTestNow,
+} from '@/application/auth/__tests__/authTestValues';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GetEmailConfirmationStatusUseCase } from '../GetEmailConfirmationStatusUseCase';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
@@ -32,10 +41,11 @@ class MockOtpRepository implements OtpRepository {
   }
 
   async findLatestByIdentifier(
-    identifier: string,
-    channel: OtpChannel,
+    destination: OtpDestination,
     purpose: OtpPurpose
   ): Promise<OtpVerification | null> {
+    const { identifier, channel } = destination;
+
     return this.latest(
       (o) =>
         o.identifier === identifier &&
@@ -57,29 +67,31 @@ class MockOtpRepository implements OtpRepository {
     return otp;
   }
 
-  async countRecentByClientIp(): Promise<number> {
-    return 0;
+  async countRecentByClientIp(): Promise<OtpCount> {
+    return OtpCount.parse(0);
   }
 
   async countRecentByIdentifier(
-    identifier: string,
-    channel: OtpChannel,
+    destination: OtpDestination,
     purpose: OtpPurpose,
-    sinceHours: number
-  ): Promise<number> {
-    const since = new Date(Date.now() - sinceHours * 3600 * 1000);
+    cutoff: Instant
+  ): Promise<OtpCount> {
+    const { identifier, channel } = destination;
+    const since = Instant.toDate(cutoff);
 
-    return Array.from(this.otps.values()).filter(
-      (o) =>
-        o.identifier === identifier &&
-        o.channel === channel &&
-        o.purpose === purpose &&
-        o.createdAt >= since
-    ).length;
+    return OtpCount.parse(
+      Array.from(this.otps.values()).filter(
+        (o) =>
+          o.identifier === identifier &&
+          o.channel === channel &&
+          o.purpose === purpose &&
+          Instant.toDate(o.createdAt) >= since
+      ).length
+    );
   }
 
-  async deleteAllForUser(): Promise<number> {
-    return 0;
+  async deleteAllForUser(): Promise<OtpCount> {
+    return OtpCount.parse(0);
   }
 
   async deleteExpired(): Promise<void> {}
@@ -89,7 +101,11 @@ class MockOtpRepository implements OtpRepository {
   ): OtpVerification | null {
     const matches = Array.from(this.otps.values())
       .filter(match)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .sort(
+        (a, b) =>
+          Instant.toDate(b.createdAt).getTime() -
+          Instant.toDate(a.createdAt).getTime()
+      );
 
     return matches[0] ?? null;
   }
@@ -134,7 +150,7 @@ function makeOtp(
     expiresAt: overrides.expiresAt ?? new Date(createdAt.getTime() + 600_000),
     verifiedAt: overrides.verifiedAt ?? null,
     createdAt,
-    userId: 'user-1',
+    userId: UserId.parse('user-1'),
   });
 }
 
@@ -145,7 +161,7 @@ describe('GetEmailConfirmationStatusUseCase', () => {
   const emailChannel = {
     channel: 'email',
     send: vi.fn(),
-  } as unknown as OtpDeliveryChannel;
+  } as unknown as OtpDeliveryChannel<'email'>;
 
   beforeEach(() => {
     vi.useFakeTimers();
@@ -155,6 +171,7 @@ describe('GetEmailConfirmationStatusUseCase', () => {
       findById: vi.fn().mockResolvedValue(buildUser('ivan@mail.ru')),
     };
     useCase = new GetEmailConfirmationStatusUseCase({
+      ...authTestDependencies(),
       otpRepository,
       userRepository: userRepository as unknown as UserRepository,
       deliveryChannel: emailChannel,
@@ -168,27 +185,27 @@ describe('GetEmailConfirmationStatusUseCase', () => {
   it('reports a fresh code as pending, with the first tier to wait', async () => {
     otpRepository.addOtp(makeOtp());
 
-    const result = await useCase.execute({ userId: 'user-1' });
+    const result = await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(result.success).toBe(true);
 
     if (result.success) {
       expect(result.value).toEqual({
         hasPendingCode: true,
-        retryAfterSeconds: 60,
+        retryAfterSeconds: Seconds.parse(60),
       });
     }
   });
 
   it('reports nothing pending when no code was issued', async () => {
-    const result = await useCase.execute({ userId: 'user-1' });
+    const result = await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(result.success).toBe(true);
 
     if (result.success) {
       expect(result.value).toEqual({
         hasPendingCode: false,
-        retryAfterSeconds: 0,
+        retryAfterSeconds: Seconds.parse(0),
       });
     }
   });
@@ -198,14 +215,14 @@ describe('GetEmailConfirmationStatusUseCase', () => {
   it('does not count a code issued to a previous address', async () => {
     otpRepository.addOtp(makeOtp({ identifier: 'old@mail.ru' }));
 
-    const result = await useCase.execute({ userId: 'user-1' });
+    const result = await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(result.success).toBe(true);
 
     if (result.success) {
       expect(result.value).toEqual({
         hasPendingCode: false,
-        retryAfterSeconds: 0,
+        retryAfterSeconds: Seconds.parse(0),
       });
     }
   });
@@ -214,32 +231,32 @@ describe('GetEmailConfirmationStatusUseCase', () => {
     userRepository.findById.mockResolvedValue(buildUser());
     otpRepository.addOtp(makeOtp());
 
-    const result = await useCase.execute({ userId: 'user-1' });
+    const result = await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(result.success).toBe(true);
 
     if (result.success) {
       expect(result.value).toEqual({
         hasPendingCode: false,
-        retryAfterSeconds: 0,
+        retryAfterSeconds: Seconds.parse(0),
       });
     }
   });
 
   it('reports nothing to confirm once the address is confirmed', async () => {
     userRepository.findById.mockResolvedValue(
-      buildUser('ivan@mail.ru').confirmEmail()
+      expectSuccess(buildUser('ivan@mail.ru').confirmEmail(authTestNow()))
     );
     otpRepository.addOtp(makeOtp());
 
-    const result = await useCase.execute({ userId: 'user-1' });
+    const result = await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(result.success).toBe(true);
 
     if (result.success) {
       expect(result.value).toEqual({
         hasPendingCode: false,
-        retryAfterSeconds: 0,
+        retryAfterSeconds: Seconds.parse(0),
       });
     }
   });
@@ -247,7 +264,7 @@ describe('GetEmailConfirmationStatusUseCase', () => {
   it('fails for an unknown user', async () => {
     userRepository.findById.mockResolvedValue(null);
 
-    const result = await useCase.execute({ userId: 'ghost' });
+    const result = await useCase.execute({ userId: UserId.parse('ghost') });
 
     expect(result.success).toBe(false);
   });

@@ -34,4 +34,4 @@ echo "Port: $PORT"
 echo "Environment: $NODE_ENV"
 
 # Start Next.js directly using node (bypasses broken symlinks)
-exec "$NODE_BIN" "$BASE_DIR/node_modules/next/dist/bin/next" start
+exec "$NODE_BIN" "$BASE_DIR/node_modules/next/dist/bin/next" start -H 127.0.0.1

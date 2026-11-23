@@ -1,3 +1,5 @@
+/** Application boundary tests exercise authorization and domain constraints
+ * with deterministic creation dependencies and repository port doubles. */
 import { describe, it, expect } from 'vitest';
 import { UpdateAssetUseCase } from '../UpdateAssetUseCase';
 import { OrganizationProperty } from '../../../domain/organization/OrganizationProperty';
@@ -32,7 +34,10 @@ describe('UpdateAssetUseCase', () => {
       propertyRepository: { findById: async () => success(prop) } as any,
       organizationRepository: { isUserAdmin: async () => true } as any,
       userRepository: { isSuperAdmin: async () => false } as any,
-      profanityChecker: { containsProfanity: () => false },
+      profanityChecker: {
+        findProfaneWords: () => [],
+        containsProfanity: () => false,
+      },
     });
     const r = await uc.execute({
       assetId: 'a-1',

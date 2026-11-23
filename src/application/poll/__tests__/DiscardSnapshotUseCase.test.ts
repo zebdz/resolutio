@@ -1,3 +1,16 @@
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { BoardId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import { pollFixtureCreation } from '@/application/poll/__tests__/pollFixtureCreation';
+/** Exercises snapshot discard through the application boundary, including
+ * domain decisions against the freshly locked poll rather than the authorization read. */
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { QuestionId, AnswerId, PollId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DiscardSnapshotUseCase } from '../DiscardSnapshotUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -6,18 +19,22 @@ import { Answer } from '../../../domain/poll/Answer';
 import { Organization } from '../../../domain/organization/Organization';
 import { Board } from '../../../domain/board/Board';
 import { PollRepository } from '../../../domain/poll/PollRepository';
-import { ParticipantRepository } from '../../../domain/poll/ParticipantRepository';
-import { VoteRepository } from '../../../domain/poll/VoteRepository';
+import { PollSnapshotTransaction } from '../PollSnapshotTransaction';
+import { PollState } from '../../../domain/poll/PollState';
+import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { BoardRepository } from '../../../domain/board/BoardRepository';
 import { UserRepository } from '../../../domain/user/UserRepository';
-import { Result, success } from '../../../domain/shared/Result';
+import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
 
 describe('DiscardSnapshotUseCase', () => {
   let pollRepository: Partial<PollRepository>;
-  let participantRepository: Partial<ParticipantRepository>;
-  let voteRepository: Partial<VoteRepository>;
+  let snapshotTransaction: PollSnapshotTransaction;
+  let persistedState: PollState;
+  let participantIds: string[];
+  let lockedPoll: Poll;
+  let hasVotes: boolean;
   let organizationRepository: Partial<OrganizationRepository>;
   let boardRepository: Partial<BoardRepository>;
   let userRepository: Partial<UserRepository>;
@@ -27,35 +44,48 @@ describe('DiscardSnapshotUseCase', () => {
   beforeEach(() => {
     // Create a poll in READY state
     const pollResult = Poll.create(
-      'Test Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'admin-1',
-      new Date('2024-01-01'),
-      new Date('2024-12-31')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('admin-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2024-01-01'), new Date('2024-12-31'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
-    poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    poll = Poll.reconstitute({
+      ...unwrap(pollResult).toJSON(),
+      id: 'poll-1',
+      questions: [],
+    });
 
     const questionResult = Question.create(
-      'Question 1',
+      QuestionText.parse('Question 1'),
       poll.id,
-      1,
-      1,
+      pollFixtureCreation(QuestionId),
+      PageNumber.parse(1),
+      SortOrder.parse(1),
       'single-choice'
     );
-    const question = questionResult.value;
-    (question as any).props.id = 'question-1';
-    const answerResult = Answer.create('Answer 1', 1, question.id);
-    question.addAnswer(answerResult.value);
+    const question = Question.reconstitute({
+      ...unwrap(questionResult).toJSON(),
+      id: 'question-1',
+      answers: [],
+    });
+    const answerResult = Answer.create(
+      AnswerText.parse('Answer 1'),
+      SortOrder.parse(1),
+      question.id,
+      pollFixtureCreation(AnswerId)
+    );
+    question.addAnswer(unwrap(answerResult));
     poll.addQuestion(question);
     poll.submitToAdmin();
     poll.takeSnapshot();
 
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
-      updatePoll: vi.fn().mockResolvedValue(success(undefined)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
     };
 
     organizationRepository = {
@@ -82,18 +112,27 @@ describe('DiscardSnapshotUseCase', () => {
       isSuperAdmin: vi.fn().mockResolvedValue(false),
     };
 
-    voteRepository = {
-      pollHasVotes: vi.fn().mockResolvedValue(success(false)),
-    };
-
-    participantRepository = {
-      deleteParticipantsByPollId: vi.fn().mockResolvedValue(success(undefined)),
+    lockedPoll = poll;
+    hasVotes = false;
+    persistedState = PollState.READY;
+    participantIds = ['participant-1'];
+    snapshotTransaction = {
+      withLockedPoll: async (_pollId, work) =>
+        work({
+          poll: lockedPoll,
+          hasVotes: async () => hasVotes,
+          savePoll: async () => {
+            persistedState = lockedPoll.state;
+          },
+          removeParticipantSnapshot: async () => {
+            participantIds = [];
+          },
+        }),
     };
 
     useCase = new DiscardSnapshotUseCase(
       pollRepository as PollRepository,
-      participantRepository as ParticipantRepository,
-      voteRepository as VoteRepository,
+      snapshotTransaction,
       organizationRepository as OrganizationRepository,
       userRepository as UserRepository,
       boardRepository as BoardRepository
@@ -106,7 +145,45 @@ describe('DiscardSnapshotUseCase', () => {
       userId: 'admin-1',
     });
 
-    expect(result.success).toBe(true);
+    expect(result).toEqual(success(undefined));
+    expect(persistedState).toBe(PollState.SUBMITTED);
+    expect(participantIds).toEqual([]);
+  });
+
+  it('rejects votes observed under the lock without changing the snapshot', async () => {
+    hasVotes = true;
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      userId: 'admin-1',
+    });
+
+    expect(result).toEqual(
+      failure(PollDomainCodes.POLL_CANNOT_DISCARD_SNAPSHOT_HAS_VOTES)
+    );
+    expect(persistedState).toBe(PollState.READY);
+    expect(participantIds).toEqual(['participant-1']);
+  });
+
+  it('rejects a poll activated after the initial authorization read', async () => {
+    // Keep the earlier READY object as the authorization read; the lock sees ACTIVE.
+    const earlierPoll = poll;
+    lockedPoll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+    });
+    unwrap(lockedPoll.activate());
+    persistedState = PollState.ACTIVE;
+
+    const result = await useCase.execute({
+      pollId: 'poll-1',
+      userId: 'admin-1',
+    });
+
+    expect(earlierPoll.state).toBe(PollState.READY);
+    expect(result).toEqual(failure(PollDomainCodes.POLL_MUST_BE_READY));
+    expect(persistedState).toBe(PollState.ACTIVE);
+    expect(participantIds).toEqual(['participant-1']);
   });
 
   it('should fail if organization is archived', async () => {
@@ -128,8 +205,7 @@ describe('DiscardSnapshotUseCase', () => {
       userId: 'admin-1',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.ORGANIZATION_ARCHIVED);
+    expect(result).toEqual(failure(PollErrors.ORGANIZATION_ARCHIVED));
   });
 
   it('should fail if board is archived', async () => {
@@ -148,8 +224,7 @@ describe('DiscardSnapshotUseCase', () => {
       userId: 'admin-1',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
+    expect(result).toEqual(failure(PollErrors.BOARD_ARCHIVED));
   });
 
   it('should fail if poll not found', async () => {
@@ -160,8 +235,7 @@ describe('DiscardSnapshotUseCase', () => {
       userId: 'admin-1',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.NOT_FOUND);
+    expect(result).toEqual(failure(PollErrors.NOT_FOUND));
   });
 
   it('should fail if user is not authorized', async () => {
@@ -172,7 +246,14 @@ describe('DiscardSnapshotUseCase', () => {
       userId: 'regular-user',
     });
 
-    expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.NOT_AUTHORIZED);
+    expect(result).toEqual(failure(PollErrors.NOT_AUTHORIZED));
   });
 });
+
+function unwrap<T>(result: Result<T, string>): T {
+  if (!result.success) {
+    throw new Error(result.error);
+  }
+
+  return result.value;
+}

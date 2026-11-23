@@ -7,6 +7,10 @@
 // (Content-Type matched to the stored mimeType, Content-Disposition with
 // the original filename). Route handlers serve that natively via Response.
 
+import {
+  PropertyClaimAttachmentId,
+  PropertyClaimId,
+} from '@/domain/shared/EntityIds';
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/web/lib/session';
 import {
@@ -34,7 +38,14 @@ export async function GET(
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
-  const { id } = await params;
+  const { id: rawId } = await params;
+  const decoded = PropertyClaimAttachmentId.safeParse(rawId);
+
+  if (!decoded.success) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  }
+
+  const id = decoded.data;
 
   // Pull metadata first to do the auth check; only fetch bytes once we
   // know the caller is allowed to receive them.
@@ -55,7 +66,9 @@ export async function GET(
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
 
-  const claimRes = await claimRepository.findById(meta.claimId);
+  const claimRes = await claimRepository.findById(
+    PropertyClaimId.parse(meta.claimId)
+  );
 
   if (!claimRes.success || !claimRes.value) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });

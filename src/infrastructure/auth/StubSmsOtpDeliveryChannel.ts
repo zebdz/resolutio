@@ -1,21 +1,25 @@
+/** Serializes validated OTP delivery values into the provider transport. */
+import { ClientIp } from '@/domain/auth/AuthValues';
+import { OtpDigits, OtpRecipient } from '@/domain/otp/OtpValues';
+import { Language } from '@/domain/user/UserValues';
 import type {
   OtpDeliveryChannel,
   OtpDeliveryResult,
 } from '@/application/auth/OtpDeliveryChannel';
-import type { OtpChannel, OtpPurpose } from '@/domain/otp/OtpVerification';
+import type { OtpPurpose } from '@/domain/otp/OtpVerification';
 
 /**
  * Stub SMS delivery channel — does not send real SMS.
  * Returns the plaintext code as backdoorCode for display in UI.
  */
-export class StubSmsOtpDeliveryChannel implements OtpDeliveryChannel {
-  channel: OtpChannel = 'sms';
+export class StubSmsOtpDeliveryChannel implements OtpDeliveryChannel<'sms'> {
+  readonly channel = 'sms' as const;
 
   async send(
-    _recipient: string,
-    code: string,
-    _locale: string,
-    _clientIp: string,
+    _recipient: OtpRecipient<'sms'>,
+    code: OtpDigits,
+    _locale: Language,
+    _clientIp: ClientIp,
     _purpose: OtpPurpose
   ): Promise<OtpDeliveryResult> {
     // The confirm-phone page no longer receives this code from the register

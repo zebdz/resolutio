@@ -1,11 +1,19 @@
 'use server';
 
+/** Gates administrator OTP resets and returns a validated count of removed codes.
+ * Authorization and rate limits run before changing the user's confirmation state. */
+import { UserId } from '@/domain/shared/EntityIds';
+import { UserDomainCodes } from '@/domain/user/UserDomainCodes';
+
 import {
   prisma,
   PrismaUserRepository,
   PrismaOtpRepository,
 } from '@/infrastructure/index';
-import { ResetUserOtpUseCase } from '@/application/auth/ResetUserOtpUseCase';
+import {
+  ResetUserOtpUseCase,
+  ResetUserOtpResult,
+} from '@/application/auth/ResetUserOtpUseCase';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { requireSuperadmin } from '@/src/web/actions/superadmin/superadminAuth';
 import { isError } from '@/src/web/actions/superadmin/superadminAuthUtils';
@@ -17,7 +25,7 @@ import type { ActionResult } from './userPassword';
 // codes, this is what lets the next one go out.
 export async function resetUserOtpAction(input: {
   userId: string;
-}): Promise<ActionResult<{ deleted: number }>> {
+}): Promise<ActionResult<ResetUserOtpResult>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -35,7 +43,16 @@ export async function resetUserOtpAction(input: {
     otpRepository: new PrismaOtpRepository(prisma),
   });
 
-  const result = await useCase.execute({ userId: input.userId });
+  const userId = UserId.safeParse(input.userId);
+
+  if (!userId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode(UserDomainCodes.USER_NOT_FOUND),
+    };
+  }
+
+  const result = await useCase.execute({ userId: userId.data });
 
   if (!result.success) {
     return { success: false, error: await translateErrorCode(result.error) };

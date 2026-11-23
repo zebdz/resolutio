@@ -1,3 +1,8 @@
+/** Stores report aggregates with their assigned identity and lifecycle timestamps.
+ * Rehydration validates all persisted values; storage failures expose stable codes. */
+import { ReportId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
+import { ResultCount } from '@/domain/shared/Pagination';
 import { PrismaClient, Prisma } from '@/generated/prisma/client';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { Report } from '../../domain/report/Report';
@@ -11,11 +16,16 @@ import { ReportVisibility } from '../../domain/report/ReportVisibility';
 export class PrismaReportRepository implements ReportRepository {
   constructor(private prisma: PrismaClient) {}
 
-  async create(report: Report): Promise<Result<Report, string>> {
+  async create(
+    report: Report
+  ): Promise<Result<Report, 'common.errors.unexpected'>> {
     try {
       const created = await this.prisma.$transaction(async (tx) => {
         const row = await tx.report.create({
           data: {
+            id: report.id,
+            createdAt: report.createdAt,
+            updatedAt: report.updatedAt,
             organizationId: report.organizationId,
             createdById: report.createdById,
             title: report.title,
@@ -59,16 +69,19 @@ export class PrismaReportRepository implements ReportRepository {
         )
       );
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
-  async update(report: Report): Promise<Result<void, string>> {
+  async update(
+    report: Report
+  ): Promise<Result<void, 'common.errors.unexpected'>> {
     try {
       await this.prisma.$transaction(async (tx) => {
         await tx.report.update({
           where: { id: report.id },
           data: {
+            updatedAt: report.updatedAt,
             title: report.title,
             body: report.body,
             visibility: report.visibility,
@@ -106,17 +119,19 @@ export class PrismaReportRepository implements ReportRepository {
 
       return success(undefined);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
-  async findById(id: string): Promise<Result<Report | null, string>> {
+  async findById(
+    id: ReportId
+  ): Promise<Result<Report | null, 'common.errors.unexpected'>> {
     return this.findByIdWithRelations(id);
   }
 
   async findByIdWithRelations(
-    id: string
-  ): Promise<Result<Report | null, string>> {
+    id: ReportId
+  ): Promise<Result<Report | null, 'common.errors.unexpected'>> {
     try {
       const row = await this.prisma.report.findUnique({
         where: { id },
@@ -140,12 +155,15 @@ export class PrismaReportRepository implements ReportRepository {
         )
       );
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async listPublicAnonForSitemap(): Promise<
-    Result<Array<{ id: string; lastPublishedAt: Date }>, string>
+    Result<
+      Array<{ id: ReportId; lastPublishedAt: Instant }>,
+      'common.errors.unexpected'
+    >
   > {
     try {
       const rows = await this.prisma.report.findMany({
@@ -160,16 +178,25 @@ export class PrismaReportRepository implements ReportRepository {
       });
 
       return success(
-        rows.map((r) => ({ id: r.id, lastPublishedAt: r.lastPublishedAt! }))
+        rows.map((r) => {
+          if (r.lastPublishedAt === null) {
+            throw new Error('Missing publication timestamp');
+          }
+
+          return {
+            id: ReportId.parse(r.id),
+            lastPublishedAt: Instant.fromDate(r.lastPublishedAt),
+          };
+        })
       );
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async search(
     filters: ReportSearchFilters
-  ): Promise<Result<ReportSearchResult, string>> {
+  ): Promise<Result<ReportSearchResult, 'common.errors.unexpected'>> {
     try {
       const where: Prisma.ReportWhereInput = {};
 
@@ -178,7 +205,7 @@ export class PrismaReportRepository implements ReportRepository {
       }
 
       if (filters.visibilities && filters.visibilities.length > 0) {
-        where.visibility = { in: filters.visibilities as ReportVisibility[] };
+        where.visibility = { in: filters.visibilities };
       }
 
       if (filters.state) {
@@ -225,10 +252,10 @@ export class PrismaReportRepository implements ReportRepository {
             row.attachments.map((a) => a.id)
           )
         ),
-        totalCount,
+        totalCount: ResultCount.parse(totalCount),
       });
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
@@ -258,8 +285,8 @@ export class PrismaReportRepository implements ReportRepository {
       createdById: row.createdById,
       title: row.title,
       body: row.body,
-      visibility: row.visibility as ReportVisibility,
-      state: row.state as 'DRAFT' | 'PUBLISHED',
+      visibility: row.visibility,
+      state: row.state,
       publishedById: row.publishedById,
       lastPublishedAt: row.lastPublishedAt,
       notifyAudience: row.notifyAudience,

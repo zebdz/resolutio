@@ -1,3 +1,5 @@
+/** Resolves authorized organization views and serializes user details for the client. */
+import { UserId } from '@/domain/shared/EntityIds';
 import { getTranslations } from 'next-intl/server';
 import { redirect } from 'next/navigation';
 import { Link } from '@/src/i18n/routing';
@@ -44,7 +46,9 @@ export default async function ManageMembersPage({
   const inviteeUserIds = pendingInvites.map((inv) => inv.inviteeId);
   const inviteeUserDomains =
     inviteeUserIds.length > 0
-      ? await userRepository.findByIds(inviteeUserIds)
+      ? await userRepository.findByIds(
+          inviteeUserIds.map((id) => UserId.parse(id))
+        )
       : [];
   const inviteeUsers = inviteeUserDomains.map((u) => ({
     id: u.id,

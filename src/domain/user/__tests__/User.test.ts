@@ -1,3 +1,5 @@
+/** User clients exercise profile invariants with explicit identity/time fixtures. */
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
 import { describe, it, expect } from 'vitest';
 import {
   User,
@@ -12,6 +14,75 @@ import { UserDomainCodes } from '../UserDomainCodes';
 import { SharedDomainCodes } from '../../shared/SharedDomainCodes';
 import { ProfanityChecker } from '../../shared/profanity/ProfanityChecker';
 import { Address } from '../Address';
+import { UserId } from '../../shared/EntityIds';
+import { Instant } from '../../shared/Instant';
+import {
+  FirstName,
+  LastName,
+  MiddleName,
+  PasswordHash,
+  Language,
+} from '../UserValues';
+import { CreateUserProps, RawUserProps } from '../User';
+
+const creation = {
+  id: UserId.parse('user-fixture'),
+  now: Instant.parse('2026-10-26T10:30:00.123Z'),
+};
+
+function createUser(
+  props: Omit<
+    CreateUserProps,
+    | 'firstName'
+    | 'lastName'
+    | 'middleName'
+    | 'password'
+    | 'language'
+    | 'consentGivenAt'
+    | 'nickname'
+  > & {
+    firstName: string;
+    lastName: string;
+    middleName?: string;
+    password: string;
+    language?: string;
+    consentGivenAt?: Date;
+    nickname?: Nickname;
+  },
+  checker?: ProfanityChecker
+): User {
+  return User.create(
+    {
+      ...props,
+      firstName: FirstName.parse(props.firstName),
+      lastName: LastName.parse(props.lastName),
+      middleName: props.middleName
+        ? MiddleName.parse(props.middleName)
+        : undefined,
+      password: PasswordHash.parse(props.password),
+      language:
+        props.language === undefined
+          ? undefined
+          : Language.parse(props.language),
+      consentGivenAt: props.consentGivenAt
+        ? Instant.fromDate(props.consentGivenAt)
+        : undefined,
+      nickname: props.nickname ?? Nickname.create('user_abcdef12'),
+    },
+    creation,
+    checker
+  );
+}
+
+// Persistence has required nicknames; older test fixtures now supply one explicitly.
+function reconstituteUser(
+  props: Omit<RawUserProps, 'nickname'> & { nickname?: Nickname }
+): User {
+  return User.reconstitute({
+    ...props,
+    nickname: props.nickname ?? Nickname.create('user_abcdef12'),
+  });
+}
 
 describe('User', () => {
   const validProps = {
@@ -20,72 +91,79 @@ describe('User', () => {
     middleName: 'Smith',
     phoneNumber: PhoneNumber.create('+79161234567'),
     password: 'hashedpassword123',
-    nickname: Nickname.generate(),
+    nickname: Nickname.create('user_abcdef12'),
   };
 
   describe('create', () => {
     it('should create a user with valid props', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
 
       expect(user.firstName).toBe('John');
       expect(user.lastName).toBe('Doe');
       expect(user.middleName).toBe('Smith');
       expect(user.phoneNumber.getValue()).toBe('+79161234567');
       expect(user.password).toBe('hashedpassword123');
-      expect(user.createdAt).toBeInstanceOf(Date);
+      expect(user.createdAt).toBe(creation.now);
     });
 
     it('should create a user without middle name', () => {
       const { middleName, ...propsWithoutMiddleName } = validProps;
-      const user = User.create(propsWithoutMiddleName);
+      const user = createUser(propsWithoutMiddleName);
 
       expect(user.middleName).toBeUndefined();
     });
 
     it('should throw error when firstName is empty', () => {
       const props = { ...validProps, firstName: '' };
-      expect(() => User.create(props)).toThrow('First name is required');
+      expect(() => createUser(props)).toThrow(
+        UserDomainCodes.FIRST_NAME_REQUIRED
+      );
     });
 
     it('should throw error when firstName is only whitespace', () => {
       const props = { ...validProps, firstName: '   ' };
-      expect(() => User.create(props)).toThrow('First name is required');
+      expect(() => createUser(props)).toThrow(
+        UserDomainCodes.FIRST_NAME_REQUIRED
+      );
     });
 
     it('should throw error when lastName is empty', () => {
       const props = { ...validProps, lastName: '' };
-      expect(() => User.create(props)).toThrow('Last name is required');
+      expect(() => createUser(props)).toThrow(
+        UserDomainCodes.LAST_NAME_REQUIRED
+      );
     });
 
     it('should throw error when password is empty', () => {
       const props = { ...validProps, password: '' };
-      expect(() => User.create(props)).toThrow('Password is required');
+      expect(() => createUser(props)).toThrow(
+        UserDomainCodes.PASSWORD_REQUIRED
+      );
     });
 
     it('should throw error when language is invalid', () => {
       const props = { ...validProps, language: 'invalid' };
-      // @ts-expect-error - Testing invalid language value
-      expect(() => User.create(props)).toThrow('Language must be one of:');
+      expect(() => createUser(props)).toThrow(UserDomainCodes.LANGUAGE_INVALID);
     });
 
     it('should create user with default language if not provided', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       expect(user.language).toBe('ru');
     });
 
     it('should create user with specified language', () => {
-      const user = User.create({ ...validProps, language: 'ru' });
+      const user = createUser({ ...validProps, language: 'ru' });
       expect(user.language).toBe('ru');
     });
 
     it('should create user with consentGivenAt', () => {
       const consentDate = new Date('2026-03-03');
-      const user = User.create({ ...validProps, consentGivenAt: consentDate });
-      expect(user.consentGivenAt).toEqual(consentDate);
+      const user = createUser({ ...validProps, consentGivenAt: consentDate });
+      expect(user.consentGivenAt).toBe(consentDate.toISOString());
     });
 
     it('should create user without consentGivenAt', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       expect(user.consentGivenAt).toBeUndefined();
     });
 
@@ -101,7 +179,7 @@ describe('User', () => {
         ['Ёлкин', 'starts with Ё'],
         ['Ab', 'minimum 2 chars'],
       ])('should accept valid firstName: %s (%s)', (name) => {
-        const user = User.create({ ...validProps, firstName: name });
+        const user = createUser({ ...validProps, firstName: name });
         expect(user.firstName).toBe(name);
       });
 
@@ -111,7 +189,7 @@ describe('User', () => {
         ["O'Brien", 'straight apostrophe'],
         ['Анна-Мария', 'hyphenated'],
       ])('should accept valid lastName: %s (%s)', (name) => {
-        const user = User.create({ ...validProps, lastName: name });
+        const user = createUser({ ...validProps, lastName: name });
         expect(user.lastName).toBe(name);
       });
 
@@ -124,7 +202,7 @@ describe('User', () => {
         ['Иван Петрович', 'contains space'],
         ['a'.repeat(51), 'exceeds max length'],
       ])('should reject invalid firstName: %s (%s)', (name) => {
-        expect(() => User.create({ ...validProps, firstName: name })).toThrow(
+        expect(() => createUser({ ...validProps, firstName: name })).toThrow(
           UserDomainCodes.FIRST_NAME_INVALID
         );
       });
@@ -135,7 +213,7 @@ describe('User', () => {
         ['doe', 'lowercase start'],
         ['D', 'single char'],
       ])('should reject invalid lastName: %s (%s)', (name) => {
-        expect(() => User.create({ ...validProps, lastName: name })).toThrow(
+        expect(() => createUser({ ...validProps, lastName: name })).toThrow(
           UserDomainCodes.LAST_NAME_INVALID
         );
       });
@@ -146,7 +224,7 @@ describe('User', () => {
         ['James', 'Latin'],
         ["O'Connor", 'with apostrophe'],
       ])('should accept valid middleName: %s (%s)', (name) => {
-        const user = User.create({ ...validProps, middleName: name });
+        const user = createUser({ ...validProps, middleName: name });
         expect(user.middleName).toBe(name);
       });
 
@@ -156,7 +234,7 @@ describe('User', () => {
         ['james', 'lowercase start'],
         ['J', 'single char'],
       ])('should reject invalid middleName: %s (%s)', (name) => {
-        expect(() => User.create({ ...validProps, middleName: name })).toThrow(
+        expect(() => createUser({ ...validProps, middleName: name })).toThrow(
           UserDomainCodes.MIDDLE_NAME_INVALID
         );
       });
@@ -164,7 +242,7 @@ describe('User', () => {
       // MiddleName — skipped when undefined
       it('should skip middleName validation when undefined', () => {
         const { middleName, ...propsWithoutMiddle } = validProps;
-        const user = User.create(propsWithoutMiddle);
+        const user = createUser(propsWithoutMiddle);
         expect(user.middleName).toBeUndefined();
       });
 
@@ -182,36 +260,37 @@ describe('User', () => {
       const profaneChecker: ProfanityChecker = {
         containsProfanity: (text: string) =>
           text.toLowerCase().includes('badword'),
+        findProfaneWords: () => [],
       };
 
       it('should throw when firstName contains profanity', () => {
         const props = { ...validProps, firstName: 'Badword' };
-        expect(() => User.create(props, profaneChecker)).toThrow(
+        expect(() => createUser(props, profaneChecker)).toThrow(
           SharedDomainCodes.CONTAINS_PROFANITY
         );
       });
 
       it('should throw when lastName contains profanity', () => {
         const props = { ...validProps, lastName: 'Badword' };
-        expect(() => User.create(props, profaneChecker)).toThrow(
+        expect(() => createUser(props, profaneChecker)).toThrow(
           SharedDomainCodes.CONTAINS_PROFANITY
         );
       });
 
       it('should throw when middleName contains profanity', () => {
         const props = { ...validProps, middleName: 'Badword' };
-        expect(() => User.create(props, profaneChecker)).toThrow(
+        expect(() => createUser(props, profaneChecker)).toThrow(
           SharedDomainCodes.CONTAINS_PROFANITY
         );
       });
 
       it('should not throw when middleName is undefined', () => {
         const { middleName, ...propsNoMiddle } = validProps;
-        expect(() => User.create(propsNoMiddle, profaneChecker)).not.toThrow();
+        expect(() => createUser(propsNoMiddle, profaneChecker)).not.toThrow();
       });
 
       it('should not check profanity when checker is not provided', () => {
-        const user = User.create(validProps);
+        const user = createUser(validProps);
         expect(user.firstName).toBe('John');
       });
     });
@@ -219,20 +298,20 @@ describe('User', () => {
 
   describe('getFullName', () => {
     it('should return full name with middle name in lastName firstName middleName order', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       expect(user.getFullName()).toBe('Doe John Smith');
     });
 
     it('should return full name without middle name in lastName firstName order', () => {
       const { middleName, ...propsWithoutMiddleName } = validProps;
-      const user = User.create(propsWithoutMiddleName);
+      const user = createUser(propsWithoutMiddleName);
       expect(user.getFullName()).toBe('Doe John');
     });
   });
 
   describe('canAuthenticate', () => {
     it('should return true for user with password and phone', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       expect(user.canAuthenticate()).toBe(true);
     });
   });
@@ -249,12 +328,12 @@ describe('User', () => {
         createdAt: new Date('2024-01-01'),
       };
 
-      const user = User.reconstitute(props);
+      const user = reconstituteUser(props);
 
       expect(user.id).toBe('user-123');
       expect(user.firstName).toBe('John');
       expect(user.language).toBe('en');
-      expect(user.createdAt).toEqual(new Date('2024-01-01'));
+      expect(user.createdAt).toBe('2024-01-01T00:00:00.000Z');
     });
 
     it('should reconstitute a user with consentGivenAt', () => {
@@ -270,15 +349,15 @@ describe('User', () => {
         consentGivenAt: consentDate,
       };
 
-      const user = User.reconstitute(props);
+      const user = reconstituteUser(props);
 
-      expect(user.consentGivenAt).toEqual(consentDate);
+      expect(user.consentGivenAt).toBe(consentDate.toISOString());
     });
   });
 
   describe('updateLanguage', () => {
     it('should update language to a valid value', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       const updatedUser = user.updateLanguage('ru');
 
       expect(updatedUser.language).toBe('ru');
@@ -287,24 +366,24 @@ describe('User', () => {
     });
 
     it('should throw error when updating to invalid language', () => {
-      const user = User.create(validProps);
-      expect(() => user.updateLanguage('invalid')).toThrow(
-        'Language must be one of:'
+      const user = createUser(validProps);
+      expect(() => user.updateLanguage(Language.parse('invalid'))).toThrow(
+        UserDomainCodes.LANGUAGE_INVALID
       );
     });
   });
 
   describe('updateMiddleName', () => {
     it('should update middle name', () => {
-      const user = User.create(validProps);
-      const updatedUser = user.updateMiddleName('NewMiddle');
+      const user = createUser(validProps);
+      const updatedUser = user.updateMiddleName(MiddleName.parse('NewMiddle'));
 
       expect(updatedUser.middleName).toBe('NewMiddle');
       expect(updatedUser.id).toBe(user.id);
     });
 
     it('should allow clearing middle name', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       const updatedUser = user.updateMiddleName(undefined);
 
       expect(updatedUser.middleName).toBeUndefined();
@@ -314,11 +393,12 @@ describe('User', () => {
       const checker: ProfanityChecker = {
         containsProfanity: (text: string) =>
           text.toLowerCase().includes('badword'),
+        findProfaneWords: () => [],
       };
-      const user = User.create(validProps);
-      expect(() => user.updateMiddleName('Badword', checker)).toThrow(
-        SharedDomainCodes.CONTAINS_PROFANITY
-      );
+      const user = createUser(validProps);
+      expect(() =>
+        user.updateMiddleName(MiddleName.parse('Badword'), checker)
+      ).toThrow(SharedDomainCodes.CONTAINS_PROFANITY);
     });
 
     it('should not throw when middleName is undefined with checker', () => {
@@ -326,28 +406,28 @@ describe('User', () => {
         containsProfanity: () => true,
         findProfaneWords: () => [],
       };
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       const updated = user.updateMiddleName(undefined, checker);
       expect(updated.middleName).toBeUndefined();
     });
 
     it('should not check profanity when checker is not provided', () => {
-      const user = User.create(validProps);
-      const updated = user.updateMiddleName('AnyName');
+      const user = createUser(validProps);
+      const updated = user.updateMiddleName(MiddleName.parse('AnyName'));
       expect(updated.middleName).toBe('AnyName');
     });
   });
 
   describe('privacy settings', () => {
     it('should create user with default privacy settings (both false)', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       expect(user.allowFindByName).toBe(false);
       expect(user.allowFindByPhone).toBe(false);
       expect(user.privacySetupCompleted).toBe(false);
     });
 
     it('should create user with a nickname', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       expect(user.nickname).toBeDefined();
       expect(user.nickname.getValue()).toMatch(/^user_[a-z0-9]{8}$/);
     });
@@ -368,7 +448,7 @@ describe('User', () => {
         privacySetupCompleted: true,
       };
 
-      const user = User.reconstitute(props);
+      const user = reconstituteUser(props);
 
       expect(user.nickname.getValue()).toBe('john_doe');
       expect(user.allowFindByName).toBe(true);
@@ -377,7 +457,7 @@ describe('User', () => {
     });
 
     it('should update privacy settings', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       const updated = user.updatePrivacySettings({
         allowFindByName: true,
         allowFindByPhone: true,
@@ -390,7 +470,7 @@ describe('User', () => {
     });
 
     it('should partially update privacy settings', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       const updated = user.updatePrivacySettings({
         allowFindByName: true,
       });
@@ -400,7 +480,7 @@ describe('User', () => {
     });
 
     it('should update nickname', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       const newNickname = Nickname.create('new_nick');
       const updated = user.updateNickname(newNickname);
 
@@ -409,7 +489,7 @@ describe('User', () => {
     });
 
     it('should complete privacy setup', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       expect(user.privacySetupCompleted).toBe(false);
 
       const updated = user.completePrivacySetup();
@@ -417,12 +497,12 @@ describe('User', () => {
     });
 
     it('should create user with default allowFindByAddress (false)', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       expect(user.allowFindByAddress).toBe(false);
     });
 
     it('should reconstitute user with allowFindByAddress', () => {
-      const user = User.reconstitute({
+      const user = reconstituteUser({
         id: 'user-123',
         firstName: 'John',
         lastName: 'Doe',
@@ -436,7 +516,7 @@ describe('User', () => {
     });
 
     it('should update allowFindByAddress via updatePrivacySettings', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       const updated = user.updatePrivacySettings({
         allowFindByAddress: true,
       });
@@ -445,7 +525,7 @@ describe('User', () => {
     });
 
     it('should preserve allowFindByAddress when not provided', () => {
-      const user = User.reconstitute({
+      const user = reconstituteUser({
         id: 'user-123',
         firstName: 'John',
         lastName: 'Doe',
@@ -462,7 +542,7 @@ describe('User', () => {
 
   describe('address', () => {
     it('should create user with no address', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       expect(user.address).toBeUndefined();
     });
 
@@ -474,7 +554,7 @@ describe('User', () => {
         building: '12',
         isPrivateHouse: true,
       });
-      const user = User.reconstitute({
+      const user = reconstituteUser({
         id: 'user-123',
         firstName: 'John',
         lastName: 'Doe',
@@ -489,7 +569,7 @@ describe('User', () => {
     });
 
     it('should update address', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       const address = Address.create({
         country: 'Russia',
         city: 'Moscow',
@@ -512,7 +592,7 @@ describe('User', () => {
         building: '12',
         isPrivateHouse: true,
       });
-      const user = User.reconstitute({
+      const user = reconstituteUser({
         id: 'user-123',
         firstName: 'John',
         lastName: 'Doe',
@@ -529,12 +609,12 @@ describe('User', () => {
 
   describe('isConfirmed', () => {
     it('should return false when confirmedAt is not set', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       expect(user.isConfirmed()).toBe(false);
     });
 
     it('should return true when confirmedAt is set', () => {
-      const user = User.reconstitute({
+      const user = reconstituteUser({
         id: 'user-123',
         firstName: 'John',
         lastName: 'Doe',
@@ -550,19 +630,19 @@ describe('User', () => {
 
   describe('confirm', () => {
     it('should return new user with confirmedAt set', () => {
-      const user = User.create(validProps);
+      const user = createUser(validProps);
       expect(user.isConfirmed()).toBe(false);
 
-      const confirmed = user.confirm();
+      const confirmed = user.confirm(creation.now);
       expect(confirmed.isConfirmed()).toBe(true);
-      expect(confirmed.confirmedAt).toBeInstanceOf(Date);
+      expect(confirmed.confirmedAt).toBe(creation.now);
       // Original unchanged
       expect(user.isConfirmed()).toBe(false);
     });
 
     it('should preserve all other props', () => {
-      const user = User.create(validProps);
-      const confirmed = user.confirm();
+      const user = createUser(validProps);
+      const confirmed = user.confirm(creation.now);
 
       expect(confirmed.firstName).toBe(user.firstName);
       expect(confirmed.lastName).toBe(user.lastName);
@@ -663,7 +743,7 @@ describe('User email', () => {
   function buildUser(
     overrides: Partial<Parameters<typeof User.reconstitute>[0]> = {}
   ) {
-    return User.reconstitute({
+    return reconstituteUser({
       id: 'user-1',
       firstName: 'Ivan',
       lastName: 'Ivanov',
@@ -692,22 +772,25 @@ describe('User email', () => {
   });
 
   it('marks an email confirmed', () => {
-    const user = buildUser()
-      .changeEmail(EmailAddress.create('ivan@mail.ru'))
-      .confirmEmail();
+    const user = expectSuccess(
+      buildUser()
+        .changeEmail(EmailAddress.create('ivan@mail.ru'))
+        .confirmEmail(creation.now)
+    );
 
     expect(user.hasConfirmedEmail()).toBe(true);
-    expect(user.emailConfirmedAt).toBeInstanceOf(Date);
+    expect(user.emailConfirmedAt).toBe(creation.now);
   });
 
   // The load-bearing invariant. If a new address inherited the old one's
   // confirmed flag, changing to an attacker-controlled address would yield an
   // immediately reset-capable email.
   it('clears confirmation when the address changes', () => {
-    const user = buildUser()
-      .changeEmail(EmailAddress.create('ivan@mail.ru'))
-      .confirmEmail()
-      .changeEmail(EmailAddress.create('petr@mail.ru'));
+    const user = expectSuccess(
+      buildUser()
+        .changeEmail(EmailAddress.create('ivan@mail.ru'))
+        .confirmEmail(creation.now)
+    ).changeEmail(EmailAddress.create('petr@mail.ru'));
 
     expect(user.email?.getValue()).toBe('petr@mail.ru');
     expect(user.emailConfirmedAt).toBeUndefined();
@@ -715,19 +798,21 @@ describe('User email', () => {
   });
 
   it('clears confirmation even when re-setting the same address', () => {
-    const user = buildUser()
-      .changeEmail(EmailAddress.create('ivan@mail.ru'))
-      .confirmEmail()
-      .changeEmail(EmailAddress.create('ivan@mail.ru'));
+    const user = expectSuccess(
+      buildUser()
+        .changeEmail(EmailAddress.create('ivan@mail.ru'))
+        .confirmEmail(creation.now)
+    ).changeEmail(EmailAddress.create('ivan@mail.ru'));
 
     expect(user.hasConfirmedEmail()).toBe(false);
   });
 
   it('removes the email and its confirmation together', () => {
-    const user = buildUser()
-      .changeEmail(EmailAddress.create('ivan@mail.ru'))
-      .confirmEmail()
-      .removeEmail();
+    const user = expectSuccess(
+      buildUser()
+        .changeEmail(EmailAddress.create('ivan@mail.ru'))
+        .confirmEmail(creation.now)
+    ).removeEmail();
 
     expect(user.email).toBeUndefined();
     expect(user.emailConfirmedAt).toBeUndefined();
@@ -743,7 +828,7 @@ describe('User email', () => {
   });
 
   it('accepts an email at creation, always unconfirmed', () => {
-    const user = User.create({
+    const user = createUser({
       firstName: 'Ivan',
       lastName: 'Ivanov',
       phoneNumber: PhoneNumber.create('+79161234567'),

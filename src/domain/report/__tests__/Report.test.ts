@@ -1,3 +1,10 @@
+/** Report aggregate clients exercise typed content, publication and audience rules.
+ * Runtime malformed inputs remain covered alongside compile-time contracts. */
+import { ReportTitle, ReportBody } from '@/domain/report/ReportValues';
+import { OrganizationId, UserId, BoardId } from '@/domain/shared/EntityIds';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { testClock, testIds } from '@/domain/report/__tests__/reportTestValues';
+import { ReportId } from '@/domain/shared/EntityIds';
 import { describe, it, expect } from 'vitest';
 import {
   Report,
@@ -8,15 +15,18 @@ import { ReportVisibility } from '../ReportVisibility';
 import { ReportDomainCodes } from '../ReportDomainCodes';
 
 const make = (overrides: Partial<Parameters<typeof Report.create>[0]> = {}) =>
-  Report.create({
-    title: 'Title',
-    body: 'Body',
-    organizationId: 'org-1',
-    createdById: 'user-1',
-    visibility: ReportVisibility.WITHIN_ORG_ONLY,
-    boardIds: [],
-    ...overrides,
-  });
+  Report.create(
+    {
+      title: ReportTitle.parse('Title'),
+      body: ReportBody.parse('Body'),
+      organizationId: OrganizationId.parse('org-1'),
+      createdById: UserId.parse('user-1'),
+      visibility: ReportVisibility.WITHIN_ORG_ONLY,
+      boardIds: [],
+      ...overrides,
+    },
+    testCreation(ReportId, 'report-1')
+  );
 
 function unwrap<T>(
   r: { success: true; value: T } | { success: false; error: string }
@@ -44,6 +54,7 @@ describe('Report.create', () => {
   });
 
   it('rejects empty title', () => {
+    // @ts-expect-error Runtime data cannot bypass the aggregate's content guard.
     const r = make({ title: '   ' });
     expect(r.success).toBe(false);
 
@@ -53,6 +64,7 @@ describe('Report.create', () => {
   });
 
   it('rejects title too long', () => {
+    // @ts-expect-error Runtime data cannot bypass the aggregate's content guard.
     const r = make({ title: 'a'.repeat(REPORT_TITLE_MAX_LENGTH + 1) });
     expect(r.success).toBe(false);
 
@@ -62,6 +74,7 @@ describe('Report.create', () => {
   });
 
   it('rejects empty body', () => {
+    // @ts-expect-error Runtime data cannot bypass the aggregate's content guard.
     const r = make({ body: '   ' });
     expect(r.success).toBe(false);
 
@@ -71,6 +84,7 @@ describe('Report.create', () => {
   });
 
   it('rejects body too long', () => {
+    // @ts-expect-error Runtime data cannot bypass the aggregate's content guard.
     const r = make({ body: 'a'.repeat(REPORT_BODY_MAX_LENGTH + 1) });
     expect(r.success).toBe(false);
 
@@ -81,7 +95,7 @@ describe('Report.create', () => {
 
   it('rejects body that references any attachment at create time', () => {
     const r = make({
-      body: 'See ![pic](/api/report-attachments/some-id)',
+      body: ReportBody.parse('See ![pic](/api/report-attachments/some-id)'),
     });
     expect(r.success).toBe(false);
 
@@ -107,7 +121,7 @@ describe('Report.create', () => {
   it('accepts WITHIN_BOARDS with boards', () => {
     const r = make({
       visibility: ReportVisibility.WITHIN_BOARDS,
-      boardIds: ['b1', 'b2'],
+      boardIds: [BoardId.parse('b1'), BoardId.parse('b2')],
     });
     expect(r.success).toBe(true);
 
@@ -119,7 +133,7 @@ describe('Report.create', () => {
   it('drops boardIds when visibility is not WITHIN_BOARDS', () => {
     const r = make({
       visibility: ReportVisibility.WITHIN_ORG_ONLY,
-      boardIds: ['b1'],
+      boardIds: [BoardId.parse('b1')],
     });
     expect(r.success).toBe(true);
 
@@ -133,7 +147,7 @@ describe('Report state machine', () => {
   it('publish: DRAFT → PUBLISHED, sets publishedBy + lastPublishedAt', () => {
     const r = unwrap(make());
     const before = new Date();
-    const res = r.publish('admin-1', false);
+    const res = r.publish(UserId.parse('admin-1'), false, testClock.now());
     expect(res.success).toBe(true);
     expect(r.state).toBe('PUBLISHED');
     expect(r.publishedById).toBe('admin-1');
@@ -145,8 +159,8 @@ describe('Report state machine', () => {
 
   it('publish: rejects when not Draft', () => {
     const r = unwrap(make());
-    r.publish('admin-1', false);
-    const second = r.publish('admin-1', false);
+    r.publish(UserId.parse('admin-1'), false, testClock.now());
+    const second = r.publish(UserId.parse('admin-1'), false, testClock.now());
     expect(second.success).toBe(false);
 
     if (!second.success) {
@@ -156,27 +170,27 @@ describe('Report state machine', () => {
 
   it('publish: forces notifyAudience=false for PUBLIC_ANON', () => {
     const r = unwrap(make({ visibility: ReportVisibility.PUBLIC_ANON }));
-    r.publish('admin-1', true);
+    r.publish(UserId.parse('admin-1'), true, testClock.now());
     expect(r.notifyAudience).toBe(false);
   });
 
   it('publish: forces notifyAudience=false for PUBLIC_AUTH', () => {
     const r = unwrap(make({ visibility: ReportVisibility.PUBLIC_AUTH }));
-    r.publish('admin-1', true);
+    r.publish(UserId.parse('admin-1'), true, testClock.now());
     expect(r.notifyAudience).toBe(false);
   });
 
   it('publish: honors notifyAudience for WITHIN_ORG_ONLY', () => {
     const r = unwrap(make());
-    r.publish('admin-1', true);
+    r.publish(UserId.parse('admin-1'), true, testClock.now());
     expect(r.notifyAudience).toBe(true);
   });
 
   it('downgrade: PUBLISHED → DRAFT preserves lastPublishedAt; clears publishedById; resets notifyAudience', () => {
     const r = unwrap(make());
-    r.publish('admin-1', true);
+    r.publish(UserId.parse('admin-1'), true, testClock.now());
     const lastPub = r.lastPublishedAt;
-    const res = r.downgradeToDraft();
+    const res = r.downgradeToDraft(testClock.now());
     expect(res.success).toBe(true);
     expect(r.state).toBe('DRAFT');
     expect(r.publishedById).toBeNull();
@@ -186,7 +200,7 @@ describe('Report state machine', () => {
 
   it('downgrade: rejects when not Published', () => {
     const r = unwrap(make());
-    const res = r.downgradeToDraft();
+    const res = r.downgradeToDraft(testClock.now());
     expect(res.success).toBe(false);
 
     if (!res.success) {
@@ -196,7 +210,7 @@ describe('Report state machine', () => {
 
   it('archive: sets archivedAt', () => {
     const r = unwrap(make());
-    const res = r.archive();
+    const res = r.archive(testClock.now());
     expect(res.success).toBe(true);
     expect(r.archivedAt).not.toBeNull();
     expect(r.isArchived()).toBe(true);
@@ -204,8 +218,8 @@ describe('Report state machine', () => {
 
   it('archive: rejects double archive', () => {
     const r = unwrap(make());
-    r.archive();
-    const second = r.archive();
+    r.archive(testClock.now());
+    const second = r.archive(testClock.now());
     expect(second.success).toBe(false);
 
     if (!second.success) {
@@ -217,15 +231,15 @@ describe('Report state machine', () => {
 describe('Report editing constraints', () => {
   it('updateTitle: allowed in Draft', () => {
     const r = unwrap(make());
-    const res = r.updateTitle('New');
+    const res = r.updateTitle(ReportTitle.parse('New'), testClock.now());
     expect(res.success).toBe(true);
     expect(r.title).toBe('New');
   });
 
   it('updateTitle: rejected in Published', () => {
     const r = unwrap(make());
-    r.publish('admin-1', false);
-    const res = r.updateTitle('New');
+    r.publish(UserId.parse('admin-1'), false, testClock.now());
+    const res = r.updateTitle(ReportTitle.parse('New'), testClock.now());
     expect(res.success).toBe(false);
 
     if (!res.success) {
@@ -235,8 +249,12 @@ describe('Report editing constraints', () => {
 
   it('setVisibility: rejected in Published', () => {
     const r = unwrap(make());
-    r.publish('admin-1', false);
-    const res = r.setVisibility(ReportVisibility.PUBLIC_AUTH, []);
+    r.publish(UserId.parse('admin-1'), false, testClock.now());
+    const res = r.setVisibility(
+      ReportVisibility.PUBLIC_AUTH,
+      [],
+      testClock.now()
+    );
     expect(res.success).toBe(false);
 
     if (!res.success) {
@@ -246,7 +264,11 @@ describe('Report editing constraints', () => {
 
   it('setVisibility: WITHIN_BOARDS requires boardIds', () => {
     const r = unwrap(make());
-    const res = r.setVisibility(ReportVisibility.WITHIN_BOARDS, []);
+    const res = r.setVisibility(
+      ReportVisibility.WITHIN_BOARDS,
+      [],
+      testClock.now()
+    );
     expect(res.success).toBe(false);
 
     if (!res.success) {
@@ -258,10 +280,14 @@ describe('Report editing constraints', () => {
     const r = unwrap(
       make({
         visibility: ReportVisibility.WITHIN_BOARDS,
-        boardIds: ['b1'],
+        boardIds: [BoardId.parse('b1')],
       })
     );
-    const res = r.setVisibility(ReportVisibility.WITHIN_ORG_ONLY, []);
+    const res = r.setVisibility(
+      ReportVisibility.WITHIN_ORG_ONLY,
+      [],
+      testClock.now()
+    );
     expect(res.success).toBe(true);
     expect(r.boardIds).toEqual([]);
   });
@@ -286,7 +312,8 @@ describe('Report editing constraints', () => {
       attachmentIds: ['own-id'],
     });
     const res = r.updateBody(
-      '![ok](/api/report-attachments/own-id)\n\nMore text'
+      ReportBody.parse('![ok](/api/report-attachments/own-id)\n\nMore text'),
+      testClock.now()
     );
     expect(res.success).toBe(true);
   });
@@ -311,7 +338,10 @@ describe('Report editing constraints', () => {
       attachmentIds: ['own-id'],
     });
     const res = r.updateBody(
-      '![nope](/api/report-attachments/foreign-id)\n\nMore text'
+      ReportBody.parse(
+        '![nope](/api/report-attachments/foreign-id)\n\nMore text'
+      ),
+      testClock.now()
     );
     expect(res.success).toBe(false);
 

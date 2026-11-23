@@ -1,21 +1,25 @@
-import { PrismaClient } from '@/generated/prisma/client';
-import { Result, success } from '../../domain/shared/Result';
+/** Validates the actor and pagination for the administrator pending-request inbox.
+ * The typed directory port restricts the query to that actor's organization roles. */
+import { ResultCount } from '../../domain/shared/Pagination';
+import {
+  OrganizationDirectory,
+  DirectoryAdminPendingRequest,
+} from './OrganizationDirectory';
 
-export interface PendingRequest {
-  organizationId: string;
-  organizationName: string;
-  requester: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    middleName: string | null;
-  };
-  requestedAt: Date;
-}
+import { UserId } from '../../domain/shared/EntityIds';
+import { PageNumber, PageSize } from '../../domain/shared/Pagination';
+import { z } from 'zod';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
+import { Result, failure } from '../../domain/shared/Result';
+
+export type PendingRequest = DirectoryAdminPendingRequest;
 
 export interface GetPendingRequestsResult {
   requests: PendingRequest[];
-  totalCount: number;
+  totalCount: ResultCount;
 }
 
 export interface GetPendingRequestsPagination {
@@ -24,89 +28,34 @@ export interface GetPendingRequestsPagination {
 }
 
 export interface GetPendingRequestsDependencies {
-  prisma: PrismaClient;
+  directory: Pick<OrganizationDirectory, 'pendingForAdmin'>;
 }
 
 export class GetPendingRequestsUseCase {
   constructor(private deps: GetPendingRequestsDependencies) {}
 
   async execute(
-    adminId: string,
-    pagination?: GetPendingRequestsPagination
-  ): Promise<Result<GetPendingRequestsResult, string>> {
-    // 1. Get all organizations where user is admin
-    const adminRoles = await this.deps.prisma.organizationAdminUser.findMany({
-      where: {
-        userId: adminId,
-      },
-      include: {
-        organization: true,
-      },
-    });
+    rawAdminId: string,
+    rawPagination?: GetPendingRequestsPagination
+  ): Promise<Result<GetPendingRequestsResult, OrganizationUseCaseFailure>> {
+    const parsedAdminId = UserId.safeParse(rawAdminId);
 
-    if (adminRoles.length === 0) {
-      return success({ requests: [], totalCount: 0 });
+    if (!parsedAdminId.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
     }
 
-    const organizationIds = adminRoles.map((role) => role.organizationId);
+    const adminId = parsedAdminId.data;
+    const parsedPagination = z
+      .object({ page: PageNumber, pageSize: PageSize })
+      .optional()
+      .safeParse(rawPagination);
 
-    const whereClause = {
-      organizationId: {
-        in: organizationIds,
-      },
-      status: 'pending' as const,
-    };
-
-    // 2. Get total count
-    const totalCount = await this.deps.prisma.organizationUser.count({
-      where: whereClause,
-    });
-
-    // 3. Get pending requests with optional pagination
-    const findManyArgs: any = {
-      where: whereClause,
-      include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            middleName: true,
-          },
-        },
-        organization: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    };
-
-    if (pagination && pagination.page > 0 && pagination.pageSize > 0) {
-      findManyArgs.skip = (pagination.page - 1) * pagination.pageSize;
-      findManyArgs.take = pagination.pageSize;
+    if (!parsedPagination.success) {
+      return failure('common.errors.unexpected');
     }
 
-    const pendingRequests =
-      await this.deps.prisma.organizationUser.findMany(findManyArgs);
+    const pagination = parsedPagination.data;
 
-    // 4. Map to result format
-    const requests: PendingRequest[] = pendingRequests.map((req: any) => ({
-      organizationId: req.organizationId,
-      organizationName: req.organization.name,
-      requester: {
-        id: req.user.id,
-        firstName: req.user.firstName,
-        lastName: req.user.lastName,
-        middleName: req.user.middleName,
-      },
-      requestedAt: req.createdAt,
-    }));
-
-    return success({ requests, totalCount });
+    return this.deps.directory.pendingForAdmin({ adminId, pagination });
   }
 }

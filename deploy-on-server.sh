@@ -3,16 +3,11 @@
 # Production server deployment script
 # This script is run on the production server after files are uploaded
 
-set -e  # Exit on any error
+set -eo pipefail
+umask 077
 
 DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOG_FILE="$DEPLOY_DIR/deploy.log"
-
-# Load .env to get PORT
-if [ -f "$DEPLOY_DIR/.env" ]; then
-    export $(grep -E '^PORT=' "$DEPLOY_DIR/.env" | xargs)
-fi
-PORT=${PORT:-3000}
 
 # Load NVM if available
 if [ -f "$HOME/.nvm/nvm.sh" ]; then
@@ -20,9 +15,8 @@ if [ -f "$HOME/.nvm/nvm.sh" ]; then
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
 fi
 
-# Find node and yarn binaries
+# Find the node binary
 NODE_BIN=$(command -v node || echo "/var/www/www-root/data/.nvm/versions/node/v24.12.0/bin/node")
-YARN_BIN=$(command -v yarn || echo "/var/www/www-root/data/.nvm/versions/node/v24.12.0/bin/yarn")
 
 log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
@@ -32,12 +26,20 @@ log "========================================="
 log "Starting deployment process..."
 log "========================================="
 log "Deploy dir: $DEPLOY_DIR"
-log "Port: $PORT"
 log "Node binary: $NODE_BIN"
-log "Yarn binary: $YARN_BIN"
 
 # Navigate to deployment directory
 cd "$DEPLOY_DIR"
+
+# Install only the cutover tools before touching files the old app can load.
+archive=${1:?provide the private deployment archive path}
+IFS= read -r migration_url
+: "${migration_url:?migration connection required on stdin}"
+tar -xzf "$archive" scripts/seal-ops
+if [[ ! -d node_modules ]]; then
+    tar -xzf "$archive" node_modules
+fi
+DATABASE_URL="$migration_url" node scripts/seal-ops/rollout.mjs prepare
 
 # Backup current deployment
 if [ -d ".next" ]; then
@@ -51,11 +53,15 @@ fi
 
 # Extract new deployment
 log "Extracting deployment package..."
-tar -xzf deploy.tar.gz
+tar -xzf "$archive"
 
+PORT=$(sed -n 's/^PORT=//p' .env)
+[[ "$PORT" =~ ^[0-9]+$ ]] || exit 1
 # Run migrations
 log "Running database migrations..."
-./migrate-production.sh
+DATABASE_URL="$migration_url" ./migrate-production.sh
+unset migration_url
+node scripts/seal-ops/rollout.mjs check-runtime
 
 # Find and kill existing next-server process on this port
 log "Stopping existing Next.js server on port $PORT..."
@@ -99,51 +105,21 @@ if [ -z "$NEW_PID" ]; then
 fi
 
 if [ -n "$NEW_PID" ]; then
-    log "✅ ISP panel automatically restarted the server (PID: $NEW_PID)"
-
-    # Verify port is listening
-    if lsof -Pi ":$PORT" -sTCP:LISTEN -t >/dev/null 2>&1; then
-        log "✅ Server is listening on port $PORT"
-    else
-        log "⚠️  Warning: Process is running but port $PORT is not listening yet"
-        log "Waiting a bit more..."
-        sleep 3
-        if lsof -Pi ":$PORT" -sTCP:LISTEN -t >/dev/null 2>&1; then
-            log "✅ Server is now listening on port $PORT"
-        else
-            log "⚠️  Server may still be starting up"
-        fi
-    fi
+    log "ISP panel restarted the server (PID: $NEW_PID)"
 else
-    # ISP panel didn't restart, start manually
-    log "ISP panel did not restart automatically, starting manually..."
-    cd "$DEPLOY_DIR"
-    nohup "$YARN_BIN" start >> "$LOG_FILE" 2>&1 &
-    NEW_PID=$!
-
-    log "Started new process with PID: $NEW_PID"
-
-    # Wait and verify the process started
-    sleep 3
-    if ps -p $NEW_PID > /dev/null 2>&1; then
-        log "✅ Next.js server started successfully!"
-
-        # Check if port is listening
-        if lsof -Pi ":$PORT" -sTCP:LISTEN -t >/dev/null 2>&1; then
-            log "✅ Server is listening on port $PORT"
-        else
-            log "⚠️  Warning: Server process is running but port $PORT is not listening yet"
-        fi
-    else
-        log "❌ ERROR: Failed to start Next.js server"
-        log "Check the logs at: $LOG_FILE"
-        exit 1
-    fi
+    log "Starting the loopback application..."
+    nohup ./start-production.sh >> "$LOG_FILE" 2>&1 &
 fi
 
-# Cleanup deployment package
-rm -f deploy.tar.gz
-
-log "========================================="
-log "Deployment completed successfully!"
-log "========================================="
+# Test the app itself. A supervisor PID can exist before Next accepts requests.
+for attempt in {1..15}; do
+    status=$(curl --silent --max-time 2 -o /dev/null -w '%{http_code}' \
+        -H 'X-Forwarded-Proto: https' "http://127.0.0.1:$PORT/ru/login" || true)
+    if [[ "$status" == 200 ]]; then
+        log "Application healthy on port $PORT. Deployment complete."
+        exit 0
+    fi
+    sleep 1
+done
+log "Application failed its loopback health check"
+exit 1

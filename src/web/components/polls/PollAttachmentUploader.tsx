@@ -1,15 +1,18 @@
 'use client';
 
-import { useRef } from 'react';
+import { AttachmentPreview } from './AttachmentPreview';
+import { useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/web/components/catalyst/button';
 import {
   POLL_ATTACHMENT_ALLOWED_MIME_TYPES,
   POLL_ATTACHMENT_COUNT_LIMIT,
+  QUESTION_ATTACHMENT_COUNT_LIMIT,
 } from '@/domain/poll/PollAttachment';
 import type { PollAttachmentSummary } from '@/web/actions/poll/pollAttachments';
 
 interface Props {
+  question?: boolean;
   attachments: PollAttachmentSummary[];
   uploading: boolean;
   /** Id currently being removed, so only that row shows a pending state. */
@@ -18,7 +21,7 @@ interface Props {
   error?: string | null;
   /** True while the poll is frozen — attachments cannot change once voting opens. */
   disabled?: boolean;
-  onPickFile: (file: File) => void;
+  onPickFile: (file: File) => Promise<void>;
   onRemove: (id: string) => void;
 }
 
@@ -31,14 +34,15 @@ function formatSize(bytes: number, locale: string): string {
 }
 
 /**
- * Visible way to attach a file to a poll description.
+ * Attach a file to a question or poll description. Each owner has its own limit.
  *
  * Paste and drag-and-drop already work inside the editor, but neither is
- * discoverable — this is the door. Uploading inserts the markdown ref for the
+ * discoverable — this control makes them discoverable. Description uploads insert the markdown ref for the
  * author, so they never have to write one by hand.
  */
 export function PollAttachmentUploader({
   attachments,
+  question = false,
   uploading,
   removingId,
   error,
@@ -50,24 +54,41 @@ export function PollAttachmentUploader({
   const locale = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const atLimit = attachments.length >= POLL_ATTACHMENT_COUNT_LIMIT;
+  const [pending, setPending] = useState<File | null>(null);
+  const limit = question
+    ? QUESTION_ATTACHMENT_COUNT_LIMIT
+    : POLL_ATTACHMENT_COUNT_LIMIT;
+  const atLimit = attachments.length >= limit;
 
   return (
     <div className="mt-3 space-y-2">
+      {question && <p className="text-sm font-medium">{t('questionLabel')}</p>}
       <input
         ref={inputRef}
         type="file"
         className="hidden"
         accept={POLL_ATTACHMENT_ALLOWED_MIME_TYPES.join(',')}
-        onChange={(e) => {
+        onChange={async (e) => {
           const file = e.target.files?.[0];
-
-          if (file) {
-            onPickFile(file);
-          }
 
           // Reset so picking the same file twice still fires onChange.
           e.target.value = '';
+
+          if (!file) {
+            return;
+          }
+
+          if (question) {
+            setPending(file);
+          }
+
+          try {
+            await onPickFile(file);
+          } finally {
+            if (question) {
+              setPending(null);
+            }
+          }
         }}
       />
 
@@ -81,14 +102,26 @@ export function PollAttachmentUploader({
           {uploading ? t('uploading') : t('uploadButton')}
         </Button>
         <span className="text-xs text-zinc-500 dark:text-zinc-400">
-          {attachments.length}/{POLL_ATTACHMENT_COUNT_LIMIT}
+          {attachments.length}/{limit}
         </span>
       </div>
 
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">{t('hint')}</p>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        {t(question ? 'questionHint' : 'hint')}
+      </p>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
+      {question && pending && (
+        <div className="flex items-center gap-3 text-sm">
+          <AttachmentPreview
+            source={pending}
+            name={pending.name}
+            mimeType={pending.type}
+          />
+          <span className="break-all">{pending.name}</span>
+        </div>
+      )}
       {attachments.length > 0 && (
         <ul className="divide-y divide-zinc-200 rounded-md border border-zinc-200 dark:divide-zinc-800 dark:border-zinc-800">
           {attachments.map((a) => (
@@ -96,9 +129,19 @@ export function PollAttachmentUploader({
               key={a.id}
               className="flex items-center justify-between gap-3 px-3 py-2"
             >
-              <span className="min-w-0 flex-1 truncate text-sm text-zinc-700 dark:text-zinc-300">
+              {question && (
+                <AttachmentPreview
+                  source={'/api/poll-attachments/' + a.id}
+                  name={a.fileName}
+                  mimeType={a.mimeType}
+                />
+              )}
+              <a
+                href={'/api/poll-attachments/' + a.id}
+                className="min-w-0 flex-1 cursor-pointer truncate text-sm text-zinc-700 underline dark:text-zinc-300"
+              >
                 {a.fileName}
-              </span>
+              </a>
               <span className="shrink-0 text-xs text-zinc-500 dark:text-zinc-400">
                 {formatSize(a.sizeBytes, locale)}
               </span>

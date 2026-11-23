@@ -1,3 +1,6 @@
+/** Account settings and owner-only imported address evidence. */
+import { Instant } from '@/domain/shared/Instant';
+import { SystemClock } from '@/infrastructure/shared/SystemEntityCreation';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { Heading } from '@/src/web/components/catalyst/heading';
@@ -22,6 +25,7 @@ import {
 } from '@/infrastructure/index';
 
 const emailStatusUseCase = new GetEmailConfirmationStatusUseCase({
+  clock: new SystemClock(),
   otpRepository: new PrismaOtpRepository(prisma),
   userRepository: new PrismaUserRepository(prisma),
   deliveryChannel: createEmailDeliveryChannelFromEnv(),
@@ -99,6 +103,15 @@ export default async function AccountPage() {
                 {t('addressSection')}
               </summary>
               <div className="mt-4">
+                {!user.address && user.addressForDisplay && (
+                  <Text>
+                    {[
+                      user.addressForDisplay.country,
+                      user.addressForDisplay.city,
+                      user.addressForDisplay.oneLine,
+                    ].join(', ')}
+                  </Text>
+                )}
                 <AddressForm
                   address={
                     user.address
@@ -115,7 +128,15 @@ export default async function AccountPage() {
                           houseFiasId: user.address.houseFiasId,
                           flatFiasId: user.address.flatFiasId,
                         }
-                      : null
+                      : user.addressForDisplay
+                        ? {
+                            country: user.addressForDisplay.country,
+                            city: user.addressForDisplay.city,
+                            street: user.addressForDisplay.street,
+                            building: user.addressForDisplay.building,
+                            oneLine: user.addressForDisplay.oneLine,
+                          }
+                        : null
                   }
                 />
               </div>
@@ -137,7 +158,7 @@ export default async function AccountPage() {
                 middleName: user.middleName,
                 phoneNumber: user.phoneNumber.toString(),
                 language: user.language,
-                createdAt: user.createdAt,
+                createdAt: Instant.toDate(user.createdAt),
                 nickname: user.nickname.getValue(),
                 allowFindByName: user.allowFindByName,
                 allowFindByPhone: user.allowFindByPhone,

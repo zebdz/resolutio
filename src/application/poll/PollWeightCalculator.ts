@@ -1,5 +1,5 @@
 // Application service: builds the input for `computeWeights` from the
-// repository layer and runs the math. Used by all three poll-flow use cases
+// repository layer and delegates calculations to pure domain policies. Used by all three poll-flow use cases
 // (TakeSnapshot, UpdatePollWeightConfig, PreviewPollWeightConfig) so that
 // the read+compute logic exists in exactly one place — fixing the data-shape
 // bug here fixes every call site at once.
@@ -12,9 +12,23 @@
 // Deriving the asset list from ownership rows would either double-count
 // multi-owner assets or drop ownerless ones — both break the math.
 
-import { Result, success, failure } from '../../domain/shared/Result';
+import {
+  BuildingWeightTotal,
+  computeBuildingWeightTotal,
+} from '@/domain/poll/BuildingWeightTotal';
+import { PollDomainCode } from '@/domain/poll/PollDomainCodes';
+import {
+  OrganizationId,
+  PropertyId,
+  UserId,
+} from '../../domain/shared/EntityIds';
+import { VotingWeight } from '../../domain/poll/VotingWeight';
+import { Result, failure } from '../../domain/shared/Result';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
-import { PropertyAssetRepository } from '../../domain/organization/PropertyAssetRepository';
+import {
+  PropertyAssetRepository,
+  PropertyAssetRepositoryError,
+} from '../../domain/organization/PropertyAssetRepository';
 import {
   computeWeights,
   WeightAsset,
@@ -26,12 +40,16 @@ import {
 } from '../../domain/poll/DistributionType';
 import { PropertyAggregation } from '../../domain/poll/PropertyAggregation';
 
+export type PollWeightCalculationFailure =
+  | PollDomainCode
+  | PropertyAssetRepositoryError;
+
 export interface PollWeightCalculatorInput {
-  organizationId: string;
+  organizationId: OrganizationId;
   distributionType: DistributionType;
   propertyAggregation: PropertyAggregation;
-  propertyIds: string[];
-  candidates: string[];
+  propertyIds: PropertyId[];
+  candidates: UserId[];
 }
 
 export class PollWeightCalculator {
@@ -42,7 +60,7 @@ export class PollWeightCalculator {
 
   async compute(
     input: PollWeightCalculatorInput
-  ): Promise<Result<Map<string, number>, string>> {
+  ): Promise<Result<Map<UserId, VotingWeight>, PollWeightCalculationFailure>> {
     // EQUAL with a property scope still has to look at ownership (scope
     // doubles as an eligibility filter); EQUAL with no scope skips the DB.
     const needsOwnership =
@@ -88,7 +106,7 @@ export class PollWeightCalculator {
       // per-user weights — skip them from the math.
       ownerships = ownershipResult.value
         .filter(
-          (r): r is typeof r & { ownership: { userId: string } } =>
+          (r): r is typeof r & { ownership: { userId: UserId } } =>
             r.ownership.userId !== null
         )
         .map((r) => ({
@@ -98,16 +116,14 @@ export class PollWeightCalculator {
         }));
     }
 
-    return success(
-      computeWeights({
-        candidates: input.candidates,
-        distributionType: input.distributionType,
-        propertyAggregation: input.propertyAggregation,
-        propertyIds: input.propertyIds,
-        assets,
-        ownerships,
-      })
-    );
+    return computeWeights({
+      candidates: input.candidates,
+      distributionType: input.distributionType,
+      propertyAggregation: input.propertyAggregation,
+      propertyIds: input.propertyIds,
+      assets,
+      ownerships,
+    });
   }
 
   // "Building total" = theoretical max Σ weights if every owner were registered
@@ -119,13 +135,15 @@ export class PollWeightCalculator {
   //   either      + NORMALIZE  → count of distinct in-scope properties
   //   EQUAL                    → not meaningful (caller should use registered)
   async computeBuildingTotal(input: {
-    organizationId: string;
+    organizationId: OrganizationId;
     distributionType: DistributionType;
     propertyAggregation: PropertyAggregation;
-    propertyIds: string[];
-  }): Promise<Result<number, string>> {
+    propertyIds: PropertyId[];
+  }): Promise<
+    Result<BuildingWeightTotal | null, PollWeightCalculationFailure>
+  > {
     if (input.distributionType === DistributionType.EQUAL) {
-      return success(0);
+      return computeBuildingWeightTotal({ ...input, assets: [] });
     }
 
     const descendantIds = await this.organizationRepository.getDescendantIds(
@@ -142,19 +160,6 @@ export class PollWeightCalculator {
       return failure(assetsResult.error);
     }
 
-    if (
-      input.propertyAggregation === PropertyAggregation.NORMALIZE_PER_PROPERTY
-    ) {
-      const propIds = new Set(assetsResult.value.map((a) => a.propertyId));
-
-      return success(propIds.size);
-    }
-
-    if (input.distributionType === DistributionType.OWNERSHIP_UNIT_COUNT) {
-      return success(assetsResult.value.length);
-    }
-
-    // OWNERSHIP_SIZE_WEIGHTED + RAW_SUM
-    return success(assetsResult.value.reduce((s, a) => s + a.size, 0));
+    return computeBuildingWeightTotal({ ...input, assets: assetsResult.value });
   }
 }

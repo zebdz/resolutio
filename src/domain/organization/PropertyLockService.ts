@@ -7,15 +7,28 @@
 //
 // Spec: readmes/2026-04-19-property-admin-design.md — "Property lock" section.
 
-export interface LockSnapshotFact {
-  // Empty = the poll's scope was "all properties".
-  explicitScopePropertyIds: string[];
-  // 'EQUAL' or one of the ownership-based types.
-  distributionType: string;
-}
+import { z } from 'zod';
+import { PropertyId } from '../shared/EntityIds';
+
+export const LockSnapshotFact = z
+  .object({
+    // Empty = the poll's scope was "all properties".
+    explicitScopePropertyIds: z.array(PropertyId).readonly(),
+    // Closed snapshot vocabulary decoded by the adapter from poll storage.
+    distributionType: z.enum([
+      'EQUAL',
+      'OWNERSHIP_UNIT_COUNT',
+      'OWNERSHIP_SIZE_WEIGHTED',
+    ]),
+  })
+  .readonly();
+export type LockSnapshotFact = z.infer<typeof LockSnapshotFact>;
 
 export class PropertyLockService {
-  isLocked(propertyId: string, facts: LockSnapshotFact[]): boolean {
+  isLocked(
+    propertyId: PropertyId,
+    facts: readonly LockSnapshotFact[]
+  ): boolean {
     for (const f of facts) {
       if (this.factLocksProperty(propertyId, f)) {
         return true;
@@ -26,7 +39,7 @@ export class PropertyLockService {
   }
 
   private factLocksProperty(
-    propertyId: string,
+    propertyId: PropertyId,
     fact: LockSnapshotFact
   ): boolean {
     const explicitMatch = fact.explicitScopePropertyIds.includes(propertyId);

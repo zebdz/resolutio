@@ -1,3 +1,5 @@
+/** Admin activity page displays authorized summaries with explicit read-error state.
+ * Valid block alternatives are checked before converting timestamps for client props. */
 import { getTranslations } from 'next-intl/server';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { Text } from '@/src/web/components/catalyst/text';
@@ -46,7 +48,15 @@ export default async function SuspiciousActivityPage({
     maxBlocked,
   });
 
-  const data = result.success ? result.data : { items: [], totalCount: 0 };
+  if (!result.success) {
+    return (
+      <div role="alert">
+        <Text>{result.error}</Text>
+      </div>
+    );
+  }
+
+  const data = result.data;
 
   const totalPages = Math.max(1, Math.ceil(data.totalCount / PAGE_SIZE));
 
@@ -58,7 +68,7 @@ export default async function SuspiciousActivityPage({
     blockStatus: item.blockStatus
       ? {
           ...item.blockStatus,
-          blockedAt: item.blockStatus.blockedAt
+          blockedAt: item.blockStatus.blocked
             ? item.blockStatus.blockedAt.toISOString()
             : undefined,
         }

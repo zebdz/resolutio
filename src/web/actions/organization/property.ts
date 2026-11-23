@@ -1,5 +1,23 @@
 'use server';
 
+/** Authenticated actions decode requests and serialize permitted property/ownership data.
+ * Core identities, quantities and instants stay typed until the client boundary. */
+
+/** Server-only property operations keep authorization and serialization at the
+ * boundary, then pass validated identities and explicit creation dependencies inward. */
+import { PrismaOrganizationDirectory } from '@/infrastructure/repositories/PrismaOrganizationDirectory';
+import {
+  OrganizationId,
+  PropertyId,
+  AssetId,
+  PropertyClaimId,
+  UserId,
+} from '@/domain/shared/EntityIds';
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
+
 import { revalidatePath } from 'next/cache';
 import { getTranslations } from 'next-intl/server';
 import {
@@ -32,6 +50,18 @@ import { getCurrentUser } from '@/web/lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChecker';
+import {
+  serializeProperty,
+  serializeAsset,
+  serializeActiveOwnership,
+  serializeOwnershipRow,
+  serializeTreeMember,
+  type PropertiesView,
+  type AssetsView,
+  type ActiveOwnershipsView,
+  type OwnershipRowsView,
+  type TreeMembersView,
+} from './serializeProperty';
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
@@ -45,18 +75,25 @@ const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 const notificationRepository = new PrismaNotificationRepository(prisma);
 const profanityChecker = LeoProfanityChecker.getInstance();
+const ids = new CryptoIdGenerator();
+const clock = new SystemClock();
 
 const notifyDenied = new NotifyPropertyClaimDeniedUseCase({
+  ids: ids,
+  clock: clock,
   notificationRepository,
   claimRepository,
 });
 const autoDenyClaims = new AutoDenyPendingClaimsOnArchiveUseCase({
+  clock,
   claimRepository,
   assetRepository,
   notifyDenied,
 });
 
 const createProperty = new CreatePropertyUseCase({
+  ids,
+  clock,
   propertyRepository,
   organizationRepository,
   userRepository,
@@ -69,6 +106,7 @@ const updateProperty = new UpdatePropertyUseCase({
   profanityChecker,
 });
 const archiveProperty = new ArchivePropertyUseCase({
+  clock,
   propertyRepository,
   assetRepository,
   organizationRepository,
@@ -82,6 +120,8 @@ const unarchiveProperty = new UnarchivePropertyUseCase({
   userRepository,
 });
 const createAsset = new CreateAssetUseCase({
+  ids,
+  clock,
   assetRepository,
   propertyRepository,
   organizationRepository,
@@ -96,6 +136,7 @@ const updateAsset = new UpdateAssetUseCase({
   profanityChecker,
 });
 const archiveAsset = new ArchiveAssetUseCase({
+  clock,
   assetRepository,
   propertyRepository,
   organizationRepository,
@@ -109,6 +150,8 @@ const unarchiveAsset = new UnarchiveAssetUseCase({
   userRepository,
 });
 const replaceOwners = new ReplaceAssetOwnersUseCase({
+  ids,
+  clock,
   assetRepository,
   propertyRepository,
   organizationRepository,
@@ -123,7 +166,7 @@ const correctOwnership = new CorrectOwnershipUseCase({
   profanityChecker,
 });
 
-async function requireUser(): Promise<{ error: string } | { userId: string }> {
+async function requireUser(): Promise<{ error: string } | { userId: UserId }> {
   const u = await getCurrentUser();
 
   if (!u) {
@@ -140,7 +183,7 @@ export async function createPropertyAction(input: {
   name: string;
   address: string | null;
   sizeUnit: string;
-}): Promise<ActionResult<{ propertyId: string }>> {
+}): Promise<ActionResult<{ propertyId: PropertyId }>> {
   const rl = await checkRateLimit();
 
   if (rl) {
@@ -261,7 +304,7 @@ export async function createAssetAction(input: {
   propertyId: string;
   name: string;
   size: number;
-}): Promise<ActionResult<{ assetId: string }>> {
+}): Promise<ActionResult<{ assetId: AssetId }>> {
   const rl = await checkRateLimit();
 
   if (rl) {
@@ -435,17 +478,7 @@ export async function correctOwnershipAction(input: {
 
 export async function listPropertiesAction(input: {
   organizationId: string;
-}): Promise<
-  ActionResult<{
-    properties: {
-      id: string;
-      name: string;
-      address: string | null;
-      sizeUnit: string;
-      archivedAt: string | null;
-    }[];
-  }>
-> {
+}): Promise<ActionResult<PropertiesView>> {
   const rl = await checkRateLimit();
 
   if (rl) {
@@ -458,9 +491,18 @@ export async function listPropertiesAction(input: {
     return { success: false, error: auth.error };
   }
 
+  const organizationId = OrganizationId.safeParse(input.organizationId);
+
+  if (!organizationId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('organization.errors.notFound'),
+    };
+  }
+
   const isAdmin = await organizationRepository.isUserAdmin(
     auth.userId,
-    input.organizationId
+    organizationId.data
   );
   const isSuper = await userRepository.isSuperAdmin(auth.userId);
 
@@ -472,7 +514,7 @@ export async function listPropertiesAction(input: {
   }
 
   const r = await propertyRepository.findAllByOrganizationIncludingArchived(
-    input.organizationId
+    organizationId.data
   );
 
   if (!r.success) {
@@ -482,13 +524,7 @@ export async function listPropertiesAction(input: {
   return {
     success: true,
     data: {
-      properties: r.value.map((p) => ({
-        id: p.id,
-        name: p.name,
-        address: p.address,
-        sizeUnit: p.sizeUnit,
-        archivedAt: p.archivedAt ? p.archivedAt.toISOString() : null,
-      })),
+      properties: r.value.map(serializeProperty),
     },
   };
 }
@@ -496,16 +532,7 @@ export async function listPropertiesAction(input: {
 export async function listAssetsAction(input: {
   propertyId: string;
   includeArchived: boolean;
-}): Promise<
-  ActionResult<{
-    assets: {
-      id: string;
-      name: string;
-      size: number;
-      archivedAt: string | null;
-    }[];
-  }>
-> {
+}): Promise<ActionResult<AssetsView>> {
   const rl = await checkRateLimit();
 
   if (rl) {
@@ -518,7 +545,16 @@ export async function listAssetsAction(input: {
     return { success: false, error: auth.error };
   }
 
-  const pRes = await propertyRepository.findById(input.propertyId);
+  const propertyId = PropertyId.safeParse(input.propertyId);
+
+  if (!propertyId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('domain.organization.propertyNotFound'),
+    };
+  }
+
+  const pRes = await propertyRepository.findById(propertyId.data);
 
   if (!pRes.success || !pRes.value) {
     return {
@@ -541,7 +577,7 @@ export async function listAssetsAction(input: {
   }
 
   const r = await assetRepository.findAssetsByProperty(
-    input.propertyId,
+    propertyId.data,
     input.includeArchived
   );
 
@@ -552,31 +588,14 @@ export async function listAssetsAction(input: {
   return {
     success: true,
     data: {
-      assets: r.value.map((a) => ({
-        id: a.id,
-        name: a.name,
-        size: a.size,
-        archivedAt: a.archivedAt ? a.archivedAt.toISOString() : null,
-      })),
+      assets: r.value.map(serializeAsset),
     },
   };
 }
 
 export async function listActiveOwnershipForAssetAction(input: {
   assetId: string;
-}): Promise<
-  ActionResult<{
-    ownerships: {
-      id: string;
-      userId: string | null;
-      // Pre-formatted display label for user-owned rows so the UI shows the
-      // member's name instead of the raw cuid. Null for external-owner rows.
-      userLabel: string | null;
-      externalOwnerLabel: string | null;
-      share: number;
-    }[];
-  }>
-> {
+}): Promise<ActionResult<ActiveOwnershipsView>> {
   const rl = await checkRateLimit();
 
   if (rl) {
@@ -589,7 +608,18 @@ export async function listActiveOwnershipForAssetAction(input: {
     return { success: false, error: auth.error };
   }
 
-  const aRes = await assetRepository.findAssetById(input.assetId);
+  const assetId = AssetId.safeParse(input.assetId);
+
+  if (!assetId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode(
+        'domain.organization.propertyAssetNotFound'
+      ),
+    };
+  }
+
+  const aRes = await assetRepository.findAssetById(assetId.data);
 
   if (!aRes.success || !aRes.value) {
     return {
@@ -603,7 +633,10 @@ export async function listActiveOwnershipForAssetAction(input: {
   const pRes = await propertyRepository.findById(aRes.value.propertyId);
 
   if (!pRes.success || !pRes.value) {
-    return { success: false, error: 'property not found' };
+    return {
+      success: false,
+      error: await translateErrorCode('domain.organization.propertyNotFound'),
+    };
   }
 
   const isAdmin = await organizationRepository.isUserAdmin(
@@ -619,7 +652,7 @@ export async function listActiveOwnershipForAssetAction(input: {
     };
   }
 
-  const r = await assetRepository.findActiveOwnershipForAsset(input.assetId);
+  const r = await assetRepository.findActiveOwnershipForAsset(assetId.data);
 
   if (!r.success) {
     return { success: false, error: await translateErrorCode(r.error) };
@@ -629,7 +662,7 @@ export async function listActiveOwnershipForAssetAction(input: {
   // them directly (no extra round-trip from the client).
   const userIds = r.value
     .map((o) => o.userId)
-    .filter((id): id is string => id !== null);
+    .filter((id): id is UserId => id !== null);
   const users = userIds.length
     ? await prisma.user.findMany({
         where: { id: { in: userIds } },
@@ -642,25 +675,28 @@ export async function listActiveOwnershipForAssetAction(input: {
         },
       })
     : [];
-  const labelByUserId = new Map<string, string>();
+  const profileById = new Map(users.map((user) => [user.id, user]));
+  const labelByUserId = new Map<UserId, string>();
 
-  for (const u of users) {
+  for (const userId of userIds) {
+    const u = profileById.get(userId);
+
+    if (!u) {
+      continue;
+    }
+
     const fullName = [u.lastName, u.firstName, u.middleName]
       .filter(Boolean)
       .join(' ');
-    labelByUserId.set(u.id, `${fullName} (@${u.nickname})`);
+    labelByUserId.set(userId, `${fullName} (@${u.nickname})`);
   }
 
   return {
     success: true,
     data: {
-      ownerships: r.value.map((o) => ({
-        id: o.id,
-        userId: o.userId,
-        userLabel: o.userId ? (labelByUserId.get(o.userId) ?? null) : null,
-        externalOwnerLabel: o.externalOwnerLabel,
-        share: o.share,
-      })),
+      ownerships: r.value.map((o) =>
+        serializeActiveOwnership(o, labelByUserId)
+      ),
     },
   };
 }
@@ -671,23 +707,7 @@ export async function listOwnershipRowsAction(input: {
   ownerQuery?: string;
   assetQuery?: string;
   propertyId?: string;
-}): Promise<
-  ActionResult<{
-    rows: {
-      id: string;
-      assetId: string;
-      assetName: string;
-      propertyId: string;
-      propertyName: string;
-      userId: string | null;
-      userLabel: string | null;
-      externalOwnerLabel: string | null;
-      share: number;
-      effectiveFrom: string;
-      effectiveUntil: string | null;
-    }[];
-  }>
-> {
+}): Promise<ActionResult<OwnershipRowsView>> {
   const rl = await checkRateLimit();
 
   if (rl) {
@@ -700,9 +720,30 @@ export async function listOwnershipRowsAction(input: {
     return { success: false, error: auth.error };
   }
 
+  const organizationId = OrganizationId.safeParse(input.organizationId);
+
+  if (!organizationId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('organization.errors.notFound'),
+    };
+  }
+
+  const propertyId =
+    input.propertyId === undefined
+      ? undefined
+      : PropertyId.safeParse(input.propertyId);
+
+  if (propertyId && !propertyId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('domain.organization.propertyNotFound'),
+    };
+  }
+
   const isAdmin = await organizationRepository.isUserAdmin(
     auth.userId,
-    input.organizationId
+    organizationId.data
   );
   const isSuper = await userRepository.isSuperAdmin(auth.userId);
 
@@ -713,7 +754,11 @@ export async function listOwnershipRowsAction(input: {
     };
   }
 
-  const r = await assetRepository.findOwnershipRows(input);
+  const r = await assetRepository.findOwnershipRows({
+    ...input,
+    organizationId: organizationId.data,
+    propertyId: propertyId?.data,
+  });
 
   if (!r.success) {
     return { success: false, error: await translateErrorCode(r.error) };
@@ -722,27 +767,13 @@ export async function listOwnershipRowsAction(input: {
   return {
     success: true,
     data: {
-      rows: r.value.map((x) => ({
-        id: x.id,
-        assetId: x.assetId,
-        assetName: x.assetName,
-        propertyId: x.propertyId,
-        propertyName: x.propertyName,
-        userId: x.userId,
-        userLabel: x.userLabel,
-        externalOwnerLabel: x.externalOwnerLabel,
-        share: x.share,
-        effectiveFrom: x.effectiveFrom.toISOString(),
-        effectiveUntil: x.effectiveUntil
-          ? x.effectiveUntil.toISOString()
-          : null,
-      })),
+      rows: r.value.map(serializeOwnershipRow),
     },
   };
 }
 
 const searchOrgTreeMembers = new SearchOrgTreeMembersUseCase({
-  prisma,
+  directory: new PrismaOrganizationDirectory(prisma),
   organizationRepository,
   userRepository,
 });
@@ -751,15 +782,7 @@ export async function searchOrgTreeMembersAction(input: {
   organizationId: string;
   query: string;
   limit?: number;
-}): Promise<
-  ActionResult<{
-    matches: Array<{
-      id: string;
-      label: string;
-      orgNames: string[];
-    }>;
-  }>
-> {
+}): Promise<ActionResult<TreeMembersView>> {
   const rl = await checkRateLimit();
 
   if (rl) {
@@ -786,13 +809,7 @@ export async function searchOrgTreeMembersAction(input: {
   return {
     success: true,
     data: {
-      matches: r.value.map((m) => ({
-        id: m.id,
-        label:
-          [m.lastName, m.firstName, m.middleName].filter(Boolean).join(' ') +
-          ` (@${m.nickname})`,
-        orgNames: m.orgNames,
-      })),
+      matches: r.value.map(serializeTreeMember),
     },
   };
 }

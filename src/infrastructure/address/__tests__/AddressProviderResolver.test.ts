@@ -1,4 +1,6 @@
+/** Provider fallback preserves validated registry references and partial address text. */
 import { describe, it, expect, vi } from 'vitest';
+import { HouseFiasId } from '@/domain/user/AddressValues';
 import { AddressProviderResolver } from '../AddressProviderResolver';
 import type { AddressSuggestion } from '../types';
 
@@ -11,7 +13,7 @@ const daDataHit: AddressSuggestion = {
   street: 'Гвардейский пер',
   building: '13',
   postalCode: '344011',
-  houseFiasId: 'house-uuid',
+  houseFiasId: HouseFiasId.parse('c1bfc52f-e9a7-4d67-a1bd-b418f495d3f5'),
   flat: '',
   houseLabel: 'г Ростов-на-Дону, Гвардейский пер, д 13',
 };

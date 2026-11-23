@@ -38,6 +38,9 @@ import { MarkdownEditor } from '@/web/components/markdown/MarkdownEditor';
 import { SaveDraftBeforeAttachModal } from '@/web/components/polls/SaveDraftBeforeAttachModal';
 import { POLL_ATTACHMENT_API_PREFIX } from '@/domain/poll/PollAttachment';
 import { POLL_DESCRIPTION_MAX_LENGTH } from '@/domain/poll/Poll';
+import { DraftQuestionFiles } from '@/web/components/polls/draft/DraftQuestionFiles';
+import { useQuestionFileUploads } from '@/web/components/polls/draft/useQuestionFileUploads';
+import type { QuestionFileUpload } from '@/web/components/polls/draft/questionFileUploads';
 import { PollAttachmentUploader } from '@/web/components/polls/PollAttachmentUploader';
 import {
   listPollAttachmentsAction,
@@ -54,6 +57,7 @@ interface Answer {
 }
 
 interface Question {
+  files?: File[];
   id: string;
   text: string;
   details?: string;
@@ -151,6 +155,7 @@ export function CreatePollForm() {
 
   const [questions, setQuestions] = useState<Question[]>([]);
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
+  const questionUploads = useQuestionFileUploads();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<
@@ -274,12 +279,18 @@ export function CreatePollForm() {
 
   const uploadAttachment = async (
     pollId: string,
-    file: File
+    file: File,
+    questionId?: string
   ): Promise<{ id: string } | { error: string }> => {
     setAttachmentError(null);
 
     const formData = new FormData();
     formData.append('pollId', pollId);
+
+    if (questionId) {
+      formData.append('questionId', questionId);
+    }
+
     formData.append('file', file);
 
     try {
@@ -735,6 +746,8 @@ export function CreatePollForm() {
 
       const pollId = persisted.pollId;
 
+      const files: QuestionFileUpload[] = [];
+
       // Create questions with answers
       for (const question of questions) {
         if (!question.answers) {
@@ -810,10 +823,18 @@ export function CreatePollForm() {
 
           return;
         }
+
+        for (const file of question.files ?? []) {
+          files.push({ file, questionId: questionResult.data.questionId });
+        }
       }
 
-      // Success! Redirect to polls list
-      router.push('/polls');
+      await questionUploads.finish(
+        pollId,
+        files,
+        (file, id) => uploadAttachment(pollId, file, id),
+        () => router.push('/polls')
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -837,6 +858,10 @@ export function CreatePollForm() {
       ],
     };
   };
+
+  if (questionUploads.recovery) {
+    return questionUploads.recovery;
+  }
 
   if (isLoading) {
     return (
@@ -881,7 +906,11 @@ export function CreatePollForm() {
           >
             {t('cancel')}
           </Button>
-          <Button color="brand-green" onClick={handleSave} disabled={isSaving}>
+          <Button
+            color="brand-green"
+            onClick={() => handleSave()}
+            disabled={isSaving}
+          >
             {isSaving ? tCommon('saving') : t('save')}
           </Button>
         </div>
@@ -1153,32 +1182,42 @@ export function CreatePollForm() {
         {/* Main Content - Question Form */}
         <div className="lg:col-span-3">
           {activeQuestion ? (
-            <QuestionForm
-              questionId={activeQuestion.id}
-              text={activeQuestion.text}
-              details={activeQuestion.details}
-              questionType={activeQuestion.questionType}
-              answers={activeQuestion.answers || []}
-              page={activeQuestion.page}
-              order={activeQuestion.order}
-              onTextChange={(text) =>
-                handleQuestionUpdate(activeQuestion.id, { text })
-              }
-              onDetailsChange={(details) =>
-                handleQuestionUpdate(activeQuestion.id, { details })
-              }
-              onTypeChange={(questionType) =>
-                handleQuestionUpdate(activeQuestion.id, { questionType })
-              }
-              onAnswersChange={(answers) =>
-                handleQuestionUpdate(activeQuestion.id, { answers })
-              }
-              fieldErrors={
-                questionFieldErrors?.questionId === activeQuestion.id
-                  ? questionFieldErrors.errors
-                  : undefined
-              }
-            />
+            <>
+              <QuestionForm
+                questionId={activeQuestion.id}
+                text={activeQuestion.text}
+                details={activeQuestion.details}
+                questionType={activeQuestion.questionType}
+                answers={activeQuestion.answers || []}
+                page={activeQuestion.page}
+                order={activeQuestion.order}
+                onTextChange={(text) =>
+                  handleQuestionUpdate(activeQuestion.id, { text })
+                }
+                onDetailsChange={(details) =>
+                  handleQuestionUpdate(activeQuestion.id, { details })
+                }
+                onTypeChange={(questionType) =>
+                  handleQuestionUpdate(activeQuestion.id, { questionType })
+                }
+                onAnswersChange={(answers) =>
+                  handleQuestionUpdate(activeQuestion.id, { answers })
+                }
+                fieldErrors={
+                  questionFieldErrors?.questionId === activeQuestion.id
+                    ? questionFieldErrors.errors
+                    : undefined
+                }
+              >
+                <DraftQuestionFiles
+                  files={activeQuestion.files ?? []}
+                  disabled={isSaving}
+                  onChange={(files) =>
+                    handleQuestionUpdate(activeQuestion.id, { files })
+                  }
+                />
+              </QuestionForm>
+            </>
           ) : questions.length === 0 ? (
             <div className="p-12 text-center bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800">
               <p className="text-zinc-500 dark:text-zinc-400 mb-4">
@@ -1204,7 +1243,11 @@ export function CreatePollForm() {
         <Button color="zinc" onClick={() => router.back()} disabled={isSaving}>
           {t('cancel')}
         </Button>
-        <Button color="brand-green" onClick={handleSave} disabled={isSaving}>
+        <Button
+          color="brand-green"
+          onClick={() => handleSave()}
+          disabled={isSaving}
+        >
           {isSaving ? tCommon('saving') : t('save')}
         </Button>
       </div>

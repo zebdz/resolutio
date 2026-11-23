@@ -1,22 +1,37 @@
+/** Builds multi membership setting changed notifications with explicit creation identity/time.
+ * Construction and storage failures return Results; an empty audience succeeds. */
+import { success, collectResults, type Result } from '@/domain/shared/Result';
+import type { NotificationDeliveryFailure } from './NotificationErrors';
+import { NotificationId, OrganizationId } from '@/domain/shared/EntityIds';
+import {
+  IdGenerator,
+  Clock,
+  entityCreation,
+} from '@/application/shared/EntityCreation';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { Notification } from '../../domain/notification/Notification';
 
 export interface NotifyMultiMembershipSettingChangedDependencies {
+  ids: IdGenerator;
+  clock: Clock;
   organizationRepository: OrganizationRepository;
-  notificationRepository: NotificationRepository;
+  notificationRepository: Pick<NotificationRepository, 'save' | 'saveBatch'>;
 }
 
 export class NotifyMultiMembershipSettingChangedUseCase {
   constructor(private deps: NotifyMultiMembershipSettingChangedDependencies) {}
 
-  async execute(input: { rootOrgId: string; allowed: boolean }): Promise<void> {
+  async execute(input: {
+    rootOrgId: OrganizationId;
+    allowed: boolean;
+  }): Promise<Result<void, NotificationDeliveryFailure>> {
     const { rootOrgId, allowed } = input;
 
     const rootOrg = await this.deps.organizationRepository.findById(rootOrgId);
 
     if (!rootOrg) {
-      return;
+      return success(undefined);
     }
 
     const memberUserIds =
@@ -25,26 +40,32 @@ export class NotifyMultiMembershipSettingChangedUseCase {
       );
 
     if (memberUserIds.length === 0) {
-      return;
+      return success(undefined);
     }
 
-    const notifications = memberUserIds
-      .map((userId) =>
-        Notification.create({
-          userId,
-          type: 'multi_membership_setting_changed',
-          title: 'notification.types.multiMembershipSettingChanged.title',
-          body: 'notification.types.multiMembershipSettingChanged.body',
-          data: {
-            organizationId: rootOrgId,
-            organizationName: rootOrg.name,
-            allowed,
+    const notifications = collectResults(
+      memberUserIds.map((userId) =>
+        Notification.create(
+          {
+            userId,
+            type: 'multi_membership_setting_changed',
+            title: 'notification.types.multiMembershipSettingChanged.title',
+            body: 'notification.types.multiMembershipSettingChanged.body',
+            data: {
+              organizationId: rootOrgId,
+              organizationName: rootOrg.name,
+              allowed,
+            },
           },
-        })
+          entityCreation(NotificationId, this.deps.ids, this.deps.clock)
+        )
       )
-      .filter((r) => r.success)
-      .map((r) => (r as { success: true; value: Notification }).value);
+    );
 
-    await this.deps.notificationRepository.saveBatch(notifications);
+    if (!notifications.success) {
+      return notifications;
+    }
+
+    return this.deps.notificationRepository.saveBatch(notifications.value);
   }
 }

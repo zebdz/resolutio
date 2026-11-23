@@ -1,3 +1,11 @@
+/** Parent-link request application boundary validates external identities before
+ * invoking domain decisions and typed authorization/persistence ports. */
+import { JoinParentRequestDomainCode } from '../../domain/organization/JoinParentRequestDomainCodes';
+import { Clock, IdGenerator, entityCreation } from '../shared/EntityCreation';
+import { JoinParentRequestId } from '../../domain/shared/EntityIds';
+import { parseJoinParentMessage } from '../../domain/organization/JoinParentRequestValues';
+
+import { OrganizationId, UserId } from '../../domain/shared/EntityIds';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { JoinParentRequestRepository } from '../../domain/organization/JoinParentRequestRepository';
 import { JoinParentRequest } from '../../domain/organization/JoinParentRequest';
@@ -5,11 +13,16 @@ import { UserRepository } from '../../domain/user/UserRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { RequestJoinParentInput } from './RequestJoinParentSchema';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 import { NotifyJoinParentRequestReceivedUseCase } from '../notification/NotifyJoinParentRequestReceivedUseCase';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 
 export interface RequestJoinParentDependencies {
+  ids: IdGenerator;
+  clock: Clock;
   organizationRepository: OrganizationRepository;
   joinParentRequestRepository: JoinParentRequestRepository;
   userRepository: UserRepository;
@@ -20,8 +33,37 @@ export interface RequestJoinParentDependencies {
 export class RequestJoinParentUseCase {
   constructor(private deps: RequestJoinParentDependencies) {}
 
-  async execute(input: RequestJoinParentInput): Promise<Result<void, string>> {
-    const { childOrgId, parentOrgId, adminUserId, message } = input;
+  async execute(
+    input: RequestJoinParentInput
+  ): Promise<
+    Result<void, OrganizationUseCaseFailure | JoinParentRequestDomainCode>
+  > {
+    const parsedChildOrgId = OrganizationId.safeParse(input.childOrgId);
+
+    if (!parsedChildOrgId.success) {
+      return failure(OrganizationErrors.CHILD_ORG_NOT_FOUND);
+    }
+
+    const parsedParentOrgId = OrganizationId.safeParse(input.parentOrgId);
+
+    if (!parsedParentOrgId.success) {
+      return failure(OrganizationErrors.PARENT_NOT_FOUND);
+    }
+
+    const parsedAdminUserId = UserId.safeParse(input.adminUserId);
+
+    if (!parsedAdminUserId.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
+    }
+
+    const command = {
+      ...input,
+      childOrgId: parsedChildOrgId.data,
+      parentOrgId: parsedParentOrgId.data,
+      adminUserId: parsedAdminUserId.data,
+    };
+
+    const { childOrgId, parentOrgId, adminUserId, message } = command;
 
     // 1. Check admin permissions: superadmin or admin of child org
     const isSuperAdmin =
@@ -86,11 +128,20 @@ export class RequestJoinParentUseCase {
     }
 
     // 7. Create the request
+    const parsedMessage = parseJoinParentMessage(message);
+
+    if (!parsedMessage.success) {
+      return parsedMessage;
+    }
+
     const requestResult = JoinParentRequest.create(
-      childOrgId,
-      parentOrgId,
-      adminUserId,
-      message,
+      {
+        childOrgId,
+        parentOrgId,
+        requestingAdminId: adminUserId,
+        message: parsedMessage.value,
+      },
+      entityCreation(JoinParentRequestId, this.deps.ids, this.deps.clock),
       this.deps.profanityChecker
     );
 
@@ -102,10 +153,16 @@ export class RequestJoinParentUseCase {
 
     // Notify admins of parent org
     const notifyUseCase = new NotifyJoinParentRequestReceivedUseCase({
+      ids: this.deps.ids,
+      clock: this.deps.clock,
       organizationRepository: this.deps.organizationRepository,
       notificationRepository: this.deps.notificationRepository,
     });
-    await notifyUseCase.execute({ childOrgId, parentOrgId });
+    const delivery = await notifyUseCase.execute({ childOrgId, parentOrgId });
+
+    if (!delivery.success) {
+      return failure('common.errors.unexpected');
+    }
 
     return success(undefined);
   }

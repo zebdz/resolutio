@@ -1,12 +1,25 @@
-import { PrismaClient } from '@/generated/prisma/client';
+/** Draft storage retains explicit creation identity/time and idempotent selection keys.
+ * Repeated saves preserve the existing row's identity while refreshing supplied time. */
+import { Prisma, PrismaClient } from '@/generated/prisma/client';
 import { VoteDraft } from '../../domain/poll/VoteDraft';
-import { DraftRepository } from '../../domain/poll/DraftRepository';
+import {
+  PollId,
+  QuestionId,
+  AnswerId,
+  UserId,
+} from '@/domain/shared/EntityIds';
+import {
+  DraftRepository,
+  DraftRepositoryFailure,
+} from '../../domain/poll/DraftRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 
 export class PrismaDraftRepository implements DraftRepository {
   constructor(private prisma: PrismaClient) {}
 
-  async saveDraft(draft: VoteDraft): Promise<Result<VoteDraft, string>> {
+  async saveDraft(
+    draft: VoteDraft
+  ): Promise<Result<VoteDraft, DraftRepositoryFailure>> {
     try {
       const created = await this.prisma.voteDraft.upsert({
         where: {
@@ -18,13 +31,16 @@ export class PrismaDraftRepository implements DraftRepository {
           },
         },
         create: {
+          id: draft.id,
           pollId: draft.pollId,
           questionId: draft.questionId,
           answerId: draft.answerId,
           userId: draft.userId,
+          createdAt: draft.createdAt,
+          updatedAt: draft.updatedAt,
         },
         update: {
-          updatedAt: new Date(),
+          updatedAt: draft.updatedAt,
         },
       });
 
@@ -37,9 +53,9 @@ export class PrismaDraftRepository implements DraftRepository {
   }
 
   async getUserDrafts(
-    pollId: string,
-    userId: string
-  ): Promise<Result<VoteDraft[], string>> {
+    pollId: PollId,
+    userId: UserId
+  ): Promise<Result<VoteDraft[], DraftRepositoryFailure>> {
     try {
       const drafts = await this.prisma.voteDraft.findMany({
         where: {
@@ -58,9 +74,9 @@ export class PrismaDraftRepository implements DraftRepository {
   }
 
   async deleteUserDrafts(
-    pollId: string,
-    userId: string
-  ): Promise<Result<void, string>> {
+    pollId: PollId,
+    userId: UserId
+  ): Promise<Result<void, DraftRepositoryFailure>> {
     try {
       await this.prisma.voteDraft.deleteMany({
         where: {
@@ -77,7 +93,9 @@ export class PrismaDraftRepository implements DraftRepository {
     }
   }
 
-  async deleteAllPollDrafts(pollId: string): Promise<Result<void, string>> {
+  async deleteAllPollDrafts(
+    pollId: PollId
+  ): Promise<Result<void, DraftRepositoryFailure>> {
     try {
       await this.prisma.voteDraft.deleteMany({
         where: { pollId },
@@ -92,10 +110,10 @@ export class PrismaDraftRepository implements DraftRepository {
   }
 
   async deleteDraftsByQuestion(
-    pollId: string,
-    questionId: string,
-    userId: string
-  ): Promise<Result<void, string>> {
+    pollId: PollId,
+    questionId: QuestionId,
+    userId: UserId
+  ): Promise<Result<void, DraftRepositoryFailure>> {
     try {
       await this.prisma.voteDraft.deleteMany({
         where: {
@@ -114,11 +132,11 @@ export class PrismaDraftRepository implements DraftRepository {
   }
 
   async deleteDraftByAnswer(
-    pollId: string,
-    questionId: string,
-    answerId: string,
-    userId: string
-  ): Promise<Result<void, string>> {
+    pollId: PollId,
+    questionId: QuestionId,
+    answerId: AnswerId,
+    userId: UserId
+  ): Promise<Result<void, DraftRepositoryFailure>> {
     try {
       await this.prisma.voteDraft.deleteMany({
         where: {
@@ -137,7 +155,9 @@ export class PrismaDraftRepository implements DraftRepository {
     }
   }
 
-  private toDomainDraft(prismaData: any): VoteDraft {
+  private toDomainDraft(
+    prismaData: Prisma.VoteDraftGetPayload<object>
+  ): VoteDraft {
     return VoteDraft.reconstitute({
       id: prismaData.id,
       pollId: prismaData.pollId,

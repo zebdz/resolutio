@@ -1,3 +1,13 @@
+/** Application boundary for authorized property changes. Raw request values are
+ * parsed before domain behavior; persistence receives validated domain values. */
+import { AssetName, AssetSize } from '../../domain/organization/PropertyValues';
+import { Clock, IdGenerator, entityCreation } from '../shared/EntityCreation';
+import {
+  AssetId,
+  PropertyId,
+  UserId,
+  OrganizationId,
+} from '../../domain/shared/EntityIds';
 import { PropertyAsset } from '../../domain/organization/PropertyAsset';
 import { PropertyAssetRepository } from '../../domain/organization/PropertyAssetRepository';
 import { OrganizationPropertyRepository } from '../../domain/organization/OrganizationPropertyRepository';
@@ -5,7 +15,10 @@ import { OrganizationRepository } from '../../domain/organization/OrganizationRe
 import { UserRepository } from '../../domain/user/UserRepository';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 import { OrganizationDomainCodes } from '../../domain/organization/OrganizationDomainCodes';
 
 export interface CreateAssetInput {
@@ -16,6 +29,8 @@ export interface CreateAssetInput {
 }
 
 export interface CreateAssetDependencies {
+  ids: IdGenerator;
+  clock: Clock;
   assetRepository: PropertyAssetRepository;
   propertyRepository: OrganizationPropertyRepository;
   organizationRepository: OrganizationRepository;
@@ -28,10 +43,14 @@ export class CreateAssetUseCase {
 
   async execute(
     input: CreateAssetInput
-  ): Promise<Result<{ asset: PropertyAsset }, string>> {
-    const propRes = await this.deps.propertyRepository.findById(
-      input.propertyId
-    );
+  ): Promise<Result<{ asset: PropertyAsset }, OrganizationUseCaseFailure>> {
+    const parsedId = PropertyId.safeParse(input.propertyId);
+
+    if (!parsedId.success) {
+      return failure(OrganizationDomainCodes.PROPERTY_NOT_FOUND);
+    }
+
+    const propRes = await this.deps.propertyRepository.findById(parsedId.data);
 
     if (!propRes.success) {
       return failure(propRes.error);
@@ -43,14 +62,32 @@ export class CreateAssetUseCase {
 
     const property = propRes.value;
 
-    if (!(await this.authorize(input.adminUserId, property.organizationId))) {
+    const actor = UserId.safeParse(input.adminUserId);
+
+    if (
+      !actor.success ||
+      !(await this.authorize(actor.data, property.organizationId))
+    ) {
       return failure(OrganizationErrors.NOT_ADMIN);
     }
 
+    const name = AssetName.safeParse(input.name);
+
+    if (!name.success) {
+      return failure(OrganizationDomainCodes.PROPERTY_ASSET_NAME_EMPTY);
+    }
+
+    const size = AssetSize.safeParse(input.size);
+
+    if (!size.success) {
+      return failure(OrganizationDomainCodes.PROPERTY_ASSET_SIZE_NON_POSITIVE);
+    }
+
     const created = PropertyAsset.create(
-      input.propertyId,
-      input.name,
-      input.size,
+      parsedId.data,
+      name.data,
+      size.data,
+      entityCreation(AssetId, this.deps.ids, this.deps.clock),
       this.deps.profanityChecker
     );
 
@@ -67,7 +104,10 @@ export class CreateAssetUseCase {
     return success({ asset: saved.value });
   }
 
-  private async authorize(userId: string, orgId: string): Promise<boolean> {
+  private async authorize(
+    userId: UserId,
+    orgId: OrganizationId
+  ): Promise<boolean> {
     if (await this.deps.userRepository.isSuperAdmin(userId)) {
       return true;
     }

@@ -1,15 +1,27 @@
+/** Parent-link request application boundary validates external identities before
+ * invoking domain decisions and typed authorization/persistence ports. */
+import { JoinParentRequestDomainCode } from '../../domain/organization/JoinParentRequestDomainCodes';
+import { Clock, IdGenerator } from '../shared/EntityCreation';
+import { parseJoinParentRejectionReason } from '../../domain/organization/JoinParentRequestValues';
+
+import { JoinParentRequestId, UserId } from '../../domain/shared/EntityIds';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { JoinParentRequestRepository } from '../../domain/organization/JoinParentRequestRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { HandleJoinParentRequestInput } from './HandleJoinParentRequestSchema';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 import { NotifyOrgJoinedParentUseCase } from '../notification/NotifyOrgJoinedParentUseCase';
 import { NotifyJoinParentRequestRejectedUseCase } from '../notification/NotifyJoinParentRequestRejectedUseCase';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 
 export interface HandleJoinParentRequestDependencies {
+  ids: IdGenerator;
+  clock: Clock;
   organizationRepository: OrganizationRepository;
   joinParentRequestRepository: JoinParentRequestRepository;
   userRepository: UserRepository;
@@ -22,8 +34,32 @@ export class HandleJoinParentRequestUseCase {
 
   async execute(
     input: HandleJoinParentRequestInput
-  ): Promise<Result<void, string>> {
-    const { requestId, adminUserId, action, rejectionReason } = input;
+  ): Promise<
+    Result<void, OrganizationUseCaseFailure | JoinParentRequestDomainCode>
+  > {
+    const parsedRequestId = JoinParentRequestId.safeParse(input.requestId);
+
+    if (!parsedRequestId.success) {
+      return failure(OrganizationErrors.PARENT_REQUEST_NOT_FOUND);
+    }
+
+    const parsedAdminUserId = UserId.safeParse(input.adminUserId);
+
+    if (!parsedAdminUserId.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
+    }
+
+    const command = {
+      ...input,
+      requestId: parsedRequestId.data,
+      adminUserId: parsedAdminUserId.data,
+    };
+
+    const { requestId, adminUserId, action, rejectionReason } = command;
+
+    if (action !== 'accept' && action !== 'reject') {
+      return failure(OrganizationErrors.INVALID_STATUS);
+    }
 
     // 1. Find the request
     const request =
@@ -106,7 +142,12 @@ export class HandleJoinParentRequestUseCase {
       }
 
       // 5a. Accept the request
-      request.accept(adminUserId);
+      const accepted = request.accept(adminUserId, this.deps.clock.now());
+
+      if (!accepted.success) {
+        return accepted;
+      }
+
       await this.deps.joinParentRequestRepository.update(request);
 
       // 6a. Set parentId on child org
@@ -117,13 +158,19 @@ export class HandleJoinParentRequestUseCase {
 
       // 7a. Notify members of child org
       const notifyUseCase = new NotifyOrgJoinedParentUseCase({
+        ids: this.deps.ids,
+        clock: this.deps.clock,
         organizationRepository: this.deps.organizationRepository,
         notificationRepository: this.deps.notificationRepository,
       });
-      await notifyUseCase.execute({
+      const delivery = await notifyUseCase.execute({
         childOrgId: request.childOrgId,
         parentOrgId: request.parentOrgId,
       });
+
+      if (!delivery.success) {
+        return failure('common.errors.unexpected');
+      }
     } else {
       // 4b. Reject requires reason
       if (!rejectionReason || rejectionReason.trim().length === 0) {
@@ -131,19 +178,41 @@ export class HandleJoinParentRequestUseCase {
       }
 
       // 5b. Reject the request
-      request.reject(adminUserId, rejectionReason, this.deps.profanityChecker);
+      const reason = parseJoinParentRejectionReason(rejectionReason);
+
+      if (!reason.success) {
+        return reason;
+      }
+
+      const rejected = request.reject(
+        adminUserId,
+        reason.value,
+        this.deps.clock.now(),
+        this.deps.profanityChecker
+      );
+
+      if (!rejected.success) {
+        return rejected;
+      }
+
       await this.deps.joinParentRequestRepository.update(request);
 
       // 6b. Notify child org admins + members
       const notifyRejectedUseCase = new NotifyJoinParentRequestRejectedUseCase({
+        ids: this.deps.ids,
+        clock: this.deps.clock,
         organizationRepository: this.deps.organizationRepository,
         notificationRepository: this.deps.notificationRepository,
       });
-      await notifyRejectedUseCase.execute({
+      const delivery = await notifyRejectedUseCase.execute({
         childOrgId: request.childOrgId,
         parentOrgId: request.parentOrgId,
-        rejectionReason: rejectionReason!,
+        rejectionReason: reason.value,
       });
+
+      if (!delivery.success) {
+        return failure('common.errors.unexpected');
+      }
     }
 
     return success(undefined);

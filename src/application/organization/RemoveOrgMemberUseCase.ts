@@ -1,9 +1,17 @@
+/** Organization application boundary validates external request identities/units
+ * before querying ports or invoking domain policies. */
+import { IdGenerator, Clock } from '../shared/EntityCreation';
+import { OrganizationId, UserId } from '../../domain/shared/EntityIds';
+import { MemberRemovalReason } from '../../domain/organization/OrganizationValues';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 import { OrganizationDomainCodes } from '../../domain/organization/OrganizationDomainCodes';
 import { OrganizationAdminPolicy } from '../../domain/organization/OrganizationAdminPolicy';
 import { LastAdminError } from '../../domain/organization/LastAdminError';
@@ -17,6 +25,8 @@ export interface RemoveOrgMemberInput {
 }
 
 export interface RemoveOrgMemberDependencies {
+  clock: Clock;
+  ids: IdGenerator;
   organizationRepository: OrganizationRepository;
   boardRepository: BoardRepository;
   userRepository: UserRepository;
@@ -24,27 +34,65 @@ export interface RemoveOrgMemberDependencies {
 }
 
 export class RemoveOrgMemberUseCase {
+  private clock: Clock;
+  private ids: IdGenerator;
   private organizationRepository: OrganizationRepository;
   private boardRepository: BoardRepository;
   private userRepository: UserRepository;
   private notificationRepository: NotificationRepository;
 
   constructor(dependencies: RemoveOrgMemberDependencies) {
+    this.clock = dependencies.clock;
+    this.ids = dependencies.ids;
     this.organizationRepository = dependencies.organizationRepository;
     this.boardRepository = dependencies.boardRepository;
     this.userRepository = dependencies.userRepository;
     this.notificationRepository = dependencies.notificationRepository;
   }
 
-  async execute(input: RemoveOrgMemberInput): Promise<Result<void, string>> {
-    const reason = input.reason.trim();
+  async execute(
+    input: RemoveOrgMemberInput
+  ): Promise<Result<void, OrganizationUseCaseFailure>> {
+    const parsedOrganizationId = OrganizationId.safeParse(input.organizationId);
+
+    if (!parsedOrganizationId.success) {
+      return failure(OrganizationErrors.NOT_FOUND);
+    }
+
+    const parsedTargetUserId = UserId.safeParse(input.targetUserId);
+
+    if (!parsedTargetUserId.success) {
+      return failure(OrganizationErrors.USER_NOT_FOUND);
+    }
+
+    const parsedActorUserId = UserId.safeParse(input.actorUserId);
+
+    if (!parsedActorUserId.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
+    }
+
+    const parsedReason = MemberRemovalReason.safeParse(input.reason);
+
+    if (!parsedReason.success) {
+      return failure(OrganizationErrors.REASON_REQUIRED);
+    }
+
+    const command = {
+      ...input,
+      organizationId: parsedOrganizationId.data,
+      targetUserId: parsedTargetUserId.data,
+      actorUserId: parsedActorUserId.data,
+      reason: parsedReason.data,
+    };
+
+    const reason = command.reason;
 
     if (!reason) {
       return failure(OrganizationErrors.REASON_REQUIRED);
     }
 
     const organization = await this.organizationRepository.findById(
-      input.organizationId
+      command.organizationId
     );
 
     if (!organization) {
@@ -56,24 +104,24 @@ export class RemoveOrgMemberUseCase {
     }
 
     // Superadmin-only for now. To allow org admins later, also accept
-    // organizationRepository.isUserAdmin(input.actorUserId, input.organizationId).
+    // organizationRepository.isUserAdmin(command.actorUserId, command.organizationId).
     const isSuperAdmin = await this.userRepository.isSuperAdmin(
-      input.actorUserId
+      command.actorUserId
     );
 
     if (!isSuperAdmin) {
       return failure(OrganizationErrors.NOT_ADMIN);
     }
 
-    if (input.actorUserId === input.targetUserId) {
+    if (command.actorUserId === command.targetUserId) {
       return failure(OrganizationErrors.CANNOT_REMOVE_SELF);
     }
 
     // Exact-org check: we delete this org's membership row, so descendant
     // memberships (which isUserMember would also count) must not qualify.
     const isMember = await this.organizationRepository.isUserExactMember(
-      input.targetUserId,
-      input.organizationId
+      command.targetUserId,
+      command.organizationId
     );
 
     if (!isMember) {
@@ -82,19 +130,19 @@ export class RemoveOrgMemberUseCase {
 
     // Drop org-admin role first; repo guarantees ≥1 admin remains
     const isTargetAdmin = await this.organizationRepository.isUserAdmin(
-      input.targetUserId,
-      input.organizationId
+      command.targetUserId,
+      command.organizationId
     );
 
     if (isTargetAdmin) {
       // Enforce the "≥1 admin must remain" invariant in the domain before mutating.
       const currentAdminIds =
         await this.organizationRepository.findAdminUserIds(
-          input.organizationId
+          command.organizationId
         );
       const canRemove = OrganizationAdminPolicy.ensureCanRemoveAdmin(
         currentAdminIds,
-        input.targetUserId
+        command.targetUserId
       );
 
       if (!canRemove.success) {
@@ -104,8 +152,8 @@ export class RemoveOrgMemberUseCase {
       // The repository re-checks the invariant atomically as a concurrency net.
       try {
         await this.organizationRepository.removeAdmin(
-          input.organizationId,
-          input.targetUserId
+          command.organizationId,
+          command.targetUserId
         );
       } catch (error) {
         if (error instanceof LastAdminError) {
@@ -118,7 +166,7 @@ export class RemoveOrgMemberUseCase {
 
     // Soft-remove from the org's boards (skip archived, mirrors leave-org)
     const boards = await this.boardRepository.findByOrganizationId(
-      input.organizationId
+      command.organizationId
     );
 
     for (const board of boards) {
@@ -127,7 +175,7 @@ export class RemoveOrgMemberUseCase {
       }
 
       const isBoardMember = await this.boardRepository.isUserMember(
-        input.targetUserId,
+        command.targetUserId,
         board.id
       );
 
@@ -136,29 +184,39 @@ export class RemoveOrgMemberUseCase {
       }
 
       await this.boardRepository.removeUserFromBoard(
-        input.targetUserId,
+        command.targetUserId,
         board.id,
-        input.actorUserId,
+        command.actorUserId,
         'removed_from_organization'
       );
     }
 
     // Hard-delete membership + audit row (one transaction in the repo)
     await this.organizationRepository.removeMemberFromOrganization(
-      input.organizationId,
-      input.targetUserId,
-      input.actorUserId,
+      command.organizationId,
+      command.targetUserId,
+      command.actorUserId,
       reason
     );
 
     // Fire-and-forget notification to the removed member
     new NotifyMemberRemovedFromOrganizationUseCase({
+      ids: this.ids,
+      clock: this.clock,
       notificationRepository: this.notificationRepository,
     })
       .execute({
-        removedUserId: input.targetUserId,
-        organizationId: input.organizationId,
+        removedUserId: command.targetUserId,
+        organizationId: command.organizationId,
         organizationName: organization.name,
+      })
+      .then((outcome) => {
+        if (!outcome.success) {
+          console.error(
+            'Notification delivery failed (NotifyMemberRemovedFromOrganizationUseCase):',
+            outcome.error
+          );
+        }
       })
       .catch((err) =>
         console.error('Failed to notify member removed from organization:', err)

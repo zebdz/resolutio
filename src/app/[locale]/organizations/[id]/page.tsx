@@ -1,3 +1,10 @@
+import { HistoricalEntries } from '@/web/components/history/HistoricalEntries';
+import {
+  hasProfileAccess,
+  listHistory,
+} from '@/infrastructure/history/history';
+/** Loads an organization and its authorized member, poll and property views. */
+import type { PollSearchView } from '@/web/actions/poll/PollQueryViews';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { Heading } from '@/src/web/components/catalyst/heading';
@@ -25,6 +32,10 @@ import { ReportsSection } from '@/src/web/components/report/ReportsSection';
 import { Linkify } from '@/src/web/components/linkify/Linkify';
 import { User } from '@/domain/user/User';
 
+import { PrismaVotingEligibilityStore } from '@/infrastructure/repositories/PrismaVotingEligibilityStore';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+
+const eligibilityStore = new PrismaVotingEligibilityStore(prisma);
 const organizationRepository = new PrismaOrganizationRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 
@@ -61,7 +72,7 @@ export default async function OrganizationDetailPage({
   } = result.data;
 
   // Fetch user data
-  let pollsData: { polls: any[]; totalCount: number } | null = null;
+  let pollsData: PollSearchView | null = null;
   let adminOrgIds: string[] = [];
   let isSuperAdmin = false;
   let userMemberOrgIds: string[] = [];
@@ -104,6 +115,17 @@ export default async function OrganizationDetailPage({
     }
   }
 
+  const archive = await getTranslations('history');
+  const [ownEligibility, showProfiles, historicalPolls, historicalReports] =
+    await Promise.all([
+      user && isUserMember
+        ? eligibilityStore.ownStatus(OrganizationId.parse(id), user.id)
+        : null,
+      user && hasProfileAccess(user.id, id),
+      listHistory(user?.id ?? null, 'poll', { orgIds: [id] }),
+      listHistory(user?.id ?? null, 'report', { orgIds: [id] }),
+    ]);
+  const voting = await getTranslations('organization.eligibility');
   let safeProperties:
     | { id: string; name: string; address: string | null }[]
     | null = null;
@@ -131,6 +153,19 @@ export default async function OrganizationDetailPage({
               </Link>
             )}
           </div>
+          {showProfiles && (
+            <Link
+              className="cursor-pointer underline"
+              href={'/organizations/' + id + '/historical-profiles'}
+            >
+              {archive('profiles')}
+            </Link>
+          )}
+          {ownEligibility !== null && (
+            <Text>
+              {voting(ownEligibility ? 'ownEligible' : 'ownIneligible')}
+            </Text>
+          )}
           {firstAdmin && (
             <Text className="text-sm text-zinc-600 dark:text-zinc-400">
               {t('firstAdmin')}:{' '}
@@ -176,6 +211,7 @@ export default async function OrganizationDetailPage({
             organizationId={id}
             initialMembers={initialMembers}
             initialTotalCount={initialMembersTotalCount}
+            canManageEligibility={isUserAdmin || isSuperAdmin}
             canRemoveMembers={isSuperAdmin}
             currentUserId={user?.id ?? null}
           />
@@ -232,6 +268,8 @@ export default async function OrganizationDetailPage({
             </div>
           </>
         )}
+        <HistoricalEntries kind="poll" items={historicalPolls} />
+        <HistoricalEntries kind="report" items={historicalReports} />
       </div>
     </AuthenticatedLayout>
   );

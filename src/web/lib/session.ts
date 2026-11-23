@@ -1,4 +1,9 @@
+/** Validates session cookies before repository access and resolves authenticated users.
+ * Browser values stay transport data until parsed into the session identity. */
 import { cache } from 'react';
+import { SessionId } from '@/domain/shared/EntityIds';
+import { Seconds } from '@/domain/auth/AuthValues';
+import { SystemClock } from '@/infrastructure/shared/SystemEntityCreation';
 import { cookies } from 'next/headers';
 import {
   prisma,
@@ -10,8 +15,8 @@ import type { User } from '@/domain/user/User';
 const SESSION_COOKIE_NAME = 'session';
 
 export async function setSessionCookie(
-  sessionId: string,
-  maxAgeSeconds: number
+  sessionId: SessionId,
+  maxAgeSeconds: Seconds
 ): Promise<void> {
   const cookieStore = await cookies();
 
@@ -24,10 +29,14 @@ export async function setSessionCookie(
   });
 }
 
-export async function getSessionCookie(): Promise<string | undefined> {
+export async function getSessionCookie(): Promise<SessionId | undefined> {
   const cookieStore = await cookies();
 
-  return cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const parsed = SessionId.safeParse(
+    cookieStore.get(SESSION_COOKIE_NAME)?.value
+  );
+
+  return parsed.success ? parsed.data : undefined;
 }
 
 export async function deleteSessionCookie(): Promise<void> {
@@ -54,7 +63,7 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
     }
 
     // Check if session is expired
-    if (session.expiresAt < new Date()) {
+    if (session.isExpired(new SystemClock().now())) {
       await sessionRepository.delete(sessionId);
 
       return null;

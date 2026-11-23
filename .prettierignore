@@ -36,3 +36,10 @@ prisma/migrations
 package-lock.json
 pnpm-lock.yaml
 yarn.lock
+
+# Public symlinks to the installed PDF.js distribution.
+public/pdfjs
+
+# These downloads are cryptographic test vectors; whitespace is committed.
+src/domain/seal/__tests__/fixtures/export-v1/*.json
+src/domain/seal/__tests__/fixtures/bitcoin-example/manifest.json

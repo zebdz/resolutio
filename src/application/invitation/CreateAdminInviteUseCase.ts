@@ -1,10 +1,24 @@
+/** Decodes invitation request references before authorization and domain transitions. */
+import {
+  IdGenerator,
+  Clock,
+  entityCreation,
+} from '@/application/shared/EntityCreation';
+import { Instant } from '@/domain/shared/Instant';
+import { z } from 'zod';
+import {
+  OrganizationId,
+  UserId,
+  InvitationId,
+  BoardId,
+} from '@/domain/shared/EntityIds';
 import { InvitationRepository } from '../../domain/invitation/InvitationRepository';
 import { Invitation } from '../../domain/invitation/Invitation';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { InvitationErrors } from './InvitationErrors';
+import { InvitationErrors, InvitationUseCaseFailure } from './InvitationErrors';
 import { User } from '../../domain/user/User';
 import { NotifyAdminInviteReceivedUseCase } from '../notification/NotifyAdminInviteReceivedUseCase';
 
@@ -15,6 +29,8 @@ export interface CreateAdminInviteInput {
 }
 
 export interface CreateAdminInviteDependencies {
+  ids: IdGenerator;
+  clock: Clock;
   invitationRepository: InvitationRepository;
   organizationRepository: OrganizationRepository;
   userRepository: UserRepository;
@@ -25,8 +41,22 @@ export class CreateAdminInviteUseCase {
   constructor(private deps: CreateAdminInviteDependencies) {}
 
   async execute(
-    input: CreateAdminInviteInput
-  ): Promise<Result<Invitation, string>> {
+    rawInput: CreateAdminInviteInput
+  ): Promise<Result<Invitation, InvitationUseCaseFailure>> {
+    const parsed = z
+      .object({
+        organizationId: OrganizationId,
+        inviteeId: UserId,
+        actorUserId: UserId,
+      })
+      .safeParse(rawInput);
+
+    if (!parsed.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawInput, ...parsed.data };
+
     const { organizationId, inviteeId, actorUserId } = input;
 
     // Check org exists and not archived
@@ -89,7 +119,8 @@ export class CreateAdminInviteUseCase {
       organizationId,
       actorUserId,
       inviteeId,
-      'admin_invite'
+      { type: 'admin_invite', boardId: null },
+      entityCreation(InvitationId, this.deps.ids, this.deps.clock)
     );
 
     const saved = await this.deps.invitationRepository.save(invitation);
@@ -106,6 +137,8 @@ export class CreateAdminInviteUseCase {
 
     // Notify invitee (fire-and-forget)
     new NotifyAdminInviteReceivedUseCase({
+      ids: this.deps.ids,
+      clock: this.deps.clock,
       organizationRepository: this.deps.organizationRepository,
       notificationRepository: this.deps.notificationRepository,
     })
@@ -115,6 +148,14 @@ export class CreateAdminInviteUseCase {
         inviteeUserId: inviteeId,
         inviterName,
         organizationName: organization.name,
+      })
+      .then((outcome) => {
+        if (!outcome.success) {
+          console.error(
+            'Notification delivery failed (NotifyAdminInviteReceivedUseCase):',
+            outcome.error
+          );
+        }
       })
       .catch((err) =>
         console.error('Failed to notify admin invite received:', err)

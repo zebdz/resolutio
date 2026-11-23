@@ -1,3 +1,14 @@
+/** Mail contracts retain validated addresses and serialize only inside the delivery adapter. */
+import { EmailAddress } from '@/domain/user/EmailAddress';
+/** Provider requests serialize validated OTP inputs; malformed transport facts fail before delivery. */
+import {
+  OtpEmailDestination,
+  OtpSmsDestination,
+  OtpDigits,
+} from '@/domain/otp/OtpValues';
+import { ClientIp } from '@/domain/auth/AuthValues';
+import { Minutes } from '@/domain/auth/AuthValues';
+
 import { describe, it, expect, vi } from 'vitest';
 import { EmailOtpDeliveryChannel } from '../EmailOtpDeliveryChannel';
 import { OtpPurposes } from '@/domain/otp/OtpVerification';
@@ -27,12 +38,31 @@ function build(
     channel: new EmailOtpDeliveryChannel({
       emailSender,
       templateRenderer,
-      expiryMinutes: 10,
+      expiryMinutes: Minutes.parse(10),
     }),
   };
 }
 
 describe('EmailOtpDeliveryChannel', () => {
+  it('rejects a phone recipient before rendering or sending email', async () => {
+    const { channel, emailSender, templateRenderer } = build();
+    const phone = OtpSmsDestination.parse({
+      channel: 'sms',
+      identifier: '+79161234567',
+    });
+    const result = await channel.send(
+      // @ts-expect-error Exercise an untyped caller bypassing the email-recipient contract.
+      phone.identifier,
+      OtpDigits.parse('123456'),
+      'ru',
+      ClientIp.parse('127.0.0.1'),
+      OtpPurposes.EMAIL_CONFIRMATION
+    );
+    expect(result).toEqual({ success: false });
+    expect(templateRenderer.renderOtp).not.toHaveBeenCalled();
+    expect(emailSender.send).not.toHaveBeenCalled();
+  });
+
   it('declares the email channel', () => {
     expect(build().channel.channel).toBe('email');
   });
@@ -41,10 +71,13 @@ describe('EmailOtpDeliveryChannel', () => {
     const { channel, templateRenderer } = build();
 
     await channel.send(
-      'ivan@mail.ru',
-      '123456',
+      OtpEmailDestination.parse({
+        channel: 'email',
+        identifier: 'ivan@mail.ru',
+      }).identifier,
+      OtpDigits.parse('123456'),
       'ru',
-      '127.0.0.1',
+      ClientIp.parse('127.0.0.1'),
       OtpPurposes.PASSWORD_RESET
     );
 
@@ -60,15 +93,18 @@ describe('EmailOtpDeliveryChannel', () => {
     const { channel, emailSender } = build();
 
     await channel.send(
-      'ivan@mail.ru',
-      '123456',
+      OtpEmailDestination.parse({
+        channel: 'email',
+        identifier: 'ivan@mail.ru',
+      }).identifier,
+      OtpDigits.parse('123456'),
       'ru',
-      '127.0.0.1',
+      ClientIp.parse('127.0.0.1'),
       OtpPurposes.EMAIL_CONFIRMATION
     );
 
     expect(emailSender.send).toHaveBeenCalledWith({
-      to: 'ivan@mail.ru',
+      to: EmailAddress.create('ivan@mail.ru'),
       subject: 'Сброс пароля',
       text: 'Ваш код: 123456. Он действует 10 минут.',
     });
@@ -78,10 +114,13 @@ describe('EmailOtpDeliveryChannel', () => {
     const { channel } = build({ sendResult: { success: false } });
 
     const result = await channel.send(
-      'ivan@mail.ru',
-      '123456',
+      OtpEmailDestination.parse({
+        channel: 'email',
+        identifier: 'ivan@mail.ru',
+      }).identifier,
+      OtpDigits.parse('123456'),
       'ru',
-      '127.0.0.1',
+      ClientIp.parse('127.0.0.1'),
       OtpPurposes.PASSWORD_RESET
     );
 
@@ -96,10 +135,13 @@ describe('EmailOtpDeliveryChannel', () => {
     });
 
     const result = await channel.send(
-      'ivan@mail.ru',
-      '123456',
+      OtpEmailDestination.parse({
+        channel: 'email',
+        identifier: 'ivan@mail.ru',
+      }).identifier,
+      OtpDigits.parse('123456'),
       'ru',
-      '127.0.0.1',
+      ClientIp.parse('127.0.0.1'),
       OtpPurposes.PASSWORD_RESET
     );
 

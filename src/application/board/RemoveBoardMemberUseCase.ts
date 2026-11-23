@@ -1,13 +1,19 @@
+/** RemoveBoardMember application flow decodes request identities before domain/repository use.
+ * Authorization and persistence stay coordinated here; lifecycle decisions belong to Board. */
+import { IdGenerator, Clock } from '../shared/EntityCreation';
+import { z } from 'zod';
+import { BoardId, UserId } from '@/domain/shared/EntityIds';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { BoardErrors } from './BoardErrors';
+import { BoardErrors, BoardUseCaseError } from './BoardErrors';
 import { OrganizationErrors } from '../organization/OrganizationErrors';
 import { User } from '../../domain/user/User';
 import { NotifyBoardMemberRemovedUseCase } from '../notification/NotifyBoardMemberRemovedUseCase';
 
+/** Raw request values, decoded once at the application boundary. */
 export interface RemoveBoardMemberInput {
   boardId: string;
   userId: string;
@@ -15,7 +21,16 @@ export interface RemoveBoardMemberInput {
   reason?: string;
 }
 
+const request = z.object({
+  boardId: BoardId,
+  userId: UserId,
+  adminUserId: UserId,
+  reason: z.string().optional(),
+});
+
 export interface RemoveBoardMemberDependencies {
+  clock: Clock;
+  ids: IdGenerator;
   boardRepository: BoardRepository;
   organizationRepository: OrganizationRepository;
   userRepository: UserRepository;
@@ -23,19 +38,33 @@ export interface RemoveBoardMemberDependencies {
 }
 
 export class RemoveBoardMemberUseCase {
+  private clock: Clock;
+  private ids: IdGenerator;
   private boardRepository: BoardRepository;
   private organizationRepository: OrganizationRepository;
   private userRepository: UserRepository;
   private notificationRepository: NotificationRepository;
 
   constructor(dependencies: RemoveBoardMemberDependencies) {
+    this.clock = dependencies.clock;
+    this.ids = dependencies.ids;
     this.boardRepository = dependencies.boardRepository;
     this.organizationRepository = dependencies.organizationRepository;
     this.userRepository = dependencies.userRepository;
     this.notificationRepository = dependencies.notificationRepository;
   }
 
-  async execute(input: RemoveBoardMemberInput): Promise<Result<void, string>> {
+  async execute(
+    rawInput: RemoveBoardMemberInput
+  ): Promise<Result<void, BoardUseCaseError>> {
+    const decoded = request.safeParse(rawInput);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = decoded.data;
+
     // Find the board
     const board = await this.boardRepository.findById(input.boardId);
 
@@ -92,6 +121,8 @@ export class RemoveBoardMemberUseCase {
     );
 
     new NotifyBoardMemberRemovedUseCase({
+      ids: this.ids,
+      clock: this.clock,
       notificationRepository: this.notificationRepository,
     })
       .execute({
@@ -101,6 +132,14 @@ export class RemoveBoardMemberUseCase {
         boardId: board.id,
         boardName: board.name,
         actorName,
+      })
+      .then((outcome) => {
+        if (!outcome.success) {
+          console.error(
+            'Notification delivery failed (NotifyBoardMemberRemovedUseCase):',
+            outcome.error
+          );
+        }
       })
       .catch((err) =>
         console.error('Failed to notify board member removed:', err)

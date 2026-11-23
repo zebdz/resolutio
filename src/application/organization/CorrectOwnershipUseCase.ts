@@ -1,3 +1,11 @@
+/** Application boundary for authorized property changes. Raw request values are
+ * parsed before domain behavior; persistence receives validated domain values. */
+import { OwnershipShare } from '../../domain/organization/PropertyValues';
+import {
+  OwnershipId,
+  UserId,
+  OrganizationId,
+} from '../../domain/shared/EntityIds';
 import { PropertyAssetRepository } from '../../domain/organization/PropertyAssetRepository';
 import { OrganizationPropertyRepository } from '../../domain/organization/OrganizationPropertyRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
@@ -6,8 +14,11 @@ import { PropertyLockRepository } from '../../domain/organization/PropertyLockRe
 import { PropertyLockService } from '../../domain/organization/PropertyLockService';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 import { SharedDomainCodes } from '../../domain/shared/SharedDomainCodes';
-import { Result, success, failure } from '../../domain/shared/Result';
-import { OrganizationErrors } from './OrganizationErrors';
+import { Result, failure } from '../../domain/shared/Result';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 import { OrganizationDomainCodes } from '../../domain/organization/OrganizationDomainCodes';
 
 export interface CorrectOwnershipInput {
@@ -33,7 +44,15 @@ export class CorrectOwnershipUseCase {
 
   constructor(private deps: CorrectOwnershipDependencies) {}
 
-  async execute(input: CorrectOwnershipInput): Promise<Result<void, string>> {
+  async execute(
+    input: CorrectOwnershipInput
+  ): Promise<Result<void, OrganizationUseCaseFailure>> {
+    const parsedId = OwnershipId.safeParse(input.ownershipId);
+
+    if (!parsedId.success) {
+      return failure(OrganizationDomainCodes.OWNERSHIP_ROW_NOT_FOUND);
+    }
+
     const reason = (input.reason ?? '').trim();
 
     if (reason.length === 0) {
@@ -45,7 +64,7 @@ export class CorrectOwnershipUseCase {
     }
 
     const oRes = await this.deps.assetRepository.findOwnershipById(
-      input.ownershipId
+      parsedId.data
     );
 
     if (!oRes.success) {
@@ -79,7 +98,12 @@ export class CorrectOwnershipUseCase {
 
     const property = pRes.value;
 
-    if (!(await this.authorize(input.adminUserId, property.organizationId))) {
+    const actor = UserId.safeParse(input.adminUserId);
+
+    if (
+      !actor.success ||
+      !(await this.authorize(actor.data, property.organizationId))
+    ) {
       return failure(OrganizationErrors.NOT_ADMIN);
     }
 
@@ -108,7 +132,15 @@ export class CorrectOwnershipUseCase {
     }
 
     // Entity-level range check.
-    const correction = ownership.correct(input.newShare);
+    const share = OwnershipShare.safeParse(input.newShare);
+
+    if (!share.success) {
+      return failure(
+        OrganizationDomainCodes.PROPERTY_ASSET_OWNERSHIP_SHARE_OUT_OF_RANGE
+      );
+    }
+
+    const correction = ownership.correct(share.data);
 
     if (!correction.success) {
       return failure(correction.error);
@@ -134,11 +166,14 @@ export class CorrectOwnershipUseCase {
 
     return this.deps.assetRepository.correctOwnership({
       ownershipId: ownership.id,
-      newShare: input.newShare,
+      newShare: share.data,
     });
   }
 
-  private async authorize(userId: string, orgId: string): Promise<boolean> {
+  private async authorize(
+    userId: UserId,
+    orgId: OrganizationId
+  ): Promise<boolean> {
     if (await this.deps.userRepository.isSuperAdmin(userId)) {
       return true;
     }

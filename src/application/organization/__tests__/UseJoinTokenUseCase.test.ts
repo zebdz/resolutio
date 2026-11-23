@@ -1,3 +1,7 @@
+import {
+  createOrganization,
+  organizationTestInstant,
+} from '../../../domain/organization/__tests__/organizationTestValues';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UseJoinTokenUseCase } from '../UseJoinTokenUseCase';
 import { JoinToken } from '../../../domain/organization/JoinToken';
@@ -25,7 +29,7 @@ function createMockJoinToken(
   return JoinToken.reconstitute({
     id: overrides.id ?? 'token-id-1',
     organizationId: overrides.organizationId ?? 'org-123',
-    token: overrides.token ?? 'abc123defg',
+    token: overrides.token ?? 'abc234defg',
     description: overrides.description ?? 'Test token',
     maxUses: overrides.maxUses ?? null,
     useCount: overrides.useCount ?? 0,
@@ -36,17 +40,16 @@ function createMockJoinToken(
 }
 
 function createMockOrg(id: string, archived = false): Organization {
-  const result = Organization.create('Test Org', 'desc', 'creator-1');
+  const result = createOrganization('Test Org', 'desc', 'creator-1');
 
   if (!result.success) {
     throw new Error('Failed to create org');
   }
 
-  const org = result.value;
-  (org as any).props.id = id;
+  const org = Organization.reconstitute({ ...result.value.toJSON(), id: id });
 
   if (archived) {
-    org.archive();
+    org.archive(organizationTestInstant);
   }
 
   return org;
@@ -74,6 +77,10 @@ function createMockJoinTokenRepo(): {
 function createMockOrgRepo(): OrganizationRepository {
   return {
     findById: vi.fn(),
+    isUserExactMember: vi.fn(),
+    getAdminUserIds: vi.fn(),
+    findAcceptedMemberUserIdsForOrgs: vi.fn(),
+    removeMemberFromOrganization: vi.fn(),
     save: vi.fn(),
     findByName: vi.fn(),
     findByCreatorId: vi.fn(),
@@ -139,7 +146,7 @@ describe('UseJoinTokenUseCase', () => {
     joinTokenRepo.tryIncrementUseCount.mockResolvedValue(true);
     joinOrgUseCase.execute.mockResolvedValue(success(undefined));
 
-    const result = await useCase.execute('abc123defg', 'user-1');
+    const result = await useCase.execute('abc234defg', 'user-1');
 
     expect(result.success).toBe(true);
 
@@ -147,7 +154,7 @@ describe('UseJoinTokenUseCase', () => {
       expect(result.value).toEqual({ organizationId: 'org-123' });
     }
 
-    expect(joinTokenRepo.findByToken).toHaveBeenCalledWith('abc123defg');
+    expect(joinTokenRepo.findByToken).toHaveBeenCalledWith('abc234defg');
     expect(joinTokenRepo.tryIncrementUseCount).toHaveBeenCalledWith(
       'token-id-1'
     );
@@ -173,7 +180,7 @@ describe('UseJoinTokenUseCase', () => {
     const token = createMockJoinToken({ expiredAt: new Date() });
     joinTokenRepo.findByToken.mockResolvedValue(token);
 
-    const result = await useCase.execute('abc123defg', 'user-1');
+    const result = await useCase.execute('abc234defg', 'user-1');
 
     expect(result.success).toBe(false);
 
@@ -190,7 +197,7 @@ describe('UseJoinTokenUseCase', () => {
     (orgRepo.findById as ReturnType<typeof vi.fn>).mockResolvedValue(org);
     joinTokenRepo.tryIncrementUseCount.mockResolvedValue(false);
 
-    const result = await useCase.execute('abc123defg', 'user-1');
+    const result = await useCase.execute('abc234defg', 'user-1');
 
     expect(result.success).toBe(false);
 
@@ -205,7 +212,7 @@ describe('UseJoinTokenUseCase', () => {
     joinTokenRepo.findByToken.mockResolvedValue(token);
     (orgRepo.findById as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
-    const result = await useCase.execute('abc123defg', 'user-1');
+    const result = await useCase.execute('abc234defg', 'user-1');
 
     expect(result.success).toBe(false);
 
@@ -221,7 +228,7 @@ describe('UseJoinTokenUseCase', () => {
     joinTokenRepo.findByToken.mockResolvedValue(token);
     (orgRepo.findById as ReturnType<typeof vi.fn>).mockResolvedValue(org);
 
-    const result = await useCase.execute('abc123defg', 'user-1');
+    const result = await useCase.execute('abc234defg', 'user-1');
 
     expect(result.success).toBe(false);
 
@@ -246,7 +253,7 @@ describe('UseJoinTokenUseCase', () => {
     joinTokenRepo.findById.mockResolvedValue(incrementedToken);
     joinTokenRepo.update.mockResolvedValue(incrementedToken);
 
-    const result = await useCase.execute('abc123defg', 'user-1');
+    const result = await useCase.execute('abc234defg', 'user-1');
 
     expect(result.success).toBe(false);
 
@@ -273,7 +280,7 @@ describe('UseJoinTokenUseCase', () => {
     // Rollback fails
     joinTokenRepo.findById.mockRejectedValue(new Error('DB error'));
 
-    const result = await useCase.execute('abc123defg', 'user-1');
+    const result = await useCase.execute('abc234defg', 'user-1');
 
     expect(result.success).toBe(false);
 

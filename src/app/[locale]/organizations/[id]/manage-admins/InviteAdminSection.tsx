@@ -19,7 +19,7 @@ type SearchResult = {
   lastName: string;
   middleName?: string;
   nickname: string;
-  address?: { city: string; street: string };
+  address?: { city?: string; street: string };
 };
 
 export function InviteAdminSection({
@@ -209,7 +209,9 @@ export function InviteAdminSection({
                   </span>
                   {user.address && (
                     <p className="text-xs text-zinc-500">
-                      {user.address.city}, {user.address.street}
+                      {[user.address.city, user.address.street]
+                        .filter(Boolean)
+                        .join(', ')}
                     </p>
                   )}
                 </div>
@@ -276,7 +278,9 @@ export function InviteAdminSection({
                   </span>
                   {user.address && (
                     <p className="text-xs text-zinc-500">
-                      {user.address.city}, {user.address.street}
+                      {[user.address.city, user.address.street]
+                        .filter(Boolean)
+                        .join(', ')}
                     </p>
                   )}
                 </div>

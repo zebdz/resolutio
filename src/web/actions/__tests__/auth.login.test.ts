@@ -1,3 +1,4 @@
+/** Login action enforces CAPTCHA and serializes only the authorized session response. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockIsSuperAdmin = vi.fn();
@@ -183,7 +184,10 @@ describe('loginAction — CAPTCHA enforcement', () => {
     );
 
     expect(result.success).toBe(true);
-    expect(mockCaptchaVerify).toHaveBeenCalledWith('good-token', '1.2.3.4');
+    expect(mockCaptchaVerify).toHaveBeenCalledWith({
+      token: 'good-token',
+      clientIp: '1.2.3.4',
+    });
   });
 
   // Local dev with no secret: a tokenless login still has to work, or the

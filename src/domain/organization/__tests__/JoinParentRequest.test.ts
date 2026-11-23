@@ -1,3 +1,9 @@
+import { UserId } from '../../shared/EntityIds';
+import { JoinParentRejectionReason } from '../JoinParentRequestValues';
+import {
+  parentRequestInstant,
+  createJoinParentRequest,
+} from './joinParentRequestTestValues';
 import { describe, it, expect } from 'vitest';
 import {
   JoinParentRequest,
@@ -8,6 +14,7 @@ import { SharedDomainCodes } from '../../shared/SharedDomainCodes';
 import { ProfanityChecker } from '../../shared/profanity/ProfanityChecker';
 
 const mockProfanityChecker: ProfanityChecker = {
+  findProfaneWords: () => [],
   containsProfanity: (text: string) => text.includes('badword'),
 };
 
@@ -31,7 +38,7 @@ function makePendingRequest(
 
 describe('JoinParentRequest.create profanity check', () => {
   it('should reject message with profanity', () => {
-    const result = JoinParentRequest.create(
+    const result = createJoinParentRequest(
       'child-1',
       'parent-1',
       'admin-1',
@@ -46,7 +53,7 @@ describe('JoinParentRequest.create profanity check', () => {
   });
 
   it('should pass clean message with profanityChecker', () => {
-    const result = JoinParentRequest.create(
+    const result = createJoinParentRequest(
       'child-1',
       'parent-1',
       'admin-1',
@@ -57,7 +64,7 @@ describe('JoinParentRequest.create profanity check', () => {
   });
 
   it('should pass without profanityChecker (backward compat)', () => {
-    const result = JoinParentRequest.create(
+    const result = createJoinParentRequest(
       'child-1',
       'parent-1',
       'admin-1',
@@ -71,8 +78,9 @@ describe('JoinParentRequest.reject profanity check', () => {
   it('should reject reason with profanity', () => {
     const request = makePendingRequest();
     const result = request.reject(
-      'admin-2',
-      'badword reason',
+      UserId.parse('admin-2'),
+      'badword reason' as JoinParentRejectionReason,
+      parentRequestInstant,
       mockProfanityChecker
     );
     expect(result.success).toBe(false);
@@ -88,8 +96,9 @@ describe('JoinParentRequest.reject profanity check', () => {
   it('should pass clean reason with profanityChecker', () => {
     const request = makePendingRequest();
     const result = request.reject(
-      'admin-2',
-      'Valid rejection reason',
+      UserId.parse('admin-2'),
+      'Valid rejection reason' as JoinParentRejectionReason,
+      parentRequestInstant,
       mockProfanityChecker
     );
     expect(result.success).toBe(true);
@@ -98,7 +107,11 @@ describe('JoinParentRequest.reject profanity check', () => {
 
   it('should pass without profanityChecker (backward compat)', () => {
     const request = makePendingRequest();
-    const result = request.reject('admin-2', 'Any reason');
+    const result = request.reject(
+      UserId.parse('admin-2'),
+      'Any reason' as JoinParentRejectionReason,
+      parentRequestInstant
+    );
     expect(result.success).toBe(true);
     expect(request.status).toBe('rejected');
   });

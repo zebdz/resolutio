@@ -1,23 +1,32 @@
+/** Adapts typed OTP delivery to localized email and preserves the development preview. */
+import { Minutes, ClientIp } from '@/domain/auth/AuthValues';
+import {
+  OtpDigits,
+  OtpRecipient,
+  OtpEmailDestination,
+} from '@/domain/otp/OtpValues';
+import { Language } from '@/domain/user/UserValues';
+import { EmailAddress } from '@/domain/user/EmailAddress';
 import type {
   OtpDeliveryChannel,
   OtpDeliveryResult,
 } from '@/application/auth/OtpDeliveryChannel';
 import type { EmailSender } from '@/application/auth/EmailSender';
 import type { EmailTemplateRenderer } from '@/application/auth/EmailTemplateRenderer';
-import type { OtpChannel, OtpPurpose } from '@/domain/otp/OtpVerification';
+import type { OtpPurpose } from '@/domain/otp/OtpVerification';
 
 interface Dependencies {
   emailSender: EmailSender;
   templateRenderer: EmailTemplateRenderer;
-  expiryMinutes: number;
+  expiryMinutes: Minutes;
 }
 
-export class EmailOtpDeliveryChannel implements OtpDeliveryChannel {
-  channel: OtpChannel = 'email';
+export class EmailOtpDeliveryChannel implements OtpDeliveryChannel<'email'> {
+  readonly channel = 'email' as const;
 
   private readonly emailSender: EmailSender;
   private readonly templateRenderer: EmailTemplateRenderer;
-  private readonly expiryMinutes: number;
+  private readonly expiryMinutes: Minutes;
 
   constructor(deps: Dependencies) {
     this.emailSender = deps.emailSender;
@@ -26,12 +35,21 @@ export class EmailOtpDeliveryChannel implements OtpDeliveryChannel {
   }
 
   async send(
-    recipient: string,
-    code: string,
-    locale: string,
-    _clientIp: string,
+    recipient: OtpRecipient<'email'>,
+    code: OtpDigits,
+    locale: Language,
+    _clientIp: ClientIp,
     purpose: OtpPurpose
   ): Promise<OtpDeliveryResult> {
+    const destination = OtpEmailDestination.safeParse({
+      channel: this.channel,
+      identifier: recipient,
+    });
+
+    if (!destination.success) {
+      return { success: false };
+    }
+
     const { subject, text } = await this.templateRenderer.renderOtp(
       purpose,
       locale,
@@ -40,7 +58,7 @@ export class EmailOtpDeliveryChannel implements OtpDeliveryChannel {
     );
 
     const result = await this.emailSender.send({
-      to: recipient,
+      to: EmailAddress.create(destination.data.identifier),
       subject,
       text,
     });

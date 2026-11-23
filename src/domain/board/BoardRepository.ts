@@ -1,4 +1,14 @@
+/** Board persistence port exposes validated identities and aggregate/projection data.
+ * Raw database strings are decoded by infrastructure before crossing this boundary. */
 import { Board } from './Board';
+import { BoardName } from './BoardName';
+import { BoardId, OrganizationId, UserId } from '../shared/EntityIds';
+
+export interface BoardSummary {
+  readonly id: BoardId;
+  readonly name: BoardName;
+  readonly organizationId: OrganizationId;
+}
 
 export interface BoardRepository {
   /**
@@ -9,36 +19,36 @@ export interface BoardRepository {
   /**
    * Finds a board by its ID
    */
-  findById(id: string): Promise<Board | null>;
+  findById(id: BoardId): Promise<Board | null>;
 
   /**
    * Finds all boards for an organization
    */
-  findByOrganizationId(organizationId: string): Promise<Board[]>;
+  findByOrganizationId(organizationId: OrganizationId): Promise<Board[]>;
 
-  findBoardMembers(boardId: string): Promise<{ userId: string }[]>;
+  findBoardMembers(boardId: BoardId): Promise<{ userId: UserId }[]>;
 
   /**
    * Checks if a user is a member of a board
    */
-  isUserMember(userId: string, boardId: string): Promise<boolean>;
+  isUserMember(userId: UserId, boardId: BoardId): Promise<boolean>;
 
   /**
    * Adds a user to a board
    */
   addUserToBoard(
-    userId: string,
-    boardId: string,
-    addedBy?: string
+    userId: UserId,
+    boardId: BoardId,
+    addedBy?: UserId
   ): Promise<void>;
 
   /**
    * Removes a user from a board
    */
   removeUserFromBoard(
-    userId: string,
-    boardId: string,
-    removedBy?: string,
+    userId: UserId,
+    boardId: BoardId,
+    removedBy?: UserId,
     removedReason?: string
   ): Promise<void>;
 
@@ -51,7 +61,5 @@ export interface BoardRepository {
    * Finds all active boards where user is a member (removedAt IS NULL),
    * returns board id, name, and organizationId.
    */
-  findActiveBoardsByUserId(
-    userId: string
-  ): Promise<Array<{ id: string; name: string; organizationId: string }>>;
+  findActiveBoardsByUserId(userId: UserId): Promise<BoardSummary[]>;
 }

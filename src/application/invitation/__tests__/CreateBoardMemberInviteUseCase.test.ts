@@ -1,3 +1,13 @@
+/** Verifies Create Board Member Invite behavior through application ports.
+ * Notification doubles return explicit append outcomes, matching the production writer. */
+import { success } from '@/domain/shared/Result';
+import { Notification } from '@/domain/notification/Notification';
+import { BoardName } from '@/domain/board/BoardName';
+import { notificationTestInputs } from '@/application/notification/__tests__/notificationTestValues';
+import { BoardId, OrganizationId } from '@/domain/shared/EntityIds';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { Instant } from '@/domain/shared/Instant';
+import { Nickname } from '@/domain/user/Nickname';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CreateBoardMemberInviteUseCase } from '../CreateBoardMemberInviteUseCase';
 import { InvitationRepository } from '../../../domain/invitation/InvitationRepository';
@@ -82,7 +92,7 @@ class MockBoardRepository implements BoardRepository {
   async findByOrganizationId(): Promise<Board[]> {
     return [];
   }
-  async findBoardMembers(): Promise<{ userId: string }[]> {
+  async findBoardMembers(): ReturnType<BoardRepository['findBoardMembers']> {
     return [];
   }
   async isUserMember(userId: string, boardId: string): Promise<boolean> {
@@ -96,7 +106,7 @@ class MockBoardRepository implements BoardRepository {
 
   async findActiveBoardsByUserId(
     _userId: string
-  ): Promise<Array<{ id: string; name: string; organizationId: string }>> {
+  ): ReturnType<BoardRepository['findActiveBoardsByUserId']> {
     return [];
   }
 
@@ -131,13 +141,17 @@ class MockOrganizationRepository implements OrganizationRepository {
   async findByParentId(): Promise<Organization[]> {
     return [];
   }
-  async getAncestorIds(): Promise<string[]> {
+  async getAncestorIds(): ReturnType<OrganizationRepository['getAncestorIds']> {
     return [];
   }
-  async getDescendantIds(): Promise<string[]> {
+  async getDescendantIds(): ReturnType<
+    OrganizationRepository['getDescendantIds']
+  > {
     return [];
   }
-  async getFullTreeOrgIds(): Promise<string[]> {
+  async getFullTreeOrgIds(): ReturnType<
+    OrganizationRepository['getFullTreeOrgIds']
+  > {
     return [];
   }
   async isUserMember(): Promise<boolean> {
@@ -161,7 +175,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   async update(org: Organization): Promise<Organization> {
     return org;
   }
-  async findAcceptedMemberUserIdsIncludingDescendants(): Promise<string[]> {
+  async findAcceptedMemberUserIdsIncludingDescendants(): ReturnType<
+    OrganizationRepository['findAcceptedMemberUserIdsIncludingDescendants']
+  > {
     return [];
   }
   async removeUserFromOrganization(): Promise<void> {}
@@ -177,16 +193,25 @@ class MockOrganizationRepository implements OrganizationRepository {
   async getHierarchyTree(): Promise<any> {
     return {
       ancestors: [],
-      tree: { id: '', name: '', memberCount: 0, children: [] },
+      tree: {
+        id: 'org-fixture',
+        name: 'Fixture organization',
+        memberCount: 0,
+        children: [],
+      },
     };
   }
-  async findAdminUserIds(): Promise<string[]> {
+  async findAdminUserIds(): ReturnType<
+    OrganizationRepository['findAdminUserIds']
+  > {
     return [];
   }
   async setParentId(): Promise<void> {}
   async addAdmin(): Promise<void> {}
   async removeAdmin(): Promise<void> {}
-  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+  async searchByNameFuzzy(): ReturnType<
+    OrganizationRepository['searchByNameFuzzy']
+  > {
     return [];
   }
   async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
@@ -194,7 +219,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
   async findUsersWithMultipleMembershipsInOrgs(
     _orgIds: string[]
-  ): Promise<string[]> {
+  ): ReturnType<
+    OrganizationRepository['findUsersWithMultipleMembershipsInOrgs']
+  > {
     return [];
   }
   async setAllowMultiTreeMembership(
@@ -211,6 +238,33 @@ class MockOrganizationRepository implements OrganizationRepository {
     }
 
     this.adminRoles.get(orgId)!.add(userId);
+  }
+
+  async isUserExactMember(
+    ..._args: Parameters<OrganizationRepository['isUserExactMember']>
+  ): ReturnType<OrganizationRepository['isUserExactMember']> {
+    throw new Error('Unexpected test repository call: isUserExactMember');
+  }
+  async getAdminUserIds(
+    ..._args: Parameters<OrganizationRepository['getAdminUserIds']>
+  ): ReturnType<OrganizationRepository['getAdminUserIds']> {
+    throw new Error('Unexpected test repository call: getAdminUserIds');
+  }
+  async findAcceptedMemberUserIdsForOrgs(
+    ..._args: Parameters<
+      OrganizationRepository['findAcceptedMemberUserIdsForOrgs']
+    >
+  ): ReturnType<OrganizationRepository['findAcceptedMemberUserIdsForOrgs']> {
+    throw new Error(
+      'Unexpected test repository call: findAcceptedMemberUserIdsForOrgs'
+    );
+  }
+  async removeMemberFromOrganization(
+    ..._args: Parameters<OrganizationRepository['removeMemberFromOrganization']>
+  ): ReturnType<OrganizationRepository['removeMemberFromOrganization']> {
+    throw new Error(
+      'Unexpected test repository call: removeMemberFromOrganization'
+    );
   }
 }
 
@@ -249,19 +303,10 @@ class MockUserRepository implements UserRepository {
     return true;
   }
   async updatePrivacySettings(): Promise<void> {}
-  async isUserBlocked(): Promise<boolean> {
-    return false;
-  }
-  async blockUser(): Promise<void> {}
-  async unblockUser(): Promise<void> {}
+
   async confirmUser(): Promise<void> {}
-  async getBlockStatus(): Promise<null> {
-    return null;
-  }
+
   async deleteAddress(): Promise<void> {}
-  async getBlockedUserIds(): Promise<string[]> {
-    return [];
-  }
 
   addUser(user: User): void {
     this.users.set(user.id, user);
@@ -269,30 +314,22 @@ class MockUserRepository implements UserRepository {
   addSuperAdmin(userId: string): void {
     this.superAdmins.add(userId);
   }
+
+  async findByEmail(
+    ..._args: Parameters<UserRepository['findByEmail']>
+  ): ReturnType<UserRepository['findByEmail']> {
+    throw new Error('Unexpected test repository call: findByEmail');
+  }
 }
 
 class MockNotificationRepository implements NotificationRepository {
-  async save(): Promise<any> {
-    return {};
+  async save(
+    notification: Notification
+  ): ReturnType<NotificationRepository['save']> {
+    return success(notification);
   }
-  async saveBatch(): Promise<void> {}
-  async findById(): Promise<any> {
-    return null;
-  }
-  async findByUserId(): Promise<any[]> {
-    return [];
-  }
-  async getUnreadCount(): Promise<number> {
-    return 0;
-  }
-  async markAsRead(): Promise<void> {}
-  async markAllAsRead(): Promise<void> {}
-  async findByIds(): Promise<any[]> {
-    return [];
-  }
-  async deleteByIds(): Promise<void> {}
-  async getCountByUserId(): Promise<number> {
-    return 0;
+  async saveBatch(): ReturnType<NotificationRepository['saveBatch']> {
+    return success(undefined);
   }
 }
 
@@ -310,30 +347,38 @@ function makeOrg(id: string, archived = false): Organization {
 }
 
 function makeBoard(id: string, orgId: string, archived = false): Board {
-  const result = Board.create('Test Board', orgId);
+  const result = Board.create(
+    BoardName.parse('Test Board'),
+    OrganizationId.parse(orgId),
+    testCreation(BoardId, id)
+  );
 
   if (!result.success) {
     throw new Error('Failed to create board');
   }
 
   const board = result.value;
-  (board as any).props.id = id;
 
   if (archived) {
-    board.archive();
+    board.archive(Instant.parse('2026-01-01T00:00:00.000Z'));
   }
 
   return board;
 }
 
 function makeUser(id: string): User {
-  const user = User.create({
-    firstName: 'John',
-    lastName: 'Doe',
-    phoneNumber: PhoneNumber.create('+1234567890'),
-    password: 'password123',
+  const user = User.reconstitute({
+    ...{
+      firstName: 'John',
+      lastName: 'Doe',
+      phoneNumber: PhoneNumber.create('+1234567890'),
+      password: 'password123',
+    },
+    id,
+    createdAt: new Date('2026-01-01'),
+    language: 'en',
+    nickname: Nickname.create('fixture_user'),
   });
-  (user as any).props.id = id;
 
   return user;
 }
@@ -353,6 +398,7 @@ describe('CreateBoardMemberInviteUseCase', () => {
     userRepo = new MockUserRepository();
     notifRepo = new MockNotificationRepository();
     useCase = new CreateBoardMemberInviteUseCase({
+      ...notificationTestInputs,
       invitationRepository: invitationRepo,
       boardRepository: boardRepo,
       organizationRepository: orgRepo,

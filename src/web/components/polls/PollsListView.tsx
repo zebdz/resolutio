@@ -1,5 +1,8 @@
 'use client';
 
+/** Renders poll filters and cards from a shared, plain list payload. */
+import type { PollListItem } from '@/web/actions/poll/PollQueryViews';
+
 import { useTranslations } from 'next-intl';
 import * as Headless from '@headlessui/react';
 import { Input } from '@/src/web/components/catalyst/input';
@@ -14,7 +17,7 @@ const ORG_WIDE_VALUE = '__org_wide__';
 
 export interface PollsListViewProps {
   // Data
-  polls: any[];
+  polls: PollListItem[];
   totalCount: number;
   currentPage: number;
   pageSize: number;
@@ -262,7 +265,7 @@ export function PollsListView({
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {polls.map((poll: any) => (
+          {polls.map((poll) => (
             <PollCard
               key={poll.id}
               poll={poll}

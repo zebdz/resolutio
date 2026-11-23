@@ -1,3 +1,13 @@
+/** Property/claim boundary regressions exercise authorized flows with explicit
+ * creation inputs while keeping raw persistence fixtures distinct from domain values. */
+import {
+  propertyTestCreation,
+  propertyTestInstant,
+  submitTestClaim,
+} from './propertyTestValues';
+import { UserId, AssetId, PropertyId } from '../../../domain/shared/EntityIds';
+import { Instant } from '../../../domain/shared/Instant';
+import { ClaimDenialReason } from '../../../domain/organization/PropertyValues';
 import { describe, it, expect } from 'vitest';
 import { SubmitPropertyClaimUseCase } from '../SubmitPropertyClaimUseCase';
 import { OrganizationProperty } from '../../../domain/organization/OrganizationProperty';
@@ -53,6 +63,7 @@ function mkDeps(
   const saved: any[] = [];
   const savedAttachments: any[] = [];
   const deps = {
+    ...propertyTestCreation(),
     claimRepository: {
       findPendingForAsset: async () => success(cfg.pendingClaims),
       findLatestDecidedForUserAndAsset: async () => success(cfg.latestDecided),
@@ -63,7 +74,6 @@ function mkDeps(
         attachment?: { entity: any; bytes: Buffer };
       }) => {
         saved.push(input.claim);
-        (input.claim as any).props.id = 'claim-saved-id';
 
         if (input.attachment) {
           savedAttachments.push({
@@ -81,7 +91,13 @@ function mkDeps(
     } as any,
     propertyRepository: { findById: async () => success(prop) } as any,
     organizationRepository: { isUserMember: async () => cfg.isMember } as any,
-    notify: { execute: async () => cfg.notify() } as any,
+    notify: {
+      execute: async () => {
+        cfg.notify();
+
+        return success(undefined);
+      },
+    } as any,
   };
 
   return { deps, saved, savedAttachments };
@@ -152,7 +168,7 @@ describe('SubmitPropertyClaimUseCase', () => {
     // case so the UI can give the user a clear message ("your previous
     // claim is still under review") instead of the ambiguous "someone has
     // a pending claim on this asset".
-    const mine = PropertyClaim.submit('org-1', 'u-1', 'a-1');
+    const mine = submitTestClaim('org-1', 'u-1', 'a-1');
 
     if (!mine.success) {
       throw new Error('setup');
@@ -180,7 +196,7 @@ describe('SubmitPropertyClaimUseCase', () => {
   });
 
   it('rejects when another claim is already pending for the asset', async () => {
-    const dup = PropertyClaim.submit('org-1', 'u-2', 'a-1');
+    const dup = submitTestClaim('org-1', 'u-2', 'a-1');
 
     if (!dup.success) {
       throw new Error('setup');
@@ -203,13 +219,17 @@ describe('SubmitPropertyClaimUseCase', () => {
   });
 
   it('blocks re-claim within the cooldown window of a prior decision', async () => {
-    const prior = PropertyClaim.submit('org-1', 'u-1', 'a-1');
+    const prior = submitTestClaim('org-1', 'u-1', 'a-1');
 
     if (!prior.success) {
       throw new Error('setup');
     }
 
-    prior.value.deny('admin', 'no', new Date()); // decidedAt = now
+    prior.value.deny(
+      UserId.parse('admin'),
+      ClaimDenialReason.parse('no'),
+      propertyTestInstant
+    ); // decidedAt = now
     const { deps } = mkDeps({ latestDecided: prior.value });
     const uc = new SubmitPropertyClaimUseCase(deps);
     const r = await uc.execute({

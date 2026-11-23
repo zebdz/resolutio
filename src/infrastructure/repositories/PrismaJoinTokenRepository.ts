@@ -1,3 +1,8 @@
+/** Prisma join-link adapter preserves caller-supplied creation values and
+ * decodes every stored record through the domain rehydration boundary. */
+import { ResultCount } from '../../domain/shared/Pagination';
+import { JoinTokenId, OrganizationId } from '../../domain/shared/EntityIds';
+import { JoinTokenValue } from '../../domain/organization/JoinTokenValues';
 import { PrismaClient, Prisma } from '@/generated/prisma/client';
 import { JoinToken, JoinTokenProps } from '../../domain/organization/JoinToken';
 import {
@@ -14,6 +19,7 @@ export class PrismaJoinTokenRepository implements JoinTokenRepository {
 
     const created = await this.prisma.organizationJoinToken.create({
       data: {
+        id: data.id,
         organizationId: data.organizationId,
         token: data.token,
         description: data.description,
@@ -44,7 +50,7 @@ export class PrismaJoinTokenRepository implements JoinTokenRepository {
     return JoinToken.reconstitute(this.toProps(updated));
   }
 
-  async findById(id: string): Promise<JoinToken | null> {
+  async findById(id: JoinTokenId): Promise<JoinToken | null> {
     const record = await this.prisma.organizationJoinToken.findUnique({
       where: { id },
     });
@@ -56,7 +62,7 @@ export class PrismaJoinTokenRepository implements JoinTokenRepository {
     return JoinToken.reconstitute(this.toProps(record));
   }
 
-  async findByToken(token: string): Promise<JoinToken | null> {
+  async findByToken(token: JoinTokenValue): Promise<JoinToken | null> {
     const record = await this.prisma.organizationJoinToken.findUnique({
       where: { token },
     });
@@ -69,9 +75,9 @@ export class PrismaJoinTokenRepository implements JoinTokenRepository {
   }
 
   async findByOrganizationId(
-    organizationId: string,
+    organizationId: OrganizationId,
     filters: JoinTokenSearchFilters
-  ): Promise<{ tokens: JoinTokenWithCreator[]; totalCount: number }> {
+  ): Promise<{ tokens: JoinTokenWithCreator[]; totalCount: ResultCount }> {
     const page = filters.page ?? 1;
     const pageSize = filters.pageSize ?? 10;
     const skip = (page - 1) * pageSize;
@@ -119,10 +125,10 @@ export class PrismaJoinTokenRepository implements JoinTokenRepository {
       creatorName: record.createdBy.firstName + ' ' + record.createdBy.lastName,
     }));
 
-    return { tokens, totalCount };
+    return { tokens, totalCount: ResultCount.parse(totalCount) };
   }
 
-  async tryIncrementUseCount(id: string): Promise<boolean> {
+  async tryIncrementUseCount(id: JoinTokenId): Promise<boolean> {
     const count = await this.prisma.$executeRaw`
       UPDATE organization_join_tokens
       SET use_count = use_count + 1

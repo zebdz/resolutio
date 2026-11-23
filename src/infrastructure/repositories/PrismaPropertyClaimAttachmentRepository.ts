@@ -1,3 +1,12 @@
+/** Prisma adapter for validated propertyclaim attachment projections.
+ * Stored identities/time are retained; storage failures never expose raw exception text. */
+import { Instant } from '@/domain/shared/Instant';
+import {
+  PropertyClaimAttachmentId,
+  PropertyClaimId,
+} from '@/domain/shared/EntityIds';
+import { AttachmentFileName } from '@/domain/shared/attachments/AttachmentValues';
+import { PropertyClaimAttachmentMime } from '@/domain/organization/PropertyClaimAttachment';
 import { PrismaClient } from '@/generated/prisma/client';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PropertyClaimAttachment } from '../../domain/organization/PropertyClaimAttachment';
@@ -13,10 +22,14 @@ export class PrismaPropertyClaimAttachmentRepository implements PropertyClaimAtt
   async save(
     attachment: PropertyClaimAttachment,
     bytes: Buffer
-  ): Promise<Result<PropertyClaimAttachmentMetadata, string>> {
+  ): Promise<
+    Result<PropertyClaimAttachmentMetadata, 'common.errors.unexpected'>
+  > {
     try {
       const created = await this.prisma.propertyClaimAttachment.create({
         data: {
+          id: attachment.id,
+          createdAt: attachment.createdAt,
           claimId: attachment.claimId,
           fileName: attachment.fileName,
           mimeType: attachment.mimeType,
@@ -42,15 +55,17 @@ export class PrismaPropertyClaimAttachmentRepository implements PropertyClaimAtt
         },
       });
 
-      return success(created);
+      return success(toMetadata(created));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findByClaimId(
-    claimId: string
-  ): Promise<Result<PropertyClaimAttachmentMetadata[], string>> {
+    claimId: PropertyClaimId
+  ): Promise<
+    Result<PropertyClaimAttachmentMetadata[], 'common.errors.unexpected'>
+  > {
     try {
       const rows = await this.prisma.propertyClaimAttachment.findMany({
         where: { claimId },
@@ -67,15 +82,17 @@ export class PrismaPropertyClaimAttachmentRepository implements PropertyClaimAtt
         orderBy: { createdAt: 'asc' },
       });
 
-      return success(rows);
+      return success(rows.map(toMetadata));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findBytesById(
-    id: string
-  ): Promise<Result<PropertyClaimAttachmentBytes | null, string>> {
+    id: PropertyClaimAttachmentId
+  ): Promise<
+    Result<PropertyClaimAttachmentBytes | null, 'common.errors.unexpected'>
+  > {
     try {
       const row = await this.prisma.propertyClaimAttachment.findUnique({
         where: { id },
@@ -89,12 +106,27 @@ export class PrismaPropertyClaimAttachmentRepository implements PropertyClaimAtt
       // Prisma returns Bytes as a Uint8Array — normalise to Buffer so callers
       // can hand it straight to a Response body.
       return success({
-        fileName: row.fileName,
-        mimeType: row.mimeType,
+        fileName: AttachmentFileName.parse(row.fileName),
+        mimeType: PropertyClaimAttachmentMime.parse(row.mimeType),
         bytes: Buffer.from(row.bytes),
       });
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
+}
+
+function toMetadata(
+  row: Parameters<typeof PropertyClaimAttachment.reconstitute>[0]
+): PropertyClaimAttachmentMetadata {
+  const attachment = PropertyClaimAttachment.reconstitute(row);
+
+  return {
+    id: attachment.id,
+    claimId: attachment.claimId,
+    fileName: attachment.fileName,
+    mimeType: attachment.mimeType,
+    sizeBytes: attachment.sizeBytes,
+    createdAt: Instant.fromDate(attachment.createdAt),
+  };
 }

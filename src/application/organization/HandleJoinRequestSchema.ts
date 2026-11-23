@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { REJECTION_REASON_MAX_LENGTH } from '../../domain/organization/JoinParentRequest';
+import { MEMBERSHIP_REJECTION_REASON_MAX_LENGTH } from '../../domain/organization/MembershipPolicy';
 import { SharedDomainCodes } from '../../domain/shared/SharedDomainCodes';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
 
@@ -13,7 +13,7 @@ export const createHandleJoinRequestSchema = (
     action: z.enum(['accept', 'reject']),
     rejectionReason: z
       .string()
-      .max(REJECTION_REASON_MAX_LENGTH)
+      .max(MEMBERSHIP_REJECTION_REASON_MAX_LENGTH)
       .refine((val) => !profanityChecker.containsProfanity(val), {
         message: SharedDomainCodes.CONTAINS_PROFANITY,
       })

@@ -1,18 +1,31 @@
+/** LeaveBoard application flow decodes request identities before domain/repository use.
+ * Authorization and persistence stay coordinated here; lifecycle decisions belong to Board. */
+import { IdGenerator, Clock } from '../shared/EntityCreation';
+import { z } from 'zod';
+import { BoardId, UserId } from '@/domain/shared/EntityIds';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { BoardErrors } from './BoardErrors';
+import { BoardErrors, BoardUseCaseError } from './BoardErrors';
 import { User } from '../../domain/user/User';
 import { NotifyMemberLeftBoardUseCase } from '../notification/NotifyMemberLeftBoardUseCase';
 
+/** Raw request values, decoded once at the application boundary. */
 export interface LeaveBoardInput {
   userId: string;
   boardId: string;
 }
 
+const request = z.object({
+  boardId: BoardId,
+  userId: UserId,
+});
+
 export interface LeaveBoardDependencies {
+  clock: Clock;
+  ids: IdGenerator;
   boardRepository: BoardRepository;
   organizationRepository: OrganizationRepository;
   userRepository: UserRepository;
@@ -20,19 +33,33 @@ export interface LeaveBoardDependencies {
 }
 
 export class LeaveBoardUseCase {
+  private clock: Clock;
+  private ids: IdGenerator;
   private boardRepository: BoardRepository;
   private organizationRepository: OrganizationRepository;
   private userRepository: UserRepository;
   private notificationRepository: NotificationRepository;
 
   constructor(dependencies: LeaveBoardDependencies) {
+    this.clock = dependencies.clock;
+    this.ids = dependencies.ids;
     this.boardRepository = dependencies.boardRepository;
     this.organizationRepository = dependencies.organizationRepository;
     this.userRepository = dependencies.userRepository;
     this.notificationRepository = dependencies.notificationRepository;
   }
 
-  async execute(input: LeaveBoardInput): Promise<Result<void, string>> {
+  async execute(
+    rawInput: LeaveBoardInput
+  ): Promise<Result<void, BoardUseCaseError>> {
+    const decoded = request.safeParse(rawInput);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = decoded.data;
+
     // Find the board
     const board = await this.boardRepository.findById(input.boardId);
 
@@ -73,6 +100,8 @@ export class LeaveBoardUseCase {
     );
 
     new NotifyMemberLeftBoardUseCase({
+      ids: this.ids,
+      clock: this.clock,
       organizationRepository: this.organizationRepository,
       notificationRepository: this.notificationRepository,
     })
@@ -82,6 +111,14 @@ export class LeaveBoardUseCase {
         boardId: board.id,
         boardName: board.name,
         memberName,
+      })
+      .then((outcome) => {
+        if (!outcome.success) {
+          console.error(
+            'Notification delivery failed (NotifyMemberLeftBoardUseCase):',
+            outcome.error
+          );
+        }
       })
       .catch((err) =>
         console.error('Failed to notify member left board:', err)

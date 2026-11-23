@@ -9,7 +9,7 @@ import { resolveSmsDeliveryConfig } from './smsDeliveryConfig';
  * confirmPhone.ts, and reuses resolveSmsDeliveryConfig so the effective
  * testMode / maxCost match exactly what superadmin displays.
  */
-export function createSmsDeliveryChannelFromEnv(): OtpDeliveryChannel {
+export function createSmsDeliveryChannelFromEnv(): OtpDeliveryChannel<'sms'> {
   const apiId = process.env.SMS_RU_API_ID;
 
   if (!apiId) {

@@ -1,3 +1,9 @@
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { UserId } from '@/domain/shared/EntityIds';
+import {
+  authTestDependencies,
+  authTestNow,
+} from '@/application/auth/__tests__/authTestValues';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ResetPasswordWithOtpUseCase } from '../ResetPasswordWithOtpUseCase';
 import { OtpErrors } from '../OtpErrors';
@@ -28,18 +34,20 @@ describe('ResetPasswordWithOtpUseCase', () => {
   const GOOD_PASSWORD = 'Korova-Zabor-71';
 
   function buildUser() {
-    return User.reconstitute({
-      id: 'user-1',
-      firstName: 'Ivan',
-      lastName: 'Ivanov',
-      phoneNumber: PhoneNumber.create('+79161234567'),
-      password: 'old-hash',
-      language: 'ru',
-      createdAt: new Date('2026-01-01'),
-      nickname: Nickname.create('ivan_ivanov'),
-    })
-      .changeEmail(EmailAddress.create('ivan@mail.ru'))
-      .confirmEmail();
+    return expectSuccess(
+      User.reconstitute({
+        id: 'user-1',
+        firstName: 'Ivan',
+        lastName: 'Ivanov',
+        phoneNumber: PhoneNumber.create('+79161234567'),
+        password: 'old-hash',
+        language: 'ru',
+        createdAt: new Date('2026-01-01'),
+        nickname: Nickname.create('ivan_ivanov'),
+      })
+        .changeEmail(EmailAddress.create('ivan@mail.ru'))
+        .confirmEmail(authTestNow())
+    );
   }
 
   function buildOtp(
@@ -84,6 +92,7 @@ describe('ResetPasswordWithOtpUseCase', () => {
     passwordHasher = { hash: vi.fn().mockResolvedValue('new-hash') };
 
     useCase = new ResetPasswordWithOtpUseCase({
+      ...authTestDependencies(),
       userRepository: userRepository as UserRepository,
       otpRepository: otpRepository as OtpRepository,
       sessionRepository: sessionRepository as SessionRepository,
@@ -139,8 +148,7 @@ describe('ResetPasswordWithOtpUseCase', () => {
     await run({ identifier: '+79161234567' });
 
     expect(otpRepository.findLatestByIdentifier).toHaveBeenCalledWith(
-      'ivan@mail.ru',
-      'email',
+      { identifier: 'ivan@mail.ru', channel: 'email' },
       OtpPurposes.PASSWORD_RESET
     );
   });
@@ -162,7 +170,7 @@ describe('ResetPasswordWithOtpUseCase', () => {
   it('refuses a code bound to a different user', async () => {
     (
       otpRepository.findLatestByIdentifier as ReturnType<typeof vi.fn>
-    ).mockResolvedValue(buildOtp({ userId: 'someone-else' }));
+    ).mockResolvedValue(buildOtp({ userId: UserId.parse('someone-else') }));
 
     const result = await run();
 
@@ -315,18 +323,20 @@ describe('ResetPasswordWithOtpUseCase — password vs. the account email', () =>
   it('refuses a new password equal to the account email', async () => {
     const userRepository: Partial<UserRepository> = {
       findByEmail: vi.fn().mockResolvedValue(
-        User.reconstitute({
-          id: 'user-1',
-          firstName: 'Ivan',
-          lastName: 'Ivanov',
-          phoneNumber: PhoneNumber.create('+79161234567'),
-          password: 'old-hash',
-          language: 'ru',
-          createdAt: new Date('2026-01-01'),
-          nickname: Nickname.create('ivan_ivanov'),
-        })
-          .changeEmail(EmailAddress.create('ivan.petrov@mail.ru'))
-          .confirmEmail()
+        expectSuccess(
+          User.reconstitute({
+            id: 'user-1',
+            firstName: 'Ivan',
+            lastName: 'Ivanov',
+            phoneNumber: PhoneNumber.create('+79161234567'),
+            password: 'old-hash',
+            language: 'ru',
+            createdAt: new Date('2026-01-01'),
+            nickname: Nickname.create('ivan_ivanov'),
+          })
+            .changeEmail(EmailAddress.create('ivan.petrov@mail.ru'))
+            .confirmEmail(authTestNow())
+        )
       ),
       save: vi.fn(),
     };
@@ -344,7 +354,7 @@ describe('ResetPasswordWithOtpUseCase — password vs. the account email', () =>
           expiresAt: new Date(Date.now() + 600_000),
           verifiedAt: null,
           createdAt: new Date(),
-          userId: 'user-1',
+          userId: UserId.parse('user-1'),
         })
       ),
       update: vi.fn().mockImplementation(async (o: OtpVerification) => o),
@@ -354,6 +364,7 @@ describe('ResetPasswordWithOtpUseCase — password vs. the account email', () =>
     };
 
     const useCase = new ResetPasswordWithOtpUseCase({
+      ...authTestDependencies(),
       userRepository: userRepository as UserRepository,
       otpRepository: otpRepository as OtpRepository,
       sessionRepository: sessionRepository as SessionRepository,

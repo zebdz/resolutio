@@ -1,3 +1,9 @@
+import { AttachmentFileName } from '@/domain/shared/attachments/AttachmentValues';
+import { PropertyClaimAttachmentMime } from '@/domain/organization/PropertyClaimAttachment';
+import { AttachmentByteCount } from '@/domain/shared/attachments/AttachmentValues';
+import { PropertyClaimId } from '@/domain/shared/EntityIds';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { PropertyClaimAttachmentId } from '@/domain/shared/EntityIds';
 import { describe, it, expect } from 'vitest';
 import {
   PropertyClaimAttachment,
@@ -32,12 +38,16 @@ const VALID_HEADS_BY_MIME: Record<string, Buffer> = {
 describe('PropertyClaimAttachment', () => {
   describe('create — validation', () => {
     it('rejects when fileName is empty / whitespace', () => {
-      const r = PropertyClaimAttachment.create({
-        claimId: 'c-1',
-        fileName: '   ',
-        mimeType: 'application/pdf',
-        sizeBytes: tinyBytes.length,
-      });
+      const r = PropertyClaimAttachment.create(
+        {
+          claimId: PropertyClaimId.parse('c-1'),
+          // @ts-expect-error Deliberately malformed runtime filename.
+          fileName: '   ',
+          mimeType: 'application/pdf',
+          sizeBytes: AttachmentByteCount.parse(tinyBytes.length),
+        },
+        testCreation(PropertyClaimAttachmentId, 'att-1')
+      );
       expect(r.success).toBe(false);
 
       if (r.success) {
@@ -50,12 +60,17 @@ describe('PropertyClaimAttachment', () => {
     });
 
     it('rejects when sizeBytes exceeds 10 MB', () => {
-      const r = PropertyClaimAttachment.create({
-        claimId: 'c-1',
-        fileName: 'huge.pdf',
-        mimeType: 'application/pdf',
-        sizeBytes: PROPERTY_CLAIM_ATTACHMENT_MAX_BYTES + 1,
-      });
+      const r = PropertyClaimAttachment.create(
+        {
+          claimId: PropertyClaimId.parse('c-1'),
+          fileName: AttachmentFileName.parse('huge.pdf'),
+          mimeType: 'application/pdf',
+          sizeBytes: AttachmentByteCount.parse(
+            PROPERTY_CLAIM_ATTACHMENT_MAX_BYTES + 1
+          ),
+        },
+        testCreation(PropertyClaimAttachmentId, 'att-1')
+      );
       expect(r.success).toBe(false);
 
       if (r.success) {
@@ -68,12 +83,16 @@ describe('PropertyClaimAttachment', () => {
     });
 
     it('rejects when mimeType is not in the allowed set', () => {
-      const r = PropertyClaimAttachment.create({
-        claimId: 'c-1',
-        fileName: 'evil.exe',
-        mimeType: 'application/x-msdownload',
-        sizeBytes: tinyBytes.length,
-      });
+      const r = PropertyClaimAttachment.create(
+        {
+          claimId: PropertyClaimId.parse('c-1'),
+          fileName: AttachmentFileName.parse('evil.exe'),
+          // @ts-expect-error Deliberately disallowed runtime MIME type.
+          mimeType: 'application/x-msdownload',
+          sizeBytes: AttachmentByteCount.parse(tinyBytes.length),
+        },
+        testCreation(PropertyClaimAttachmentId, 'att-1')
+      );
       expect(r.success).toBe(false);
 
       if (r.success) {
@@ -88,12 +107,15 @@ describe('PropertyClaimAttachment', () => {
     it.each(PROPERTY_CLAIM_ATTACHMENT_ALLOWED_MIME_TYPES.map((m) => [m]))(
       'accepts allowed mime type %s',
       (mime: string) => {
-        const r = PropertyClaimAttachment.create({
-          claimId: 'c-1',
-          fileName: `proof.bin`,
-          mimeType: mime,
-          sizeBytes: tinyBytes.length,
-        });
+        const r = PropertyClaimAttachment.create(
+          {
+            claimId: PropertyClaimId.parse('c-1'),
+            fileName: AttachmentFileName.parse(`proof.bin`),
+            mimeType: PropertyClaimAttachmentMime.parse(mime),
+            sizeBytes: AttachmentByteCount.parse(tinyBytes.length),
+          },
+          testCreation(PropertyClaimAttachmentId, 'att-1')
+        );
         expect(r.success).toBe(true);
       }
     );
@@ -113,12 +135,15 @@ describe('PropertyClaimAttachment', () => {
     });
 
     it('accepts a valid attachment and exposes its props', () => {
-      const r = PropertyClaimAttachment.create({
-        claimId: 'c-1',
-        fileName: 'deed.pdf',
-        mimeType: 'application/pdf',
-        sizeBytes: tinyBytes.length,
-      });
+      const r = PropertyClaimAttachment.create(
+        {
+          claimId: PropertyClaimId.parse('c-1'),
+          fileName: AttachmentFileName.parse('deed.pdf'),
+          mimeType: 'application/pdf',
+          sizeBytes: AttachmentByteCount.parse(tinyBytes.length),
+        },
+        testCreation(PropertyClaimAttachmentId, 'att-1')
+      );
       expect(r.success).toBe(true);
 
       if (!r.success) {
@@ -132,12 +157,15 @@ describe('PropertyClaimAttachment', () => {
     });
 
     it('trims surrounding whitespace from fileName before validation', () => {
-      const r = PropertyClaimAttachment.create({
-        claimId: 'c-1',
-        fileName: '  deed.pdf  ',
-        mimeType: 'application/pdf',
-        sizeBytes: tinyBytes.length,
-      });
+      const r = PropertyClaimAttachment.create(
+        {
+          claimId: PropertyClaimId.parse('c-1'),
+          fileName: AttachmentFileName.parse('  deed.pdf  '),
+          mimeType: 'application/pdf',
+          sizeBytes: AttachmentByteCount.parse(tinyBytes.length),
+        },
+        testCreation(PropertyClaimAttachmentId, 'att-1')
+      );
       expect(r.success).toBe(true);
 
       if (!r.success) {
@@ -154,12 +182,15 @@ describe('PropertyClaimAttachment', () => {
     )(
       'accepts a real %s file (magic matches)',
       (mime: string, head: Buffer) => {
-        const r = PropertyClaimAttachment.createWithBytes({
-          claimId: 'c-1',
-          fileName: 'proof.bin',
-          mimeType: mime,
-          bytes: head,
-        });
+        const r = PropertyClaimAttachment.createWithBytes(
+          {
+            claimId: PropertyClaimId.parse('c-1'),
+            fileName: AttachmentFileName.parse('proof.bin'),
+            mimeType: PropertyClaimAttachmentMime.parse(mime),
+            bytes: head,
+          },
+          testCreation(PropertyClaimAttachmentId, 'att-1')
+        );
         expect(r.success).toBe(true);
 
         if (!r.success) {
@@ -173,12 +204,15 @@ describe('PropertyClaimAttachment', () => {
     it('rejects when bytes start with MZ but mime claims application/pdf (rename attack)', () => {
       // 'MZ' is the DOS executable signature. Trying to upload an .exe
       // renamed to .pdf must fail the magic check.
-      const r = PropertyClaimAttachment.createWithBytes({
-        claimId: 'c-1',
-        fileName: 'fake.pdf',
-        mimeType: 'application/pdf',
-        bytes: Buffer.from([0x4d, 0x5a, 0x90, 0x00]),
-      });
+      const r = PropertyClaimAttachment.createWithBytes(
+        {
+          claimId: PropertyClaimId.parse('c-1'),
+          fileName: AttachmentFileName.parse('fake.pdf'),
+          mimeType: 'application/pdf',
+          bytes: Buffer.from([0x4d, 0x5a, 0x90, 0x00]),
+        },
+        testCreation(PropertyClaimAttachmentId, 'att-1')
+      );
       expect(r.success).toBe(false);
 
       if (r.success) {
@@ -193,12 +227,15 @@ describe('PropertyClaimAttachment', () => {
     it('rejects when bytes are PNG-shaped but mime claims application/zip', () => {
       // Mismatch between declared type and actual content — even if the
       // declared type is on the whitelist, the bytes betray the truth.
-      const r = PropertyClaimAttachment.createWithBytes({
-        claimId: 'c-1',
-        fileName: 'sneaky.zip',
-        mimeType: 'application/zip',
-        bytes: PNG_HEAD,
-      });
+      const r = PropertyClaimAttachment.createWithBytes(
+        {
+          claimId: PropertyClaimId.parse('c-1'),
+          fileName: AttachmentFileName.parse('sneaky.zip'),
+          mimeType: 'application/zip',
+          bytes: PNG_HEAD,
+        },
+        testCreation(PropertyClaimAttachmentId, 'att-1')
+      );
       expect(r.success).toBe(false);
 
       if (r.success) {
@@ -211,12 +248,15 @@ describe('PropertyClaimAttachment', () => {
     });
 
     it('still rejects too-large files before checking magic', () => {
-      const r = PropertyClaimAttachment.createWithBytes({
-        claimId: 'c-1',
-        fileName: 'huge.pdf',
-        mimeType: 'application/pdf',
-        bytes: Buffer.alloc(PROPERTY_CLAIM_ATTACHMENT_MAX_BYTES + 1),
-      });
+      const r = PropertyClaimAttachment.createWithBytes(
+        {
+          claimId: PropertyClaimId.parse('c-1'),
+          fileName: AttachmentFileName.parse('huge.pdf'),
+          mimeType: 'application/pdf',
+          bytes: Buffer.alloc(PROPERTY_CLAIM_ATTACHMENT_MAX_BYTES + 1),
+        },
+        testCreation(PropertyClaimAttachmentId, 'att-1')
+      );
       expect(r.success).toBe(false);
 
       if (r.success) {
@@ -231,12 +271,16 @@ describe('PropertyClaimAttachment', () => {
     it('still rejects disallowed mime even if bytes happen to look like one', () => {
       // image/gif was explicitly removed; even with valid GIF bytes the
       // factory must reject because the type isn't on the whitelist.
-      const r = PropertyClaimAttachment.createWithBytes({
-        claimId: 'c-1',
-        fileName: 'anim.gif',
-        mimeType: 'image/gif',
-        bytes: Buffer.from('GIF89a', 'ascii'),
-      });
+      const r = PropertyClaimAttachment.createWithBytes(
+        {
+          claimId: PropertyClaimId.parse('c-1'),
+          fileName: AttachmentFileName.parse('anim.gif'),
+          // @ts-expect-error Deliberately disallowed runtime MIME type.
+          mimeType: 'image/gif',
+          bytes: Buffer.from('GIF89a', 'ascii'),
+        },
+        testCreation(PropertyClaimAttachmentId, 'att-1')
+      );
       expect(r.success).toBe(false);
 
       if (r.success) {

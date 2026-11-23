@@ -1,49 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+/** Edits authorized ballot selections and presents the owner’s cast receipt on completion. */
+
+import { useState } from 'react';
+import type { VoteReceiptView } from '@/application/poll/VoteReceiptView';
+import { VoteReceiptPanel } from '@/web/components/seal/VoteReceiptPanel';
 import { useTranslations } from 'next-intl';
 import {
   submitDraftAction,
   finishVotingAction,
 } from '@/src/web/actions/poll/vote';
-import { Button } from '@/src/web/components/catalyst/button';
 import { Switch, SwitchField } from '@/src/web/components/catalyst/switch';
 import { Label, Description } from '@/src/web/components/catalyst/fieldset';
 import VotingQuestion from './VotingQuestion';
 import VotingProgress from './VotingProgress';
 import VotingControls from './VotingControls';
 import { toast } from 'sonner';
-import type { QuestionType } from '@/src/domain/poll/QuestionType';
-
-interface Question {
-  id: string;
-  text: string;
-  details: string | null;
-  page: number;
-  order: number;
-  questionType: QuestionType;
-  answers: Answer[];
-}
-
-interface Answer {
-  id: string;
-  text: string;
-  order: number;
-}
-
-interface Poll {
-  id: string;
-  title: string;
-  description: string;
-  questions: Question[];
-}
-
-interface VoteDraft {
-  id: string;
-  questionId: string;
-  answerId: string;
-}
+import type {
+  VotingQuestionView as Question,
+  VotingPollView as Poll,
+  VotingDraftView as VoteDraft,
+} from '@/web/actions/poll/VotingProgressView';
 
 interface VotingInterfaceProps {
   poll: Poll;
@@ -63,10 +40,10 @@ export default function VotingInterface({
   isPropertyBased,
 }: VotingInterfaceProps) {
   const t = useTranslations('poll.voting');
-  const router = useRouter();
+  const [receipt, setReceipt] = useState<VoteReceiptView | null>(null);
 
   // Group questions by page
-  const questionsByPage = poll.questions.reduce(
+  const questionsByPage = poll.questions.reduce<Record<number, Question[]>>(
     (acc, question) => {
       if (!acc[question.page]) {
         acc[question.page] = [];
@@ -76,7 +53,7 @@ export default function VotingInterface({
 
       return acc;
     },
-    {} as Record<number, Question[]>
+    {}
   );
 
   const pages = Object.keys(questionsByPage)
@@ -195,7 +172,7 @@ export default function VotingInterface({
 
       if (result.success) {
         toast.success(t('votingComplete'));
-        router.push('/polls');
+        setReceipt(result.data);
       } else {
         toast.error(result.error);
       }
@@ -209,6 +186,14 @@ export default function VotingInterface({
   const isFirstPage = currentPage === pages[0];
   const isLastPage = currentPage === pages[pages.length - 1];
   const canFinish = answeredQuestions === totalQuestions && !isSaving;
+
+  if (receipt) {
+    return (
+      <div tabIndex={-1} ref={(node) => node?.focus()}>
+        <VoteReceiptPanel view={receipt} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

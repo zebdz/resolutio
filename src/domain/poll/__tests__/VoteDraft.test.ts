@@ -1,3 +1,14 @@
+/** Draft clients use explicit identity/time and refresh through domain behavior.
+ * Date assertions compare values because getters cannot expose mutable internal state. */
+import {
+  VoteDraftId,
+  PollId,
+  QuestionId,
+  AnswerId,
+  UserId,
+} from '../../shared/EntityIds';
+import { testCreation } from '../../shared/__tests__/creation';
+import { Instant } from '../../shared/Instant';
 import { describe, it, expect } from 'vitest';
 import { VoteDraft } from '../VoteDraft';
 
@@ -5,10 +16,11 @@ describe('VoteDraft Domain', () => {
   describe('create', () => {
     it('should create a draft with valid data', () => {
       const result = VoteDraft.create(
-        'poll-1',
-        'question-1',
-        'answer-1',
-        'user-1'
+        PollId.parse('poll-1'),
+        QuestionId.parse('question-1'),
+        AnswerId.parse('answer-1'),
+        UserId.parse('user-1'),
+        testCreation(VoteDraftId, 'draft-1')
       );
 
       expect(result.success).toBe(true);
@@ -25,10 +37,11 @@ describe('VoteDraft Domain', () => {
 
     it('should set createdAt and updatedAt to same time initially', () => {
       const result = VoteDraft.create(
-        'poll-1',
-        'question-1',
-        'answer-1',
-        'user-1'
+        PollId.parse('poll-1'),
+        QuestionId.parse('question-1'),
+        AnswerId.parse('answer-1'),
+        UserId.parse('user-1'),
+        testCreation(VoteDraftId, 'draft-1')
       );
 
       expect(result.success).toBe(true);
@@ -37,18 +50,19 @@ describe('VoteDraft Domain', () => {
         const timeDiff = Math.abs(
           result.value.updatedAt.getTime() - result.value.createdAt.getTime()
         );
-        expect(timeDiff).toBeLessThan(100); // Within 100ms
+        expect(timeDiff).toBe(0); // The same explicit creation instant.
       }
     });
   });
 
   describe('touch', () => {
-    it('should update updatedAt when touched', async () => {
+    it('should update updatedAt when touched', () => {
       const result = VoteDraft.create(
-        'poll-1',
-        'question-1',
-        'answer-1',
-        'user-1'
+        PollId.parse('poll-1'),
+        QuestionId.parse('question-1'),
+        AnswerId.parse('answer-1'),
+        UserId.parse('user-1'),
+        testCreation(VoteDraftId, 'draft-1')
       );
 
       expect(result.success).toBe(true);
@@ -57,10 +71,8 @@ describe('VoteDraft Domain', () => {
         const draft = result.value;
         const originalUpdatedAt = draft.updatedAt;
 
-        // Wait a bit to ensure time difference
-        await new Promise((resolve) => setTimeout(resolve, 10));
-
-        draft.touch();
+        // Time is supplied explicitly, so the client does not wait on system time.
+        draft.touch(Instant.parse('2026-01-01T00:00:01.000Z'));
 
         expect(draft.updatedAt.getTime()).toBeGreaterThan(
           originalUpdatedAt.getTime()
@@ -89,8 +101,8 @@ describe('VoteDraft Domain', () => {
       expect(draft.questionId).toBe('question-1');
       expect(draft.answerId).toBe('answer-1');
       expect(draft.userId).toBe('user-1');
-      expect(draft.createdAt).toBe(createdAt);
-      expect(draft.updatedAt).toBe(updatedAt);
+      expect(draft.createdAt).toEqual(createdAt);
+      expect(draft.updatedAt).toEqual(updatedAt);
     });
   });
 });

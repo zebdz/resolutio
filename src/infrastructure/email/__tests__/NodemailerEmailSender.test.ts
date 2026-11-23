@@ -1,3 +1,5 @@
+/** Mail contracts retain validated addresses and serialize only inside the delivery adapter. */
+import { EmailAddress } from '@/domain/user/EmailAddress';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const sendMail = vi.fn();
@@ -27,7 +29,7 @@ describe('NodemailerEmailSender', () => {
     sendMail.mockResolvedValue({ messageId: 'abc' });
 
     const result = await new NodemailerEmailSender(config).send({
-      to: 'ivan@mail.ru',
+      to: EmailAddress.create('ivan@mail.ru'),
       subject: 'Код подтверждения',
       text: 'Ваш код: 123456',
     });
@@ -49,7 +51,7 @@ describe('NodemailerEmailSender', () => {
     sendMail.mockResolvedValue({ messageId: 'abc' });
 
     const result = await new NodemailerEmailSender(config).send({
-      to: 'ivan@mail.ru',
+      to: EmailAddress.create('ivan@mail.ru'),
       subject: 'Код',
       text: 'Ваш код: 123456',
     });
@@ -62,7 +64,7 @@ describe('NodemailerEmailSender', () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const result = await new NodemailerEmailSender(config).send({
-      to: 'ivan@mail.ru',
+      to: EmailAddress.create('ivan@mail.ru'),
       subject: 'Код',
       text: 'Ваш код: 123456',
     });
@@ -77,7 +79,7 @@ describe('NodemailerEmailSender', () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     await new NodemailerEmailSender(config).send({
-      to: 'ivan@mail.ru',
+      to: EmailAddress.create('ivan@mail.ru'),
       subject: 'Код',
       text: 'Ваш код: 123456',
     });
@@ -86,5 +88,44 @@ describe('NodemailerEmailSender', () => {
     expect(logging).not.toContain('123456');
 
     logged.mockRestore();
+  });
+});
+
+it('passes exact attachment bytes to the mail transport and marks a lost acknowledgement uncertain', async () => {
+  const sender = new NodemailerEmailSender({
+    host: 'fixture',
+    port: 25,
+    secure: false,
+    user: '',
+    password: '',
+    from: 'fixture@example.org',
+  });
+  const attachments = [
+    {
+      filename: 'receipt.json',
+      content: '{"version":1}',
+      contentType: 'application/json',
+    },
+  ];
+  const message = {
+    to: EmailAddress.create('fixture@example.org'),
+    subject: 'Receipt',
+    text: 'Saved',
+    attachments,
+  };
+  sendMail.mockResolvedValueOnce({ messageId: 'accepted' });
+  await sender.send(message);
+  expect(sendMail).toHaveBeenLastCalledWith(
+    expect.objectContaining({ attachments })
+  );
+  sendMail.mockRejectedValueOnce(
+    Object.assign(new Error('socket closed'), {
+      code: 'ESOCKET',
+      command: 'DATA',
+    })
+  );
+  expect(await sender.send(message)).toMatchObject({
+    success: false,
+    uncertain: true,
   });
 });

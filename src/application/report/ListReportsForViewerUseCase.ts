@@ -1,3 +1,20 @@
+/** Lists authorized report aggregates after decoding viewer/query references.
+ * Query totals retain their validated units until the final viewer DTO is assembled. */
+import { ReportUseCaseFailure } from './ReportErrors';
+import { z } from 'zod';
+import {
+  ReportId,
+  UserId,
+  OrganizationId,
+  BoardId,
+  PollId,
+} from '../../domain/shared/EntityIds';
+import { BoardName } from '../../domain/board/BoardName';
+import {
+  PageNumber,
+  PageSize,
+  ResultCount,
+} from '../../domain/shared/Pagination';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { Report } from '../../domain/report/Report';
 import {
@@ -8,18 +25,20 @@ import { ReportVisibility } from '../../domain/report/ReportVisibility';
 import { Organization } from '../../domain/organization/Organization';
 
 export interface OrgRepoForListReports {
-  findMembershipsByUserId(userId: string): Promise<Organization[]>;
-  findAdminOrganizationsByUserId(userId: string): Promise<Organization[]>;
+  findMembershipsByUserId(userId: UserId): Promise<Organization[]>;
+  findAdminOrganizationsByUserId(userId: UserId): Promise<Organization[]>;
 }
 
 export interface BoardRepoForListReports {
   findActiveBoardsByUserId(
-    userId: string
-  ): Promise<Array<{ id: string; name: string; organizationId: string }>>;
+    userId: UserId
+  ): Promise<
+    Array<{ id: BoardId; name: BoardName; organizationId: OrganizationId }>
+  >;
 }
 
 export interface UserRepoForListReports {
-  isSuperAdmin(userId: string): Promise<boolean>;
+  isSuperAdmin(userId: UserId): Promise<boolean>;
 }
 
 export interface ListReportsForViewerInput {
@@ -33,9 +52,9 @@ export interface ListReportsForViewerInput {
 
 export interface ListReportsForViewerResult {
   reports: Report[];
-  totalCount: number;
-  page: number;
-  pageSize: number;
+  totalCount: ResultCount;
+  page: PageNumber;
+  pageSize: PageSize;
 }
 
 // PERF: This implementation issues several search passes and merges in-memory.
@@ -52,24 +71,39 @@ export class ListReportsForViewerUseCase {
 
   async execute(
     input: ListReportsForViewerInput
-  ): Promise<Result<ListReportsForViewerResult, string>> {
-    const page = input.page ?? 1;
-    const pageSize = input.pageSize ?? 20;
+  ): Promise<Result<ListReportsForViewerResult, ReportUseCaseFailure>> {
+    const decoded = z
+      .object({
+        viewerId: UserId.nullable(),
+        organizationIds: z.array(OrganizationId).optional(),
+        attachedPollId: PollId.optional(),
+        page: PageNumber.default(PageNumber.parse(1)),
+        pageSize: PageSize.default(PageSize.parse(20)),
+      })
+      .safeParse(input);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const command = { ...decoded.data, publishedOnly: input.publishedOnly };
+    const page = command.page;
+    const pageSize = command.pageSize;
 
     // -- Anonymous viewer: only PUBLIC_ANON published non-archived reports
-    if (!input.viewerId) {
+    if (!command.viewerId) {
       const filters: ReportSearchFilters = {
         visibilities: [ReportVisibility.PUBLIC_ANON],
         state: 'PUBLISHED',
         includeArchived: false,
       };
 
-      if (input.organizationIds && input.organizationIds.length > 0) {
-        filters.organizationIds = input.organizationIds;
+      if (command.organizationIds && command.organizationIds.length > 0) {
+        filters.organizationIds = command.organizationIds;
       }
 
-      if (input.attachedPollId) {
-        filters.attachedPollId = input.attachedPollId;
+      if (command.attachedPollId) {
+        filters.attachedPollId = command.attachedPollId;
       }
 
       const result = await this.reports.search(filters);
@@ -83,14 +117,14 @@ export class ListReportsForViewerUseCase {
 
       return success({
         reports: paginated,
-        totalCount: sorted.length,
+        totalCount: ResultCount.parse(sorted.length),
         page,
         pageSize,
       });
     }
 
     // -- Logged-in viewer
-    const viewerId = input.viewerId;
+    const viewerId = command.viewerId;
 
     const isSuperAdmin = await this.users.isSuperAdmin(viewerId);
 
@@ -98,8 +132,8 @@ export class ListReportsForViewerUseCase {
     if (isSuperAdmin) {
       const result = await this.reports.search({
         includeArchived: false,
-        attachedPollId: input.attachedPollId,
-        state: input.publishedOnly ? 'PUBLISHED' : undefined,
+        attachedPollId: command.attachedPollId,
+        state: command.publishedOnly ? 'PUBLISHED' : undefined,
       });
 
       if (!result.success) {
@@ -108,8 +142,8 @@ export class ListReportsForViewerUseCase {
 
       let all = dedup(result.value.reports);
 
-      if (input.organizationIds && input.organizationIds.length > 0) {
-        const orgSet = new Set(input.organizationIds);
+      if (command.organizationIds && command.organizationIds.length > 0) {
+        const orgSet = new Set(command.organizationIds);
         all = all.filter((r) => orgSet.has(r.organizationId));
       }
 
@@ -118,7 +152,7 @@ export class ListReportsForViewerUseCase {
 
       return success({
         reports: paginated,
-        totalCount: sorted.length,
+        totalCount: ResultCount.parse(sorted.length),
         page,
         pageSize,
       });
@@ -137,11 +171,9 @@ export class ListReportsForViewerUseCase {
     // Org ids that host at least one board the viewer is in
     const boardOrgIds = [...new Set(memberBoards.map((b) => b.organizationId))];
 
-    const passes: Array<
-      Promise<Result<{ reports: Report[]; totalCount: number }, string>>
-    > = [];
+    const passes: ReturnType<ReportRepository['search']>[] = [];
 
-    const attachedPollId = input.attachedPollId;
+    const attachedPollId = command.attachedPollId;
 
     // Pass 1: public-anon + public-auth published
     passes.push(
@@ -188,7 +220,7 @@ export class ListReportsForViewerUseCase {
     }
 
     // Draft passes — skipped when caller asks for published-only.
-    if (!input.publishedOnly) {
+    if (!command.publishedOnly) {
       // Pass 4: own drafts
       passes.push(
         this.reports.search({
@@ -238,8 +270,8 @@ export class ListReportsForViewerUseCase {
     let merged = dedup(filtered);
 
     // Apply optional organizationIds intersection
-    if (input.organizationIds && input.organizationIds.length > 0) {
-      const orgSet = new Set(input.organizationIds);
+    if (command.organizationIds && command.organizationIds.length > 0) {
+      const orgSet = new Set(command.organizationIds);
       merged = merged.filter((r) => orgSet.has(r.organizationId));
     }
 
@@ -248,7 +280,7 @@ export class ListReportsForViewerUseCase {
 
     return success({
       reports: paginated,
-      totalCount: sorted.length,
+      totalCount: ResultCount.parse(sorted.length),
       page,
       pageSize,
     });
@@ -260,7 +292,7 @@ export class ListReportsForViewerUseCase {
 // ---------------------------------------------------------------------------
 
 function dedup(reports: Report[]): Report[] {
-  const seen = new Set<string>();
+  const seen = new Set<ReportId>();
   const result: Report[] = [];
 
   for (const r of reports) {
@@ -293,7 +325,7 @@ function sortReports(reports: Report[]): Report[] {
   });
 }
 
-function paginate<T>(items: T[], page: number, pageSize: number): T[] {
+function paginate<T>(items: T[], page: PageNumber, pageSize: PageSize): T[] {
   const start = (page - 1) * pageSize;
 
   return items.slice(start, start + pageSize);

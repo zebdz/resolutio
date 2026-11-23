@@ -1,3 +1,5 @@
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import { notificationTestInputs } from '@/application/notification/__tests__/notificationTestValues';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NotifyMultiMembershipSettingChangedUseCase } from '../NotifyMultiMembershipSettingChangedUseCase';
 import { Organization } from '../../../domain/organization/Organization';
@@ -72,6 +74,7 @@ describe('NotifyMultiMembershipSettingChangedUseCase', () => {
     orgRepo = new MockOrganizationRepository();
     notificationRepo = new MockNotificationRepository();
     useCase = new NotifyMultiMembershipSettingChangedUseCase({
+      ...notificationTestInputs,
       organizationRepository: orgRepo as unknown as OrganizationRepository,
       notificationRepository:
         notificationRepo as unknown as NotificationRepository,
@@ -92,7 +95,10 @@ describe('NotifyMultiMembershipSettingChangedUseCase', () => {
     orgRepo.addOrganization(rootOrg);
     orgRepo.setAcceptedMembers('root-1', ['user-1', 'user-2']);
 
-    await useCase.execute({ rootOrgId: 'root-1', allowed: true });
+    await useCase.execute({
+      rootOrgId: OrganizationId.parse('root-1'),
+      allowed: true,
+    });
 
     const saved = notificationRepo.getSaved();
     expect(saved).toHaveLength(2);
@@ -119,13 +125,19 @@ describe('NotifyMultiMembershipSettingChangedUseCase', () => {
     orgRepo.addOrganization(rootOrg);
     orgRepo.setAcceptedMembers('root-1', []);
 
-    await useCase.execute({ rootOrgId: 'root-1', allowed: true });
+    await useCase.execute({
+      rootOrgId: OrganizationId.parse('root-1'),
+      allowed: true,
+    });
 
     expect(notificationRepo.getSaved()).toHaveLength(0);
   });
 
   it('should not send notifications when org not found', async () => {
-    await useCase.execute({ rootOrgId: 'nonexistent', allowed: true });
+    await useCase.execute({
+      rootOrgId: OrganizationId.parse('nonexistent'),
+      allowed: true,
+    });
 
     expect(notificationRepo.getSaved()).toHaveLength(0);
   });

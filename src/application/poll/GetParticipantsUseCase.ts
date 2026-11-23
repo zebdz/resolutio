@@ -1,11 +1,16 @@
+/** Reads the authorized participant snapshot and explicit user display projections.
+ * Application logic depends on repository ports rather than ORM access. */
 import { Result, success, failure } from '../../domain/shared/Result';
+import { PollId, UserId } from '@/domain/shared/EntityIds';
+import { PollDomainCodes } from '@/domain/poll/PollDomainCodes';
+import { PollUserDisplay, pollUserDisplay } from './PollUserDisplay';
 import { PollParticipant } from '../../domain/poll/PollParticipant';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 import { OrganizationErrors } from '../organization/OrganizationErrors';
 
 export interface GetParticipantsInput {
@@ -15,12 +20,7 @@ export interface GetParticipantsInput {
 
 export interface ParticipantWithUser {
   participant: PollParticipant;
-  user: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    middleName: string | null;
-  };
+  user: PollUserDisplay;
 }
 
 export interface GetParticipantsResult {
@@ -34,14 +34,26 @@ export class GetParticipantsUseCase {
     private participantRepository: ParticipantRepository,
     private voteRepository: VoteRepository,
     private organizationRepository: OrganizationRepository,
-    private userRepository: UserRepository,
-    private prisma: any
+    private userRepository: UserRepository
   ) {}
 
   async execute(
     input: GetParticipantsInput
-  ): Promise<Result<GetParticipantsResult, string>> {
-    const { pollId, adminUserId } = input;
+  ): Promise<
+    Result<
+      GetParticipantsResult,
+      PollUseCaseFailure | typeof OrganizationErrors.NOT_ADMIN
+    >
+  > {
+    const pollResultId = PollId.safeParse(input.pollId);
+    const adminResultId = UserId.safeParse(input.adminUserId);
+
+    if (!pollResultId.success || !adminResultId.success) {
+      return failure(PollDomainCodes.INVALID_BALLOT);
+    }
+
+    const pollId = pollResultId.data;
+    const adminUserId = adminResultId.data;
 
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(pollId);
@@ -84,20 +96,12 @@ export class GetParticipantsUseCase {
     const participantsWithUsers: ParticipantWithUser[] = [];
 
     for (const participant of participants) {
-      const user = await this.prisma.user.findUnique({
-        where: { id: participant.userId },
-        select: {
-          id: true,
-          firstName: true,
-          lastName: true,
-          middleName: true,
-        },
-      });
+      const user = await this.userRepository.findById(participant.userId);
 
       if (user) {
         participantsWithUsers.push({
           participant,
-          user,
+          user: pollUserDisplay(user),
         });
       }
     }

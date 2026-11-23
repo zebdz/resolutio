@@ -1,16 +1,33 @@
-import { PrismaClient } from '@/generated/prisma/client';
+/** Authorizes membership decisions and supplies actor/time to the domain policy.
+ * Persists the typed decision, then coordinates hierarchy changes and notifications. */
+import { Clock, IdGenerator } from '../shared/EntityCreation';
+
+import { OrganizationId, UserId } from '../../domain/shared/EntityIds';
+import { MembershipStore } from './MembershipStore';
+import {
+  MembershipReference,
+  MembershipRejectionReason,
+  MembershipAction,
+  requirePendingMembership,
+  decideMembershipRequest,
+} from '../../domain/organization/MembershipPolicy';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
-import { OrganizationMembershipService } from '../../domain/organization/OrganizationMembershipService';
+import { OrganizationMembershipService } from './OrganizationMembershipService';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { HandleJoinRequestInput } from './HandleJoinRequestSchema';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 import { NotifyJoinRequestAcceptedUseCase } from '../notification/NotifyJoinRequestAcceptedUseCase';
 import { NotifyJoinRequestRejectedUseCase } from '../notification/NotifyJoinRequestRejectedUseCase';
 
 export interface HandleJoinRequestDependencies {
-  prisma: PrismaClient;
+  ids: IdGenerator;
+  clock: Clock;
+  memberships: Pick<MembershipStore, 'findStatus' | 'saveDecision'>;
   organizationRepository: OrganizationRepository;
   notificationRepository: NotificationRepository;
   userRepository: UserRepository;
@@ -19,7 +36,34 @@ export interface HandleJoinRequestDependencies {
 export class HandleJoinRequestUseCase {
   constructor(private deps: HandleJoinRequestDependencies) {}
 
-  async execute(input: HandleJoinRequestInput): Promise<Result<void, string>> {
+  async execute(
+    input: HandleJoinRequestInput
+  ): Promise<Result<void, OrganizationUseCaseFailure>> {
+    const parsedOrganizationId = OrganizationId.safeParse(input.organizationId);
+
+    if (!parsedOrganizationId.success) {
+      return failure(OrganizationErrors.NOT_FOUND);
+    }
+
+    const parsedRequesterId = UserId.safeParse(input.requesterId);
+
+    if (!parsedRequesterId.success) {
+      return failure(OrganizationErrors.USER_NOT_FOUND);
+    }
+
+    const parsedAdminId = UserId.safeParse(input.adminId);
+
+    if (!parsedAdminId.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
+    }
+
+    const command = {
+      ...input,
+      organizationId: parsedOrganizationId.data,
+      requesterId: parsedRequesterId.data,
+      adminId: parsedAdminId.data,
+    };
+
     const {
       organizationId,
       requesterId,
@@ -27,21 +71,19 @@ export class HandleJoinRequestUseCase {
       action,
       rejectionReason,
       silent,
-    } = input;
+    } = command;
+
+    if (action !== 'accept' && action !== 'reject') {
+      return failure(OrganizationErrors.INVALID_STATUS);
+    }
 
     // 1. Check admin permissions: superadmin or org admin
     const isSuperAdmin = await this.deps.userRepository.isSuperAdmin(adminId);
 
     if (!isSuperAdmin) {
-      const adminRole = await this.deps.prisma.organizationAdminUser.findUnique(
-        {
-          where: {
-            organizationId_userId: {
-              organizationId,
-              userId: adminId,
-            },
-          },
-        }
+      const adminRole = await this.deps.organizationRepository.isUserAdmin(
+        adminId,
+        organizationId
       );
 
       if (!adminRole) {
@@ -49,43 +91,55 @@ export class HandleJoinRequestUseCase {
       }
     }
 
-    // 2. Find the join request
-    const request = await this.deps.prisma.organizationUser.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId,
-          userId: requesterId,
-        },
-      },
+    // 2. Load the request status and let the domain enforce pending-only decisions.
+    const reference = MembershipReference.parse({
+      organizationId,
+      userId: requesterId,
     });
+    const status = await this.deps.memberships.findStatus(reference);
 
-    if (!request) {
-      return failure(OrganizationErrors.REQUEST_NOT_FOUND);
+    if (!status.success) {
+      return status;
     }
 
-    // 3. Check if request is pending
-    if (request.status !== 'pending') {
-      return failure(OrganizationErrors.NOT_PENDING);
+    const pending = requirePendingMembership(status.value);
+
+    if (!pending.success) {
+      return pending;
     }
 
-    // 4. Update the request based on action
-    const now = new Date();
+    const parsedReason = MembershipRejectionReason.nullable().safeParse(
+      action === 'reject' ? rejectionReason || null : null
+    );
+
+    if (!parsedReason.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const decisionAction: MembershipAction =
+      action === 'accept' ? { action } : { action, reason: parsedReason.data };
+    const decision = decideMembershipRequest(
+      status.value,
+      decisionAction,
+      adminId,
+      this.deps.clock.now()
+    );
+
+    if (!decision.success) {
+      return decision;
+    }
+
+    // 3. Persist the validated decision, then coordinate hierarchy membership.
+    const saved = await this.deps.memberships.saveDecision(
+      reference,
+      decision.value
+    );
+
+    if (!saved.success) {
+      return saved;
+    }
 
     if (action === 'accept') {
-      await this.deps.prisma.organizationUser.update({
-        where: {
-          organizationId_userId: {
-            organizationId,
-            userId: requesterId,
-          },
-        },
-        data: {
-          status: 'accepted',
-          acceptedAt: now,
-          acceptedByUserId: adminId,
-        },
-      });
-
       // Remove user from existing memberships in hierarchy orgs
       // (unless tree allows multi-membership)
       const allowsMulti =
@@ -100,26 +154,13 @@ export class HandleJoinRequestUseCase {
           this.deps.organizationRepository
         );
       }
-    } else {
-      await this.deps.prisma.organizationUser.update({
-        where: {
-          organizationId_userId: {
-            organizationId,
-            userId: requesterId,
-          },
-        },
-        data: {
-          status: 'rejected',
-          rejectedAt: now,
-          rejectedByUserId: adminId,
-          rejectionReason: rejectionReason || null,
-        },
-      });
     }
 
-    // 5. Notify requester (fire-and-forget, skip for autoJoin)
+    // 4. Notify requester (fire-and-forget, skip for autoJoin)
     if (!silent) {
       const notifyDeps = {
+        ids: this.deps.ids,
+        clock: this.deps.clock,
         organizationRepository: this.deps.organizationRepository,
         notificationRepository: this.deps.notificationRepository,
       };
@@ -127,6 +168,14 @@ export class HandleJoinRequestUseCase {
       if (action === 'accept') {
         new NotifyJoinRequestAcceptedUseCase(notifyDeps)
           .execute({ organizationId, requesterUserId: requesterId })
+          .then((outcome) => {
+            if (!outcome.success) {
+              console.error(
+                'Notification delivery failed (NotifyJoinRequestAcceptedUseCase):',
+                outcome.error
+              );
+            }
+          })
           .catch((err) =>
             console.error('Failed to notify join request accepted:', err)
           );
@@ -136,6 +185,14 @@ export class HandleJoinRequestUseCase {
             organizationId,
             requesterUserId: requesterId,
             rejectionReason: rejectionReason || '',
+          })
+          .then((outcome) => {
+            if (!outcome.success) {
+              console.error(
+                'Notification delivery failed (NotifyJoinRequestRejectedUseCase):',
+                outcome.error
+              );
+            }
           })
           .catch((err) =>
             console.error('Failed to notify join request rejected:', err)

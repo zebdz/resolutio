@@ -1,11 +1,15 @@
+/** Report edit clients retain authorization and lifecycle failure precedence.
+ * Raw request content is decoded before invoking typed aggregate mutations. */
+import { UserId } from '@/domain/shared/EntityIds';
+import { testClock, testIds } from '@/domain/report/__tests__/reportTestValues';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { UpdateReportUseCase } from '../UpdateReportUseCase';
-import { Report, ReportProps } from '../../../domain/report/Report';
+import { Report, ReportData } from '../../../domain/report/Report';
 import { ReportVisibility } from '../../../domain/report/ReportVisibility';
 import { ReportErrors } from '../ReportErrors';
 import { ReportDomainCodes } from '../../../domain/report/ReportDomainCodes';
 
-const makeReport = (overrides: Partial<ReportProps> = {}) =>
+const makeReport = (overrides: Partial<ReportData> = {}) =>
   Report.reconstitute({
     id: 'r1',
     organizationId: 'org-1',
@@ -24,6 +28,12 @@ const makeReport = (overrides: Partial<ReportProps> = {}) =>
     pollIds: [],
     attachmentIds: [],
     ...overrides,
+    ...(overrides.state === 'PUBLISHED'
+      ? {
+          publishedById: overrides.publishedById ?? 'admin-1',
+          lastPublishedAt: overrides.lastPublishedAt ?? new Date('2026-01-01'),
+        }
+      : {}),
   });
 
 class FakeReports {
@@ -66,7 +76,12 @@ describe('UpdateReportUseCase', () => {
     orgs = new FakeOrgs();
     users = new FakeUsers();
 
-    uc = new UpdateReportUseCase(reports as any, orgs as any, users as any);
+    uc = new UpdateReportUseCase(
+      reports as any,
+      orgs as any,
+      users as any,
+      testClock
+    );
     reports.store.set('r1', makeReport());
   });
 
@@ -117,15 +132,15 @@ describe('UpdateReportUseCase', () => {
     }
   });
 
-  it('cannot update Published report', async () => {
+  it('rejects Published reports before validating malformed edit content', async () => {
     const r = makeReport();
-    r.publish('admin-1', false);
+    r.publish(UserId.parse('admin-1'), false, testClock.now());
     reports.store.set('r1', r);
     const out = await uc.execute({
       reportId: 'r1',
       callerId: 'author-1',
-      title: 'X',
-      body: 'Y',
+      title: '',
+      body: '',
     });
     expect(out.success).toBe(false);
 

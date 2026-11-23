@@ -1,3 +1,12 @@
+/** Administrator directory tests preserve access, search and pagination behavior.
+ * The real read adapter validates simulated storage projections. */
+import { PrismaClient } from '@/generated/prisma/client';
+import { PrismaOrganizationDirectory } from '@/infrastructure/repositories/PrismaOrganizationDirectory';
+import { MemberCount } from '@/domain/organization/OrganizationValues';
+import { ResultCount } from '@/domain/shared/Pagination';
+import { UserId } from '../../../domain/shared/EntityIds';
+import { OrganizationName } from '../../../domain/organization/OrganizationValues';
+import { OrganizationId } from '../../../domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   GetOrgAdminsPaginatedUseCase,
@@ -12,103 +21,151 @@ class MockOrganizationRepository implements OrganizationRepository {
   private adminRoles: Map<string, Set<string>> = new Map();
   private memberRoles: Map<string, Set<string>> = new Map();
 
-  async save(org: Organization): Promise<Organization> {
+  async save(org: Organization): ReturnType<OrganizationRepository['save']> {
     this.organizations.set(org.id, org);
 
     return org;
   }
-  async findById(id: string): Promise<Organization | null> {
+  async findById(id: string): ReturnType<OrganizationRepository['findById']> {
     return this.organizations.get(id) || null;
   }
-  async findByName(): Promise<Organization | null> {
+  async findByName(): ReturnType<OrganizationRepository['findByName']> {
     return null;
   }
-  async findByCreatorId(): Promise<Organization[]> {
+  async findByCreatorId(): ReturnType<
+    OrganizationRepository['findByCreatorId']
+  > {
     return [];
   }
-  async findByParentId(): Promise<Organization[]> {
+  async findByParentId(): ReturnType<OrganizationRepository['findByParentId']> {
     return [];
   }
-  async getAncestorIds(): Promise<string[]> {
-    return [];
+  async getAncestorIds(): ReturnType<OrganizationRepository['getAncestorIds']> {
+    return OrganizationId.array().parse([]);
   }
-  async getDescendantIds(): Promise<string[]> {
-    return [];
+  async getDescendantIds(): ReturnType<
+    OrganizationRepository['getDescendantIds']
+  > {
+    return OrganizationId.array().parse([]);
   }
-  async getFullTreeOrgIds(): Promise<string[]> {
-    return [];
+  async getFullTreeOrgIds(): ReturnType<
+    OrganizationRepository['getFullTreeOrgIds']
+  > {
+    return OrganizationId.array().parse([]);
   }
-  async isUserMember(userId: string, organizationId: string): Promise<boolean> {
+  async isUserMember(
+    userId: string,
+    organizationId: string
+  ): ReturnType<OrganizationRepository['isUserMember']> {
     const members = this.memberRoles.get(organizationId);
 
     return members ? members.has(userId) : false;
   }
-  async isUserAdmin(userId: string, organizationId: string): Promise<boolean> {
+  async isUserAdmin(
+    userId: string,
+    organizationId: string
+  ): ReturnType<OrganizationRepository['isUserAdmin']> {
     const admins = this.adminRoles.get(organizationId);
 
     return admins ? admins.has(userId) : false;
   }
-  async findMembershipsByUserId(): Promise<Organization[]> {
+  async findMembershipsByUserId(): ReturnType<
+    OrganizationRepository['findMembershipsByUserId']
+  > {
     return [];
   }
-  async findAdminOrganizationsByUserId(): Promise<Organization[]> {
+  async findAdminOrganizationsByUserId(): ReturnType<
+    OrganizationRepository['findAdminOrganizationsByUserId']
+  > {
     return [];
   }
-  async findAllWithStats(): Promise<any[]> {
+  async findAllWithStats(): ReturnType<
+    OrganizationRepository['findAllWithStats']
+  > {
     return [];
   }
-  async searchOrganizationsWithStats(): Promise<any> {
-    return { organizations: [], totalCount: 0 };
+  async searchOrganizationsWithStats(): ReturnType<
+    OrganizationRepository['searchOrganizationsWithStats']
+  > {
+    return { organizations: [], totalCount: ResultCount.parse(0) };
   }
-  async update(org: Organization): Promise<Organization> {
+  async update(
+    org: Organization
+  ): ReturnType<OrganizationRepository['update']> {
     return org;
   }
-  async findAcceptedMemberUserIdsIncludingDescendants(): Promise<string[]> {
+  async findAcceptedMemberUserIdsIncludingDescendants(): ReturnType<
+    OrganizationRepository['findAcceptedMemberUserIdsIncludingDescendants']
+  > {
+    return UserId.array().parse([]);
+  }
+  async removeUserFromOrganization(): ReturnType<
+    OrganizationRepository['removeUserFromOrganization']
+  > {}
+  async findPendingRequestsByUserId(): ReturnType<
+    OrganizationRepository['findPendingRequestsByUserId']
+  > {
     return [];
   }
-  async removeUserFromOrganization(): Promise<void> {}
-  async findPendingRequestsByUserId(): Promise<Organization[]> {
+  async getAncestors(): ReturnType<OrganizationRepository['getAncestors']> {
     return [];
   }
-  async getAncestors(): Promise<any[]> {
+  async getChildrenWithStats(): ReturnType<
+    OrganizationRepository['getChildrenWithStats']
+  > {
     return [];
   }
-  async getChildrenWithStats(): Promise<any[]> {
-    return [];
-  }
-  async getHierarchyTree(): Promise<any> {
+  async getHierarchyTree(): ReturnType<
+    OrganizationRepository['getHierarchyTree']
+  > {
     return {
       ancestors: [],
-      tree: { id: '', name: '', memberCount: 0, children: [] },
+      tree: {
+        id: OrganizationId.parse('org-fixture'),
+        name: OrganizationName.parse('Fixture organization'),
+        memberCount: MemberCount.parse(0),
+        children: [],
+      },
     };
   }
-  async findAdminUserIds(): Promise<string[]> {
-    return [];
+  async findAdminUserIds(): ReturnType<
+    OrganizationRepository['findAdminUserIds']
+  > {
+    return UserId.array().parse([]);
   }
-  async setParentId(): Promise<void> {}
-  async addAdmin(organizationId: string, userId: string): Promise<void> {
+  async setParentId(): ReturnType<OrganizationRepository['setParentId']> {}
+  async addAdmin(
+    organizationId: string,
+    userId: string
+  ): ReturnType<OrganizationRepository['addAdmin']> {
     if (!this.adminRoles.has(organizationId)) {
       this.adminRoles.set(organizationId, new Set());
     }
 
     this.adminRoles.get(organizationId)!.add(userId);
   }
-  async removeAdmin(): Promise<void> {}
-  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+  async removeAdmin(): ReturnType<OrganizationRepository['removeAdmin']> {}
+  async searchByNameFuzzy(): ReturnType<
+    OrganizationRepository['searchByNameFuzzy']
+  > {
     return [];
   }
-  async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
+  async getRootAllowMultiTreeMembership(
+    _orgId: string
+  ): ReturnType<OrganizationRepository['getRootAllowMultiTreeMembership']> {
     return false;
   }
   async findUsersWithMultipleMembershipsInOrgs(
     _orgIds: string[]
-  ): Promise<string[]> {
-    return [];
+  ): ReturnType<
+    OrganizationRepository['findUsersWithMultipleMembershipsInOrgs']
+  > {
+    return UserId.array().parse([]);
   }
   async setAllowMultiTreeMembership(
     _organizationId: string,
     _value: boolean | null
-  ): Promise<void> {}
+  ): ReturnType<OrganizationRepository['setAllowMultiTreeMembership']> {}
 
   // Test helpers
   addOrganization(org: Organization): void {
@@ -128,58 +185,87 @@ class MockOrganizationRepository implements OrganizationRepository {
 
     this.memberRoles.get(organizationId)!.add(userId);
   }
+
+  async isUserExactMember(
+    ..._args: Parameters<OrganizationRepository['isUserExactMember']>
+  ): ReturnType<OrganizationRepository['isUserExactMember']> {
+    throw new Error('Unexpected isUserExactMember in this test');
+  }
+
+  async getAdminUserIds(
+    ..._args: Parameters<OrganizationRepository['getAdminUserIds']>
+  ): ReturnType<OrganizationRepository['getAdminUserIds']> {
+    throw new Error('Unexpected getAdminUserIds in this test');
+  }
+
+  async findAcceptedMemberUserIdsForOrgs(
+    ..._args: Parameters<
+      OrganizationRepository['findAcceptedMemberUserIdsForOrgs']
+    >
+  ): ReturnType<OrganizationRepository['findAcceptedMemberUserIdsForOrgs']> {
+    throw new Error('Unexpected findAcceptedMemberUserIdsForOrgs in this test');
+  }
+
+  async removeMemberFromOrganization(
+    ..._args: Parameters<OrganizationRepository['removeMemberFromOrganization']>
+  ): ReturnType<OrganizationRepository['removeMemberFromOrganization']> {
+    throw new Error('Unexpected removeMemberFromOrganization in this test');
+  }
 }
 
 class MockUserRepository implements UserRepository {
   private superAdmins: Set<string> = new Set();
 
-  async findById(): Promise<any> {
+  async findById(): ReturnType<UserRepository['findById']> {
     return null;
   }
-  async findByIds(): Promise<any[]> {
+  async findByIds(): ReturnType<UserRepository['findByIds']> {
     return [];
   }
-  async findByPhoneNumber(): Promise<any> {
+  async findByPhoneNumber(): ReturnType<UserRepository['findByPhoneNumber']> {
     return null;
   }
-  async save(user: any): Promise<any> {
+  async save(user: any): ReturnType<UserRepository['save']> {
     return user;
   }
-  async exists(): Promise<boolean> {
+  async exists(): ReturnType<UserRepository['exists']> {
     return false;
   }
-  async searchUsers(): Promise<any[]> {
+  async searchUsers(): ReturnType<UserRepository['searchUsers']> {
     return [];
   }
-  async searchUserByPhone(): Promise<any> {
+  async searchUserByPhone(): ReturnType<UserRepository['searchUserByPhone']> {
     return null;
   }
-  async isSuperAdmin(userId: string): Promise<boolean> {
+  async isSuperAdmin(
+    userId: string
+  ): ReturnType<UserRepository['isSuperAdmin']> {
     return this.superAdmins.has(userId);
   }
-  async findByNickname(): Promise<any> {
+  async findByNickname(): ReturnType<UserRepository['findByNickname']> {
     return null;
   }
-  async isNicknameAvailable(): Promise<boolean> {
+  async isNicknameAvailable(): ReturnType<
+    UserRepository['isNicknameAvailable']
+  > {
     return true;
   }
-  async updatePrivacySettings(): Promise<void> {}
-  async isUserBlocked(): Promise<boolean> {
-    return false;
-  }
-  async blockUser(): Promise<void> {}
-  async unblockUser(): Promise<void> {}
-  async confirmUser(): Promise<void> {}
-  async getBlockStatus(): Promise<null> {
-    return null;
-  }
-  async deleteAddress(): Promise<void> {}
-  async getBlockedUserIds(): Promise<string[]> {
-    return [];
-  }
+  async updatePrivacySettings(): ReturnType<
+    UserRepository['updatePrivacySettings']
+  > {}
+
+  async confirmUser(): ReturnType<UserRepository['confirmUser']> {}
+
+  async deleteAddress(): ReturnType<UserRepository['deleteAddress']> {}
 
   addSuperAdmin(userId: string): void {
     this.superAdmins.add(userId);
+  }
+
+  async findByEmail(
+    ..._args: Parameters<UserRepository['findByEmail']>
+  ): ReturnType<UserRepository['findByEmail']> {
+    throw new Error('Unexpected findByEmail in this test');
   }
 }
 
@@ -230,7 +316,7 @@ describe('GetOrgAdminsPaginatedUseCase', () => {
 
   function createUseCase(prisma: any): GetOrgAdminsPaginatedUseCase {
     const deps: GetOrgAdminsPaginatedDependencies = {
-      prisma,
+      directory: new PrismaOrganizationDirectory(prisma as PrismaClient),
       organizationRepository: orgRepo,
       userRepository: userRepo,
     };
@@ -260,12 +346,12 @@ describe('GetOrgAdminsPaginatedUseCase', () => {
 
     if (result.success) {
       expect(result.value.admins).toHaveLength(2);
+      expect(result.value.admins[0].nickname.getValue()).toBe('asmith');
       expect(result.value.totalCount).toBe(2);
       expect(result.value.admins[0]).toMatchObject({
         id: 'admin-1',
         firstName: 'Alice',
         lastName: 'Smith',
-        nickname: 'asmith',
       });
     }
 

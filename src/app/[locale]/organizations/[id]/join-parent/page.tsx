@@ -1,3 +1,5 @@
+/** Renders the authorized parent-organization selector with validated tree references. */
+import { OrganizationId } from '@/domain/shared/EntityIds';
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { getOrganizationDetailsAction } from '@/src/web/actions/organization/organization';
@@ -42,8 +44,9 @@ export default async function JoinParentPage({ params }: PageProps) {
   }
 
   // Build excludeIds: self + descendants
-  const descendantIds =
-    await organizationRepository.getDescendantIds(organizationId);
+  const descendantIds = await organizationRepository.getDescendantIds(
+    OrganizationId.parse(organizationId)
+  );
   const excludeIds = [organizationId, ...descendantIds];
 
   const { organization } = detailsResult.data;

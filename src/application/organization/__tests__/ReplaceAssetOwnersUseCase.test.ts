@@ -1,3 +1,6 @@
+/** Application boundary tests exercise authorization and domain constraints
+ * with deterministic creation dependencies and repository port doubles. */
+import { Instant } from '../../../domain/shared/Instant';
 import { describe, it, expect } from 'vitest';
 import { ReplaceAssetOwnersUseCase } from '../ReplaceAssetOwnersUseCase';
 import { OrganizationProperty } from '../../../domain/organization/OrganizationProperty';
@@ -27,7 +30,14 @@ const asset = PropertyAsset.reconstitute({
 function mkDeps(overrides: Partial<{ isAdmin: boolean }> = {}) {
   const cfg = { isAdmin: true, ...overrides };
   const calls: any[] = [];
+  let nextId = 0;
   const deps = {
+    ids: {
+      generate: <Id extends string>(identity: {
+        parse(value: unknown): Id;
+      }): Id => identity.parse(`ownership-${++nextId}`),
+    },
+    clock: { now: () => Instant.parse('2026-01-01T00:00:00.000Z') },
     assetRepository: {
       findAssetById: async () => success(asset),
       replaceOwners: async (input: any) => {
@@ -58,7 +68,21 @@ describe('ReplaceAssetOwnersUseCase', () => {
     });
     expect(r.success).toBe(true);
     expect(calls.length).toBe(1);
-    expect(calls[0].inserts.length).toBe(2);
+    expect(calls[0].inserts).toEqual([
+      {
+        id: 'ownership-1',
+        owner: { kind: 'user', userId: 'u-1' },
+        share: 0.5,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+      {
+        id: 'ownership-2',
+        owner: { kind: 'user', userId: 'u-2' },
+        share: 0.5,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
+    ]);
+    expect(calls[0].at).toBe('2026-01-01T00:00:00.000Z');
   });
 
   it('accepts an empty owners list (asset becomes ownerless)', async () => {

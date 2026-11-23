@@ -1,29 +1,105 @@
+/** Persists participant snapshots and atomic ballots. Poll locks coordinate all
+ * accepted ballots with lifecycle changes; receipt replay uses frozen cast data. */
+import { DistributionType } from '@/domain/poll/DistributionType';
+import { PropertyAggregation } from '@/domain/poll/PropertyAggregation';
+import { VotingWeight } from '@/domain/poll/VotingWeight';
+import { PropertyId } from '@/domain/shared/EntityIds';
 import {
   Prisma,
   PrismaClient,
   PollState as PrismaPollState,
 } from '@/generated/prisma/client';
+import { PollId, UserId, ParticipantId } from '@/domain/poll/PollValues';
+import { PollWriteFailure } from '@/domain/poll/PollWriteFailure';
 import { Poll } from '../../domain/poll/Poll';
 import { PollState } from '../../domain/poll/PollState';
 import { PollParticipant } from '../../domain/poll/PollParticipant';
 import { ParticipantWeightHistory } from '../../domain/poll/ParticipantWeightHistory';
 import { Vote } from '../../domain/poll/Vote';
-import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
+import { Instant } from '../../domain/shared/Instant';
+import {
+  ParticipantRepository,
+  ParticipantAddition,
+  ParticipantRemoval,
+  ParticipantReweighting,
+} from '../../domain/poll/ParticipantRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
+import { RecordedBallot } from '@/domain/poll/BallotSnapshot';
+import { ReceiptSecret } from '@/domain/poll/ReceiptSecret';
+import {
+  lockPoll,
+  lockPollRevision,
+  pollWriteError,
+  PollWriteError,
+} from './PollWriteLock';
+import { PollRevision } from '@/domain/poll/PollRevision';
+import { PollDomainCodes } from '@/domain/poll/PollDomainCodes';
+import { readCastBallot, saveCastBallot } from './CastBallotTransaction';
 
 export class PrismaParticipantRepository implements ParticipantRepository {
   constructor(private prisma: PrismaClient) {}
 
+  async getCastBallot(
+    pollId: PollId,
+    userId: UserId
+  ): Promise<Result<RecordedBallot | null, PollWriteFailure>> {
+    try {
+      // The participant and vote-presence reads must see the same commit.
+      // Otherwise a new original ballot can be misclassified as legacy.
+      const ballot = await this.prisma.$transaction(
+        (tx) => readCastBallot(tx, pollId, userId),
+        { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead }
+      );
+
+      return success(ballot);
+    } catch (error) {
+      return failure(pollWriteError(error));
+    }
+  }
+
+  async castVotes(
+    participantId: ParticipantId,
+    votes: Vote[],
+    willingness: boolean,
+    secret: ReceiptSecret
+  ): Promise<Result<RecordedBallot, PollWriteFailure>> {
+    try {
+      const ballot = await this.prisma.$transaction(async (tx) => {
+        const participant = await tx.pollParticipant.findUniqueOrThrow({
+          where: { id: participantId },
+        });
+        await lockPoll(tx, PollId.parse(participant.pollId));
+        const existing = await readCastBallot(
+          tx,
+          PollId.parse(participant.pollId),
+          UserId.parse(participant.userId)
+        );
+
+        if (existing) {
+          return existing;
+        }
+
+        return saveCastBallot(tx, participantId, votes, willingness, secret);
+      });
+
+      return success(ballot);
+    } catch (error) {
+      return failure(pollWriteError(error));
+    }
+  }
+
   async createParticipants(
     participants: PollParticipant[]
-  ): Promise<Result<void, string>> {
+  ): Promise<Result<void, PollWriteFailure>> {
     try {
       await this.prisma.pollParticipant.createMany({
         data: participants.map((p) => ({
+          id: p.id,
           pollId: p.pollId,
           userId: p.userId,
           userWeight: new Prisma.Decimal(p.userWeight),
           snapshotAt: p.snapshotAt,
+          createdAt: p.createdAt,
         })),
       });
 
@@ -36,8 +112,8 @@ export class PrismaParticipantRepository implements ParticipantRepository {
   }
 
   async getParticipants(
-    pollId: string
-  ): Promise<Result<PollParticipant[], string>> {
+    pollId: PollId
+  ): Promise<Result<PollParticipant[], PollWriteFailure>> {
     try {
       const participants = await this.prisma.pollParticipant.findMany({
         where: { pollId },
@@ -53,8 +129,8 @@ export class PrismaParticipantRepository implements ParticipantRepository {
   }
 
   async getParticipantById(
-    participantId: string
-  ): Promise<Result<PollParticipant | null, string>> {
+    participantId: ParticipantId
+  ): Promise<Result<PollParticipant | null, PollWriteFailure>> {
     try {
       const participant = await this.prisma.pollParticipant.findUnique({
         where: { id: participantId },
@@ -73,9 +149,9 @@ export class PrismaParticipantRepository implements ParticipantRepository {
   }
 
   async getParticipantByUserAndPoll(
-    pollId: string,
-    userId: string
-  ): Promise<Result<PollParticipant | null, string>> {
+    pollId: PollId,
+    userId: UserId
+  ): Promise<Result<PollParticipant | null, PollWriteFailure>> {
     try {
       const participant = await this.prisma.pollParticipant.findUnique({
         where: {
@@ -99,27 +175,62 @@ export class PrismaParticipantRepository implements ParticipantRepository {
   }
 
   async updateParticipantWeight(
-    participant: PollParticipant
-  ): Promise<Result<void, string>> {
+    participant: PollParticipant,
+    history: ParticipantWeightHistory
+  ): Promise<Result<void, PollWriteFailure>> {
     try {
-      await this.prisma.pollParticipant.update({
-        where: { id: participant.id },
-        data: {
-          userWeight: new Prisma.Decimal(participant.userWeight),
-        },
+      await this.prisma.$transaction(async (tx) => {
+        await lockPoll(tx, PollId.parse(participant.pollId));
+        const current = await tx.poll.findUniqueOrThrow({
+          where: { id: participant.pollId },
+        });
+
+        if (current.state !== 'READY') {
+          throw new PollWriteError(PollDomainCodes.POLL_MUST_BE_READY);
+        }
+
+        if (
+          await tx.vote.count({
+            where: { question: { pollId: participant.pollId } },
+          })
+        ) {
+          throw new PollWriteError(
+            PollDomainCodes.CANNOT_MODIFY_PARTICIPANTS_HAS_VOTES
+          );
+        }
+
+        await tx.pollParticipant.update({
+          where: { id: participant.id },
+          data: {
+            userWeight: new Prisma.Decimal(participant.userWeight),
+          },
+        });
+        await tx.participantWeightHistory.create({
+          data: {
+            id: history.id,
+            participantId: history.participantId,
+            pollId: history.pollId,
+            userId: history.userId,
+            oldWeight: new Prisma.Decimal(history.oldWeight),
+            newWeight: new Prisma.Decimal(history.newWeight),
+            changedBy: history.changedBy,
+            reason: history.reason,
+            changedAt: history.changedAt,
+          },
+        });
       });
 
       return success(undefined);
     } catch (error) {
       console.error('Failed to update participant weight:', error);
 
-      return failure('common.errors.unexpected');
+      return failure(pollWriteError(error));
     }
   }
 
   async deleteParticipant(
-    participantId: string
-  ): Promise<Result<void, string>> {
+    participantId: ParticipantId
+  ): Promise<Result<void, PollWriteFailure>> {
     try {
       await this.prisma.pollParticipant.delete({
         where: { id: participantId },
@@ -134,9 +245,9 @@ export class PrismaParticipantRepository implements ParticipantRepository {
   }
 
   async updateWillingToSignProtocol(
-    participantId: string,
+    participantId: ParticipantId,
     willingToSignProtocol: boolean
-  ): Promise<Result<void, string>> {
+  ): Promise<Result<void, PollWriteFailure>> {
     try {
       await this.prisma.pollParticipant.update({
         where: { id: participantId },
@@ -152,8 +263,8 @@ export class PrismaParticipantRepository implements ParticipantRepository {
   }
 
   async deleteParticipantsByPollId(
-    pollId: string
-  ): Promise<Result<void, string>> {
+    pollId: PollId
+  ): Promise<Result<void, PollWriteFailure>> {
     try {
       await this.prisma.pollParticipant.deleteMany({
         where: { pollId },
@@ -169,10 +280,11 @@ export class PrismaParticipantRepository implements ParticipantRepository {
 
   async createWeightHistory(
     history: ParticipantWeightHistory
-  ): Promise<Result<ParticipantWeightHistory, string>> {
+  ): Promise<Result<ParticipantWeightHistory, PollWriteFailure>> {
     try {
       const created = await this.prisma.participantWeightHistory.create({
         data: {
+          id: history.id,
           participantId: history.participantId,
           pollId: history.pollId,
           userId: history.userId,
@@ -180,6 +292,7 @@ export class PrismaParticipantRepository implements ParticipantRepository {
           newWeight: new Prisma.Decimal(history.newWeight),
           changedBy: history.changedBy,
           reason: history.reason,
+          changedAt: history.changedAt,
         },
       });
 
@@ -192,8 +305,8 @@ export class PrismaParticipantRepository implements ParticipantRepository {
   }
 
   async getWeightHistory(
-    pollId: string
-  ): Promise<Result<ParticipantWeightHistory[], string>> {
+    pollId: PollId
+  ): Promise<Result<ParticipantWeightHistory[], PollWriteFailure>> {
     try {
       const history = await this.prisma.participantWeightHistory.findMany({
         where: { pollId },
@@ -209,8 +322,8 @@ export class PrismaParticipantRepository implements ParticipantRepository {
   }
 
   async getParticipantWeightHistory(
-    participantId: string
-  ): Promise<Result<ParticipantWeightHistory[], string>> {
+    participantId: ParticipantId
+  ): Promise<Result<ParticipantWeightHistory[], PollWriteFailure>> {
     try {
       const history = await this.prisma.participantWeightHistory.findMany({
         where: { participantId },
@@ -229,22 +342,30 @@ export class PrismaParticipantRepository implements ParticipantRepository {
     poll: Poll,
     participants: PollParticipant[],
     historyRecords: ParticipantWeightHistory[]
-  ): Promise<Result<PollParticipant[], string>> {
+  ): Promise<Result<PollParticipant[], PollWriteFailure>> {
     try {
       const savedParticipants = await this.prisma.$transaction(async (tx) => {
+        const current = await lockPollRevision(tx, poll);
+
+        if (current.state !== 'SUBMITTED' || poll.state !== PollState.READY) {
+          throw new PollWriteError(PollDomainCodes.POLL_STALE);
+        }
+
         // 1. Create participants
         if (participants.length > 0) {
           await tx.pollParticipant.createMany({
             data: participants.map((p) => ({
+              id: p.id,
               pollId: p.pollId,
               userId: p.userId,
               userWeight: new Prisma.Decimal(p.userWeight),
               snapshotAt: p.snapshotAt,
+              createdAt: p.createdAt,
             })),
           });
         }
 
-        // 2. Fetch created participants to get IDs
+        // 2. Fetch the persisted snapshot using the supplied stable identities.
         const createdParticipants = await tx.pollParticipant.findMany({
           where: { pollId: poll.id },
           orderBy: { createdAt: 'asc' },
@@ -252,14 +373,16 @@ export class PrismaParticipantRepository implements ParticipantRepository {
 
         // 3. Create weight history records with participant IDs
         if (historyRecords.length > 0) {
-          const historyData = historyRecords.map((h, idx) => ({
-            participantId: createdParticipants[idx]?.id || h.participantId,
+          const historyData = historyRecords.map((h) => ({
+            id: h.id,
+            participantId: h.participantId,
             pollId: h.pollId,
             userId: h.userId,
             oldWeight: new Prisma.Decimal(h.oldWeight),
             newWeight: new Prisma.Decimal(h.newWeight),
             changedBy: h.changedBy,
             reason: h.reason,
+            changedAt: h.changedAt,
           }));
 
           await tx.participantWeightHistory.createMany({
@@ -288,7 +411,7 @@ export class PrismaParticipantRepository implements ParticipantRepository {
     } catch (error) {
       console.error('Failed to execute activation:', error);
 
-      return failure('common.errors.unexpected');
+      return failure(pollWriteError(error));
     }
   }
 
@@ -296,13 +419,30 @@ export class PrismaParticipantRepository implements ParticipantRepository {
     participant: PollParticipant,
     history: ParticipantWeightHistory,
     votes: Vote[],
-    willingToSignProtocol: boolean
-  ): Promise<Result<void, string>> {
+    willingToSignProtocol: boolean,
+    receiptSecret: ReceiptSecret
+  ): Promise<Result<RecordedBallot, PollWriteFailure>> {
     try {
-      await this.prisma.$transaction(async (tx) => {
-        // Upsert keeps a double submit from creating a second participant row;
-        // the unique (questionId, userId, answerId) constraint stops duplicate
-        // votes, aborting the whole transaction if one slips through.
+      const ballot = await this.prisma.$transaction(async (tx) => {
+        await lockPoll(tx, PollId.parse(participant.pollId));
+        const existing = await readCastBallot(
+          tx,
+          PollId.parse(participant.pollId),
+          UserId.parse(participant.userId)
+        );
+
+        if (existing) {
+          return existing;
+        }
+
+        const poll = await tx.poll.findUniqueOrThrow({
+          where: { id: participant.pollId },
+        });
+
+        if (poll.pollType !== 'OPEN') {
+          throw new PollWriteError('domain.poll.notParticipant');
+        }
+
         const saved = await tx.pollParticipant.upsert({
           where: {
             pollId_userId: {
@@ -311,46 +451,47 @@ export class PrismaParticipantRepository implements ParticipantRepository {
             },
           },
           create: {
+            id: participant.id,
             pollId: participant.pollId,
             userId: participant.userId,
-            userWeight: new Prisma.Decimal(participant.userWeight),
+            userWeight: new Prisma.Decimal(1),
             snapshotAt: participant.snapshotAt,
-            willingToSignProtocol,
+            createdAt: participant.createdAt,
           },
-          update: { willingToSignProtocol },
+          update: {},
         });
-
         await tx.participantWeightHistory.create({
           data: {
+            id: history.id,
             participantId: saved.id,
-            pollId: history.pollId,
-            userId: history.userId,
-            oldWeight: new Prisma.Decimal(history.oldWeight),
-            newWeight: new Prisma.Decimal(history.newWeight),
-            changedBy: history.changedBy,
+            pollId: participant.pollId,
+            userId: participant.userId,
+            oldWeight: 0,
+            newWeight: 1,
+            changedBy: participant.userId,
             reason: history.reason,
+            changedAt: history.changedAt,
           },
         });
 
-        await tx.vote.createMany({
-          data: votes.map((vote) => ({
-            questionId: vote.questionId,
-            answerId: vote.answerId,
-            userId: vote.userId,
-            userWeight: new Prisma.Decimal(vote.userWeight),
-          })),
-        });
+        return saveCastBallot(
+          tx,
+          ParticipantId.parse(saved.id),
+          votes,
+          willingToSignProtocol,
+          receiptSecret
+        );
       });
 
-      return success(undefined);
+      return success(ballot);
     } catch (error) {
-      console.error('Failed to join and vote:', error);
-
-      return failure('common.errors.unexpected');
+      return failure(pollWriteError(error));
     }
   }
 
-  async pollHasVotes(pollId: string): Promise<Result<boolean, string>> {
+  async pollHasVotes(
+    pollId: PollId
+  ): Promise<Result<boolean, PollWriteFailure>> {
     try {
       const vote = await this.prisma.vote.findFirst({
         where: { question: { pollId } },
@@ -358,34 +499,52 @@ export class PrismaParticipantRepository implements ParticipantRepository {
 
       return success(vote !== null);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure(pollWriteError(e));
     }
   }
 
   async applyWeightConfigChange(
-    pollId: string,
-    newDistributionType: string,
-    newPropertyAggregation: string,
-    newPropertyIds: string[],
-    add: Array<{ userId: string; weight: number }>,
-    remove: Array<{ participantId: string; userId: string; oldWeight: number }>,
-    update: Array<{
-      participantId: string;
-      userId: string;
-      oldWeight: number;
-      newWeight: number;
-    }>,
-    adminUserId: string,
-    reason: string
-  ): Promise<Result<void, string>> {
+    pollId: PollId,
+    newDistributionType: DistributionType,
+    newPropertyAggregation: PropertyAggregation,
+    newPropertyIds: PropertyId[],
+    add: ParticipantAddition[],
+    remove: ParticipantRemoval[],
+    update: ParticipantReweighting[],
+    adminUserId: UserId,
+    reason: string,
+    expectedRevision: PollRevision
+  ): Promise<Result<void, PollWriteFailure>> {
     try {
       await this.prisma.$transaction(async (tx) => {
+        await lockPoll(tx, PollId.parse(pollId));
+        const current = await tx.poll.findUniqueOrThrow({
+          where: { id: pollId },
+        });
+
+        if (current.revision !== expectedRevision) {
+          throw new PollWriteError(PollDomainCodes.POLL_STALE);
+        }
+
+        if (current.state === 'ACTIVE' || current.state === 'FINISHED') {
+          throw new PollWriteError(
+            PollDomainCodes.WEIGHT_CONFIG_LOCKED_AFTER_ACTIVATION
+          );
+        }
+
+        if (await tx.vote.count({ where: { question: { pollId } } })) {
+          throw new PollWriteError(
+            PollDomainCodes.VOTES_CAST_CANNOT_CHANGE_WEIGHT_CONFIG
+          );
+        }
+
         // 1. Update polls columns
         await tx.poll.update({
           where: { id: pollId },
           data: {
             distributionType: newDistributionType,
             propertyAggregation: newPropertyAggregation,
+            revision: { increment: 1 },
           },
         });
 
@@ -405,6 +564,8 @@ export class PrismaParticipantRepository implements ParticipantRepository {
           });
           await tx.participantWeightHistory.createMany({
             data: remove.map((r) => ({
+              id: r.historyCreation.id,
+              changedAt: Instant.toDate(r.historyCreation.now),
               participantId: r.participantId,
               pollId,
               userId: r.userId,
@@ -419,10 +580,19 @@ export class PrismaParticipantRepository implements ParticipantRepository {
         // 4. Inserts + history rows
         for (const a of add) {
           const created = await tx.pollParticipant.create({
-            data: { pollId, userId: a.userId, userWeight: a.weight },
+            data: {
+              id: a.creation.id,
+              createdAt: Instant.toDate(a.creation.now),
+              snapshotAt: Instant.toDate(a.creation.now),
+              pollId,
+              userId: a.userId,
+              userWeight: a.weight,
+            },
           });
           await tx.participantWeightHistory.create({
             data: {
+              id: a.historyCreation.id,
+              changedAt: Instant.toDate(a.historyCreation.now),
               participantId: created.id,
               pollId,
               userId: a.userId,
@@ -442,6 +612,8 @@ export class PrismaParticipantRepository implements ParticipantRepository {
           });
           await tx.participantWeightHistory.create({
             data: {
+              id: u.historyCreation.id,
+              changedAt: Instant.toDate(u.historyCreation.now),
               participantId: u.participantId,
               pollId,
               userId: u.userId,
@@ -456,23 +628,31 @@ export class PrismaParticipantRepository implements ParticipantRepository {
 
       return success(undefined);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure(pollWriteError(e));
     }
   }
 
-  private toDomainParticipant(prismaData: any): PollParticipant {
+  private toDomainParticipant(
+    prismaData: Prisma.PollParticipantGetPayload<object>
+  ): PollParticipant {
     return PollParticipant.reconstitute({
       id: prismaData.id,
       pollId: prismaData.pollId,
       userId: prismaData.userId,
       userWeight: prismaData.userWeight.toNumber(),
       willingToSignProtocol: prismaData.willingToSignProtocol ?? null,
+      receiptSecret:
+        prismaData.receiptSecret == null
+          ? null
+          : ReceiptSecret.parse(prismaData.receiptSecret),
       snapshotAt: prismaData.snapshotAt,
       createdAt: prismaData.createdAt,
     });
   }
 
-  private toDomainWeightHistory(prismaData: any): ParticipantWeightHistory {
+  private toDomainWeightHistory(
+    prismaData: Prisma.ParticipantWeightHistoryGetPayload<object>
+  ): ParticipantWeightHistory {
     return ParticipantWeightHistory.reconstitute({
       id: prismaData.id,
       participantId: prismaData.participantId,

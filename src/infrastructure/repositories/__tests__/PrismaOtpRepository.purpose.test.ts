@@ -1,7 +1,12 @@
+import { OtpVerificationId } from '@/domain/shared/EntityIds';
+import { OtpDestination } from '@/domain/otp/OtpValues';
+import { createOtpFixture } from '@/domain/otp/__tests__/otpTestValues';
 import { describe, it, expect, vi } from 'vitest';
 import { PrismaOtpRepository } from '../PrismaOtpRepository';
 import { OtpPurposes, OtpVerification } from '@/domain/otp/OtpVerification';
 import type { PrismaClient } from '@/generated/prisma/client';
+import { Instant } from '@/domain/shared/Instant';
+import { ClientIp } from '@/domain/auth/AuthValues';
 
 function buildRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -22,12 +27,45 @@ function buildRow(overrides: Record<string, unknown> = {}) {
 }
 
 describe('PrismaOtpRepository purpose', () => {
+  it('persists the supplied identity', async () => {
+    const create = vi.fn().mockResolvedValue(buildRow());
+    const prisma = { otpVerification: { create } } as unknown as PrismaClient;
+
+    await new PrismaOtpRepository(prisma).save(
+      OtpVerification.reconstitute(buildRow())
+    );
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ id: 'otp-1' }),
+      })
+    );
+  });
+
+  it('counts from the supplied cutoff without consulting another clock', async () => {
+    const count = vi.fn().mockResolvedValue(2);
+    const prisma = { otpVerification: { count } } as unknown as PrismaClient;
+    const since = Instant.parse('2026-10-25T10:00:00.000Z');
+
+    await new PrismaOtpRepository(prisma).countRecentByClientIp(
+      ClientIp.parse('127.0.0.1'),
+      since
+    );
+
+    expect(count).toHaveBeenCalledWith({
+      where: {
+        clientIp: '127.0.0.1',
+        createdAt: { gte: Instant.toDate(since) },
+      },
+    });
+  });
+
   it('persists the purpose on save', async () => {
     const create = vi.fn().mockResolvedValue(buildRow());
     const prisma = { otpVerification: { create } } as unknown as PrismaClient;
 
     await new PrismaOtpRepository(prisma).save(
-      OtpVerification.create({
+      createOtpFixture({
         identifier: 'ivan@mail.ru',
         channel: 'email',
         purpose: OtpPurposes.PASSWORD_RESET,
@@ -50,7 +88,9 @@ describe('PrismaOtpRepository purpose', () => {
       otpVerification: { findUnique: vi.fn().mockResolvedValue(buildRow()) },
     } as unknown as PrismaClient;
 
-    const otp = await new PrismaOtpRepository(prisma).findById('otp-1');
+    const otp = await new PrismaOtpRepository(prisma).findById(
+      OtpVerificationId.parse('otp-1')
+    );
 
     expect(otp?.purpose).toBe('password_reset');
   });
@@ -63,8 +103,7 @@ describe('PrismaOtpRepository purpose', () => {
     } as unknown as PrismaClient;
 
     await new PrismaOtpRepository(prisma).findLatestByIdentifier(
-      'ivan@mail.ru',
-      'email',
+      OtpDestination.parse({ identifier: 'ivan@mail.ru', channel: 'email' }),
       OtpPurposes.PASSWORD_RESET
     );
 
@@ -86,10 +125,9 @@ describe('PrismaOtpRepository purpose', () => {
     const result = await new PrismaOtpRepository(
       prisma
     ).countRecentByIdentifier(
-      'ivan@mail.ru',
-      'email',
+      OtpDestination.parse({ identifier: 'ivan@mail.ru', channel: 'email' }),
       OtpPurposes.EMAIL_CONFIRMATION,
-      24
+      Instant.parse('2026-10-25T00:00:00.000Z')
     );
 
     expect(result).toBe(2);

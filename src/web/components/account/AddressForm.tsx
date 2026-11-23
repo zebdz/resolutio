@@ -1,5 +1,7 @@
 'use client';
 
+/** Display known profile address fields and submit complete addresses through profile validation. */
+
 import { useTranslations } from 'next-intl';
 import { useState, useRef, useTransition } from 'react';
 import { Button } from '@/src/web/components/catalyst/button';
@@ -21,10 +23,10 @@ type AddressData = {
   region?: string;
   city: string;
   street: string;
-  building: string;
+  building?: string;
   apartment?: string;
   postalCode?: string;
-  isPrivateHouse: boolean;
+  isPrivateHouse?: boolean;
   oneLine?: string;
   houseFiasId?: string;
   flatFiasId?: string;

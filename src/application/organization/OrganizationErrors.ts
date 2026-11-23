@@ -1,5 +1,8 @@
 // Organization-related error codes
 // These should be translated at the presentation layer
+import { MembershipPolicyCodes } from '../../domain/organization/MembershipPolicy';
+import { OrganizationDomainCode } from '../../domain/organization/OrganizationDomainCodes';
+import { SharedDomainCode } from '../../domain/shared/SharedDomainCodes';
 export const OrganizationErrors = {
   // General
   NOT_FOUND: 'organization.errors.notFound',
@@ -7,8 +10,8 @@ export const OrganizationErrors = {
   NAME_EXISTS: 'organization.errors.nameExists',
 
   // Join/Membership
-  ALREADY_MEMBER: 'organization.errors.alreadyMember',
-  PENDING_REQUEST: 'organization.errors.pendingRequest',
+  ALREADY_MEMBER: MembershipPolicyCodes.ALREADY_MEMBER,
+  PENDING_REQUEST: MembershipPolicyCodes.PENDING_REQUEST,
   PENDING_INVITE: 'organization.errors.pendingInvite',
   REJECTED_REQUEST: 'organization.errors.rejectedRequest',
   HIERARCHY_CONFLICT: 'organization.errors.hierarchyConflict',
@@ -21,8 +24,8 @@ export const OrganizationErrors = {
   // Admin/Authorization
   NOT_ADMIN: 'organization.errors.notAdmin',
   INVALID_STATUS: 'organization.errors.invalidStatus',
-  REQUEST_NOT_FOUND: 'organization.errors.requestNotFound',
-  NOT_PENDING: 'organization.errors.notPending',
+  REQUEST_NOT_FOUND: MembershipPolicyCodes.REQUEST_NOT_FOUND,
+  NOT_PENDING: MembershipPolicyCodes.NOT_PENDING,
 
   // Join Parent Request
   CANNOT_JOIN_OWN_DESCENDANT: 'organization.errors.cannotJoinOwnDescendant',
@@ -54,3 +57,12 @@ export const OrganizationErrors = {
 
 export type OrganizationError =
   (typeof OrganizationErrors)[keyof typeof OrganizationErrors];
+
+/** Organization application failures retain the domain/adapter alternatives.
+ * Join-link and other context-specific operations add their failures locally. */
+export type OrganizationUseCaseFailure =
+  | OrganizationError
+  | OrganizationDomainCode
+  | SharedDomainCode
+  | 'common.errors.validationFailed'
+  | 'common.errors.unexpected';

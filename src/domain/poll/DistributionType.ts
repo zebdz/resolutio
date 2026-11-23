@@ -1,5 +1,5 @@
 import { Result, success, failure } from '../shared/Result';
-import { PollDomainCodes } from './PollDomainCodes';
+import { PollDomainCodes, PollDomainCode } from './PollDomainCodes';
 
 export const DistributionType = {
   EQUAL: 'EQUAL',
@@ -12,7 +12,7 @@ export type DistributionType =
 
 export function parseDistributionType(
   value: string
-): Result<DistributionType, string> {
+): Result<DistributionType, PollDomainCode> {
   if (
     value === DistributionType.EQUAL ||
     value === DistributionType.OWNERSHIP_UNIT_COUNT ||

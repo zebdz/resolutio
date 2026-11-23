@@ -1,3 +1,24 @@
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { VotingWeight } from '@/domain/poll/VotingWeight';
+import { PollState } from '@/domain/poll/PollState';
+import { PropertyName } from '@/domain/organization/PropertyValues';
+import { BoardId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import { PropertyId } from '@/domain/shared/EntityIds';
+import { UserId, PollEligibleMemberId } from '@/domain/shared/EntityIds';
+import { participantFixtureData } from '@/application/poll/__tests__/pollFixtureCreation';
+import {
+  pollFixtureCreation,
+  pollFixtureIds,
+  pollFixtureClock,
+} from '@/application/poll/__tests__/pollFixtureCreation';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { ParticipantId, PollId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { UpdatePollWeightConfigUseCase } from '../UpdatePollWeightConfigUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -18,44 +39,62 @@ import { PollWeightCalculator } from '../PollWeightCalculator';
 
 function makePoll(): Poll {
   const r = Poll.create(
-    'Test Poll',
-    'Test Description',
-    'org-1',
-    'board-1',
-    'admin-user',
-    new Date('2026-01-01'),
-    new Date('2026-12-31')
+    PollTitle.parse('Test Poll'),
+    PollDescription.parse('Test Description'),
+    OrganizationId.parse('org-1'),
+    BoardId.parse('board-1'),
+    UserId.parse('admin-user'),
+    expectSuccess(
+      PollPeriod.create(new Date('2026-01-01'), new Date('2026-12-31'))
+    ),
+    testCreation(PollId, 'poll-1')
   );
   expect(r.success).toBe(true);
-  const poll = r.value!;
-  (poll as any).props.id = 'poll-1';
+  let poll = expectSuccess(r)!;
+  poll = Poll.reconstitute({
+    ...poll.toJSON(),
+    questions: poll.questions,
+    id: 'poll-1',
+  });
 
   return poll;
 }
 
 function makeParticipant(userId: string, weight: number): PollParticipant {
-  const r = PollParticipant.create('poll-1', userId, weight);
+  const r = PollParticipant.create(
+    PollId.parse('poll-1'),
+    UserId.parse(userId),
+    pollFixtureCreation(ParticipantId),
+    VotingWeight.parse(weight)
+  );
   expect(r.success).toBe(true);
-  const p = r.value!;
-  (p as any).props.id = `participant-${userId}`;
+  let p = expectSuccess(r)!;
+  p = PollParticipant.reconstitute({
+    ...participantFixtureData(p),
+    id: `participant-${userId}`,
+  });
 
   return p;
 }
 
 function makeEligibleMember(userId: string): PollEligibleMember {
-  return PollEligibleMember.create('poll-1', userId, new Date());
+  return PollEligibleMember.create(
+    PollId.parse('poll-1'),
+    UserId.parse(userId),
+    pollFixtureCreation(PollEligibleMemberId)
+  );
 }
 
 function makeOrgProperty(id: string): OrganizationProperty {
   const r = OrganizationProperty.create(
-    'org-1',
-    `Property ${id}`,
+    OrganizationId.parse('org-1'),
+    PropertyName.parse(`Property ${id}`),
     null,
-    'SQUARE_METERS'
+    'SQUARE_METERS',
+    testCreation(PropertyId, id)
   );
   expect(r.success).toBe(true);
-  const prop = r.value!;
-  (prop as any).props.id = id;
+  const prop = expectSuccess(r)!;
 
   return prop;
 }
@@ -76,7 +115,7 @@ describe('UpdatePollWeightConfigUseCase', () => {
     poll = makePoll();
 
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
     };
 
     participantRepository = {
@@ -127,7 +166,9 @@ describe('UpdatePollWeightConfigUseCase', () => {
       eligibleRepository as PollEligibleMemberRepository,
       propertyAssetRepository as PropertyAssetRepository,
       organizationPropertyRepository as OrganizationPropertyRepository,
-      pollWeightCalculator as PollWeightCalculator
+      pollWeightCalculator as PollWeightCalculator,
+      pollFixtureIds,
+      pollFixtureClock
     );
   });
 
@@ -228,12 +269,19 @@ describe('UpdatePollWeightConfigUseCase', () => {
     // Bypass takeSnapshot()/activate() validation (test poll has no questions)
     // and set the state directly — we only care about the guard, not the
     // transitions themselves.
-    function setState(state: 'ACTIVE' | 'FINISHED' | 'READY') {
-      (poll as any).props.state = state;
+    function setState(
+      state: PollState.ACTIVE | PollState.FINISHED | PollState.READY
+    ) {
+      poll = Poll.reconstitute({
+        ...poll.toJSON(),
+        questions: poll.questions,
+        finishedAt: null,
+        state: state,
+      });
     }
 
     it('rejects with WEIGHT_CONFIG_LOCKED_AFTER_ACTIVATION when poll is ACTIVE', async () => {
-      setState('ACTIVE');
+      setState(PollState.ACTIVE);
 
       const result = await useCase.execute({
         pollId: 'poll-1',
@@ -256,7 +304,7 @@ describe('UpdatePollWeightConfigUseCase', () => {
     });
 
     it('rejects with WEIGHT_CONFIG_LOCKED_AFTER_ACTIVATION when poll is FINISHED', async () => {
-      setState('FINISHED');
+      setState(PollState.FINISHED);
 
       const result = await useCase.execute({
         pollId: 'poll-1',
@@ -276,7 +324,7 @@ describe('UpdatePollWeightConfigUseCase', () => {
     });
 
     it('allows edits in READY (post-snapshot, pre-activation)', async () => {
-      setState('READY');
+      setState(PollState.READY);
 
       const result = await useCase.execute({
         pollId: 'poll-1',
@@ -322,18 +370,26 @@ describe('UpdatePollWeightConfigUseCase', () => {
   });
 
   function makeOpenPoll(): Poll {
-    const openPoll = Poll.create(
-      'Open Poll',
-      'Everyone may vote',
-      'org-1',
-      null,
-      'user-admin',
-      new Date('2026-01-15'),
-      new Date('2026-02-15'),
-      undefined,
-      'OPEN'
-    ).value;
-    (openPoll as any).props.id = 'poll-1';
+    let openPoll = expectSuccess(
+      Poll.create(
+        PollTitle.parse('Open Poll'),
+        PollDescription.parse('Everyone may vote'),
+        OrganizationId.parse('org-1'),
+        null,
+        UserId.parse('user-admin'),
+        expectSuccess(
+          PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+        ),
+        testCreation(PollId, 'poll-1'),
+        undefined,
+        'OPEN'
+      )
+    );
+    openPoll = Poll.reconstitute({
+      ...openPoll.toJSON(),
+      questions: openPoll.questions,
+      id: 'poll-1',
+    });
 
     return openPoll;
   }
@@ -350,6 +406,6 @@ describe('UpdatePollWeightConfigUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.OPEN_CONFIG_FIXED);
+    expect(expectFailure(result)).toBe(PollErrors.OPEN_CONFIG_FIXED);
   });
 });

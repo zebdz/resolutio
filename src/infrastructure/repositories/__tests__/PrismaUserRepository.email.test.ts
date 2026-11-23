@@ -1,7 +1,9 @@
+/** Repository mapping preserves assigned identity and email confirmation semantics. */
 import { describe, it, expect, vi } from 'vitest';
 import { PrismaUserRepository } from '../PrismaUserRepository';
 import { EmailAddress } from '@/domain/user/EmailAddress';
 import type { PrismaClient } from '@/generated/prisma/client';
+import { UserId } from '@/domain/shared/EntityIds';
 
 function buildRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -28,6 +30,24 @@ function buildRow(overrides: Record<string, unknown> = {}) {
 }
 
 describe('PrismaUserRepository email mapping', () => {
+  it('persists the identity already assigned to the aggregate', async () => {
+    const upsert = vi.fn().mockResolvedValue(buildRow());
+    const prisma = {
+      user: { findUnique: vi.fn().mockResolvedValue(buildRow()), upsert },
+    } as unknown as PrismaClient;
+    const repository = new PrismaUserRepository(prisma);
+    const user = await repository.findById(UserId.parse('user-1'));
+
+    await repository.save(user!);
+
+    expect(upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'user-1' },
+        create: expect.objectContaining({ id: 'user-1' }),
+      })
+    );
+  });
+
   it('maps a stored email and its confirmation into the domain object', async () => {
     const prisma = {
       user: {
@@ -40,7 +60,9 @@ describe('PrismaUserRepository email mapping', () => {
       },
     } as unknown as PrismaClient;
 
-    const user = await new PrismaUserRepository(prisma).findById('user-1');
+    const user = await new PrismaUserRepository(prisma).findById(
+      UserId.parse('user-1')
+    );
 
     expect(user?.email?.getValue()).toBe('ivan@mail.ru');
     expect(user?.hasConfirmedEmail()).toBe(true);
@@ -51,7 +73,9 @@ describe('PrismaUserRepository email mapping', () => {
       user: { findUnique: vi.fn().mockResolvedValue(buildRow()) },
     } as unknown as PrismaClient;
 
-    const user = await new PrismaUserRepository(prisma).findById('user-1');
+    const user = await new PrismaUserRepository(prisma).findById(
+      UserId.parse('user-1')
+    );
 
     expect(user?.email).toBeUndefined();
     expect(user?.hasConfirmedEmail()).toBe(false);

@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { generateSessionId } from '../PrismaSessionRepository';
+import { CryptoSessionTokenGenerator } from '../../auth/CryptoSessionTokenGenerator';
+
+const generateSessionId = () => new CryptoSessionTokenGenerator().generate();
 
 describe('generateSessionId', () => {
   it('should produce a 64-char hex string (256 bits)', () => {

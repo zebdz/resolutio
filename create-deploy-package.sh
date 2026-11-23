@@ -1,39 +1,17 @@
-#!/bin/bash
-
-# Deployment package creation script
-# This creates a minimal deployment package and installs dependencies on production
-
-echo "Creating deployment package..."
-
-# Create package with built files only (no node_modules)
-# Copy .env.production as .env for deployment
-cp .env.production .env
-
-tar -czf deploy.tar.gz \
-  .next/ \
-  generated/ \
-  prisma/ \
-  public/ \
-  src/ \
-  messages/ \
-  package.json \
-  yarn.lock \
-  next.config.ts \
-  prisma.config.ts \
-  migrate-production.sh \
-  tsconfig.json \
-  eslint.config.mjs \
-  postcss.config.mjs \
-  next-env.d.ts \
-  .env
-
-# Clean up temporary .env file
-rm .env
-
-echo "✅ Deployment package created: deploy.tar.gz"
-echo ""
-echo "📦 On production server, run:"
-echo "  1. tar -xzf deploy.tar.gz"
-echo "  2. yarn install --production=false"
-echo "  3. ./migrate-production.sh"
-echo "  4. yarn start (or restart via ISP panel)"
+#!/usr/bin/env bash
+# Package the built application, verifier and migration tools. Stage the chosen
+# runtime configuration privately so a developer's local .env is preserved.
+set -eu
+umask 077
+runtime_env=${1:-.env.production}
+archive=${2:-deploy.tar.gz}
+stage=$(mktemp -d)
+trap 'rm -f "$stage/.env"; rmdir "$stage"' EXIT
+install -m 600 "$runtime_env" "$stage/.env"
+tar --exclude=.next/dev --exclude=.next/cache --exclude=.next/trace -czf "$archive" \
+  .next node_modules generated prisma public messages \
+  src/infrastructure/anchor/ots-worker.mjs src/i18n build/version-helper.ts \
+  build/backfill-receipt-secrets.cjs build/verify-seal.mjs scripts/seal-ops scripts/berezka/{import,preflight,matching,apply,project,verify,verify-access,content,native-import,meeting-import,meeting-evidence}.mjs scripts/berezka/{staging,evidence-access}.sql \
+  package.json next.config.ts prisma.config.ts migrate-production.sh \
+  deploy-on-server.sh start-production.sh -C "$stage" .env
+chmod 600 "$archive"

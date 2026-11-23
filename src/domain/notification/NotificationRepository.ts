@@ -1,22 +1,14 @@
-import { Notification } from './Notification';
+/** Append-only notification persistence accepts validated aggregates and explicit outcomes.
+ * Inbox queries and recipient operations have separate ports; producer failures cannot appear as success. */
+import type { Notification } from './Notification';
+import type { Result } from '../shared/Result';
 
-export interface FindByUserIdOptions {
-  limit?: number;
-  offset?: number;
-}
-
+export type NotificationStorageFailure = 'common.errors.unexpected';
 export interface NotificationRepository {
-  save(notification: Notification): Promise<Notification>;
-  saveBatch(notifications: Notification[]): Promise<void>;
-  findById(id: string): Promise<Notification | null>;
-  findByUserId(
-    userId: string,
-    options?: FindByUserIdOptions
-  ): Promise<Notification[]>;
-  getUnreadCount(userId: string): Promise<number>;
-  markAsRead(id: string): Promise<void>;
-  markAllAsRead(userId: string): Promise<void>;
-  findByIds(ids: string[]): Promise<Notification[]>;
-  deleteByIds(ids: string[]): Promise<void>;
-  getCountByUserId(userId: string): Promise<number>;
+  save(
+    notification: Notification
+  ): Promise<Result<Notification, NotificationStorageFailure>>;
+  saveBatch(
+    notifications: Notification[]
+  ): Promise<Result<void, NotificationStorageFailure>>;
 }

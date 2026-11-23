@@ -1,3 +1,5 @@
+import { UserId } from '@/domain/shared/EntityIds';
+import { authTestDependencies } from '@/application/auth/__tests__/authTestValues';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ResetUserOtpUseCase } from '../ResetUserOtpUseCase';
 import { User } from '@/domain/user/User';
@@ -28,13 +30,14 @@ describe('ResetUserOtpUseCase', () => {
     otpRepository = { deleteAllForUser: vi.fn().mockResolvedValue(4) };
 
     useCase = new ResetUserOtpUseCase({
+      ...authTestDependencies(),
       userRepository: userRepository as UserRepository,
       otpRepository: otpRepository as OtpRepository,
     });
   });
 
   it('removes every code issued to the user and reports the count', async () => {
-    const result = await useCase.execute({ userId: 'user-1' });
+    const result = await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(result.success).toBe(true);
 
@@ -50,7 +53,7 @@ describe('ResetUserOtpUseCase', () => {
       null
     );
 
-    const result = await useCase.execute({ userId: 'ghost' });
+    const result = await useCase.execute({ userId: UserId.parse('ghost') });
 
     expect(result.success).toBe(false);
 

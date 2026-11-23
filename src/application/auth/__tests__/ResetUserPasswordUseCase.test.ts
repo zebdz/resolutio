@@ -1,3 +1,5 @@
+import { UserId } from '@/domain/shared/EntityIds';
+import { authTestDependencies } from '@/application/auth/__tests__/authTestValues';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ResetUserPasswordUseCase } from '../ResetUserPasswordUseCase';
 import { PasswordGenerator } from '../PasswordGenerator';
@@ -39,10 +41,13 @@ describe('ResetUserPasswordUseCase', () => {
     };
     passwordHasher = { hash: vi.fn().mockResolvedValue('new-hash') };
     passwordGenerator = {
-      generate: vi.fn().mockReturnValue('gen3-Rated-Pass'),
+      generate: vi
+        .fn()
+        .mockReturnValue(GeneratedPassword.parse('gen3-Rated-Pass')),
     };
 
     useCase = new ResetUserPasswordUseCase({
+      ...authTestDependencies(),
       userRepository: userRepository as UserRepository,
       sessionRepository: sessionRepository as SessionRepository,
       passwordHasher,
@@ -51,7 +56,7 @@ describe('ResetUserPasswordUseCase', () => {
   });
 
   it('returns the generated plaintext password', async () => {
-    const result = await useCase.execute({ userId: 'user-1' });
+    const result = await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(result.success).toBe(true);
 
@@ -61,7 +66,7 @@ describe('ResetUserPasswordUseCase', () => {
   });
 
   it('stores the hash of the generated password, never the plaintext', async () => {
-    await useCase.execute({ userId: 'user-1' });
+    await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(passwordHasher.hash).toHaveBeenCalledWith('gen3-Rated-Pass');
 
@@ -71,7 +76,7 @@ describe('ResetUserPasswordUseCase', () => {
   });
 
   it('leaves the rest of the user untouched', async () => {
-    await useCase.execute({ userId: 'user-1' });
+    await useCase.execute({ userId: UserId.parse('user-1') });
 
     const savedUser = (userRepository.save as ReturnType<typeof vi.fn>).mock
       .calls[0][0] as User;
@@ -79,11 +84,11 @@ describe('ResetUserPasswordUseCase', () => {
     expect(savedUser.firstName).toBe('Ivan');
     expect(savedUser.phoneNumber.getValue()).toBe('+79161234567');
     expect(savedUser.nickname.getValue()).toBe('ivan_ivanov');
-    expect(savedUser.confirmedAt).toEqual(new Date('2026-01-02'));
+    expect(savedUser.confirmedAt).toBe('2026-01-02T00:00:00.000Z');
   });
 
   it('revokes every session the old password had opened', async () => {
-    await useCase.execute({ userId: 'user-1' });
+    await useCase.execute({ userId: UserId.parse('user-1') });
 
     expect(sessionRepository.deleteAllForUser).toHaveBeenCalledWith('user-1');
   });
@@ -93,7 +98,7 @@ describe('ResetUserPasswordUseCase', () => {
       null
     );
 
-    const result = await useCase.execute({ userId: 'missing' });
+    const result = await useCase.execute({ userId: UserId.parse('missing') });
 
     expect(result.success).toBe(false);
 
@@ -105,3 +110,5 @@ describe('ResetUserPasswordUseCase', () => {
     expect(sessionRepository.deleteAllForUser).not.toHaveBeenCalled();
   });
 });
+/** Resets store only the generated credential's hash and revoke every previous session. */
+import { GeneratedPassword } from '@/domain/user/UserValues';

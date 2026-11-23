@@ -1,3 +1,25 @@
+/** Poll use-case compatibility: explicit creation fixtures and repository ports
+ * preserve authorization, eligibility and expected user-visible outcomes. */
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { VotingWeight } from '@/domain/poll/VotingWeight';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { createQuestionIds, questionClock } from './questionTestValues';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import {
+  PollId,
+  QuestionId,
+  AnswerId,
+  ParticipantId,
+  ParticipantWeightHistoryId,
+  VoteId,
+  VoteDraftId,
+  UserId,
+  OrganizationId,
+  BoardId,
+} from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GetUserVotingProgressUseCase } from '../GetUserVotingProgressUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -14,6 +36,7 @@ import { Answer } from '../../../domain/poll/Answer';
 import { Decimal } from 'decimal.js';
 import { PollState } from '../../../domain/poll/PollState';
 import { UserRepository } from '../../../domain/user/UserRepository';
+import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { User } from '../../../domain/user/User';
 
 const confirmedUser = { isConfirmed: () => true } as unknown as User;
@@ -25,6 +48,7 @@ describe('GetUserVotingProgressUseCase', () => {
   let voteRepository: Partial<VoteRepository>;
   let draftRepository: Partial<DraftRepository>;
   let userRepository: Partial<UserRepository>;
+  let organizationRepository: Partial<OrganizationRepository>;
   let useCase: GetUserVotingProgressUseCase;
   let poll: Poll;
   let question1: Question;
@@ -36,52 +60,61 @@ describe('GetUserVotingProgressUseCase', () => {
   beforeEach(() => {
     // Create a poll
     const pollResult = Poll.create(
-      'Test Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'user-admin',
-      new Date('2026-01-15'),
-      new Date('2026-02-15')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-admin'),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
 
     expect(pollResult.success).toBe(true);
-    poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    poll = expectSuccess(pollResult);
 
     // Create two questions
     const question1Result = Question.create(
-      'Question 1',
+      QuestionText.parse('Question 1'),
       poll.id,
-      1,
-      0,
+      testCreation(QuestionId, 'question-1'),
+      PageNumber.parse(1),
+      SortOrder.parse(0),
       'single-choice'
     );
     expect(question1Result.success).toBe(true);
-    question1 = question1Result.value;
-    (question1 as any).props.id = 'question-1';
+    question1 = expectSuccess(question1Result);
 
     const question2Result = Question.create(
-      'Question 2',
+      QuestionText.parse('Question 2'),
       poll.id,
-      1,
-      1,
+      testCreation(QuestionId, 'question-2'),
+      PageNumber.parse(1),
+      SortOrder.parse(1),
       'single-choice'
     );
     expect(question2Result.success).toBe(true);
-    question2 = question2Result.value;
-    (question2 as any).props.id = 'question-2';
+    question2 = expectSuccess(question2Result);
 
     // Create answers
-    const answer1Result = Answer.create('Answer 1', 1, question1.id);
+    const answer1Result = Answer.create(
+      AnswerText.parse('Answer 1'),
+      SortOrder.parse(1),
+      question1.id,
+      testCreation(AnswerId, 'answer-1')
+    );
     expect(answer1Result.success).toBe(true);
-    answer1 = answer1Result.value;
-    (answer1 as any).props.id = 'answer-1';
+    answer1 = expectSuccess(answer1Result);
 
-    const answer2Result = Answer.create('Answer 2', 1, question2.id);
+    const answer2Result = Answer.create(
+      AnswerText.parse('Answer 2'),
+      SortOrder.parse(1),
+      question2.id,
+      testCreation(AnswerId, 'answer-2')
+    );
     expect(answer2Result.success).toBe(true);
-    answer2 = answer2Result.value;
-    (answer2 as any).props.id = 'answer-2';
+    answer2 = expectSuccess(answer2Result);
 
     // Reconstitute poll with questions (in ACTIVE state)
     poll = Poll.reconstitute({
@@ -98,6 +131,7 @@ describe('GetUserVotingProgressUseCase', () => {
       distributionType: 'EQUAL',
       propertyAggregation: 'RAW_SUM',
       propertyIds: [],
+      anonymous: false,
       createdBy: poll.createdBy,
       createdAt: poll.createdAt,
       archivedAt: poll.archivedAt,
@@ -107,16 +141,16 @@ describe('GetUserVotingProgressUseCase', () => {
     // Create a participant
     const participantResult = PollParticipant.create(
       poll.id,
-      'user-1',
-      new Decimal(1.0).toNumber()
+      UserId.parse('user-1'),
+      testCreation(ParticipantId, 'participant-1'),
+      VotingWeight.parse(new Decimal(1.0).toNumber())
     );
     expect(participantResult.success).toBe(true);
-    participant = participantResult.value;
-    (participant as any).props.id = 'participant-1';
+    participant = expectSuccess(participantResult);
 
     // Mock repositories
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
     };
 
     participantRepository = {
@@ -135,6 +169,11 @@ describe('GetUserVotingProgressUseCase', () => {
 
     userRepository = {
       findById: vi.fn().mockResolvedValue(confirmedUser),
+      isSuperAdmin: vi.fn().mockResolvedValue(false),
+    };
+    organizationRepository = {
+      isUserMember: vi.fn().mockResolvedValue(true),
+      isUserAdmin: vi.fn().mockResolvedValue(false),
     };
 
     useCase = new GetUserVotingProgressUseCase(
@@ -142,7 +181,8 @@ describe('GetUserVotingProgressUseCase', () => {
       participantRepository as ParticipantRepository,
       voteRepository as VoteRepository,
       draftRepository as DraftRepository,
-      userRepository as UserRepository
+      userRepository as UserRepository,
+      organizationRepository as OrganizationRepository
     );
   });
 
@@ -165,18 +205,54 @@ describe('GetUserVotingProgressUseCase', () => {
     }
   });
 
+  it('denies an organization outsider before loading private voting progress', async () => {
+    vi.mocked(
+      participantRepository.getParticipantByUserAndPoll!
+    ).mockResolvedValue(success(null));
+    vi.mocked(organizationRepository.isUserMember!).mockResolvedValue(false);
+    const result = await useCase.execute({
+      userId: 'outsider',
+      pollId: poll.id,
+    });
+    expect(result).toEqual({
+      success: false,
+      error: PollErrors.NOT_ORG_MEMBER,
+    });
+    expect(draftRepository.getUserDrafts).not.toHaveBeenCalled();
+    expect(voteRepository.hasUserFinishedVoting).not.toHaveBeenCalled();
+  });
+
+  it.each(['organization', 'superadmin'])(
+    'allows %s administrators without membership',
+    async (role) => {
+      vi.mocked(organizationRepository.isUserMember!).mockResolvedValue(false);
+      vi.mocked(organizationRepository.isUserAdmin!).mockResolvedValue(
+        role === 'organization'
+      );
+      vi.mocked(userRepository.isSuperAdmin!).mockResolvedValue(
+        role === 'superadmin'
+      );
+      const result = await useCase.execute({
+        userId: 'admin',
+        pollId: poll.id,
+      });
+      expect(result.success).toBe(true);
+    }
+  );
+
   it('should return voting progress with drafts', async () => {
     // Create draft
     const draftResult = VoteDraft.create(
       poll.id,
       question1.id,
       answer1.id,
-      'user-1'
+      UserId.parse('user-1'),
+      testCreation(VoteDraftId, 'draft-1')
     );
     expect(draftResult.success).toBe(true);
     draftRepository.getUserDrafts = vi
       .fn()
-      .mockResolvedValue(success([draftResult.value]));
+      .mockResolvedValue(success([expectSuccess(draftResult)]));
 
     const result = await useCase.execute({
       userId: 'user-1',
@@ -229,6 +305,7 @@ describe('GetUserVotingProgressUseCase', () => {
       distributionType: 'EQUAL',
       propertyAggregation: 'RAW_SUM',
       propertyIds: [],
+      anonymous: false,
       createdBy: poll.createdBy,
       createdAt: poll.createdAt,
       archivedAt: poll.archivedAt,
@@ -267,6 +344,7 @@ describe('GetUserVotingProgressUseCase', () => {
       distributionType: 'EQUAL',
       propertyAggregation: 'RAW_SUM',
       propertyIds: [],
+      anonymous: false,
       createdBy: poll.createdBy,
       createdAt: poll.createdAt,
       archivedAt: poll.archivedAt,
@@ -324,7 +402,7 @@ describe('GetUserVotingProgressUseCase', () => {
 
   it('should exclude archived questions from total count', async () => {
     // Archive first question
-    question1.archive();
+    question1.archive(questionClock.now());
 
     const result = await useCase.execute({
       userId: 'user-1',
@@ -344,19 +422,23 @@ describe('GetUserVotingProgressUseCase', () => {
     const draft1Result = VoteDraft.create(
       poll.id,
       question1.id,
-      'answer-1',
-      'user-1'
+      AnswerId.parse('answer-1'),
+      UserId.parse('user-1'),
+      testCreation(VoteDraftId, 'draft-2')
     );
     const draft2Result = VoteDraft.create(
       poll.id,
       question1.id,
-      'answer-2',
-      'user-1'
+      AnswerId.parse('answer-2'),
+      UserId.parse('user-1'),
+      testCreation(VoteDraftId, 'draft-3')
     );
     expect(draft1Result.success && draft2Result.success).toBe(true);
     draftRepository.getUserDrafts = vi
       .fn()
-      .mockResolvedValue(success([draft1Result.value, draft2Result.value]));
+      .mockResolvedValue(
+        success([expectSuccess(draft1Result), expectSuccess(draft2Result)])
+      );
 
     const result = await useCase.execute({
       userId: 'user-1',
@@ -392,13 +474,16 @@ describe('GetUserVotingProgressUseCase', () => {
         distributionType: 'EQUAL',
         propertyAggregation: 'RAW_SUM',
         propertyIds: [],
+        anonymous: false,
         createdBy: poll.createdBy,
         createdAt: poll.createdAt,
         archivedAt: null,
         questions: [question1, question2],
       });
 
-      pollRepository.getPollById = vi.fn().mockResolvedValue(success(openPoll));
+      pollRepository.getPollById = vi
+        .fn()
+        .mockImplementation(async () => success(openPoll));
       participantRepository.getParticipantByUserAndPoll = vi
         .fn()
         .mockResolvedValue(success(null));
@@ -411,7 +496,7 @@ describe('GetUserVotingProgressUseCase', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(result.value.canVote).toBe(true);
+      expect(expectSuccess(result).canVote).toBe(true);
     });
 
     it('canVote is false for an unconfirmed user', async () => {
@@ -423,7 +508,7 @@ describe('GetUserVotingProgressUseCase', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(result.value.canVote).toBe(false);
+      expect(expectSuccess(result).canVote).toBe(false);
     });
 
     it('canVote is false once the user has finished voting', async () => {
@@ -437,8 +522,8 @@ describe('GetUserVotingProgressUseCase', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(result.value.canVote).toBe(false);
-      expect(result.value.hasFinished).toBe(true);
+      expect(expectSuccess(result).canVote).toBe(false);
+      expect(expectSuccess(result).hasFinished).toBe(true);
     });
   });
 });

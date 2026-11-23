@@ -1,3 +1,9 @@
+/** Property/claim boundary regressions exercise authorized flows with explicit
+ * creation inputs while keeping raw persistence fixtures distinct from domain values. */
+import {
+  propertyTestCreation,
+  propertyTestInstant,
+} from './propertyTestValues';
 import { describe, it, expect } from 'vitest';
 import { CreatePropertyUseCase } from '../CreatePropertyUseCase';
 import { OrganizationProperty } from '../../../domain/organization/OrganizationProperty';
@@ -20,6 +26,7 @@ const mkDeps = (
   };
   const saved: OrganizationProperty[] = [];
   const deps = {
+    ...propertyTestCreation(),
     propertyRepository: {
       save: async (p: OrganizationProperty) => {
         saved.push(p);
@@ -33,7 +40,10 @@ const mkDeps = (
     userRepository: {
       isSuperAdmin: async () => cfg.isSuperAdmin,
     } as any,
-    profanityChecker: { containsProfanity: () => false },
+    profanityChecker: {
+      findProfaneWords: () => [],
+      containsProfanity: () => false,
+    },
   };
 
   return { deps, saved };
@@ -52,6 +62,8 @@ describe('CreatePropertyUseCase', () => {
     });
     expect(r.success).toBe(true);
     expect(saved.length).toBe(1);
+    expect(saved[0].id).toBe('created-1');
+    expect(saved[0].createdAt.toISOString()).toBe(propertyTestInstant);
   });
 
   it('rejects non-admin, non-superadmin', async () => {

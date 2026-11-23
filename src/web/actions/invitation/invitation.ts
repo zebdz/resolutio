@@ -1,5 +1,15 @@
 'use server';
 
+/** Invitation and membership actions authorize requests, compose application ports,
+ * and serialize localized, permitted browser payloads. */
+
+import { PrismaMembershipStore } from '@/infrastructure/repositories/PrismaMembershipStore';
+import { PrismaOrganizationDirectory } from '@/infrastructure/repositories/PrismaOrganizationDirectory';
+import { serializeDirectoryMember } from '@/web/actions/organization/serializeDirectory';
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
 import { getTranslations } from 'next-intl/server';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { CreateAdminInviteUseCase } from '@/application/invitation/CreateAdminInviteUseCase';
@@ -10,10 +20,12 @@ import { RevokeInviteUseCase } from '@/application/invitation/RevokeInviteUseCas
 import { GetPendingAdminInvitesUseCase } from '@/application/invitation/GetPendingAdminInvitesUseCase';
 import { GetPendingBoardInvitesUseCase } from '@/application/invitation/GetPendingBoardInvitesUseCase';
 import { GetPendingMemberInvitesUseCase } from '@/application/invitation/GetPendingMemberInvitesUseCase';
+import { GetInviteDetailsUseCase } from '@/application/invitation/GetInviteDetailsUseCase';
 import {
-  GetInviteDetailsUseCase,
-  InviteDetails,
-} from '@/application/invitation/GetInviteDetailsUseCase';
+  serializeInviteDetails,
+  InviteDetailsDto,
+  type PendingInviteView,
+} from './serializeInviteDetails';
 import { GetUserPendingInvitesUseCase } from '@/application/invitation/GetUserPendingInvitesUseCase';
 import { GetOrgMembersUseCase } from '@/application/organization/GetOrgMembersUseCase';
 import {
@@ -59,6 +71,8 @@ export async function createAdminInviteAction(
     }
 
     const useCase = new CreateAdminInviteUseCase({
+      ids: new CryptoIdGenerator(),
+      clock: new SystemClock(),
       invitationRepository,
       organizationRepository,
       userRepository,
@@ -106,6 +120,8 @@ export async function createBoardMemberInviteAction(
     }
 
     const useCase = new CreateBoardMemberInviteUseCase({
+      ids: new CryptoIdGenerator(),
+      clock: new SystemClock(),
       invitationRepository,
       boardRepository,
       organizationRepository,
@@ -154,7 +170,9 @@ export async function createOrgMemberInviteAction(
     }
 
     const useCase = new CreateOrgMemberInviteUseCase({
-      prisma,
+      ids: new CryptoIdGenerator(),
+      clock: new SystemClock(),
+      memberships: new PrismaMembershipStore(prisma),
       invitationRepository,
       organizationRepository,
       userRepository,
@@ -202,7 +220,9 @@ export async function handleInviteAction(
     }
 
     const useCase = new HandleInviteUseCase({
-      prisma,
+      ids: new CryptoIdGenerator(),
+      clock: new SystemClock(),
+      memberships: new PrismaMembershipStore(prisma),
       invitationRepository,
       organizationRepository,
       boardRepository,
@@ -250,6 +270,8 @@ export async function revokeInviteAction(
     }
 
     const useCase = new RevokeInviteUseCase({
+      ids: new CryptoIdGenerator(),
+      clock: new SystemClock(),
       invitationRepository,
       organizationRepository,
       userRepository,
@@ -278,11 +300,7 @@ export async function revokeInviteAction(
 
 export async function getPendingAdminInvitesAction(
   organizationId: string
-): Promise<
-  ActionResult<
-    { id: string; inviteeId: string; inviterId: string; createdAt: Date }[]
-  >
-> {
+): Promise<ActionResult<PendingInviteView[]>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -334,11 +352,7 @@ export async function getPendingAdminInvitesAction(
 
 export async function getPendingBoardInvitesAction(
   boardId: string
-): Promise<
-  ActionResult<
-    { id: string; inviteeId: string; inviterId: string; createdAt: Date }[]
-  >
-> {
+): Promise<ActionResult<PendingInviteView[]>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -391,11 +405,7 @@ export async function getPendingBoardInvitesAction(
 
 export async function getPendingMemberInvitesAction(
   organizationId: string
-): Promise<
-  ActionResult<
-    { id: string; inviteeId: string; inviterId: string; createdAt: Date }[]
-  >
-> {
+): Promise<ActionResult<PendingInviteView[]>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -477,7 +487,10 @@ export async function getInviteDetailsAction(invitationId: string) {
       };
     }
 
-    return { success: true as const, data: result.value };
+    return {
+      success: true as const,
+      data: serializeInviteDetails(result.value),
+    };
   } catch (error) {
     console.error('Error fetching invite details:', error);
 
@@ -507,7 +520,7 @@ export async function getOrgMembersAction(
     }
 
     const useCase = new GetOrgMembersUseCase({
-      prisma,
+      directory: new PrismaOrganizationDirectory(prisma),
       organizationRepository,
       userRepository,
     });
@@ -527,7 +540,13 @@ export async function getOrgMembersAction(
       };
     }
 
-    return { success: true as const, data: result.value };
+    return {
+      success: true as const,
+      data: {
+        members: result.value.members.map(serializeDirectoryMember),
+        totalCount: result.value.totalCount,
+      },
+    };
   } catch (error) {
     console.error('Error fetching org members:', error);
 
@@ -536,7 +555,7 @@ export async function getOrgMembersAction(
 }
 
 export async function getUserPendingInvitesAction(): Promise<
-  ActionResult<InviteDetails[]>
+  ActionResult<InviteDetailsDto[]>
 > {
   const rateLimited = await checkRateLimit();
 
@@ -569,7 +588,7 @@ export async function getUserPendingInvitesAction(): Promise<
       };
     }
 
-    return { success: true, data: result.value };
+    return { success: true, data: result.value.map(serializeInviteDetails) };
   } catch (error) {
     console.error('Error fetching user pending invites:', error);
 

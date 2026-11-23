@@ -1,29 +1,47 @@
-import { PrismaClient } from '@/generated/prisma/client';
+/** Join-link application boundary validates external values before invoking
+ * domain behavior and typed authorization/persistence ports. */
+import { OrganizationId } from '../../domain/shared/EntityIds';
+import {
+  MemberCount,
+  OrganizationName,
+  OrganizationDescription,
+} from '../../domain/organization/OrganizationValues';
+
+import { JoinTokenValue } from '../../domain/organization/JoinTokenValues';
+import { OrganizationDirectory } from './OrganizationDirectory';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { JoinTokenRepository } from '../../domain/organization/JoinTokenRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { JoinTokenErrors } from './JoinTokenErrors';
+import { JoinTokenErrors, JoinTokenUseCaseFailure } from './JoinTokenErrors';
 import { OrganizationErrors } from './OrganizationErrors';
 
 export interface GetJoinTokenPublicInfoDependencies {
   joinTokenRepository: JoinTokenRepository;
   organizationRepository: OrganizationRepository;
-  prisma: PrismaClient;
+  directory: Pick<OrganizationDirectory, 'countAcceptedMembers'>;
 }
 
 export interface JoinTokenPublicInfo {
-  organizationId: string;
-  organizationName: string;
-  organizationDescription: string;
-  memberCount: number;
+  organizationId: OrganizationId;
+  organizationName: OrganizationName;
+  organizationDescription: OrganizationDescription;
+  memberCount: MemberCount;
 }
 
 export class GetJoinTokenPublicInfoUseCase {
   constructor(private deps: GetJoinTokenPublicInfoDependencies) {}
 
   async execute(
-    tokenValue: string
-  ): Promise<Result<JoinTokenPublicInfo, string>> {
+    rawTokenValue: string
+  ): Promise<Result<JoinTokenPublicInfo, JoinTokenUseCaseFailure>> {
+    const parsedTokenValue = JoinTokenValue.safeParse(rawTokenValue);
+
+    if (!parsedTokenValue.success) {
+      return failure(JoinTokenErrors.NOT_FOUND);
+    }
+
+    const tokenValue = parsedTokenValue.data;
+
     // 1. Find token by token value
     const token = await this.deps.joinTokenRepository.findByToken(tokenValue);
 
@@ -50,18 +68,19 @@ export class GetJoinTokenPublicInfoUseCase {
     }
 
     // 4. Count accepted members
-    const memberCount = await this.deps.prisma.organizationUser.count({
-      where: {
-        organizationId: token.organizationId,
-        status: 'accepted',
-      },
-    });
+    const count = await this.deps.directory.countAcceptedMembers(
+      token.organizationId
+    );
+
+    if (!count.success) {
+      return count;
+    }
 
     return success({
       organizationId: org.id,
       organizationName: org.name,
       organizationDescription: org.description,
-      memberCount,
+      memberCount: count.value,
     });
   }
 }

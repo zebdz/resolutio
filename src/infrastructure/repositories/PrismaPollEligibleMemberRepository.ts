@@ -1,3 +1,7 @@
+/** Stores the supplied eligibility identity/time and decodes stored snapshots.
+ * Storage failures never expose database exception text to application callers. */
+import { PollId } from '../../domain/shared/EntityIds';
+import { PollWriteFailure } from '../../domain/poll/PollWriteFailure';
 import { PrismaClient } from '@/generated/prisma/client';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollEligibleMember } from '../../domain/poll/PollEligibleMember';
@@ -8,7 +12,7 @@ export class PrismaPollEligibleMemberRepository implements PollEligibleMemberRep
 
   async createMany(
     members: PollEligibleMember[]
-  ): Promise<Result<void, string>> {
+  ): Promise<Result<void, PollWriteFailure>> {
     try {
       if (members.length === 0) {
         return success(undefined);
@@ -16,6 +20,8 @@ export class PrismaPollEligibleMemberRepository implements PollEligibleMemberRep
 
       await this.prisma.pollEligibleMember.createMany({
         data: members.map((m) => ({
+          id: m.id,
+          createdAt: m.createdAt,
           pollId: m.pollId,
           userId: m.userId,
           snapshotAt: m.snapshotAt,
@@ -25,13 +31,13 @@ export class PrismaPollEligibleMemberRepository implements PollEligibleMemberRep
 
       return success(undefined);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findByPollId(
-    pollId: string
-  ): Promise<Result<PollEligibleMember[], string>> {
+    pollId: PollId
+  ): Promise<Result<PollEligibleMember[], PollWriteFailure>> {
     try {
       const rows = await this.prisma.pollEligibleMember.findMany({
         where: { pollId },
@@ -49,7 +55,7 @@ export class PrismaPollEligibleMemberRepository implements PollEligibleMemberRep
         )
       );
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 }

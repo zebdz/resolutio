@@ -1,11 +1,14 @@
+/** Removes an eligible snapshot participant after authorization and voting checks.
+ * External identifiers are decoded before they enter repository contracts. */
 import { Result, success, failure } from '../../domain/shared/Result';
+import { ParticipantId, UserId } from '@/domain/shared/EntityIds';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { ParticipantRepository } from '../../domain/poll/ParticipantRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 import { OrganizationErrors } from '../organization/OrganizationErrors';
 import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
 
@@ -24,8 +27,20 @@ export class RemoveParticipantUseCase {
     private boardRepository: BoardRepository
   ) {}
 
-  async execute(input: RemoveParticipantInput): Promise<Result<void, string>> {
-    const { participantId, adminUserId } = input;
+  async execute(
+    input: RemoveParticipantInput
+  ): Promise<
+    Result<void, PollUseCaseFailure | typeof OrganizationErrors.NOT_ADMIN>
+  > {
+    const parsedParticipantId = ParticipantId.safeParse(input.participantId);
+    const parsedAdminId = UserId.safeParse(input.adminUserId);
+
+    if (!parsedParticipantId.success || !parsedAdminId.success) {
+      return failure(PollDomainCodes.INVALID_BALLOT);
+    }
+
+    const participantId = parsedParticipantId.data;
+    const adminUserId = parsedAdminId.data;
 
     // 1. Get participant
     const participantResult =
@@ -38,7 +53,7 @@ export class RemoveParticipantUseCase {
     const participant = participantResult.value;
 
     if (!participant) {
-      return failure('poll.errors.participantNotFound');
+      return failure(PollErrors.PARTICIPANT_NOT_FOUND);
     }
 
     // 2. Get poll

@@ -1,38 +1,64 @@
+/** Validated property-claim evidence metadata with caller-assigned identity/time.
+ * Content bytes remain separate, so metadata never leaks file content across boundaries. */
+import { z } from 'zod';
+import { EntityCreation } from '../shared/EntityCreation';
+import {
+  PropertyClaimAttachmentId,
+  PropertyClaimId,
+} from '../shared/EntityIds';
+import { Instant } from '../shared/Instant';
+import {
+  AttachmentFileName,
+  AttachmentByteCount,
+} from '../shared/attachments/AttachmentValues';
+import { SharedDomainCodes } from '../shared/SharedDomainCodes';
 import { Result, success, failure } from '../shared/Result';
-import { OrganizationDomainCodes } from './OrganizationDomainCodes';
+import {
+  OrganizationDomainCodes,
+  OrganizationDomainCode,
+} from './OrganizationDomainCodes';
 
 // 10 MB cap. Files are stored inline as Postgres BYTEA; Postgres TOAST keeps
 // values >2 KB out of line so this does not slow scans on the parent claim.
-export const PROPERTY_CLAIM_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+export const PROPERTY_CLAIM_ATTACHMENT_MAX_BYTES = AttachmentByteCount.parse(
+  10 * 1024 * 1024
+);
 
 // Whitelist of accepted upload types — common image formats, PDF, and ZIP
 // (a folder of scanned documents bundled together is a frequent shape for
 // proof-of-ownership). Adding a type here is intentional; do not loosen
 // this set without a security review.
-export const PROPERTY_CLAIM_ATTACHMENT_ALLOWED_MIME_TYPES = [
+export const PROPERTY_CLAIM_ATTACHMENT_ALLOWED_MIME_TYPES = Object.freeze([
   'image/png',
   'image/jpeg',
   'image/webp',
   'application/pdf',
   'application/zip',
-] as const;
+] as const);
 
 export type PropertyClaimAttachmentMimeType =
   (typeof PROPERTY_CLAIM_ATTACHMENT_ALLOWED_MIME_TYPES)[number];
 
 interface CreateInput {
-  claimId: string;
-  fileName: string;
-  mimeType: string;
-  sizeBytes: number;
+  claimId: PropertyClaimId;
+  fileName: AttachmentFileName;
+  mimeType: PropertyClaimAttachmentMimeType;
+  sizeBytes: AttachmentByteCount;
 }
 
 interface CreateWithBytesInput {
-  claimId: string;
-  fileName: string;
-  mimeType: string;
+  claimId: PropertyClaimId;
+  fileName: AttachmentFileName;
+  mimeType: PropertyClaimAttachmentMimeType;
   bytes: Buffer;
 }
+
+export const PropertyClaimAttachmentMime = z.enum(
+  PROPERTY_CLAIM_ATTACHMENT_ALLOWED_MIME_TYPES
+);
+export type PropertyClaimAttachmentFailure =
+  | OrganizationDomainCode
+  | typeof SharedDomainCodes.INVALID_ATTACHMENT_METADATA;
 
 const MAGIC_HEADER_PREFIX_BYTES = 12;
 
@@ -45,7 +71,10 @@ const MAGIC_HEADER_PREFIX_BYTES = 12;
 //
 // Reads up to 12 bytes (the WebP check needs offset 0..3 + 8..11). All
 // other types check offset 0 only.
-function magicMatches(mimeType: string, head: Buffer): boolean {
+function magicMatches(
+  mimeType: PropertyClaimAttachmentMimeType,
+  head: Buffer
+): boolean {
   switch (mimeType) {
     case 'image/png':
       // 89 50 4E 47 0D 0A 1A 0A — fixed 8-byte PNG signature.
@@ -109,49 +138,91 @@ interface ReconstituteInput {
   createdAt: Date;
 }
 
+/** Decodes raw upload metadata with this context's established error order.
+ * Factories consume validated values and still enforce byte signatures and parent identity. */
+export function parsePropertyClaimAttachmentMetadata(input: {
+  fileName: unknown;
+  mimeType: unknown;
+  sizeBytes: unknown;
+}): Result<Omit<CreateInput, 'claimId'>, PropertyClaimAttachmentFailure> {
+  const fileName = AttachmentFileName.safeParse(input.fileName);
+
+  if (!fileName.success) {
+    return failure(
+      OrganizationDomainCodes.PROPERTY_CLAIM_ATTACHMENT_FILENAME_EMPTY
+    );
+  }
+
+  if (
+    typeof input.sizeBytes === 'number' &&
+    input.sizeBytes > PROPERTY_CLAIM_ATTACHMENT_MAX_BYTES
+  ) {
+    return failure(OrganizationDomainCodes.PROPERTY_CLAIM_ATTACHMENT_TOO_LARGE);
+  }
+
+  const mime = PropertyClaimAttachmentMime.safeParse(input.mimeType);
+
+  if (!mime.success) {
+    return failure(
+      OrganizationDomainCodes.PROPERTY_CLAIM_ATTACHMENT_TYPE_NOT_ALLOWED
+    );
+  }
+
+  const bytes = AttachmentByteCount.safeParse(input.sizeBytes);
+
+  if (!bytes.success) {
+    return failure(SharedDomainCodes.INVALID_ATTACHMENT_METADATA);
+  }
+
+  return success({
+    fileName: AttachmentFileName.parse(fileName.data.trim()),
+    mimeType: mime.data,
+    sizeBytes: bytes.data,
+  });
+}
+
 export class PropertyClaimAttachment {
   private constructor(
-    public readonly id: string | null,
-    public readonly claimId: string,
-    public readonly fileName: string,
-    public readonly mimeType: string,
-    public readonly sizeBytes: number,
-    public readonly createdAt: Date | null
-  ) {}
+    public readonly id: PropertyClaimAttachmentId,
+    public readonly claimId: PropertyClaimId,
+    public readonly fileName: AttachmentFileName,
+    public readonly mimeType: PropertyClaimAttachmentMimeType,
+    public readonly sizeBytes: AttachmentByteCount,
+    private readonly created: Instant
+  ) {
+    Object.freeze(this);
+  }
 
-  static create(input: CreateInput): Result<PropertyClaimAttachment, string> {
-    const trimmed = input.fileName.trim();
+  get createdAt(): Date {
+    return Instant.toDate(this.created);
+  }
 
-    if (trimmed.length === 0) {
-      return failure(
-        OrganizationDomainCodes.PROPERTY_CLAIM_ATTACHMENT_FILENAME_EMPTY
-      );
+  static create(
+    input: CreateInput,
+    creation: EntityCreation<PropertyClaimAttachmentId>
+  ): Result<PropertyClaimAttachment, PropertyClaimAttachmentFailure> {
+    const metadata = parsePropertyClaimAttachmentMetadata(input);
+
+    if (!metadata.success) {
+      return metadata;
     }
 
-    if (input.sizeBytes > PROPERTY_CLAIM_ATTACHMENT_MAX_BYTES) {
-      return failure(
-        OrganizationDomainCodes.PROPERTY_CLAIM_ATTACHMENT_TOO_LARGE
-      );
-    }
+    const identity = PropertyClaimAttachmentId.safeParse(creation?.id);
+    const parent = PropertyClaimId.safeParse(input.claimId);
+    const time = Instant.safeParse(creation?.now);
 
-    if (
-      !(
-        PROPERTY_CLAIM_ATTACHMENT_ALLOWED_MIME_TYPES as readonly string[]
-      ).includes(input.mimeType)
-    ) {
-      return failure(
-        OrganizationDomainCodes.PROPERTY_CLAIM_ATTACHMENT_TYPE_NOT_ALLOWED
-      );
+    if (!identity.success || !parent.success || !time.success) {
+      return failure(SharedDomainCodes.INVALID_ATTACHMENT_METADATA);
     }
 
     return success(
       new PropertyClaimAttachment(
-        null,
-        input.claimId,
-        trimmed,
-        input.mimeType,
-        input.sizeBytes,
-        null
+        identity.data,
+        parent.data,
+        metadata.value.fileName,
+        metadata.value.mimeType,
+        metadata.value.sizeBytes,
+        time.data
       )
     );
   }
@@ -161,18 +232,22 @@ export class PropertyClaimAttachment {
   // in upload paths so a renamed-and-lied-about file (e.g., .exe declared
   // as application/pdf) is rejected before any DB write.
   static createWithBytes(
-    input: CreateWithBytesInput
-  ): Result<PropertyClaimAttachment, string> {
+    input: CreateWithBytesInput,
+    creation: EntityCreation<PropertyClaimAttachmentId>
+  ): Result<PropertyClaimAttachment, PropertyClaimAttachmentFailure> {
     // Reuse the metadata-only path for size, mime whitelist, fileName trim.
     // This keeps the validation order: size → type → magic. Returning the
     // size error first is more useful — a 200 MB file is wrong regardless
     // of its declared type.
-    const meta = PropertyClaimAttachment.create({
-      claimId: input.claimId,
-      fileName: input.fileName,
-      mimeType: input.mimeType,
-      sizeBytes: input.bytes.length,
-    });
+    const meta = PropertyClaimAttachment.create(
+      {
+        claimId: input.claimId,
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        sizeBytes: AttachmentByteCount.parse(input.bytes.length),
+      },
+      creation
+    );
 
     if (!meta.success) {
       return meta;
@@ -180,7 +255,7 @@ export class PropertyClaimAttachment {
 
     const head = input.bytes.subarray(0, MAGIC_HEADER_PREFIX_BYTES);
 
-    if (!magicMatches(input.mimeType, head)) {
+    if (!magicMatches(meta.value.mimeType, head)) {
       return failure(
         OrganizationDomainCodes.PROPERTY_CLAIM_ATTACHMENT_MAGIC_MISMATCH
       );
@@ -190,13 +265,29 @@ export class PropertyClaimAttachment {
   }
 
   static reconstitute(input: ReconstituteInput): PropertyClaimAttachment {
-    return new PropertyClaimAttachment(
-      input.id,
-      input.claimId,
-      input.fileName,
-      input.mimeType,
-      input.sizeBytes,
-      input.createdAt
+    const metadata = parsePropertyClaimAttachmentMetadata(input);
+
+    if (!metadata.success) {
+      throw new Error(metadata.error);
+    }
+
+    const result = PropertyClaimAttachment.create(
+      {
+        claimId: PropertyClaimId.parse(input.claimId),
+        fileName: metadata.value.fileName,
+        mimeType: metadata.value.mimeType,
+        sizeBytes: metadata.value.sizeBytes,
+      },
+      {
+        id: PropertyClaimAttachmentId.parse(input.id),
+        now: Instant.fromDate(input.createdAt),
+      }
     );
+
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+
+    return result.value;
   }
 }

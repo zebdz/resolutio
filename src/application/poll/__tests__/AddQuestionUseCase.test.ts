@@ -1,3 +1,23 @@
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { PollInstant } from '@/domain/poll/PollValues';
+import { AnswerText, QuestionText } from '@/domain/poll/QuestionValues';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { ResultCount } from '@/domain/shared/Pagination';
+/** Application client regressions exercise typed question/answer creation and editing.
+ * Raw requests remain transport values; fixtures supply deterministic identity/time. */
+import { UserId } from '@/domain/shared/EntityIds';
+import { BoardId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { PollId } from '@/domain/shared/EntityIds';
+import { QuestionId, AnswerId } from '@/domain/shared/EntityIds';
+import { createQuestionIds, questionClock } from './questionTestValues';
+
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AddQuestionUseCase } from '../AddQuestionUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -6,9 +26,13 @@ import { Answer } from '../../../domain/poll/Answer';
 import { PollRepository } from '../../../domain/poll/PollRepository';
 import {
   QuestionRepository,
+  QuestionRepositoryFailure,
   UpdateQuestionOrderData,
 } from '../../../domain/poll/QuestionRepository';
-import { AnswerRepository } from '../../../domain/poll/AnswerRepository';
+import {
+  AnswerRepository,
+  AnswerRepositoryFailure,
+} from '../../../domain/poll/AnswerRepository';
 import { UserRepository } from '../../../domain/user/UserRepository';
 import { Result, success, failure } from '../../../domain/shared/Result';
 import { PollErrors } from '../PollErrors';
@@ -16,21 +40,26 @@ import { PollDomainCodes } from '../../../domain/poll/PollDomainCodes';
 
 // Mock PollRepository
 class MockPollRepository implements PollRepository {
+  async searchPolls(): ReturnType<PollRepository['searchPolls']> {
+    return success({ polls: [], totalCount: ResultCount.parse(0) });
+  }
+
   private polls: Map<string, Poll> = new Map();
 
-  async createPoll(poll: Poll): Promise<Result<Poll, string>> {
-    const id = `poll-${Math.random()}`;
-    (poll as any).props.id = id;
+  async createPoll(poll: Poll): ReturnType<PollRepository['createPoll']> {
+    const id = poll.id;
     this.polls.set(id, poll);
 
     return success(poll);
   }
 
-  async getPollById(pollId: string): Promise<Result<Poll | null, string>> {
+  async getPollById(pollId: string): ReturnType<PollRepository['getPollById']> {
     return success(this.polls.get(pollId) || null);
   }
 
-  async getPollsByBoardId(boardId: string): Promise<Result<Poll[], string>> {
+  async getPollsByBoardId(
+    boardId: string
+  ): ReturnType<PollRepository['getPollsByBoardId']> {
     return success(
       Array.from(this.polls.values()).filter((p) => p.boardId === boardId)
     );
@@ -38,25 +67,27 @@ class MockPollRepository implements PollRepository {
 
   async getPollsByOrganizationId(
     orgId: string
-  ): Promise<Result<Poll[], string>> {
+  ): ReturnType<PollRepository['getPollsByOrganizationId']> {
     return success([]);
   }
 
-  async getPollsByUserId(userId: string): Promise<Result<Poll[], string>> {
+  async getPollsByUserId(
+    userId: string
+  ): ReturnType<PollRepository['getPollsByUserId']> {
     return success(Array.from(this.polls.values()));
   }
 
-  async updatePoll(poll: Poll): Promise<Result<void, string>> {
+  async updatePoll(poll: Poll): Promise<Result<void, never>> {
     this.polls.set(poll.id, poll);
 
     return success(undefined);
   }
 
-  async deletePoll(pollId: string): Promise<Result<void, string>> {
+  async deletePoll(pollId: string): Promise<Result<void, never>> {
     const poll = this.polls.get(pollId);
 
     if (poll) {
-      poll.archive();
+      poll.archive(questionClock.now());
     }
 
     return success(undefined);
@@ -79,11 +110,11 @@ class MockPollRepository implements PollRepository {
 class MockQuestionRepository implements QuestionRepository {
   private questions: Map<string, Question> = new Map();
   private answers: Map<string, Answer[]> = new Map();
-  private nextId = 1;
 
-  async createQuestion(question: Question): Promise<Result<Question, string>> {
-    const id = `question-${this.nextId++}`;
-    (question as any).props.id = id;
+  async createQuestion(
+    question: Question
+  ): Promise<Result<Question, QuestionRepositoryFailure>> {
+    const id = question.id;
     this.questions.set(id, question);
 
     return success(question);
@@ -91,7 +122,7 @@ class MockQuestionRepository implements QuestionRepository {
 
   async getQuestionById(
     questionId: string
-  ): Promise<Result<Question | null, string>> {
+  ): Promise<Result<Question | null, QuestionRepositoryFailure>> {
     const question = this.questions.get(questionId);
 
     if (!question) {
@@ -118,7 +149,7 @@ class MockQuestionRepository implements QuestionRepository {
 
   async getQuestionsByPollId(
     pollId: string
-  ): Promise<Result<Question[], string>> {
+  ): Promise<Result<Question[], QuestionRepositoryFailure>> {
     return success(
       Array.from(this.questions.values()).filter(
         (q) => q.pollId === pollId && !q.isArchived()
@@ -126,7 +157,7 @@ class MockQuestionRepository implements QuestionRepository {
     );
   }
 
-  async updateQuestion(question: Question): Promise<Result<void, string>> {
+  async updateQuestion(question: Question): Promise<Result<void, never>> {
     this.questions.set(question.id, question);
 
     return success(undefined);
@@ -134,7 +165,7 @@ class MockQuestionRepository implements QuestionRepository {
 
   async updateQuestionOrder(
     updates: UpdateQuestionOrderData[]
-  ): Promise<Result<void, string>> {
+  ): Promise<Result<void, never>> {
     for (const update of updates) {
       const question = this.questions.get(update.questionId);
 
@@ -147,11 +178,11 @@ class MockQuestionRepository implements QuestionRepository {
     return success(undefined);
   }
 
-  async deleteQuestion(questionId: string): Promise<Result<void, string>> {
+  async deleteQuestion(questionId: string): Promise<Result<void, never>> {
     const question = this.questions.get(questionId);
 
     if (question) {
-      question.archive();
+      question.archive(questionClock.now());
     }
 
     return success(undefined);
@@ -166,7 +197,6 @@ class MockQuestionRepository implements QuestionRepository {
   clear(): void {
     this.questions.clear();
     this.answers.clear();
-    this.nextId = 1;
   }
 }
 
@@ -174,15 +204,15 @@ class MockQuestionRepository implements QuestionRepository {
 class MockAnswerRepository implements AnswerRepository {
   private answers: Map<string, Answer> = new Map();
   private questionRepository: MockQuestionRepository;
-  private nextId = 1;
 
   constructor(questionRepository: MockQuestionRepository) {
     this.questionRepository = questionRepository;
   }
 
-  async createAnswer(answer: Answer): Promise<Result<Answer, string>> {
-    const id = `answer-${this.nextId++}`;
-    (answer as any).props.id = id;
+  async createAnswer(
+    answer: Answer
+  ): Promise<Result<Answer, AnswerRepositoryFailure>> {
+    const id = answer.id;
     this.answers.set(id, answer);
     this.questionRepository.addAnswerToQuestion(answer.questionId, answer);
 
@@ -191,13 +221,13 @@ class MockAnswerRepository implements AnswerRepository {
 
   async getAnswerById(
     answerId: string
-  ): Promise<Result<Answer | null, string>> {
+  ): Promise<Result<Answer | null, AnswerRepositoryFailure>> {
     return success(this.answers.get(answerId) || null);
   }
 
   async getAnswersByQuestionId(
     questionId: string
-  ): Promise<Result<Answer[], string>> {
+  ): Promise<Result<Answer[], AnswerRepositoryFailure>> {
     return success(
       Array.from(this.answers.values()).filter(
         (a) => a.questionId === questionId && !a.isArchived()
@@ -205,17 +235,17 @@ class MockAnswerRepository implements AnswerRepository {
     );
   }
 
-  async updateAnswer(answer: Answer): Promise<Result<void, string>> {
+  async updateAnswer(answer: Answer): Promise<Result<void, never>> {
     this.answers.set(answer.id, answer);
 
     return success(undefined);
   }
 
-  async deleteAnswer(answerId: string): Promise<Result<void, string>> {
+  async deleteAnswer(answerId: string): Promise<Result<void, never>> {
     const answer = this.answers.get(answerId);
 
     if (answer) {
-      answer.archive();
+      answer.archive(questionClock.now());
     }
 
     return success(undefined);
@@ -223,7 +253,6 @@ class MockAnswerRepository implements AnswerRepository {
 
   clear(): void {
     this.answers.clear();
-    this.nextId = 1;
   }
 }
 
@@ -256,23 +285,31 @@ describe('AddQuestionUseCase', () => {
       pollRepository,
       questionRepository,
       answerRepository,
-      userRepository as unknown as UserRepository
+      userRepository as unknown as UserRepository,
+      createQuestionIds(),
+      questionClock
     );
   });
 
   it('should add a question with answers to a poll', async () => {
     const pollResult = Poll.create(
-      'Test Poll',
-      'Description',
-      'org-1',
-      'board-1',
-      'user-1',
-      new Date('2025-01-01'),
-      new Date('2025-12-31')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2025-01-01'), new Date('2025-12-31'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(pollResult.success).toBe(true);
-    const poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    let poll = expectSuccess(pollResult);
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      id: 'poll-1',
+    });
     pollRepository.addPoll(poll);
 
     const result = await useCase.execute({
@@ -303,17 +340,23 @@ describe('AddQuestionUseCase', () => {
 
   it('should add a multiple-choice question', async () => {
     const pollResult = Poll.create(
-      'Test Poll',
-      'Description',
-      'org-1',
-      'board-1',
-      'user-1',
-      new Date('2025-01-01'),
-      new Date('2025-12-31')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2025-01-01'), new Date('2025-12-31'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(pollResult.success).toBe(true);
-    const poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    let poll = expectSuccess(pollResult);
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      id: 'poll-1',
+    });
     pollRepository.addPoll(poll);
 
     const result = await useCase.execute({
@@ -354,17 +397,23 @@ describe('AddQuestionUseCase', () => {
 
   it('should fail when question text is empty', async () => {
     const pollResult = Poll.create(
-      'Test Poll',
-      'Description',
-      'org-1',
-      'board-1',
-      'user-1',
-      new Date('2025-01-01'),
-      new Date('2025-12-31')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2025-01-01'), new Date('2025-12-31'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(pollResult.success).toBe(true);
-    const poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    let poll = expectSuccess(pollResult);
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      id: 'poll-1',
+    });
     pollRepository.addPoll(poll);
 
     const result = await useCase.execute({
@@ -386,17 +435,23 @@ describe('AddQuestionUseCase', () => {
 
   it('should fail when no answers are provided', async () => {
     const pollResult = Poll.create(
-      'Test Poll',
-      'Description',
-      'org-1',
-      'board-1',
-      'user-1',
-      new Date('2025-01-01'),
-      new Date('2025-12-31')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2025-01-01'), new Date('2025-12-31'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(pollResult.success).toBe(true);
-    const poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    let poll = expectSuccess(pollResult);
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      id: 'poll-1',
+    });
     pollRepository.addPoll(poll);
 
     const result = await useCase.execute({
@@ -418,36 +473,48 @@ describe('AddQuestionUseCase', () => {
 
   it('should fail when poll is finished', async () => {
     const pollResult = Poll.create(
-      'Test Poll',
-      'Description',
-      'org-1',
-      'board-1',
-      'user-1',
-      new Date('2025-01-01'),
-      new Date('2025-12-31')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2025-01-01'), new Date('2025-12-31'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(pollResult.success).toBe(true);
-    const poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    let poll = expectSuccess(pollResult);
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      id: 'poll-1',
+    });
 
     // Add question with answer so we can transition through states
     const questionResult = Question.create(
-      'Q1',
+      QuestionText.parse('Q1'),
       poll.id,
-      1,
-      1,
+      testCreation(QuestionId, 'question-1'),
+      PageNumber.parse(1),
+      SortOrder.parse(1),
       'single-choice'
     );
-    const question = questionResult.value;
-    const answerResult = Answer.create('A1', 1, question.id);
-    question.addAnswer(answerResult.value);
+    const question = expectSuccess(questionResult);
+    const answerResult = Answer.create(
+      AnswerText.parse('A1'),
+      SortOrder.parse(1),
+      question.id,
+      testCreation(AnswerId, 'answer-1')
+    );
+    question.addAnswer(expectSuccess(answerResult));
     poll.addQuestion(question);
 
     // Transition to FINISHED state
     poll.submitToAdmin();
     poll.takeSnapshot();
     poll.activate();
-    poll.finish();
+    poll.finish(PollInstant.parse(new Date().toISOString()));
 
     pollRepository.addPoll(poll);
 
@@ -470,17 +537,23 @@ describe('AddQuestionUseCase', () => {
 
   it('should handle questions on different pages', async () => {
     const pollResult = Poll.create(
-      'Test Poll',
-      'Description',
-      'org-1',
-      'board-1',
-      'user-1',
-      new Date('2025-01-01'),
-      new Date('2025-12-31')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2025-01-01'), new Date('2025-12-31'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(pollResult.success).toBe(true);
-    const poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    let poll = expectSuccess(pollResult);
+    poll = Poll.reconstitute({
+      ...poll.toJSON(),
+      questions: poll.questions,
+      id: 'poll-1',
+    });
     pollRepository.addPoll(poll);
 
     const result = await useCase.execute({
@@ -503,16 +576,22 @@ describe('AddQuestionUseCase', () => {
   describe('superadmin authorization', () => {
     it('should allow superadmin (not creator) to add question', async () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2025-01-01'),
-        new Date('2025-12-31')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2025-01-01'), new Date('2025-12-31'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
-      const poll = pollResult.value;
-      (poll as any).props.id = 'poll-1';
+      let poll = expectSuccess(pollResult);
+      poll = Poll.reconstitute({
+        ...poll.toJSON(),
+        questions: poll.questions,
+        id: 'poll-1',
+      });
       pollRepository.addPoll(poll);
       userRepository.setSuperAdmin('superadmin-1');
 
@@ -531,16 +610,22 @@ describe('AddQuestionUseCase', () => {
 
     it('should reject non-creator non-superadmin', async () => {
       const pollResult = Poll.create(
-        'Test Poll',
-        'Description',
-        'org-1',
-        'board-1',
-        'user-1',
-        new Date('2025-01-01'),
-        new Date('2025-12-31')
+        PollTitle.parse('Test Poll'),
+        PollDescription.parse('Description'),
+        OrganizationId.parse('org-1'),
+        BoardId.parse('board-1'),
+        UserId.parse('user-1'),
+        expectSuccess(
+          PollPeriod.create(new Date('2025-01-01'), new Date('2025-12-31'))
+        ),
+        testCreation(PollId, 'poll-1')
       );
-      const poll = pollResult.value;
-      (poll as any).props.id = 'poll-1';
+      let poll = expectSuccess(pollResult);
+      poll = Poll.reconstitute({
+        ...poll.toJSON(),
+        questions: poll.questions,
+        id: 'poll-1',
+      });
       pollRepository.addPoll(poll);
 
       const result = await useCase.execute({
@@ -554,7 +639,7 @@ describe('AddQuestionUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollErrors.NOT_POLL_CREATOR);
+      expect(expectFailure(result)).toBe(PollErrors.NOT_POLL_CREATOR);
     });
   });
 });

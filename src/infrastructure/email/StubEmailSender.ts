@@ -1,3 +1,4 @@
+/** Development-only mail adapter exposes rendered messages for local OTP testing. */
 import type {
   EmailMessage,
   EmailSender,
@@ -10,9 +11,15 @@ import type {
  * StubSmsOtpDeliveryChannel.
  */
 export class StubEmailSender implements EmailSender {
+  readonly previewOnly = true;
   async send(message: EmailMessage): Promise<EmailSendResult> {
+    if (message.attachments?.length) {
+      // Receipt and proof messages carry private ballot data. Never preview them.
+      return { success: false };
+    }
+
     console.info(
-      `[StubEmailSender] to=${message.to} subject=${message.subject}\n${message.text}`
+      `[StubEmailSender] to=${message.to.getValue()} subject=${message.subject}\n${message.text}`
     );
 
     return { success: true, backdoorPreview: message.text };

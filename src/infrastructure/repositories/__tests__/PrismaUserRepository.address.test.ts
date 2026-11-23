@@ -1,3 +1,4 @@
+import { UserId } from '@/domain/shared/EntityIds';
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs/promises';
 import os from 'os';
@@ -69,7 +70,7 @@ describe('PrismaUserRepository address reconstitution', () => {
       })
     );
 
-    const user = await repo.findById('user-1');
+    const user = await repo.findById(UserId.parse('user-1'));
 
     expect(user?.address?.isPrivateHouse).toBe(true);
     expect(user?.address?.apartment).toBeUndefined();
@@ -88,7 +89,7 @@ describe('PrismaUserRepository address reconstitution', () => {
       })
     );
 
-    const user = await repo.findById('user-1');
+    const user = await repo.findById(UserId.parse('user-1'));
 
     expect(user?.address?.apartment).toBe('2');
     expect(user?.address?.oneLine).toContain('кв 2');
@@ -187,9 +188,9 @@ describe('PrismaUserRepository list reconstitution — searchUsers vs findByIds'
 
     const repo = repoReturningMany(rows, logger);
 
-    await expect(repo.findByIds(['user-good-1', 'user-bad'])).rejects.toThrow(
-      'domain.user.address.apartmentRequired'
-    );
+    await expect(
+      repo.findByIds([UserId.parse('user-good-1'), UserId.parse('user-bad')])
+    ).rejects.toThrow('domain.user.address.apartmentRequired');
   });
 });
 
@@ -329,4 +330,32 @@ describe('PrismaUserRepository address persistence — save()', () => {
       expect(block.flatFiasId).toBe('9d9d7e0a-e49f-4ebf-a962-00cfa892b1ee');
     }
   });
+});
+
+it('retains an imported street-only address for the owner and privacy-aware directory', async () => {
+  const { serializeDirectoryUserSearch } =
+    await import('@/web/actions/organization/serializeDirectory');
+  const row = userRow({
+    ...baseAddress,
+    street: 'Лесная',
+    oneLine: 'Лесная',
+    building: null,
+    isPrivateHouse: null,
+  });
+  const user = await repoReturning(row).findById(UserId.parse('user-1'));
+  expect(user?.addressForDisplay).toMatchObject({
+    country: 'Россия',
+    city: 'Ростов-на-Дону',
+    oneLine: 'Лесная',
+  });
+  expect(user?.address).toBeUndefined();
+  expect(serializeDirectoryUserSearch(user!).address).toEqual({
+    city: 'Ростов-на-Дону',
+    street: 'Лесная',
+  });
+  const hidden = await repoReturning({
+    ...row,
+    allowFindByAddress: false,
+  }).findById(UserId.parse('user-1'));
+  expect(serializeDirectoryUserSearch(hidden!).address).toBeUndefined();
 });

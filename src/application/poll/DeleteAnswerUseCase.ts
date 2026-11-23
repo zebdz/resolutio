@@ -1,15 +1,22 @@
+/** DeleteAnswer decodes raw request identities before invoking core ports.
+ * Authorization and persistence are coordinated here; entity invariants stay in the domain. */
+import { Clock } from '../shared/EntityCreation';
+import { z } from 'zod';
+import { AnswerId, UserId } from '@/domain/shared/EntityIds';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { PollRepository } from '../../domain/poll/PollRepository';
 import { QuestionRepository } from '../../domain/poll/QuestionRepository';
 import { AnswerRepository } from '../../domain/poll/AnswerRepository';
 import { VoteRepository } from '../../domain/poll/VoteRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 
 export interface DeleteAnswerInput {
   answerId: string;
   userId: string;
 }
+
+const request = z.object({ answerId: AnswerId, userId: UserId });
 
 export class DeleteAnswerUseCase {
   constructor(
@@ -17,10 +24,21 @@ export class DeleteAnswerUseCase {
     private questionRepository: QuestionRepository,
     private answerRepository: AnswerRepository,
     private voteRepository: VoteRepository,
-    private userRepository: UserRepository
+    private userRepository: UserRepository,
+    private clock: Clock
   ) {}
 
-  async execute(input: DeleteAnswerInput): Promise<Result<void, string>> {
+  async execute(
+    rawInput: DeleteAnswerInput
+  ): Promise<Result<void, PollUseCaseFailure>> {
+    const decoded = request.safeParse(rawInput);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawInput, ...decoded.data };
+
     // Get the answer
     const answerResult = await this.answerRepository.getAnswerById(
       input.answerId
@@ -97,10 +115,14 @@ export class DeleteAnswerUseCase {
       return failure(PollErrors.CANNOT_MODIFY_HAS_VOTES);
     }
 
-    // Delete (archive) the answer
-    const deleteResult = await this.answerRepository.deleteAnswer(
-      input.answerId
-    );
+    // Archive through domain behavior, using the application-supplied clock.
+    const archived = answer.archive(this.clock.now());
+
+    if (!archived.success) {
+      return failure(archived.error);
+    }
+
+    const deleteResult = await this.answerRepository.updateAnswer(answer);
 
     if (!deleteResult.success) {
       return failure(deleteResult.error);

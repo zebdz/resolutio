@@ -1,5 +1,19 @@
 'use server';
 
+/** Join-link actions compose explicit entropy/identity/time adapters and serialize
+ * only authorized link information for the browser. */
+import { PrismaMembershipStore } from '@/infrastructure/repositories/PrismaMembershipStore';
+import { readJoinTokenLimit } from './JoinTokenFormData';
+import type { JoinTokenId, OrganizationId } from '@/domain/shared/EntityIds';
+import type { JoinTokenValue } from '@/domain/organization/JoinTokenValues';
+import type { JoinTokenSnapshot } from '@/domain/organization/JoinToken';
+import type { ResultCount } from '@/domain/shared/Pagination';
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
+import { CryptoJoinTokenGenerator } from '@/infrastructure/organization/CryptoJoinTokenGenerator';
+
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '../../lib/session';
 import { checkRateLimit } from '@/web/actions/rateLimit';
@@ -35,6 +49,9 @@ const profanityChecker = LeoProfanityChecker.getInstance();
 
 // Use cases
 const createJoinTokenUseCase = new CreateJoinTokenUseCase({
+  ids: new CryptoIdGenerator(),
+  clock: new SystemClock(),
+  tokens: new CryptoJoinTokenGenerator(),
   organizationRepository,
   joinTokenRepository,
   userRepository,
@@ -42,6 +59,7 @@ const createJoinTokenUseCase = new CreateJoinTokenUseCase({
 });
 
 const expireJoinTokenUseCase = new ExpireJoinTokenUseCase({
+  clock: new SystemClock(),
   joinTokenRepository,
   organizationRepository,
   userRepository,
@@ -66,11 +84,13 @@ const getJoinTokensByOrgUseCase = new GetJoinTokensByOrgUseCase({
 });
 
 const joinOrganizationUseCase = new JoinOrganizationUseCase({
+  ids: new CryptoIdGenerator(),
+  clock: new SystemClock(),
   organizationRepository,
   invitationRepository,
   notificationRepository,
   userRepository,
-  prisma,
+  memberships: new PrismaMembershipStore(prisma),
 });
 
 const useJoinTokenUseCase = new UseJoinTokenUseCase({
@@ -81,7 +101,7 @@ const useJoinTokenUseCase = new UseJoinTokenUseCase({
 
 export async function createJoinTokenAction(
   formData: FormData
-): Promise<ActionResult<{ tokenId: string; token: string }>> {
+): Promise<ActionResult<{ tokenId: JoinTokenId; token: JoinTokenValue }>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -97,11 +117,10 @@ export async function createJoinTokenAction(
       return { success: false, error: t('unauthorized') };
     }
 
-    const maxUsesRaw = formData.get('maxUses') as string;
     const input = {
-      organizationId: formData.get('organizationId') as string,
-      description: formData.get('description') as string,
-      maxUses: maxUsesRaw ? parseInt(maxUsesRaw, 10) : null,
+      organizationId: formData.get('organizationId'),
+      description: formData.get('description'),
+      maxUses: readJoinTokenLimit(formData.get('maxUses')),
     };
 
     const validation = createJoinTokenSchema(profanityChecker).safeParse(input);
@@ -162,9 +181,9 @@ export async function expireJoinTokenAction(
       return { success: false, error: t('unauthorized') };
     }
 
-    const tokenId = formData.get('tokenId') as string;
+    const tokenId = formData.get('tokenId');
 
-    if (!tokenId) {
+    if (typeof tokenId !== 'string' || !tokenId) {
       return { success: false, error: t('validationFailed') };
     }
 
@@ -203,9 +222,9 @@ export async function reactivateJoinTokenAction(
       return { success: false, error: t('unauthorized') };
     }
 
-    const tokenId = formData.get('tokenId') as string;
+    const tokenId = formData.get('tokenId');
 
-    if (!tokenId) {
+    if (typeof tokenId !== 'string' || !tokenId) {
       return { success: false, error: t('validationFailed') };
     }
 
@@ -244,10 +263,9 @@ export async function updateJoinTokenMaxUsesAction(
       return { success: false, error: t('unauthorized') };
     }
 
-    const maxUsesRaw = formData.get('maxUses') as string;
     const input = {
-      tokenId: formData.get('tokenId') as string,
-      maxUses: maxUsesRaw ? parseInt(maxUsesRaw, 10) : null,
+      tokenId: formData.get('tokenId'),
+      maxUses: readJoinTokenLimit(formData.get('maxUses')),
     };
 
     const validation = UpdateJoinTokenMaxUsesSchema.safeParse(input);
@@ -292,19 +310,8 @@ export async function getJoinTokensByOrgAction(
   activeOnly?: boolean
 ): Promise<
   ActionResult<{
-    tokens: Array<{
-      id: string;
-      organizationId: string;
-      token: string;
-      description: string;
-      maxUses: number | null;
-      useCount: number;
-      createdById: string;
-      createdAt: Date;
-      expiredAt: Date | null;
-      creatorName: string;
-    }>;
-    totalCount: number;
+    tokens: (JoinTokenSnapshot & { creatorName: string })[];
+    totalCount: ResultCount;
   }>
 > {
   const rateLimited = await checkRateLimit();
@@ -357,7 +364,7 @@ export async function getJoinTokensByOrgAction(
 
 export async function joinViaTokenAction(
   formData: FormData
-): Promise<ActionResult<{ organizationId: string }>> {
+): Promise<ActionResult<{ organizationId: OrganizationId }>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -373,9 +380,9 @@ export async function joinViaTokenAction(
       return { success: false, error: t('unauthorized') };
     }
 
-    const tokenValue = formData.get('token') as string;
+    const tokenValue = formData.get('token');
 
-    if (!tokenValue) {
+    if (typeof tokenValue !== 'string' || !tokenValue) {
       return { success: false, error: t('validationFailed') };
     }
 

@@ -1,3 +1,5 @@
+/** Application boundary tests exercise authorization and domain constraints
+ * with deterministic creation dependencies and repository port doubles. */
 import { describe, it, expect } from 'vitest';
 import { CreateAssetUseCase } from '../CreateAssetUseCase';
 import { OrganizationProperty } from '../../../domain/organization/OrganizationProperty';
@@ -5,6 +7,7 @@ import { PropertyAsset } from '../../../domain/organization/PropertyAsset';
 import { OrganizationErrors } from '../OrganizationErrors';
 import { OrganizationDomainCodes } from '../../../domain/organization/OrganizationDomainCodes';
 import { success } from '../../../domain/shared/Result';
+import { Instant } from '../../../domain/shared/Instant';
 
 const prop = OrganizationProperty.reconstitute({
   id: 'p-1',
@@ -19,6 +22,8 @@ const prop = OrganizationProperty.reconstitute({
 describe('CreateAssetUseCase', () => {
   it('creates asset under property', async () => {
     const uc = new CreateAssetUseCase({
+      ids: { generate: (identity) => identity.parse('asset-created') },
+      clock: { now: () => Instant.parse('2026-01-01T00:00:00.000Z') },
       assetRepository: {
         saveAsset: async (a: PropertyAsset) => success(a),
       } as any,
@@ -27,7 +32,10 @@ describe('CreateAssetUseCase', () => {
       } as any,
       organizationRepository: { isUserAdmin: async () => true } as any,
       userRepository: { isSuperAdmin: async () => false } as any,
-      profanityChecker: { containsProfanity: () => false },
+      profanityChecker: {
+        findProfaneWords: () => [],
+        containsProfanity: () => false,
+      },
     });
     const r = await uc.execute({
       propertyId: 'p-1',
@@ -36,17 +44,29 @@ describe('CreateAssetUseCase', () => {
       size: 50,
     });
     expect(r.success).toBe(true);
+
+    if (r.success) {
+      expect(r.value.asset.id).toBe('asset-created');
+      expect(r.value.asset.createdAt).toEqual(
+        new Date('2026-01-01T00:00:00.000Z')
+      );
+    }
   });
 
   it('rejects size 0', async () => {
     const uc = new CreateAssetUseCase({
+      ids: { generate: (identity) => identity.parse('asset-created') },
+      clock: { now: () => Instant.parse('2026-01-01T00:00:00.000Z') },
       assetRepository: {
         saveAsset: async (a: PropertyAsset) => success(a),
       } as any,
       propertyRepository: { findById: async () => success(prop) } as any,
       organizationRepository: { isUserAdmin: async () => true } as any,
       userRepository: { isSuperAdmin: async () => false } as any,
-      profanityChecker: { containsProfanity: () => false },
+      profanityChecker: {
+        findProfaneWords: () => [],
+        containsProfanity: () => false,
+      },
     });
     const r = await uc.execute({
       propertyId: 'p-1',
@@ -65,13 +85,18 @@ describe('CreateAssetUseCase', () => {
 
   it('rejects non-admin', async () => {
     const uc = new CreateAssetUseCase({
+      ids: { generate: (identity) => identity.parse('asset-created') },
+      clock: { now: () => Instant.parse('2026-01-01T00:00:00.000Z') },
       assetRepository: {
         saveAsset: async (a: PropertyAsset) => success(a),
       } as any,
       propertyRepository: { findById: async () => success(prop) } as any,
       organizationRepository: { isUserAdmin: async () => false } as any,
       userRepository: { isSuperAdmin: async () => false } as any,
-      profanityChecker: { containsProfanity: () => false },
+      profanityChecker: {
+        findProfaneWords: () => [],
+        containsProfanity: () => false,
+      },
     });
     const r = await uc.execute({
       propertyId: 'p-1',

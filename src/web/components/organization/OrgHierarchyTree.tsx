@@ -5,13 +5,19 @@ import { useTranslations } from 'next-intl';
 import { hierarchy, tree as d3Tree } from 'd3-hierarchy';
 import { linkRadial } from 'd3-shape';
 import { select } from 'd3-selection';
-import type { OrganizationTreeNode } from '@/domain/organization/OrganizationRepository';
+/** Public hierarchy DTO from server actions; browser rendering does not construct domain values. */
+interface OrganizationTreeData {
+  id: string;
+  name: string;
+  memberCount: number;
+  children: OrganizationTreeData[];
+}
 import { useRouter } from '@/src/i18n/routing';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Heading } from '@/src/web/components/catalyst/heading';
 
 interface OrgHierarchyTreeProps {
-  tree: OrganizationTreeNode;
+  tree: OrganizationTreeData;
   currentOrgId: string;
   userMemberOrgIds?: string[];
 }
@@ -63,7 +69,7 @@ function TreeDiagram({
   currentOrgId,
   userMemberOrgIds = [],
 }: {
-  tree: OrganizationTreeNode;
+  tree: OrganizationTreeData;
   currentOrgId: string;
   userMemberOrgIds?: string[];
 }) {
@@ -259,7 +265,7 @@ function TreeDiagram({
     const nodeCount = root.descendants().length;
 
     const radius = Math.max(150, Math.min(400, nodeCount * 40));
-    const layout = d3Tree<OrganizationTreeNode>()
+    const layout = d3Tree<OrganizationTreeData>()
       .size([2 * Math.PI, radius])
       .separation((a, b) => (a.parent === b.parent ? 1 : 2) / a.depth || 1);
 

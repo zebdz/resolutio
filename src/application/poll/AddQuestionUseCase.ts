@@ -1,3 +1,21 @@
+/** AddQuestion decodes raw request identities and position units before invoking core ports.
+ * Authorization and persistence are coordinated here; entity invariants stay in the domain. */
+import {
+  PageNumber,
+  SortOrder,
+  parseQuestionText,
+  parseQuestionDetails,
+  parseAnswerText,
+} from '@/domain/poll/QuestionValues';
+import { PollDomainCodes } from '@/domain/poll/PollDomainCodes';
+import { Clock, IdGenerator, entityCreation } from '../shared/EntityCreation';
+import { z } from 'zod';
+import {
+  PollId,
+  UserId,
+  QuestionId,
+  AnswerId,
+} from '@/domain/shared/EntityIds';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { Question } from '../../domain/poll/Question';
 import { Answer } from '../../domain/poll/Answer';
@@ -7,7 +25,7 @@ import { AnswerRepository } from '../../domain/poll/AnswerRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { QuestionType } from '../../domain/poll/QuestionType';
 import { ProfanityChecker } from '../../domain/shared/profanity/ProfanityChecker';
-import { PollErrors } from './PollErrors';
+import { PollErrors, PollUseCaseFailure } from './PollErrors';
 
 export interface AddQuestionInput {
   pollId: string;
@@ -20,16 +38,30 @@ export interface AddQuestionInput {
   answers: string[];
 }
 
+const request = z.object({ pollId: PollId, userId: UserId });
+
 export class AddQuestionUseCase {
   constructor(
     private pollRepository: PollRepository,
     private questionRepository: QuestionRepository,
     private answerRepository: AnswerRepository,
     private userRepository: UserRepository,
+    private ids: IdGenerator,
+    private clock: Clock,
     private profanityChecker?: ProfanityChecker
   ) {}
 
-  async execute(input: AddQuestionInput): Promise<Result<Question, string>> {
+  async execute(
+    rawInput: AddQuestionInput
+  ): Promise<Result<Question, PollUseCaseFailure>> {
+    const decoded = request.safeParse(rawInput);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawInput, ...decoded.data };
+
     // 1. Check if poll exists
     const pollResult = await this.pollRepository.getPollById(input.pollId);
 
@@ -62,14 +94,39 @@ export class AddQuestionUseCase {
       return failure(PollErrors.NO_ANSWERS);
     }
 
-    // 4. Create question domain object with validation
+    const page = PageNumber.safeParse(input.page);
+
+    if (!page.success) {
+      return failure(PollDomainCodes.QUESTION_INVALID_PAGE);
+    }
+
+    const order = SortOrder.safeParse(input.order);
+
+    if (!order.success) {
+      return failure(PollDomainCodes.QUESTION_INVALID_ORDER);
+    }
+
+    // 4. Decode content before creating the validated question domain object.
+    const text = parseQuestionText(input.text);
+
+    if (!text.success) {
+      return text;
+    }
+
+    const details = parseQuestionDetails(input.details);
+
+    if (!details.success) {
+      return details;
+    }
+
     const questionResult = Question.create(
-      input.text,
+      text.value,
       input.pollId,
-      input.page,
-      input.order,
+      entityCreation(QuestionId, this.ids, this.clock),
+      page.data,
+      order.data,
       input.questionType,
-      input.details,
+      details.value,
       this.profanityChecker
     );
 
@@ -90,10 +147,17 @@ export class AddQuestionUseCase {
 
     // 6. Create and persist answers
     for (let i = 0; i < input.answers.length; i++) {
+      const answerText = parseAnswerText(input.answers[i]);
+
+      if (!answerText.success) {
+        return answerText;
+      }
+
       const answerResult = Answer.create(
-        input.answers[i],
-        i,
+        answerText.value,
+        SortOrder.parse(i),
         question.id,
+        entityCreation(AnswerId, this.ids, this.clock),
         this.profanityChecker
       );
 

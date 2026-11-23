@@ -1,15 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+/** CAPTCHA policy scenarios isolate environment changes and restore them after each test. */
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { isCaptchaEnforced } from '../captchaPolicy';
 
 const SECRET = 'TURNSTILE_SECRET_KEY';
 
 describe('isCaptchaEnforced', () => {
   let originalSecret: string | undefined;
-  let originalEnv: string | undefined;
 
   beforeEach(() => {
     originalSecret = process.env[SECRET];
-    originalEnv = process.env.NODE_ENV;
   });
 
   afterEach(() => {
@@ -19,14 +18,14 @@ describe('isCaptchaEnforced', () => {
       process.env[SECRET] = originalSecret;
     }
 
-    process.env.NODE_ENV = originalEnv;
+    vi.unstubAllEnvs();
   });
 
   it('enforces whenever a secret makes verification possible', () => {
     process.env[SECRET] = '0x4AAAAAAA_secret';
 
     for (const nodeEnv of ['development', 'test', 'production']) {
-      process.env.NODE_ENV = nodeEnv;
+      vi.stubEnv('NODE_ENV', nodeEnv);
       expect(isCaptchaEnforced()).toBe(true);
     }
   });
@@ -35,7 +34,7 @@ describe('isCaptchaEnforced', () => {
   // outside production would make local login impossible.
   it('does not enforce outside production when no secret is configured', () => {
     delete process.env[SECRET];
-    process.env.NODE_ENV = 'development';
+    vi.stubEnv('NODE_ENV', 'development');
 
     expect(isCaptchaEnforced()).toBe(false);
   });
@@ -44,14 +43,14 @@ describe('isCaptchaEnforced', () => {
   // logins, never as a silently disabled control.
   it('enforces in production even when the secret is missing', () => {
     delete process.env[SECRET];
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
 
     expect(isCaptchaEnforced()).toBe(true);
   });
 
   it('treats an empty secret as absent', () => {
     process.env[SECRET] = '';
-    process.env.NODE_ENV = 'development';
+    vi.stubEnv('NODE_ENV', 'development');
 
     expect(isCaptchaEnforced()).toBe(false);
   });

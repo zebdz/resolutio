@@ -1,10 +1,14 @@
+/** Verifies Publish Report behavior through application ports.
+ * Notification doubles return explicit append outcomes, matching the production writer. */
+import { testClock, testIds } from '@/domain/report/__tests__/reportTestValues';
+import { success } from '@/domain/shared/Result';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PublishReportUseCase } from '../PublishReportUseCase';
-import { Report, ReportProps } from '../../../domain/report/Report';
+import { Report, ReportData } from '../../../domain/report/Report';
 import { ReportVisibility } from '../../../domain/report/ReportVisibility';
 import { ReportErrors } from '../ReportErrors';
 
-const makeReport = (overrides: Partial<ReportProps> = {}) =>
+const makeReport = (overrides: Partial<ReportData> = {}) =>
   Report.reconstitute({
     id: 'r1',
     organizationId: 'org-1',
@@ -23,6 +27,12 @@ const makeReport = (overrides: Partial<ReportProps> = {}) =>
     pollIds: [],
     attachmentIds: [],
     ...overrides,
+    ...(overrides.state === 'PUBLISHED'
+      ? {
+          publishedById: overrides.publishedById ?? 'admin-1',
+          lastPublishedAt: overrides.lastPublishedAt ?? new Date('2026-01-01'),
+        }
+      : {}),
   });
 
 class FakeReports {
@@ -58,6 +68,8 @@ class FakeNotify {
   calls: Report[] = [];
   async notifyPublished(report: Report) {
     this.calls.push(report);
+
+    return success(undefined);
   }
 }
 
@@ -77,7 +89,8 @@ describe('PublishReportUseCase', () => {
       reports as any,
       orgs as any,
       users as any,
-      notify
+      notify,
+      testClock
     );
     reports.store.set('r1', makeReport());
   });
@@ -182,7 +195,8 @@ describe('PublishReportUseCase', () => {
       reports as any,
       orgs as any,
       users as any,
-      throwingNotify
+      throwingNotify,
+      testClock
     );
     orgs.admins.add('admin-1:org-1');
     const r = await uc.execute({

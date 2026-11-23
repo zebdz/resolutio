@@ -1,3 +1,5 @@
+import { AuthenticationError } from './AuthenticationError';
+import { UserId } from '@/domain/shared/EntityIds';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { SessionRepository } from '@/domain/user/SessionRepository';
 import { UserDomainCodes } from '@/domain/user/UserDomainCodes';
@@ -6,7 +8,7 @@ import { PasswordHasher } from './RegisterUserUseCase';
 import { PasswordGenerator } from './PasswordGenerator';
 
 export interface ResetUserPasswordInput {
-  userId: string;
+  userId: UserId;
 }
 
 export interface ResetUserPasswordResult {
@@ -15,7 +17,7 @@ export interface ResetUserPasswordResult {
    * user out of band. Only the hash is stored; this value exists for the
    * lifetime of the response and must never be logged or persisted.
    */
-  password: string;
+  password: GeneratedPassword;
 }
 
 interface Dependencies {
@@ -45,7 +47,7 @@ export class ResetUserPasswordUseCase {
 
   async execute(
     input: ResetUserPasswordInput
-  ): Promise<Result<ResetUserPasswordResult, string>> {
+  ): Promise<Result<ResetUserPasswordResult, AuthenticationError>> {
     const user = await this.userRepository.findById(input.userId);
 
     if (!user) {
@@ -65,3 +67,5 @@ export class ResetUserPasswordUseCase {
     return success({ password });
   }
 }
+/** Replaces a user's credential with a validated generated password and revokes existing sessions. */
+import { GeneratedPassword } from '@/domain/user/UserValues';

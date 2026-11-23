@@ -1,3 +1,7 @@
+/** Resolves unknown rate-limited sessions against persistence and caches denials.
+ * Untrusted cookie text is validated before entering the session repository. */
+import { SessionId } from '@/domain/shared/EntityIds';
+import { SystemClock } from '@/infrastructure/shared/SystemEntityCreation';
 import {
   prisma,
   PrismaSessionRepository,
@@ -19,6 +23,12 @@ export async function checkSuperadminBySessionFallback(
   sessionId: string,
   ip: string
 ): Promise<boolean> {
+  const parsedSessionId = SessionId.safeParse(sessionId);
+
+  if (!parsedSessionId.success) {
+    return false;
+  }
+
   const cachedExpiry = notSuperadminCache.get(sessionId);
 
   if (cachedExpiry && cachedExpiry > Date.now()) {
@@ -26,9 +36,9 @@ export async function checkSuperadminBySessionFallback(
   }
 
   const sessionRepo = new PrismaSessionRepository(prisma);
-  const session = await sessionRepo.findById(sessionId);
+  const session = await sessionRepo.findById(parsedSessionId.data);
 
-  if (!session || session.expiresAt < new Date()) {
+  if (!session || session.isExpired(new SystemClock().now())) {
     notSuperadminCache.set(sessionId, Date.now() + NEGATIVE_CACHE_TTL_MS);
 
     return false;

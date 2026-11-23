@@ -1,3 +1,11 @@
+import {
+  InvitationId,
+  OrganizationId,
+  UserId,
+  BoardId,
+} from '../../shared/EntityIds';
+import { Instant } from '../../shared/Instant';
+import { testCreation } from '../../shared/__tests__/creation';
 import { describe, it, expect } from 'vitest';
 import { Invitation } from '../Invitation';
 import { InvitationDomainCodes } from '../InvitationDomainCodes';
@@ -14,14 +22,23 @@ function makeInvitation(
     type: 'admin_invite',
     status: 'pending',
     createdAt: new Date(),
-    handledAt: null,
+    handledAt:
+      overrides?.status && overrides.status !== 'pending'
+        ? new Date('2026-01-01')
+        : null,
     ...overrides,
   });
 }
 
 describe('Invitation.create', () => {
   it('should create a pending admin invitation', () => {
-    const inv = Invitation.create('org-1', 'user-1', 'user-2', 'admin_invite');
+    const inv = Invitation.create(
+      OrganizationId.parse('org-1'),
+      UserId.parse('user-1'),
+      UserId.parse('user-2'),
+      { type: 'admin_invite', boardId: null },
+      testCreation(InvitationId, 'invite-1')
+    );
 
     expect(inv.organizationId).toBe('org-1');
     expect(inv.inviterId).toBe('user-1');
@@ -35,11 +52,11 @@ describe('Invitation.create', () => {
 
   it('should create a board member invitation with boardId', () => {
     const inv = Invitation.create(
-      'org-1',
-      'user-1',
-      'user-2',
-      'board_member_invite',
-      'board-1'
+      OrganizationId.parse('org-1'),
+      UserId.parse('user-1'),
+      UserId.parse('user-2'),
+      { type: 'board_member_invite', boardId: BoardId.parse('board-1') },
+      testCreation(InvitationId, 'invite-1')
     );
 
     expect(inv.type).toBe('board_member_invite');
@@ -47,7 +64,13 @@ describe('Invitation.create', () => {
   });
 
   it('should create a member invitation', () => {
-    const inv = Invitation.create('org-1', 'user-1', 'user-2', 'member_invite');
+    const inv = Invitation.create(
+      OrganizationId.parse('org-1'),
+      UserId.parse('user-1'),
+      UserId.parse('user-2'),
+      { type: 'member_invite', boardId: null },
+      testCreation(InvitationId, 'invite-1')
+    );
 
     expect(inv.type).toBe('member_invite');
   });
@@ -56,7 +79,7 @@ describe('Invitation.create', () => {
 describe('Invitation.accept', () => {
   it('should accept a pending invitation', () => {
     const inv = makeInvitation();
-    const result = inv.accept();
+    const result = inv.accept(Instant.parse('2026-01-01T00:00:00.000Z'));
 
     expect(result.success).toBe(true);
     expect(inv.status).toBe('accepted');
@@ -66,7 +89,7 @@ describe('Invitation.accept', () => {
 
   it('should fail to accept a non-pending invitation', () => {
     const inv = makeInvitation({ status: 'declined' });
-    const result = inv.accept();
+    const result = inv.accept(Instant.parse('2026-01-01T00:00:00.000Z'));
 
     expect(result.success).toBe(false);
 
@@ -77,7 +100,7 @@ describe('Invitation.accept', () => {
 
   it('should fail to accept an already accepted invitation', () => {
     const inv = makeInvitation({ status: 'accepted' });
-    const result = inv.accept();
+    const result = inv.accept(Instant.parse('2026-01-01T00:00:00.000Z'));
 
     expect(result.success).toBe(false);
 
@@ -90,7 +113,7 @@ describe('Invitation.accept', () => {
 describe('Invitation.decline', () => {
   it('should decline a pending invitation', () => {
     const inv = makeInvitation();
-    const result = inv.decline();
+    const result = inv.decline(Instant.parse('2026-01-01T00:00:00.000Z'));
 
     expect(result.success).toBe(true);
     expect(inv.status).toBe('declined');
@@ -99,7 +122,7 @@ describe('Invitation.decline', () => {
 
   it('should fail to decline a non-pending invitation', () => {
     const inv = makeInvitation({ status: 'revoked' });
-    const result = inv.decline();
+    const result = inv.decline(Instant.parse('2026-01-01T00:00:00.000Z'));
 
     expect(result.success).toBe(false);
 
@@ -112,7 +135,7 @@ describe('Invitation.decline', () => {
 describe('Invitation.revoke', () => {
   it('should revoke a pending invitation', () => {
     const inv = makeInvitation();
-    const result = inv.revoke();
+    const result = inv.revoke(Instant.parse('2026-01-01T00:00:00.000Z'));
 
     expect(result.success).toBe(true);
     expect(inv.status).toBe('revoked');
@@ -121,7 +144,7 @@ describe('Invitation.revoke', () => {
 
   it('should fail to revoke a non-pending invitation', () => {
     const inv = makeInvitation({ status: 'accepted' });
-    const result = inv.revoke();
+    const result = inv.revoke(Instant.parse('2026-01-01T00:00:00.000Z'));
 
     expect(result.success).toBe(false);
 

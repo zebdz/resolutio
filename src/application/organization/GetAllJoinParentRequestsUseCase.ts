@@ -1,9 +1,15 @@
+/** Parent-link request application boundary validates external identities before
+ * invoking domain decisions and typed authorization/persistence ports. */
+import { OrganizationId, UserId } from '../../domain/shared/EntityIds';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { JoinParentRequestRepository } from '../../domain/organization/JoinParentRequestRepository';
 import { JoinParentRequest } from '../../domain/organization/JoinParentRequest';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 
 export interface GetAllJoinParentRequestsDependencies {
   joinParentRequestRepository: JoinParentRequestRepository;
@@ -22,8 +28,28 @@ export class GetAllJoinParentRequestsUseCase {
   async execute(input: {
     organizationId: string;
     adminUserId: string;
-  }): Promise<Result<GetAllJoinParentRequestsResult, string>> {
-    const { organizationId, adminUserId } = input;
+  }): Promise<
+    Result<GetAllJoinParentRequestsResult, OrganizationUseCaseFailure>
+  > {
+    const parsedOrganizationId = OrganizationId.safeParse(input.organizationId);
+
+    if (!parsedOrganizationId.success) {
+      return failure(OrganizationErrors.NOT_FOUND);
+    }
+
+    const parsedAdminUserId = UserId.safeParse(input.adminUserId);
+
+    if (!parsedAdminUserId.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
+    }
+
+    const command = {
+      ...input,
+      organizationId: parsedOrganizationId.data,
+      adminUserId: parsedAdminUserId.data,
+    };
+
+    const { organizationId, adminUserId } = command;
 
     // Check admin permissions: superadmin or admin of org
     const isSuperAdmin =

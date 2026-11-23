@@ -1,25 +1,32 @@
-import { Invitation } from './Invitation';
+/** Typed invitation persistence keeps target/lifecycle decoding at the boundary. */
+import {
+  InvitationId,
+  OrganizationId,
+  BoardId,
+  UserId,
+} from '@/domain/shared/EntityIds';
+import { Invitation, InvitationType } from './Invitation';
 
 export interface InvitationRepository {
   save(invitation: Invitation): Promise<Invitation>;
   update(invitation: Invitation): Promise<Invitation>;
-  findById(id: string): Promise<Invitation | null>;
-  findPendingByInviteeId(inviteeId: string): Promise<Invitation[]>;
+  findById(id: InvitationId): Promise<Invitation | null>;
+  findPendingByInviteeId(inviteeId: UserId): Promise<Invitation[]>;
   findPendingByOrganizationId(
-    organizationId: string,
-    type: string
+    organizationId: OrganizationId,
+    type: InvitationType
   ): Promise<Invitation[]>;
-  findPendingByBoardId(boardId: string): Promise<Invitation[]>;
+  findPendingByBoardId(boardId: BoardId): Promise<Invitation[]>;
   findPendingAdminInvite(
-    organizationId: string,
-    inviteeId: string
+    organizationId: OrganizationId,
+    inviteeId: UserId
   ): Promise<Invitation | null>;
   findPendingBoardMemberInvite(
-    boardId: string,
-    inviteeId: string
+    boardId: BoardId,
+    inviteeId: UserId
   ): Promise<Invitation | null>;
   findPendingMemberInvite(
-    organizationId: string,
-    inviteeId: string
+    organizationId: OrganizationId,
+    inviteeId: UserId
   ): Promise<Invitation | null>;
 }

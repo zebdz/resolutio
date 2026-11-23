@@ -1,3 +1,4 @@
+/** Checks frozen register, holdings, consent-free named votes, precise weights and printable verification. */
 import { describe, it, expect } from 'vitest';
 import {
   buildNamedProtocolPdfDefinition,
@@ -90,6 +91,61 @@ function baseData(
 const dump = (d: unknown) => JSON.stringify(d);
 
 describe('buildNamedProtocolPdfDefinition', () => {
+  it('uses the sealed winner when numeric totals round to the same value', () => {
+    const data = baseData();
+    const q = data.questions[0];
+    q.winningAnswerId = 'a1';
+    q.answers[0].answerId = 'a1';
+    q.answers[1].answerId = 'a2';
+
+    for (const answer of q.answers) {
+      answer.totalWeight = Number('99999999999.000001');
+    }
+
+    q.answers[0].exactWeight = '99999999999.000001';
+    q.answers[1].exactWeight = '99999999999.000000';
+    const doc = dump(buildNamedProtocolPdfDefinition(data, t));
+    expect(doc).toContain(t.winnerMark);
+    expect(doc).toContain('99999999999.000001');
+  });
+
+  it('preserves millionth voter weights and the recorded holding share and unit', () => {
+    const data = baseData({ isPropertyBased: true });
+    data.register[0].weight = 2.125001;
+    data.register[0].holdings.push({
+      propertyName: 'Tower',
+      assetName: 'Suite',
+      size: 15,
+      sizeUnitKey: 'm2',
+      share: 0.33333333,
+    });
+    const question = data.questions[0];
+    question.answers[0].voters[0].weight = 2.125001;
+    question.answers[0].totalWeight = 2.125001;
+    const doc = dump(buildNamedProtocolPdfDefinition(data, t));
+    expect(doc).toContain('2.125001');
+    expect(doc).toContain('15 m2, доля 33.333333%');
+    expect(doc).toContain('вес 2.125001');
+  });
+
+  it('prints the provided record verification footer on every page', () => {
+    const doc = buildNamedProtocolPdfDefinition(baseData(), t, {
+      text: 'record evidence',
+    });
+
+    for (const page of [1, 2]) {
+      const footer =
+        typeof doc.footer === 'function'
+          ? doc.footer(page, 2, {
+              width: 595,
+              height: 842,
+              orientation: 'portrait',
+            })
+          : doc.footer;
+      expect(JSON.stringify(footer)).toContain('record evidence');
+    }
+  });
+
   it('names the voters under the answer they chose', () => {
     const doc = dump(buildNamedProtocolPdfDefinition(baseData(), t));
 

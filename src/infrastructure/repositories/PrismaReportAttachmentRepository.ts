@@ -1,3 +1,12 @@
+/** Prisma adapter for validated report attachment projections.
+ * Stored identities/time are retained; storage failures never expose raw exception text. */
+import { Instant } from '@/domain/shared/Instant';
+import { ReportAttachmentId, ReportId } from '@/domain/shared/EntityIds';
+import {
+  AttachmentFileName,
+  AttachmentCount,
+} from '@/domain/shared/attachments/AttachmentValues';
+import { ReportAttachmentMime } from '@/domain/report/ReportAttachment';
 import { PrismaClient } from '@/generated/prisma/client';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { ReportAttachment } from '../../domain/report/ReportAttachment';
@@ -13,10 +22,12 @@ export class PrismaReportAttachmentRepository implements ReportAttachmentReposit
   async save(
     attachment: ReportAttachment,
     bytes: Buffer
-  ): Promise<Result<ReportAttachmentMetadata, string>> {
+  ): Promise<Result<ReportAttachmentMetadata, 'common.errors.unexpected'>> {
     try {
       const created = await this.prisma.reportAttachment.create({
         data: {
+          id: attachment.id,
+          createdAt: attachment.createdAt,
           reportId: attachment.reportId,
           fileName: attachment.fileName,
           mimeType: attachment.mimeType,
@@ -42,15 +53,15 @@ export class PrismaReportAttachmentRepository implements ReportAttachmentReposit
         },
       });
 
-      return success(created);
+      return success(toMetadata(created));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findByReportId(
-    reportId: string
-  ): Promise<Result<ReportAttachmentMetadata[], string>> {
+    reportId: ReportId
+  ): Promise<Result<ReportAttachmentMetadata[], 'common.errors.unexpected'>> {
     try {
       const rows = await this.prisma.reportAttachment.findMany({
         where: { reportId },
@@ -67,15 +78,15 @@ export class PrismaReportAttachmentRepository implements ReportAttachmentReposit
         orderBy: { createdAt: 'asc' },
       });
 
-      return success(rows);
+      return success(rows.map(toMetadata));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findBytesById(
-    id: string
-  ): Promise<Result<ReportAttachmentBytes | null, string>> {
+    id: ReportAttachmentId
+  ): Promise<Result<ReportAttachmentBytes | null, 'common.errors.unexpected'>> {
     try {
       const row = await this.prisma.reportAttachment.findUnique({
         where: { id },
@@ -89,18 +100,20 @@ export class PrismaReportAttachmentRepository implements ReportAttachmentReposit
       // Prisma returns Bytes as a Uint8Array — normalise to Buffer so callers
       // can hand it straight to a Response body.
       return success({
-        fileName: row.fileName,
-        mimeType: row.mimeType,
+        fileName: AttachmentFileName.parse(row.fileName),
+        mimeType: ReportAttachmentMime.parse(row.mimeType),
         bytes: Buffer.from(row.bytes),
       });
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findById(
-    id: string
-  ): Promise<Result<ReportAttachmentMetadata | null, string>> {
+    id: ReportAttachmentId
+  ): Promise<
+    Result<ReportAttachmentMetadata | null, 'common.errors.unexpected'>
+  > {
     try {
       const row = await this.prisma.reportAttachment.findUnique({
         where: { id },
@@ -114,31 +127,50 @@ export class PrismaReportAttachmentRepository implements ReportAttachmentReposit
         },
       });
 
-      return success(row ?? null);
+      return success(row === null ? null : toMetadata(row));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
-  async countByReportId(reportId: string): Promise<Result<number, string>> {
+  async countByReportId(
+    reportId: ReportId
+  ): Promise<Result<AttachmentCount, 'common.errors.unexpected'>> {
     try {
       const count = await this.prisma.reportAttachment.count({
         where: { reportId },
       });
 
-      return success(count);
+      return success(AttachmentCount.parse(count));
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
-  async deleteById(id: string): Promise<Result<void, string>> {
+  async deleteById(
+    id: ReportAttachmentId
+  ): Promise<Result<void, 'common.errors.unexpected'>> {
     try {
       await this.prisma.reportAttachment.delete({ where: { id } });
 
       return success(undefined);
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
+}
+
+function toMetadata(
+  row: Parameters<typeof ReportAttachment.reconstitute>[0]
+): ReportAttachmentMetadata {
+  const attachment = ReportAttachment.reconstitute(row);
+
+  return {
+    id: attachment.id,
+    reportId: attachment.reportId,
+    fileName: attachment.fileName,
+    mimeType: attachment.mimeType,
+    sizeBytes: attachment.sizeBytes,
+    createdAt: Instant.fromDate(attachment.createdAt),
+  };
 }

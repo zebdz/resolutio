@@ -5,6 +5,10 @@ const mockRequestExecute = vi.fn();
 const mockIsCaptchaEnforced = vi.fn();
 const mockCaptchaVerify = vi.fn();
 
+vi.mock('@/web/actions/utils/translateErrorCode', () => ({
+  translateErrorCode: vi.fn(async (code: string) => `translated:${code}`),
+}));
+
 vi.mock('@/infrastructure/index', () => ({
   prisma: {},
   PrismaUserRepository: class {},
@@ -55,6 +59,20 @@ beforeEach(() => {
 });
 
 describe('confirmPhoneAction', () => {
+  it('translates domain failures through the shared error translator', async () => {
+    mockConfirmExecute.mockResolvedValue({
+      success: false,
+      error: 'domain.user.userNotFound',
+    });
+    const formData = new FormData();
+    formData.set('code', '123456');
+
+    expect(await confirmPhoneAction(formData)).toEqual({
+      success: false,
+      error: 'translated:domain.user.userNotFound',
+    });
+  });
+
   // The otp id used to travel through sessionStorage and was gone after a
   // reload; the server resolves the pending code from the session user now.
   it('confirms with just the code from the form', async () => {

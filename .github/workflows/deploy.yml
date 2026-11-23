@@ -93,7 +93,7 @@ jobs:
 
       - name: Generate Prisma client
         env:
-          DATABASE_URL: ${{ inputs.branch == 'beta' && secrets.DATABASE_URL_BETA || secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets[inputs.branch == 'beta' && 'DATABASE_URL_BETA' || 'DATABASE_URL'] }}
         run: yarn prisma generate
 
       - name: Lint
@@ -107,14 +107,24 @@ jobs:
 
       - name: Build application
         env:
-          DATABASE_URL: ${{ inputs.branch == 'beta' && secrets.DATABASE_URL_BETA || secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets[inputs.branch == 'beta' && 'DATABASE_URL_BETA' || 'DATABASE_URL'] }}
           NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${{ secrets.NEXT_PUBLIC_TURNSTILE_SITE_KEY }}
           NEXT_PUBLIC_APP_URL: ${{ inputs.site_url }}
-        run: yarn build
+          NEXT_PUBLIC_API_URL: ${{ inputs.site_url }}
+          ANCHOR_PROVIDER: opentimestamps
+          ANCHOR_POLLER_SECRET: ${{ secrets[inputs.branch == 'beta' && 'ANCHOR_POLLER_SECRET_BETA' || 'ANCHOR_POLLER_SECRET'] }}
+        run: |
+          yarn build
+          yarn build:receipt-backfill
+          yarn build:seal-verifier
 
       - name: Create deployment package
         env:
-          DATABASE_URL: ${{ inputs.branch == 'beta' && secrets.DATABASE_URL_BETA || secrets.DATABASE_URL }}
+          DATABASE_URL: ${{ secrets[inputs.branch == 'beta' && 'DATABASE_URL_BETA' || 'DATABASE_URL'] }}
+          ANCHOR_POLLER_SECRET: ${{ secrets[inputs.branch == 'beta' && 'ANCHOR_POLLER_SECRET_BETA' || 'ANCHOR_POLLER_SECRET'] }}
+          OTS_CALENDAR_URLS: ${{ vars.OTS_CALENDAR_URLS }}
+          OTS_ESPLORA_URL: ${{ vars.OTS_ESPLORA_URL }}
+          OTS_TIMEOUT_MS: ${{ vars.OTS_TIMEOUT_MS }}
           TURNSTILE_SECRET_KEY: ${{ secrets.TURNSTILE_SECRET_KEY }}
           OTP_CODE_SECRET: ${{ secrets.OTP_CODE_SECRET }}
           OTP_EXPIRY_MINUTES: ${{ vars.OTP_EXPIRY_MINUTES || '10' }}
@@ -133,50 +143,19 @@ jobs:
           SMTP_FROM: ${{ vars.SMTP_FROM }}
           PORT: ${{ inputs.port }}
         run: |
-          # Create .env file for deployment
-          echo "DATABASE_URL=$DATABASE_URL" > .env
-          echo "TURNSTILE_SECRET_KEY=$TURNSTILE_SECRET_KEY" >> .env
-          echo "OTP_CODE_SECRET=$OTP_CODE_SECRET" >> .env
-          echo "OTP_EXPIRY_MINUTES=$OTP_EXPIRY_MINUTES" >> .env
-          echo "OTP_MAX_ATTEMPTS=$OTP_MAX_ATTEMPTS" >> .env
-          echo "SMS_RU_API_ID=$SMS_RU_API_ID" >> .env
-          echo "SMS_RU_TEST_MODE=$SMS_RU_TEST_MODE" >> .env
-          echo "SMS_RU_MAX_COST_RUBLES=$SMS_RU_MAX_COST_RUBLES" >> .env
-          echo "DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY" >> .env
-          echo "GOOGLE_GENERATIVE_AI_KEY=$GOOGLE_GENERATIVE_AI_KEY" >> .env
-          # Required: a missing DADATA_API_KEY makes the address suggestion
-          # routes throw rather than silently fall back to Nominatim (which has
-          # no apartment data). See readmes/2026-08-06-address-dadata-design.md
-          echo "DADATA_API_KEY=$DADATA_API_KEY" >> .env
-          # Email delivery. An unset SMTP_HOST makes createEmailSenderFromEnv
-          # fall back to the stub, which logs instead of sending — so password
-          # reset would fail silently rather than loudly. Keep all six in sync.
-          echo "SMTP_HOST=$SMTP_HOST" >> .env
-          echo "SMTP_PORT=$SMTP_PORT" >> .env
-          echo "SMTP_SECURE=$SMTP_SECURE" >> .env
-          echo "SMTP_USER=$SMTP_USER" >> .env
-          echo "SMTP_PASSWORD=$SMTP_PASSWORD" >> .env
-          echo "SMTP_FROM=$SMTP_FROM" >> .env
-          echo "PORT=$PORT" >> .env
-
-          tar -czf deploy.tar.gz \
-            .next/ \
-            node_modules/ \
-            generated/ \
-            prisma/ \
-            public/ \
-            messages/ \
-            build/version-helper.ts \
-            package.json \
-            next.config.ts \
-            prisma.config.ts \
-            migrate-production.sh \
-            deploy-on-server.sh \
-            start-production.sh \
-            .env
-
-          # Clean up temporary .env file
-          rm .env
+          set -eu
+          umask 077
+          : "${DATABASE_URL:?}" "${ANCHOR_POLLER_SECRET:?}"
+          runtime_env=$(mktemp)
+          trap 'rm -f "$runtime_env"' EXIT
+          for name in DATABASE_URL ANCHOR_POLLER_SECRET TURNSTILE_SECRET_KEY OTP_CODE_SECRET OTP_EXPIRY_MINUTES OTP_MAX_ATTEMPTS SMS_RU_API_ID SMS_RU_TEST_MODE SMS_RU_MAX_COST_RUBLES DEEPSEEK_API_KEY GOOGLE_GENERATIVE_AI_KEY DADATA_API_KEY SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASSWORD SMTP_FROM PORT; do
+            printf '%s=%s\n' "$name" "${!name}" >> "$runtime_env"
+          done
+          printf 'ANCHOR_PROVIDER=opentimestamps\nNEXT_PUBLIC_API_URL=%s\n' "$SITE_URL" >> "$runtime_env"
+          for name in OTS_CALENDAR_URLS OTS_ESPLORA_URL OTS_TIMEOUT_MS; do
+            if [[ -n "${!name}" ]]; then printf '%s=%s\n' "$name" "${!name}" >> "$runtime_env"; fi
+          done
+          ./create-deploy-package.sh "$runtime_env"
 
       - name: Setup SSH
         run: |
@@ -187,41 +166,17 @@ jobs:
 
       - name: Deploy to server
         env:
+          MIGRATION_DATABASE_URL: ${{ secrets[inputs.branch == 'beta' && 'MIGRATION_DATABASE_URL_BETA' || 'MIGRATION_DATABASE_URL'] }}
           DEPLOY_DIR: ${{ env.DEPLOY_DIR }}
         run: |
-          # Upload deployment package
-          echo "📦 Uploading deployment package..."
-          scp -i ~/.ssh/id_ed25519 deploy.tar.gz ${{ env.SERVER_USER }}@${{ env.SERVER_IP }}:${DEPLOY_DIR}/
-
-          # Execute deployment on server
-          echo "🚀 Deploying on server..."
-          ssh -i ~/.ssh/id_ed25519 ${{ env.SERVER_USER }}@${{ env.SERVER_IP }} << EOF
-            cd ${DEPLOY_DIR}
-
-            # Extract the deployment package
-            echo "📂 Extracting deployment package..."
-            tar -xzf deploy.tar.gz
-
-            # Make deployment script executable
-            chmod +x deploy-on-server.sh
-
-            # Run deployment script
-            ./deploy-on-server.sh
-            DEPLOY_EXIT=\$?
-
-            # Show the last few lines of the log if it exists
-            echo ""
-            if [ -f deploy.log ]; then
-              echo "Recent deployment log:"
-              tail -20 deploy.log
-            else
-              echo "No deployment log found (deploy.log doesn't exist yet)"
-            fi
-
-            exit \$DEPLOY_EXIT
-          EOF
-
-          echo "✅ Deployment complete!"
+          set -eu
+          : "${MIGRATION_DATABASE_URL:?}"
+          target="$SERVER_USER@$SERVER_IP"
+          remote_archive=$(ssh -i ~/.ssh/id_ed25519 "$target" 'umask 077 && mktemp /tmp/resolutio-release.XXXXXXXX')
+          [[ "$remote_archive" =~ ^/tmp/resolutio-release\.[[:alnum:]]+$ ]]
+          trap 'ssh -i ~/.ssh/id_ed25519 "$target" "rm -f $remote_archive"' EXIT
+          scp -i ~/.ssh/id_ed25519 deploy.tar.gz "$target:$remote_archive"
+          ssh -i ~/.ssh/id_ed25519 "$target" "cd '$DEPLOY_DIR' && tar -xzf '$remote_archive' deploy-on-server.sh && ./deploy-on-server.sh '$remote_archive'" <<< "$MIGRATION_DATABASE_URL"
 
       - name: Health check
         run: |
@@ -246,8 +201,8 @@ jobs:
                 echo "Waiting 5 seconds before retrying..."
                 sleep 5
               else
-                echo "⚠️  Warning: Site may need manual verification"
-                echo "However, deployment was completed and ISP panel should have restarted the app"
+                echo "Site health check failed"
+                exit 1
               fi
             fi
             ATTEMPT=$((ATTEMPT + 1))

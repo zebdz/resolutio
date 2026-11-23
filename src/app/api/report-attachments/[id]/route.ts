@@ -7,6 +7,7 @@
 // forcing a save-dialog. RFC 5987 filename encoding keeps non-ASCII names
 // (Russian etc.) intact.
 
+import { ReportAttachmentId, PropertyClaimId } from '@/domain/shared/EntityIds';
 import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentUser } from '@/web/lib/session';
 import {
@@ -36,7 +37,14 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params;
+  const { id: rawId } = await params;
+  const decoded = ReportAttachmentId.safeParse(rawId);
+
+  if (!decoded.success) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  }
+
+  const id = decoded.data;
 
   // Metadata first: lightweight, no bytes yet.
   const metaR = await attachmentRepo.findById(id);

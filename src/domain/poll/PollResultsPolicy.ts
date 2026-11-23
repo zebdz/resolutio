@@ -1,6 +1,6 @@
 import { Result, success, failure } from '../shared/Result';
 import { Poll } from './Poll';
-import { PollDomainCodes } from './PollDomainCodes';
+import { PollDomainCodes, PollDomainCode } from './PollDomainCodes';
 
 export interface ResultsViewerFacts {
   // Org admin or platform superadmin.
@@ -23,9 +23,9 @@ export interface ResultsViewerFacts {
  * collected under a separate consent, not part of the voting record.
  */
 function canViewResults(
-  poll: Poll,
+  poll: Pick<Poll, 'isOpen' | 'isActive' | 'isAnonymous'>,
   facts: ResultsViewerFacts
-): Result<void, string> {
+): Result<void, PollDomainCode> {
   if (facts.isAdmin) {
     return success(undefined);
   }
@@ -45,7 +45,10 @@ function canViewResults(
   return success(undefined);
 }
 
-function canViewVoterNames(poll: Poll, facts: ResultsViewerFacts): boolean {
+function canViewVoterNames(
+  poll: Pick<Poll, 'isOpen' | 'isActive' | 'isAnonymous'>,
+  facts: ResultsViewerFacts
+): boolean {
   if (facts.isAdmin) {
     return true;
   }
@@ -66,9 +69,9 @@ function canViewSignWillingness(facts: ResultsViewerFacts): boolean {
  * generator marks such a document preliminary.
  */
 function canExportProtocol(
-  poll: Poll,
+  poll: Pick<Poll, 'isOpen' | 'isActive' | 'isAnonymous' | 'isFinished'>,
   facts: ResultsViewerFacts
-): Result<void, string> {
+): Result<void, PollDomainCode> {
   const readable = canViewResults(poll, facts);
 
   if (!readable.success) {
@@ -87,9 +90,9 @@ function canExportProtocol(
 }
 
 function canExportNamedProtocol(
-  poll: Poll,
+  poll: Pick<Poll, 'isOpen' | 'isActive' | 'isAnonymous' | 'isFinished'>,
   facts: ResultsViewerFacts
-): Result<void, string> {
+): Result<void, PollDomainCode> {
   if (poll.isAnonymous()) {
     return failure(PollDomainCodes.POLL_IS_ANONYMOUS);
   }

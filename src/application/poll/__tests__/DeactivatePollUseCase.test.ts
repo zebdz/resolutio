@@ -1,3 +1,24 @@
+/** Verifies Deactivate Poll behavior through typed core ports.
+ * User persistence doubles exclude obsolete moderation methods; access uses the checked moderation port. */
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { PollInstant } from '@/domain/poll/PollValues';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { MemberCount } from '@/domain/organization/OrganizationValues';
+import { ResultCount } from '@/domain/shared/Pagination';
+import { OrganizationName } from '@/domain/organization/OrganizationValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { UpdateQuestionOrderData } from '@/domain/poll/QuestionRepository';
+import { BoardId } from '@/domain/shared/EntityIds';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import { pollFixtureCreation } from '@/application/poll/__tests__/pollFixtureCreation';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { QuestionId, AnswerId, PollId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { DeactivatePollUseCase } from '../DeactivatePollUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -6,10 +27,7 @@ import { Answer } from '../../../domain/poll/Answer';
 import { Organization } from '../../../domain/organization/Organization';
 import { Board } from '../../../domain/board/Board';
 import { BoardRepository } from '../../../domain/board/BoardRepository';
-import {
-  PollRepository,
-  UpdateQuestionOrderData,
-} from '../../../domain/poll/PollRepository';
+import { PollRepository } from '../../../domain/poll/PollRepository';
 import { OrganizationRepository } from '../../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../../domain/user/UserRepository';
 import { User } from '../../../domain/user/User';
@@ -23,39 +41,47 @@ import { VoteDraft } from '../../../domain/poll/VoteDraft';
 import { ParticipantWeightHistory } from '../../../domain/poll/ParticipantWeightHistory';
 
 class MockPollRepository implements PollRepository {
+  async searchPolls(): ReturnType<PollRepository['searchPolls']> {
+    return success({ polls: [], totalCount: ResultCount.parse(0) });
+  }
+
   private polls: Map<string, Poll> = new Map();
 
-  async createPoll(poll: Poll): Promise<Result<Poll, string>> {
+  async createPoll(poll: Poll): ReturnType<PollRepository['createPoll']> {
     this.polls.set(poll.id, poll);
 
     return success(poll);
   }
 
-  async getPollById(pollId: string): Promise<Result<Poll | null, string>> {
+  async getPollById(pollId: string): ReturnType<PollRepository['getPollById']> {
     return success(this.polls.get(pollId) || null);
   }
 
-  async getPollsByBoardId(boardId: string): Promise<Result<Poll[], string>> {
+  async getPollsByBoardId(
+    boardId: string
+  ): ReturnType<PollRepository['getPollsByBoardId']> {
     return success([]);
   }
 
   async getPollsByOrganizationId(
     orgId: string
-  ): Promise<Result<Poll[], string>> {
+  ): ReturnType<PollRepository['getPollsByOrganizationId']> {
     return success([]);
   }
 
-  async getPollsByUserId(userId: string): Promise<Result<Poll[], string>> {
+  async getPollsByUserId(
+    userId: string
+  ): ReturnType<PollRepository['getPollsByUserId']> {
     return success([]);
   }
 
-  async updatePoll(poll: Poll): Promise<Result<void, string>> {
+  async updatePoll(poll: Poll): ReturnType<PollRepository['updatePoll']> {
     this.polls.set(poll.id, poll);
 
     return success(undefined);
   }
 
-  async deletePoll(pollId: string): Promise<Result<void, string>> {
+  async deletePoll(pollId: string): ReturnType<PollRepository['deletePoll']> {
     return success(undefined);
   }
 
@@ -261,11 +287,15 @@ class MockOrganizationRepository implements OrganizationRepository {
     return [];
   }
 
-  async getAncestorIds(organizationId: string): Promise<string[]> {
+  async getAncestorIds(
+    organizationId: string
+  ): ReturnType<OrganizationRepository['getAncestorIds']> {
     return [];
   }
 
-  async getDescendantIds(organizationId: string): Promise<string[]> {
+  async getDescendantIds(
+    organizationId: string
+  ): ReturnType<OrganizationRepository['getDescendantIds']> {
     return [];
   }
 
@@ -287,18 +317,9 @@ class MockOrganizationRepository implements OrganizationRepository {
     return [];
   }
 
-  async findAllWithStats(excludeUserMemberships?: string): Promise<
-    Array<{
-      organization: Organization;
-      memberCount: number;
-      firstAdmin: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        middleName: string | null;
-      } | null;
-    }>
-  > {
+  async findAllWithStats(
+    excludeUserMemberships?: string
+  ): ReturnType<OrganizationRepository['findAllWithStats']> {
     return [];
   }
 
@@ -308,51 +329,60 @@ class MockOrganizationRepository implements OrganizationRepository {
 
   async findAcceptedMemberUserIdsIncludingDescendants(
     organizationId: string
-  ): Promise<string[]> {
-    return [];
-  }
-
-  async getAncestors(): Promise<
-    { id: string; name: string; memberCount: number }[]
+  ): ReturnType<
+    OrganizationRepository['findAcceptedMemberUserIdsIncludingDescendants']
   > {
     return [];
   }
 
-  async getChildrenWithStats(): Promise<
-    { id: string; name: string; memberCount: number }[]
+  async getAncestors(): ReturnType<OrganizationRepository['getAncestors']> {
+    return [];
+  }
+
+  async getChildrenWithStats(): ReturnType<
+    OrganizationRepository['getChildrenWithStats']
   > {
     return [];
   }
 
-  async getHierarchyTree(): Promise<{
-    ancestors: { id: string; name: string; memberCount: number }[];
-    tree: { id: string; name: string; memberCount: number; children: any[] };
-  }> {
+  async getHierarchyTree(): ReturnType<
+    OrganizationRepository['getHierarchyTree']
+  > {
     return {
       ancestors: [],
-      tree: { id: '', name: '', memberCount: 0, children: [] },
+      tree: {
+        id: OrganizationId.parse('org-fixture'),
+        name: OrganizationName.parse('Fixture organization'),
+        memberCount: MemberCount.parse(0),
+        children: [],
+      },
     };
   }
-  async searchOrganizationsWithStats(): Promise<{
-    organizations: any[];
-    totalCount: number;
-  }> {
-    return { organizations: [], totalCount: 0 };
+  async searchOrganizationsWithStats(): ReturnType<
+    OrganizationRepository['searchOrganizationsWithStats']
+  > {
+    return { organizations: [], totalCount: ResultCount.parse(0) };
   }
   async setParentId(
     organizationId: string,
     parentId: string | null
   ): Promise<void> {}
-  async findAdminUserIds(): Promise<string[]> {
+  async findAdminUserIds(): ReturnType<
+    OrganizationRepository['findAdminUserIds']
+  > {
     return [];
   }
 
   async addAdmin(): Promise<void> {}
   async removeAdmin(): Promise<void> {}
-  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+  async searchByNameFuzzy(): ReturnType<
+    OrganizationRepository['searchByNameFuzzy']
+  > {
     return [];
   }
-  async getFullTreeOrgIds(): Promise<string[]> {
+  async getFullTreeOrgIds(): ReturnType<
+    OrganizationRepository['getFullTreeOrgIds']
+  > {
     return [];
   }
   async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
@@ -360,13 +390,56 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
   async findUsersWithMultipleMembershipsInOrgs(
     _orgIds: string[]
-  ): Promise<string[]> {
+  ): ReturnType<
+    OrganizationRepository['findUsersWithMultipleMembershipsInOrgs']
+  > {
     return [];
   }
   async setAllowMultiTreeMembership(
     _organizationId: string,
     _value: boolean | null
   ): Promise<void> {}
+
+  async isUserExactMember(
+    ..._args: Parameters<OrganizationRepository['isUserExactMember']>
+  ): ReturnType<OrganizationRepository['isUserExactMember']> {
+    throw new Error('Unexpected test repository call: isUserExactMember');
+  }
+  async getAdminUserIds(
+    ..._args: Parameters<OrganizationRepository['getAdminUserIds']>
+  ): ReturnType<OrganizationRepository['getAdminUserIds']> {
+    throw new Error('Unexpected test repository call: getAdminUserIds');
+  }
+  async findAcceptedMemberUserIdsForOrgs(
+    ..._args: Parameters<
+      OrganizationRepository['findAcceptedMemberUserIdsForOrgs']
+    >
+  ): ReturnType<OrganizationRepository['findAcceptedMemberUserIdsForOrgs']> {
+    throw new Error(
+      'Unexpected test repository call: findAcceptedMemberUserIdsForOrgs'
+    );
+  }
+  async removeUserFromOrganization(
+    ..._args: Parameters<OrganizationRepository['removeUserFromOrganization']>
+  ): ReturnType<OrganizationRepository['removeUserFromOrganization']> {
+    throw new Error(
+      'Unexpected test repository call: removeUserFromOrganization'
+    );
+  }
+  async removeMemberFromOrganization(
+    ..._args: Parameters<OrganizationRepository['removeMemberFromOrganization']>
+  ): ReturnType<OrganizationRepository['removeMemberFromOrganization']> {
+    throw new Error(
+      'Unexpected test repository call: removeMemberFromOrganization'
+    );
+  }
+  async findPendingRequestsByUserId(
+    ..._args: Parameters<OrganizationRepository['findPendingRequestsByUserId']>
+  ): ReturnType<OrganizationRepository['findPendingRequestsByUserId']> {
+    throw new Error(
+      'Unexpected test repository call: findPendingRequestsByUserId'
+    );
+  }
 }
 
 class MockUserRepository implements UserRepository {
@@ -400,7 +473,9 @@ class MockUserRepository implements UserRepository {
     return [];
   }
 
-  async searchUserByPhone(_phone: string): Promise<User | null> {
+  async searchUserByPhone(
+    _phone: Parameters<UserRepository['searchUserByPhone']>[0]
+  ): ReturnType<UserRepository['searchUserByPhone']> {
     return null;
   }
 
@@ -418,17 +493,13 @@ class MockUserRepository implements UserRepository {
 
   async updatePrivacySettings(): Promise<void> {}
   async confirmUser(): Promise<void> {}
-  async isUserBlocked(): Promise<boolean> {
-    return false;
-  }
-  async blockUser(): Promise<void> {}
-  async unblockUser(): Promise<void> {}
-  async getBlockStatus(): Promise<null> {
-    return null;
-  }
+
   async deleteAddress(): Promise<void> {}
-  async getBlockedUserIds(): Promise<string[]> {
-    return [];
+
+  async findByEmail(
+    ..._args: Parameters<UserRepository['findByEmail']>
+  ): ReturnType<UserRepository['findByEmail']> {
+    throw new Error('Unexpected test repository call: findByEmail');
   }
 }
 
@@ -470,38 +541,55 @@ describe('DeactivatePollUseCase', () => {
 
     // Create a test poll
     const pollResult = Poll.create(
-      'Test Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'user-1',
-      new Date('2024-01-01'),
-      new Date('2024-12-31')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-1'),
+      expectSuccess(
+        PollPeriod.create(new Date('2024-01-01'), new Date('2024-12-31'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(pollResult.success).toBe(true);
 
     if (pollResult.success) {
       poll = pollResult.value;
-      (poll as any).props.id = 'poll-1';
+      poll = Poll.reconstitute({
+        ...poll.toJSON(),
+        questions: poll.questions,
+        id: 'poll-1',
+      });
 
       // Add a question with answer
       const questionResult = Question.create(
-        'Question 1',
+        QuestionText.parse('Question 1'),
         poll.id,
-        1,
-        1,
+        pollFixtureCreation(QuestionId),
+        PageNumber.parse(1),
+        SortOrder.parse(1),
         'single-choice'
       );
       expect(questionResult.success).toBe(true);
 
       if (questionResult.success) {
-        const question = questionResult.value;
-        (question as any).props.id = 'question-1';
+        let question = questionResult.value;
+        question = Question.reconstitute({
+          ...question.toJSON(),
+          answers: question.answers,
+          id: 'question-1',
+        });
 
         // Add answer
-        const answerResult = Answer.create('Answer 1', 1, question.id);
-        (answerResult.value as any).props.id = 'answer-1';
-        question.addAnswer(answerResult.value);
+        const answer = expectSuccess(
+          Answer.create(
+            AnswerText.parse('Answer 1'),
+            SortOrder.parse(1),
+            question.id,
+            testCreation(AnswerId, 'answer-1')
+          )
+        );
+        question.addAnswer(answer);
 
         poll.addQuestion(question);
       }
@@ -541,7 +629,7 @@ describe('DeactivatePollUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.NOT_FOUND);
+    expect(expectFailure(result)).toBe(PollErrors.NOT_FOUND);
   });
 
   it('should fail if poll is in READY state (not active)', async () => {
@@ -555,12 +643,12 @@ describe('DeactivatePollUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
+    expect(expectFailure(result)).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
   });
 
   it('should fail if poll is finished', async () => {
     // Finish the poll
-    poll.finish();
+    poll.finish(PollInstant.parse(new Date().toISOString()));
     await repository.updatePoll(poll);
 
     const result = await useCase.execute({
@@ -569,7 +657,7 @@ describe('DeactivatePollUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
+    expect(expectFailure(result)).toBe(PollDomainCodes.POLL_MUST_BE_ACTIVE);
   });
 
   // Authorization tests
@@ -581,7 +669,7 @@ describe('DeactivatePollUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollErrors.NOT_AUTHORIZED);
+      expect(expectFailure(result)).toBe(PollErrors.NOT_AUTHORIZED);
     });
 
     it('should allow admin user', async () => {
@@ -624,7 +712,7 @@ describe('DeactivatePollUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.ORGANIZATION_ARCHIVED);
+    expect(expectFailure(result)).toBe(PollErrors.ORGANIZATION_ARCHIVED);
   });
 
   it('should fail if board is archived', async () => {
@@ -644,6 +732,6 @@ describe('DeactivatePollUseCase', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollErrors.BOARD_ARCHIVED);
+    expect(expectFailure(result)).toBe(PollErrors.BOARD_ARCHIVED);
   });
 });

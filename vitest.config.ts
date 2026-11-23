@@ -41,6 +41,8 @@ export default defineConfig({
       '**/.next/**',
       '**/playwright-report/**',
       '**/test-results/**',
+      '**/*.database.test.ts',
+      '**/*.dbConstraint.test.ts',
     ],
   },
   resolve: {

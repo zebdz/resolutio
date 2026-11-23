@@ -1,3 +1,7 @@
+/** Extracts untrusted ID lexemes from the supported inline URL namespaces.
+ * Ownership validation consumes these strings; extraction never manufactures domain identities. */
+import type { AttachmentReferencePrefix } from './AttachmentReferenceScope';
+
 // Inline attachment URLs look like:
 //   ![alt](/api/<kind>-attachments/<id>)   — images
 //   [name](/api/<kind>-attachments/<id>)   — PDFs and other downloads
@@ -11,7 +15,7 @@ function escapeForRegex(value: string): string {
 
 export function extractAttachmentIds(
   text: string,
-  apiPrefix: string
+  apiPrefix: AttachmentReferencePrefix
 ): string[] {
   const pattern = new RegExp(
     `${escapeForRegex(apiPrefix)}/([A-Za-z0-9_-]+)`,

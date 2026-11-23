@@ -1,4 +1,7 @@
 import type { OtpPurpose } from '@/domain/otp/OtpVerification';
+import type { OtpDigits } from '@/domain/otp/OtpValues';
+import type { Minutes } from '@/domain/auth/AuthValues';
+import type { Language } from '@/domain/user/UserValues';
 
 export interface RenderedEmail {
   subject: string;
@@ -12,13 +15,13 @@ export interface RenderedEmail {
 export interface EmailTemplateRenderer {
   renderOtp(
     purpose: OtpPurpose,
-    locale: string,
-    code: string,
-    expiryMinutes: number
+    locale: Language,
+    code: OtpDigits,
+    expiryMinutes: Minutes
   ): Promise<RenderedEmail>;
 
   renderEmailChangedNotice(
-    locale: string,
+    locale: Language,
     newEmailMasked: string
   ): Promise<RenderedEmail>;
 }

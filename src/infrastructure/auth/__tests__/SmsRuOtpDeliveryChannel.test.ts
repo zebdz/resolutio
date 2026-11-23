@@ -1,3 +1,7 @@
+/** Provider requests serialize validated OTP inputs; malformed transport facts fail before delivery. */
+import { OtpSmsDestination, OtpDigits } from '@/domain/otp/OtpValues';
+import { ClientIp } from '@/domain/auth/AuthValues';
+import { OtpPurposes } from '@/domain/otp/OtpVerification';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SmsRuOtpDeliveryChannel } from '../SmsRuOtpDeliveryChannel';
 import { SmsRuLogger } from '../SmsRuLogger';
@@ -158,7 +162,15 @@ describe('SmsRuOtpDeliveryChannel', () => {
       const mockFetch = vi.fn();
       globalThis.fetch = mockFetch;
 
-      const result = await channel.send(phone, '123456', 'ru', '');
+      const result = await channel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        // @ts-expect-error Malformed external IP deliberately tests the adapter's runtime defense.
+        '',
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       expect(result.success).toBe(false);
       expect(mockFetch).not.toHaveBeenCalled();
@@ -169,7 +181,15 @@ describe('SmsRuOtpDeliveryChannel', () => {
       const mockFetch = vi.fn();
       globalThis.fetch = mockFetch;
 
-      const result = await channel.send(phone, '123456', 'ru', null as any);
+      const result = await channel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        // @ts-expect-error Malformed external IP deliberately tests the adapter's runtime defense.
+        null,
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       expect(result.success).toBe(false);
       expect(mockFetch).not.toHaveBeenCalled();
@@ -181,10 +201,13 @@ describe('SmsRuOtpDeliveryChannel', () => {
       globalThis.fetch = mockFetch;
 
       const result = await channel.send(
-        phone,
-        '123456',
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
         'ru',
-        undefined as any
+        // @ts-expect-error Malformed external IP deliberately tests the adapter's runtime defense.
+        undefined,
+        OtpPurposes.PHONE_CONFIRMATION
       );
 
       expect(result.success).toBe(false);
@@ -199,13 +222,52 @@ describe('SmsRuOtpDeliveryChannel', () => {
       smsRuSuccess(phone)
     );
 
-    const result = await channel.send(phone, '123456', 'ru', TEST_IP);
+    const result = await channel.send(
+      OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+        .identifier,
+      OtpDigits.parse('123456'),
+      'ru',
+      ClientIp.parse(TEST_IP),
+      OtpPurposes.PHONE_CONFIRMATION
+    );
 
     expect(result.success).toBe(true);
     expect(result.backdoorCode).toBeUndefined();
   });
 
-  it('should send correct params to sms.ru', async () => {
+  it.each([
+    { status: 'OK', status_code: 100 },
+    {
+      status: 'OK',
+      status_code: 100,
+      sms: { '79255070602': { status: 'UNKNOWN', status_code: 100 } },
+    },
+  ])(
+    'does not claim delivery from an invalid or missing recipient outcome',
+    async (sendResponse) => {
+      const phone = '79255070602';
+      const mockFetch = mockCostThenSend(
+        smsRuCostSuccess(phone, 1.77),
+        sendResponse
+      );
+      globalThis.fetch = mockFetch;
+      const result = await channel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
+      expect(result).toEqual({ success: false });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(
+        vi.mocked(SmsRuLogger).mock.instances[0].logSuccess
+      ).not.toHaveBeenCalled();
+    }
+  );
+
+  it('converts a canonical phone to provider request and response keys', async () => {
     const phone = '79255070602';
     const mockFetch = mockCostThenSend(
       smsRuCostSuccess(phone, 1.77),
@@ -213,7 +275,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
     );
     globalThis.fetch = mockFetch;
 
-    await channel.send(phone, '123456', 'ru', TEST_IP);
+    await channel.send(
+      OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+        .identifier,
+      OtpDigits.parse('123456'),
+      'ru',
+      ClientIp.parse(TEST_IP),
+      OtpPurposes.PHONE_CONFIRMATION
+    );
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     // Send call is the second one (after cost check)
@@ -238,7 +307,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
     );
     globalThis.fetch = mockFetch;
 
-    await channel.send(phone, '123456', 'ru', TEST_IP);
+    await channel.send(
+      OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+        .identifier,
+      OtpDigits.parse('123456'),
+      'ru',
+      ClientIp.parse(TEST_IP),
+      OtpPurposes.PHONE_CONFIRMATION
+    );
 
     // Send call is the second one (after cost check)
     const bodyStr = decodeFetchBody(mockFetch.mock.calls[1][1]?.body);
@@ -257,7 +333,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
     );
     globalThis.fetch = mockFetch;
 
-    await channel.send(phone, '654321', 'en', TEST_IP);
+    await channel.send(
+      OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+        .identifier,
+      OtpDigits.parse('654321'),
+      'en',
+      ClientIp.parse(TEST_IP),
+      OtpPurposes.PHONE_CONFIRMATION
+    );
 
     // Send call is the second one (after cost check)
     const bodyStr = decodeFetchBody(mockFetch.mock.calls[1][1]?.body);
@@ -273,7 +356,15 @@ describe('SmsRuOtpDeliveryChannel', () => {
     );
     globalThis.fetch = mockFetch;
 
-    await channel.send(phone, '111111', 'de', TEST_IP);
+    await channel.send(
+      OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+        .identifier,
+      OtpDigits.parse('111111'),
+      // @ts-expect-error Unknown provider locale exercises the runtime fallback.
+      'de',
+      ClientIp.parse(TEST_IP),
+      OtpPurposes.PHONE_CONFIRMATION
+    );
 
     // Send call is the second one (after cost check)
     const bodyStr = decodeFetchBody(mockFetch.mock.calls[1][1]?.body);
@@ -297,7 +388,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
       );
       globalThis.fetch = mockFetch;
 
-      const result = await channel.send(phone, '123456', 'ru', TEST_IP);
+      const result = await channel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       expect(result.success).toBe(false);
       // cost check + one send attempt
@@ -320,7 +418,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
       .mockRejectedValue(new Error('Network error'));
     globalThis.fetch = mockFetch;
 
-    const result = await channel.send(phone, '123456', 'ru', TEST_IP);
+    const result = await channel.send(
+      OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+        .identifier,
+      OtpDigits.parse('123456'),
+      'ru',
+      ClientIp.parse(TEST_IP),
+      OtpPurposes.PHONE_CONFIRMATION
+    );
 
     expect(result.success).toBe(false);
   });
@@ -354,7 +459,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
         );
       globalThis.fetch = mockFetch;
 
-      const result = await channel.send(phone, '123456', 'ru', TEST_IP);
+      const result = await channel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       expect(result.success).toBe(true);
       // cost check + failed send + retry send
@@ -370,7 +482,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
     );
     globalThis.fetch = mockFetch;
 
-    await channel.send(phone, '123456', 'ru', '203.0.113.42');
+    await channel.send(
+      OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+        .identifier,
+      OtpDigits.parse('123456'),
+      'ru',
+      ClientIp.parse('203.0.113.42'),
+      OtpPurposes.PHONE_CONFIRMATION
+    );
 
     // Cost check should include ip
     const costBody = decodeFetchBody(mockFetch.mock.calls[0][1]?.body);
@@ -397,7 +516,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
       );
       globalThis.fetch = mockFetch;
 
-      await channel.send(phone, '123456', 'ru', TEST_IP);
+      await channel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       // Send call is the second one (after cost check)
       const bodyStr = decodeFetchBody(mockFetch.mock.calls[1][1]?.body);
@@ -411,7 +537,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
         smsRuSuccess(phone)
       );
 
-      const result = await channel.send(phone, '123456', 'ru', TEST_IP);
+      const result = await channel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       expect(result.success).toBe(true);
       expect(result.backdoorCode).toBe('123456');
@@ -426,7 +559,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
         smsRuSuccess(phone)
       );
 
-      await channel.send(phone, '123456', 'ru', TEST_IP);
+      await channel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       const loggerInstance = vi.mocked(SmsRuLogger).mock.instances[0];
       expect(loggerInstance.logSuccess).toHaveBeenCalledWith(
@@ -451,7 +591,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
         smsRuError(201, 'Insufficient balance')
       );
 
-      await channel.send(phone, '123456', 'ru', TEST_IP);
+      await channel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       const loggerInstance = vi.mocked(SmsRuLogger).mock.instances[0];
       expect(loggerInstance.logError).toHaveBeenCalledWith(
@@ -473,7 +620,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
       );
       globalThis.fetch = mockFetch;
 
-      const result = await channel.send(phone, '123456', 'en', TEST_IP);
+      const result = await channel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'en',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       expect(result.success).toBe(false);
 
@@ -502,6 +656,30 @@ describe('SmsRuOtpDeliveryChannel', () => {
       });
     });
 
+    it.each(['0junk', '-1', -1])(
+      'blocks an invalid quote %s instead of coercing it into a valid price',
+      async (cost) => {
+        const phone = '79255070602';
+        const quote = {
+          status: 'OK',
+          status_code: 100,
+          sms: { [phone]: { status: 'OK', status_code: 100, cost } },
+        };
+        const mockFetch = mockCostThenSend(quote, smsRuSuccess(phone));
+        globalThis.fetch = mockFetch;
+        const result = await guardedChannel.send(
+          OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+            .identifier,
+          OtpDigits.parse('123456'),
+          'ru',
+          ClientIp.parse(TEST_IP),
+          OtpPurposes.PHONE_CONFIRMATION
+        );
+        expect(result).toEqual({ success: false });
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+      }
+    );
+
     it('should call cost API before sending when maxCost is set', async () => {
       const phone = '79255070602';
       const mockFetch = mockCostThenSend(
@@ -510,7 +688,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
       );
       globalThis.fetch = mockFetch;
 
-      await guardedChannel.send(phone, '123456', 'ru', TEST_IP);
+      await guardedChannel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       expect(mockFetch).toHaveBeenCalledTimes(2);
       // First call should be to /sms/cost
@@ -530,7 +715,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
         smsRuSuccess(phone)
       );
 
-      const result = await guardedChannel.send(phone, '123456', 'ru', TEST_IP);
+      const result = await guardedChannel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       expect(result.success).toBe(true);
     });
@@ -540,7 +732,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
       const mockFetch = mockFetchResponse(smsRuCostSuccess(phone, 8.5));
       globalThis.fetch = mockFetch;
 
-      const result = await guardedChannel.send(phone, '123456', 'en', TEST_IP);
+      const result = await guardedChannel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'en',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       expect(result.success).toBe(false);
       // Should only call cost API, not send
@@ -552,7 +751,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
       const mockFetch = mockFetchResponse(smsRuCostUndeliverable(phone));
       globalThis.fetch = mockFetch;
 
-      const result = await guardedChannel.send(phone, '123456', 'en', TEST_IP);
+      const result = await guardedChannel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'en',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       expect(result.success).toBe(false);
       expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -565,10 +771,12 @@ describe('SmsRuOtpDeliveryChannel', () => {
       globalThis.fetch = mockFetch;
 
       const result = await guardedChannel.send(
-        '79255070602',
-        '123456',
+        OtpSmsDestination.parse({ channel: 'sms', identifier: '+79255070602' })
+          .identifier,
+        OtpDigits.parse('123456'),
         'ru',
-        TEST_IP
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
       );
 
       expect(result.success).toBe(false);
@@ -580,7 +788,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
       const phone = '44712345678';
       globalThis.fetch = mockFetchResponse(smsRuCostSuccess(phone, 8.5));
 
-      await guardedChannel.send(phone, '123456', 'en', TEST_IP);
+      await guardedChannel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'en',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       // guardedChannel is instances[1] (parent beforeEach creates channel at [0])
       const loggerInstance = vi.mocked(SmsRuLogger).mock.instances[1];
@@ -602,7 +817,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
       const phone = '44712345678';
       globalThis.fetch = mockFetchResponse(smsRuCostUndeliverable(phone));
 
-      await guardedChannel.send(phone, '123456', 'en', TEST_IP);
+      await guardedChannel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'en',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       // guardedChannel is instances[1] (parent beforeEach creates channel at [0])
       const loggerInstance = vi.mocked(SmsRuLogger).mock.instances[1];
@@ -625,7 +847,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
         smsRuSuccess(phone)
       );
 
-      await guardedChannel.send(phone, '123456', 'ru', TEST_IP);
+      await guardedChannel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       // guardedChannel is instances[1] (parent beforeEach creates channel at [0])
       const loggerInstance = vi.mocked(SmsRuLogger).mock.instances[1];
@@ -643,7 +872,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
       const mockFetch = mockFetchResponse(smsRuCostMissingCost(phone));
       globalThis.fetch = mockFetch;
 
-      const result = await guardedChannel.send(phone, '123456', 'ru', TEST_IP);
+      const result = await guardedChannel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       expect(result.success).toBe(false);
       // Only cost check, no send
@@ -667,7 +903,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
       const mockFetch = mockCostThenSend(zeroCostResponse, smsRuSuccess(phone));
       globalThis.fetch = mockFetch;
 
-      const result = await guardedChannel.send(phone, '123456', 'ru', TEST_IP);
+      const result = await guardedChannel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       expect(result.success).toBe(true);
       expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -690,7 +933,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
       const mockFetch = mockFetchResponse(garbageCostResponse);
       globalThis.fetch = mockFetch;
 
-      const result = await guardedChannel.send(phone, '123456', 'ru', TEST_IP);
+      const result = await guardedChannel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       expect(result.success).toBe(false);
       // Only cost check, no send
@@ -706,7 +956,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
       globalThis.fetch = mockFetch;
 
       // Use the channel without maxCost
-      await channel.send(phone, '123456', 'ru', TEST_IP);
+      await channel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'ru',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       // Cost check + send = 2 calls
       expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -729,7 +986,14 @@ describe('SmsRuOtpDeliveryChannel', () => {
       globalThis.fetch = mockFetch;
 
       // Use the channel without maxCost
-      await channel.send(phone, '123456', 'en', TEST_IP);
+      await channel.send(
+        OtpSmsDestination.parse({ channel: 'sms', identifier: `+${phone}` })
+          .identifier,
+        OtpDigits.parse('123456'),
+        'en',
+        ClientIp.parse(TEST_IP),
+        OtpPurposes.PHONE_CONFIRMATION
+      );
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
 

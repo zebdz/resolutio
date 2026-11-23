@@ -1,11 +1,12 @@
+import { testClock, testIds } from '@/domain/report/__tests__/reportTestValues';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ArchiveReportUseCase } from '../ArchiveReportUseCase';
-import { Report, ReportProps } from '../../../domain/report/Report';
+import { Report, ReportData } from '../../../domain/report/Report';
 import { ReportVisibility } from '../../../domain/report/ReportVisibility';
 import { ReportErrors } from '../ReportErrors';
 import { ReportDomainCodes } from '../../../domain/report/ReportDomainCodes';
 
-const makeReport = (overrides: Partial<ReportProps> = {}) =>
+const makeReport = (overrides: Partial<ReportData> = {}) =>
   Report.reconstitute({
     id: 'r1',
     organizationId: 'org-1',
@@ -24,6 +25,12 @@ const makeReport = (overrides: Partial<ReportProps> = {}) =>
     pollIds: [],
     attachmentIds: [],
     ...overrides,
+    ...(overrides.state === 'PUBLISHED'
+      ? {
+          publishedById: overrides.publishedById ?? 'admin-1',
+          lastPublishedAt: overrides.lastPublishedAt ?? new Date('2026-01-01'),
+        }
+      : {}),
   });
 
 class FakeReports {
@@ -65,7 +72,12 @@ describe('ArchiveReportUseCase', () => {
     reports = new FakeReports();
     orgs = new FakeOrgs();
     users = new FakeUsers();
-    uc = new ArchiveReportUseCase(reports as any, orgs as any, users as any);
+    uc = new ArchiveReportUseCase(
+      reports as any,
+      orgs as any,
+      users as any,
+      testClock
+    );
     reports.store.set('r1', makeReport());
   });
 

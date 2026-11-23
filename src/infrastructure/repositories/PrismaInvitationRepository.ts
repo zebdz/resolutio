@@ -1,7 +1,14 @@
+/** Typed invitation persistence keeps target/lifecycle decoding at the boundary. */
+import {
+  InvitationId,
+  OrganizationId,
+  BoardId,
+  UserId,
+} from '@/domain/shared/EntityIds';
 import { PrismaClient } from '@/generated/prisma/client';
 import {
   Invitation,
-  InvitationProps,
+  InvitationData,
   InvitationType,
   InvitationStatus,
 } from '../../domain/invitation/Invitation';
@@ -15,6 +22,7 @@ export class PrismaInvitationRepository implements InvitationRepository {
 
     const created = await this.prisma.invitation.create({
       data: {
+        id: data.id,
         organizationId: data.organizationId,
         boardId: data.boardId,
         inviterId: data.inviterId,
@@ -43,7 +51,7 @@ export class PrismaInvitationRepository implements InvitationRepository {
     return Invitation.reconstitute(this.toProps(updated));
   }
 
-  async findById(id: string): Promise<Invitation | null> {
+  async findById(id: InvitationId): Promise<Invitation | null> {
     const record = await this.prisma.invitation.findUnique({
       where: { id },
     });
@@ -55,7 +63,7 @@ export class PrismaInvitationRepository implements InvitationRepository {
     return Invitation.reconstitute(this.toProps(record));
   }
 
-  async findPendingByInviteeId(inviteeId: string): Promise<Invitation[]> {
+  async findPendingByInviteeId(inviteeId: UserId): Promise<Invitation[]> {
     const records = await this.prisma.invitation.findMany({
       where: { inviteeId, status: 'pending' },
       orderBy: { createdAt: 'desc' },
@@ -65,8 +73,8 @@ export class PrismaInvitationRepository implements InvitationRepository {
   }
 
   async findPendingByOrganizationId(
-    organizationId: string,
-    type: string
+    organizationId: OrganizationId,
+    type: InvitationType
   ): Promise<Invitation[]> {
     const records = await this.prisma.invitation.findMany({
       where: { organizationId, type, status: 'pending' },
@@ -76,7 +84,7 @@ export class PrismaInvitationRepository implements InvitationRepository {
     return records.map((r) => Invitation.reconstitute(this.toProps(r)));
   }
 
-  async findPendingByBoardId(boardId: string): Promise<Invitation[]> {
+  async findPendingByBoardId(boardId: BoardId): Promise<Invitation[]> {
     const records = await this.prisma.invitation.findMany({
       where: { boardId, status: 'pending' },
       orderBy: { createdAt: 'desc' },
@@ -86,8 +94,8 @@ export class PrismaInvitationRepository implements InvitationRepository {
   }
 
   async findPendingAdminInvite(
-    organizationId: string,
-    inviteeId: string
+    organizationId: OrganizationId,
+    inviteeId: UserId
   ): Promise<Invitation | null> {
     const record = await this.prisma.invitation.findFirst({
       where: {
@@ -106,8 +114,8 @@ export class PrismaInvitationRepository implements InvitationRepository {
   }
 
   async findPendingBoardMemberInvite(
-    boardId: string,
-    inviteeId: string
+    boardId: BoardId,
+    inviteeId: UserId
   ): Promise<Invitation | null> {
     const record = await this.prisma.invitation.findFirst({
       where: {
@@ -126,8 +134,8 @@ export class PrismaInvitationRepository implements InvitationRepository {
   }
 
   async findPendingMemberInvite(
-    organizationId: string,
-    inviteeId: string
+    organizationId: OrganizationId,
+    inviteeId: UserId
   ): Promise<Invitation | null> {
     const record = await this.prisma.invitation.findFirst({
       where: {
@@ -155,15 +163,15 @@ export class PrismaInvitationRepository implements InvitationRepository {
     status: string;
     createdAt: Date;
     handledAt: Date | null;
-  }): InvitationProps {
+  }): InvitationData {
     return {
       id: record.id,
       organizationId: record.organizationId,
       boardId: record.boardId,
       inviterId: record.inviterId,
       inviteeId: record.inviteeId,
-      type: record.type as InvitationType,
-      status: record.status as InvitationStatus,
+      type: record.type,
+      status: record.status,
       createdAt: record.createdAt,
       handledAt: record.handledAt,
     };

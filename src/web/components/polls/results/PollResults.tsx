@@ -1,6 +1,12 @@
 'use client';
 
+/** Render the current viewer’s results. Frozen tallies retain exact weight strings
+ * and the winner determined from the sealed record before display rounding. */
+
+import { QuestionFiles } from '../QuestionFiles';
+import type { QuestionFile } from '@/web/lib/questionAttachmentFiles';
 import { useState } from 'react';
+import { printWeight, leadingAnswer } from '@/web/lib/protocolWeight';
 import { useTranslations } from 'next-intl';
 import { Badge } from '@/src/web/components/catalyst/badge';
 import VoterBreakdownDialog from './VoterBreakdownDialog';
@@ -9,51 +15,17 @@ import ExportProtocolPdfButton from './ExportProtocolPdfButton';
 import ExportNamedProtocolPdfButton from './ExportNamedProtocolPdfButton';
 import { PollState } from '@/src/domain/poll/PollState';
 import { User } from '@/domain/user/User';
-import type { QuestionType } from '@/src/domain/poll/QuestionType';
+import type {
+  AnswerResult,
+  PollResultsData,
+} from '@/web/actions/poll/PollResultsView';
 
-interface AnswerResult {
-  answerId: string;
-  answerText: string;
-  voteCount: number;
-  weightedVotes: number;
-  percentage: number;
-  voters: {
-    userId: string;
-    userName: string;
-    weight: number;
-  }[];
-}
-
-interface QuestionResult {
-  questionId: string;
-  questionText: string;
-  questionType: QuestionType;
-  totalVotes: number;
-  totalWeight: number;
-  participantWeight: number;
-  answers: AnswerResult[];
-}
-
-interface ProtocolSignWillingnessEntry {
-  userId: string;
-  firstName: string;
-  lastName: string;
-  middleName: string | null;
-  willingToSignProtocol: boolean;
-  // Server sends this only for admins, and only for willing participants.
-  phoneNumber: string | null;
-}
-
-interface PollResultsData {
-  pollId: string;
-  totalParticipants: number;
-  totalWeight: number;
-  votedParticipants: number;
-  questions: QuestionResult[];
-  protocolSignWillingness: ProtocolSignWillingnessEntry[];
+function displayWeight(value: number, exact?: string) {
+  return exact === undefined ? value.toFixed(2) : printWeight(value, exact);
 }
 
 interface PollResultsProps {
+  questionFiles?: QuestionFile[];
   results: PollResultsData;
   pollState: PollState;
   isPollCreator: boolean;
@@ -75,6 +47,7 @@ interface PollResultsProps {
 
 export default function PollResults({
   results,
+  questionFiles = [],
   pollState,
   isPollCreator,
   canViewVoterNames,
@@ -140,8 +113,11 @@ export default function PollResults({
               </div>
               <div className="mt-1 text-2xl font-semibold text-zinc-900 dark:text-white">
                 {buildingTotal > 0
-                  ? `${results.totalWeight.toFixed(2)} / ${buildingTotal.toFixed(2)}`
-                  : results.totalWeight.toFixed(2)}
+                  ? `${displayWeight(results.totalWeight, results.exactTotalWeight)} / ${buildingTotal.toFixed(2)}`
+                  : displayWeight(
+                      results.totalWeight,
+                      results.exactTotalWeight
+                    )}
               </div>
               {buildingTotal > 0 && (
                 <div className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
@@ -182,45 +158,46 @@ export default function PollResults({
 
         {/* Question results */}
         {results.questions.map((question) => {
-          const winner = (() => {
-            if (question.questionType !== 'single-choice') {
-              return null;
-            }
-
-            if (question.answers.length === 0) {
-              return null;
-            }
-
-            const maxVotes = Math.max(
-              ...question.answers.map((a) => a.weightedVotes)
-            );
-            const topAnswers = question.answers.filter(
-              (a) => a.weightedVotes === maxVotes
-            );
-
-            return topAnswers.length === 1 ? topAnswers[0] : null;
-          })();
+          const winner = leadingAnswer(
+            question.questionType,
+            question.answers,
+            (answer) => answer.weightedVotes,
+            question.winningAnswerId
+          );
 
           return (
             <div
               key={question.questionId}
+              id={`question-${question.questionId}`}
               className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 bg-white dark:bg-zinc-900"
             >
               <div className="mb-4">
                 <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">
                   {question.questionText}
                 </h3>
+                <QuestionFiles
+                  files={questionFiles.filter(
+                    (f) => f.questionId === question.questionId
+                  )}
+                />
                 <div className="mt-2 flex items-center gap-4 text-sm text-zinc-600 dark:text-zinc-400">
                   <span>
                     {t('votes')}: {question.totalVotes}
                   </span>
                   <span>
-                    {t('voteWeight')}: {question.totalWeight.toFixed(2)}
+                    {t('voteWeight')}:{' '}
+                    {displayWeight(
+                      question.totalWeight,
+                      question.exactTotalWeight
+                    )}
                   </span>
                   {buildingTotal > 0 && (
                     <span>
                       {t('participation')}:{' '}
-                      {question.participantWeight.toFixed(2)}{' '}
+                      {displayWeight(
+                        question.participantWeight,
+                        question.exactParticipantWeight
+                      )}{' '}
                       {`(${((question.participantWeight / buildingTotal) * 100).toFixed(2)}% ${t('ofBuilding')})`}
                     </span>
                   )}
@@ -258,7 +235,11 @@ export default function PollResults({
                           </div>
                           <div className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
                             {answer.voteCount} {t('votes')} (
-                            {answer.weightedVotes.toFixed(2)} {t('voteWeight')})
+                            {displayWeight(
+                              answer.weightedVotes,
+                              answer.exactWeight
+                            )}{' '}
+                            {t('voteWeight')})
                           </div>
                         </div>
                         <div className="text-2xl font-semibold text-zinc-900 dark:text-white">

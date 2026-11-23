@@ -1,14 +1,20 @@
+/** Snapshot-fact adapter validates persisted scope IDs and distribution choices
+ * before the property-lock policy interprets ownership involvement. */
+import { OrganizationId, PropertyId } from '../../domain/shared/EntityIds';
 import { PrismaClient } from '@/generated/prisma/client';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { PropertyLockRepository } from '../../domain/organization/PropertyLockRepository';
+import {
+  PropertyLockRepository,
+  PropertyLockFailure,
+} from '../../domain/organization/PropertyLockRepository';
 import { LockSnapshotFact } from '../../domain/organization/PropertyLockService';
 
 export class PrismaPropertyLockRepository implements PropertyLockRepository {
   constructor(private prisma: PrismaClient) {}
 
   async findSnapshotFactsForOrg(
-    organizationId: string
-  ): Promise<Result<LockSnapshotFact[], string>> {
+    organizationId: OrganizationId
+  ): Promise<Result<LockSnapshotFact[], PropertyLockFailure>> {
     try {
       // A snapshot fact exists for every poll in the org that has at least one
       // row in poll_eligible_members (i.e. TakeSnapshot has run for it).
@@ -24,19 +30,21 @@ export class PrismaPropertyLockRepository implements PropertyLockRepository {
       });
 
       return success(
-        polls.map((p) => ({
-          distributionType: p.distributionType,
-          explicitScopePropertyIds: p.properties.map((x) => x.propertyId),
-        }))
+        polls.map((p) =>
+          LockSnapshotFact.parse({
+            distributionType: p.distributionType,
+            explicitScopePropertyIds: p.properties.map((x) => x.propertyId),
+          })
+        )
       );
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 
   async findSnapshotFactsForProperty(
-    propertyId: string
-  ): Promise<Result<LockSnapshotFact[], string>> {
+    propertyId: PropertyId
+  ): Promise<Result<LockSnapshotFact[], PropertyLockFailure>> {
     try {
       const property = await this.prisma.organizationProperty.findUnique({
         where: { id: propertyId },
@@ -49,8 +57,10 @@ export class PrismaPropertyLockRepository implements PropertyLockRepository {
 
       // Walk ancestor chain: a parent-org poll with empty scope implicitly
       // locks this property if that poll is ownership-based.
-      const ancestorIds: string[] = [];
-      let currentId: string | null = property.organizationId;
+      const ancestorIds: OrganizationId[] = [];
+      let currentId: OrganizationId | null = OrganizationId.parse(
+        property.organizationId
+      );
 
       while (currentId) {
         ancestorIds.push(currentId);
@@ -59,7 +69,9 @@ export class PrismaPropertyLockRepository implements PropertyLockRepository {
             where: { id: currentId },
             select: { parentId: true },
           });
-        currentId = parentRow?.parentId ?? null;
+        currentId = parentRow?.parentId
+          ? OrganizationId.parse(parentRow.parentId)
+          : null;
       }
 
       const polls = await this.prisma.poll.findMany({
@@ -82,13 +94,15 @@ export class PrismaPropertyLockRepository implements PropertyLockRepository {
       });
 
       return success(
-        polls.map((p) => ({
-          distributionType: p.distributionType,
-          explicitScopePropertyIds: p.properties.map((x) => x.propertyId),
-        }))
+        polls.map((p) =>
+          LockSnapshotFact.parse({
+            distributionType: p.distributionType,
+            explicitScopePropertyIds: p.properties.map((x) => x.propertyId),
+          })
+        )
       );
     } catch (e) {
-      return failure((e as Error).message);
+      return failure('common.errors.unexpected');
     }
   }
 }

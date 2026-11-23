@@ -1,3 +1,7 @@
+import { AttachmentFileName } from '@/domain/shared/attachments/AttachmentValues';
+import { ReportId } from '@/domain/shared/EntityIds';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { ReportAttachmentId } from '@/domain/shared/EntityIds';
 import { describe, it, expect } from 'vitest';
 import {
   ReportAttachment,
@@ -31,112 +35,145 @@ const ODS_MIME = 'application/vnd.oasis.opendocument.spreadsheet';
 
 describe('ReportAttachment', () => {
   it('accepts a valid PNG', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.png',
-      mimeType: 'image/png',
-      bytes: Buffer.concat([PNG_HEADER, Buffer.alloc(10)]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.png'),
+        mimeType: 'image/png',
+        bytes: Buffer.concat([PNG_HEADER, Buffer.alloc(10)]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(true);
   });
 
   it('accepts a valid JPEG', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.jpg',
-      mimeType: 'image/jpeg',
-      bytes: Buffer.concat([JPEG_HEADER, Buffer.alloc(10)]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.jpg'),
+        mimeType: 'image/jpeg',
+        bytes: Buffer.concat([JPEG_HEADER, Buffer.alloc(10)]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(true);
   });
 
   it('accepts a valid WebP', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.webp',
-      mimeType: 'image/webp',
-      bytes: Buffer.concat([WEBP_HEADER, Buffer.alloc(10)]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.webp'),
+        mimeType: 'image/webp',
+        bytes: Buffer.concat([WEBP_HEADER, Buffer.alloc(10)]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(true);
   });
 
   it('accepts a valid PDF', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.pdf',
-      mimeType: 'application/pdf',
-      bytes: Buffer.concat([PDF_HEADER, Buffer.alloc(10)]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.pdf'),
+        mimeType: 'application/pdf',
+        bytes: Buffer.concat([PDF_HEADER, Buffer.alloc(10)]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(true);
   });
 
   it('accepts a valid .xls (OLE2 magic)', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.xls',
-      mimeType: XLS_MIME,
-      bytes: Buffer.concat([OLE2_HEADER, Buffer.alloc(10)]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.xls'),
+        mimeType: XLS_MIME,
+        bytes: Buffer.concat([OLE2_HEADER, Buffer.alloc(10)]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(true);
   });
 
   it('accepts a valid .xlsx (ZIP magic)', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.xlsx',
-      mimeType: XLSX_MIME,
-      bytes: Buffer.concat([ZIP_HEADER, Buffer.alloc(10)]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.xlsx'),
+        mimeType: XLSX_MIME,
+        bytes: Buffer.concat([ZIP_HEADER, Buffer.alloc(10)]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(true);
   });
 
   it('accepts a valid .doc (OLE2 magic)', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.doc',
-      mimeType: DOC_MIME,
-      bytes: Buffer.concat([OLE2_HEADER, Buffer.alloc(10)]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.doc'),
+        mimeType: DOC_MIME,
+        bytes: Buffer.concat([OLE2_HEADER, Buffer.alloc(10)]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(true);
   });
 
   it('accepts a valid .docx (ZIP magic)', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.docx',
-      mimeType: DOCX_MIME,
-      bytes: Buffer.concat([ZIP_HEADER, Buffer.alloc(10)]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.docx'),
+        mimeType: DOCX_MIME,
+        bytes: Buffer.concat([ZIP_HEADER, Buffer.alloc(10)]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(true);
   });
 
   it('accepts a valid .odt (ZIP magic)', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.odt',
-      mimeType: ODT_MIME,
-      bytes: Buffer.concat([ZIP_HEADER, Buffer.alloc(10)]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.odt'),
+        mimeType: ODT_MIME,
+        bytes: Buffer.concat([ZIP_HEADER, Buffer.alloc(10)]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(true);
   });
 
   it('accepts a valid .ods (ZIP magic)', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.ods',
-      mimeType: ODS_MIME,
-      bytes: Buffer.concat([ZIP_HEADER, Buffer.alloc(10)]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.ods'),
+        mimeType: ODS_MIME,
+        bytes: Buffer.concat([ZIP_HEADER, Buffer.alloc(10)]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(true);
   });
 
   it('rejects .xlsx declared with wrong bytes', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.xlsx',
-      mimeType: XLSX_MIME,
-      bytes: Buffer.concat([PDF_HEADER, Buffer.alloc(10)]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.xlsx'),
+        mimeType: XLSX_MIME,
+        bytes: Buffer.concat([PDF_HEADER, Buffer.alloc(10)]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(false);
 
     if (!r.success) {
@@ -145,15 +182,18 @@ describe('ReportAttachment', () => {
   });
 
   it('rejects oversized .xlsx', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.xlsx',
-      mimeType: XLSX_MIME,
-      bytes: Buffer.concat([
-        ZIP_HEADER,
-        Buffer.alloc(REPORT_ATTACHMENT_PDF_MAX_BYTES + 1),
-      ]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.xlsx'),
+        mimeType: XLSX_MIME,
+        bytes: Buffer.concat([
+          ZIP_HEADER,
+          Buffer.alloc(REPORT_ATTACHMENT_PDF_MAX_BYTES + 1),
+        ]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(false);
 
     if (!r.success) {
@@ -162,15 +202,18 @@ describe('ReportAttachment', () => {
   });
 
   it('rejects oversized image', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.png',
-      mimeType: 'image/png',
-      bytes: Buffer.concat([
-        PNG_HEADER,
-        Buffer.alloc(REPORT_ATTACHMENT_IMAGE_MAX_BYTES + 1),
-      ]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.png'),
+        mimeType: 'image/png',
+        bytes: Buffer.concat([
+          PNG_HEADER,
+          Buffer.alloc(REPORT_ATTACHMENT_IMAGE_MAX_BYTES + 1),
+        ]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(false);
 
     if (!r.success) {
@@ -179,15 +222,18 @@ describe('ReportAttachment', () => {
   });
 
   it('rejects oversized PDF', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.pdf',
-      mimeType: 'application/pdf',
-      bytes: Buffer.concat([
-        PDF_HEADER,
-        Buffer.alloc(REPORT_ATTACHMENT_PDF_MAX_BYTES + 1),
-      ]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.pdf'),
+        mimeType: 'application/pdf',
+        bytes: Buffer.concat([
+          PDF_HEADER,
+          Buffer.alloc(REPORT_ATTACHMENT_PDF_MAX_BYTES + 1),
+        ]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(false);
 
     if (!r.success) {
@@ -196,12 +242,16 @@ describe('ReportAttachment', () => {
   });
 
   it('rejects disallowed mime', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.gif',
-      mimeType: 'image/gif',
-      bytes: Buffer.from([0x47, 0x49, 0x46, 0x38]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.gif'),
+        // @ts-expect-error Deliberately disallowed runtime MIME type.
+        mimeType: 'image/gif',
+        bytes: Buffer.from([0x47, 0x49, 0x46, 0x38]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(false);
 
     if (!r.success) {
@@ -212,12 +262,15 @@ describe('ReportAttachment', () => {
   });
 
   it('rejects magic-byte mismatch (PNG declared, JPEG bytes)', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: 'a.png',
-      mimeType: 'image/png',
-      bytes: Buffer.concat([JPEG_HEADER, Buffer.alloc(10)]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        fileName: AttachmentFileName.parse('a.png'),
+        mimeType: 'image/png',
+        bytes: Buffer.concat([JPEG_HEADER, Buffer.alloc(10)]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(false);
 
     if (!r.success) {
@@ -226,12 +279,16 @@ describe('ReportAttachment', () => {
   });
 
   it('rejects empty filename', () => {
-    const r = ReportAttachment.createWithBytes({
-      reportId: 'r1',
-      fileName: '   ',
-      mimeType: 'image/png',
-      bytes: Buffer.concat([PNG_HEADER, Buffer.alloc(10)]),
-    });
+    const r = ReportAttachment.createWithBytes(
+      {
+        reportId: ReportId.parse('r1'),
+        // @ts-expect-error Deliberately malformed runtime filename.
+        fileName: '   ',
+        mimeType: 'image/png',
+        bytes: Buffer.concat([PNG_HEADER, Buffer.alloc(10)]),
+      },
+      testCreation(ReportAttachmentId, 'att-1')
+    );
     expect(r.success).toBe(false);
 
     if (!r.success) {

@@ -1,6 +1,13 @@
+/** Report listings combine authorized audiences without duplicating records.
+ * The search fake preserves the repository's decoded query and count contracts. */
 import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  ReportRepository,
+  ReportSearchFilters,
+} from '@/domain/report/ReportRepository';
+import { ResultCount } from '@/domain/shared/Pagination';
 import { ListReportsForViewerUseCase } from '../ListReportsForViewerUseCase';
-import { Report, ReportProps } from '../../../domain/report/Report';
+import { Report, ReportData } from '../../../domain/report/Report';
 import { ReportVisibility } from '../../../domain/report/ReportVisibility';
 import { success } from '../../../domain/shared/Result';
 
@@ -10,7 +17,7 @@ import { success } from '../../../domain/shared/Result';
 
 let reportIdSeq = 0;
 
-const makeReport = (overrides: Partial<ReportProps> = {}): Report => {
+const makeReport = (overrides: Partial<ReportData> = {}): Report => {
   reportIdSeq++;
 
   return Report.reconstitute({
@@ -31,6 +38,9 @@ const makeReport = (overrides: Partial<ReportProps> = {}): Report => {
     pollIds: [],
     attachmentIds: [],
     ...overrides,
+    ...(overrides.state === 'DRAFT'
+      ? { publishedById: null, notifyAudience: false }
+      : {}),
   });
 };
 
@@ -38,22 +48,16 @@ const makeReport = (overrides: Partial<ReportProps> = {}): Report => {
 // Fakes
 // ---------------------------------------------------------------------------
 
-class FakeReportRepo {
+class FakeReportRepo implements Pick<ReportRepository, 'search'> {
   private store: Report[] = [];
 
   seed(report: Report) {
     this.store.push(report);
   }
 
-  async search(filters: {
-    organizationIds?: string[];
-    visibilities?: string[];
-    state?: string;
-    includeArchived?: boolean;
-    authorId?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
+  async search(
+    filters: ReportSearchFilters
+  ): ReturnType<ReportRepository['search']> {
     let results = [...this.store];
 
     if (filters.organizationIds && filters.organizationIds.length > 0) {
@@ -80,7 +84,10 @@ class FakeReportRepo {
       results = results.filter((r) => r.createdById === filters.authorId);
     }
 
-    return success({ reports: results, totalCount: results.length });
+    return success({
+      reports: results,
+      totalCount: ResultCount.parse(results.length),
+    });
   }
 }
 

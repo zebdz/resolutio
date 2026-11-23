@@ -1,8 +1,20 @@
 'use server';
 
+/** Composes authentication ports and exposes plain confirmation results with typed retry intervals.
+ * Domain code receives explicit time and randomness; delivery details stay server-side. */
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
+import { CryptoOtpCodeGenerator } from '@/infrastructure/auth/CryptoOtpCodeGenerator';
+import { otpExpiryMinutesFromEnv } from '@/infrastructure/auth/otpConfiguration';
+
 import { getTranslations } from 'next-intl/server';
 import { ChangeUserEmailUseCase } from '@/application/auth/ChangeUserEmailUseCase';
-import { RequestEmailConfirmationOtpUseCase } from '@/application/auth/RequestEmailConfirmationOtpUseCase';
+import {
+  RequestEmailConfirmationOtpUseCase,
+  RequestEmailConfirmationOtpResult,
+} from '@/application/auth/RequestEmailConfirmationOtpUseCase';
 import { ConfirmEmailUseCase } from '@/application/auth/ConfirmEmailUseCase';
 import {
   prisma,
@@ -24,7 +36,7 @@ const otpRepository = new PrismaOtpRepository(prisma);
 const otpCodeHasher = new OtpCodeHasherImpl(
   process.env.OTP_CODE_SECRET || 'dev-otp-secret'
 );
-const expiryMinutes = parseInt(process.env.OTP_EXPIRY_MINUTES || '10', 10);
+const expiryMinutes = otpExpiryMinutesFromEnv();
 
 const changeUserEmailUseCase = new ChangeUserEmailUseCase({
   userRepository,
@@ -34,6 +46,9 @@ const changeUserEmailUseCase = new ChangeUserEmailUseCase({
 
 const requestEmailConfirmationOtpUseCase =
   new RequestEmailConfirmationOtpUseCase({
+    clock: new SystemClock(),
+    ids: new CryptoIdGenerator(),
+    otpCodeGenerator: new CryptoOtpCodeGenerator(),
     userRepository,
     otpRepository,
     deliveryChannel: createEmailDeliveryChannelFromEnv(),
@@ -42,6 +57,7 @@ const requestEmailConfirmationOtpUseCase =
   });
 
 const confirmEmailUseCase = new ConfirmEmailUseCase({
+  clock: new SystemClock(),
   userRepository,
   otpRepository,
   otpCodeHasher,
@@ -51,7 +67,7 @@ export interface EmailOtpIssued {
   // Seconds until the throttle allows the next code; the form counts down
   // from this. Nothing about the code itself: the account page reads the
   // pending state from the server, and confirming resolves the code by user.
-  retryAfterSeconds: number;
+  retryAfterSeconds: RequestEmailConfirmationOtpResult['retryAfterSeconds'];
 }
 
 export async function updateEmailAction(

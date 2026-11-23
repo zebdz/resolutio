@@ -1,3 +1,8 @@
+/** Verifies Notify Member Removed From Organization behavior through application ports.
+ * Notification doubles return explicit append outcomes, matching the production writer. */
+import { success } from '@/domain/shared/Result';
+import { UserId, OrganizationId } from '@/domain/shared/EntityIds';
+import { notificationTestInputs } from '@/application/notification/__tests__/notificationTestValues';
 import { describe, it, expect } from 'vitest';
 import { NotifyMemberRemovedFromOrganizationUseCase } from '../NotifyMemberRemovedFromOrganizationUseCase';
 import { NotificationRepository } from '../../../domain/notification/NotificationRepository';
@@ -6,29 +11,15 @@ import { Notification } from '../../../domain/notification/Notification';
 class MockNotificationRepository implements NotificationRepository {
   private saved: Notification | null = null;
 
-  async save(notification: Notification): Promise<Notification> {
+  async save(
+    notification: Notification
+  ): ReturnType<NotificationRepository['save']> {
     this.saved = notification;
 
-    return notification;
+    return success(notification);
   }
-  async saveBatch(): Promise<void> {}
-  async findById(): Promise<Notification | null> {
-    return null;
-  }
-  async findByUserId(): Promise<Notification[]> {
-    return [];
-  }
-  async getUnreadCount(): Promise<number> {
-    return 0;
-  }
-  async markAsRead(): Promise<void> {}
-  async markAllAsRead(): Promise<void> {}
-  async findByIds(): Promise<Notification[]> {
-    return [];
-  }
-  async deleteByIds(): Promise<void> {}
-  async getCountByUserId(): Promise<number> {
-    return 0;
+  async saveBatch(): ReturnType<NotificationRepository['saveBatch']> {
+    return success(undefined);
   }
 
   getSaved() {
@@ -40,12 +31,13 @@ describe('NotifyMemberRemovedFromOrganizationUseCase', () => {
   it('saves a notification to the removed member with type and org data', async () => {
     const notifRepo = new MockNotificationRepository();
     const useCase = new NotifyMemberRemovedFromOrganizationUseCase({
+      ...notificationTestInputs,
       notificationRepository: notifRepo,
     });
 
     await useCase.execute({
-      removedUserId: 'user-1',
-      organizationId: 'org-1',
+      removedUserId: UserId.parse('user-1'),
+      organizationId: OrganizationId.parse('org-1'),
       organizationName: 'Test Org',
     });
 

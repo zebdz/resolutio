@@ -1,3 +1,6 @@
+/** Formats the named register, holdings and question votes with the record verification footer. */
+import { leadingAnswer, printWeight } from '@/web/lib/protocolWeight';
+import { protocolPageFooter } from './sealFooter';
 import type { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
 
 export interface NamedProtocolPdfHolding {
@@ -16,19 +19,23 @@ export interface NamedProtocolPdfPerson {
 }
 
 export interface NamedProtocolPdfAnswer {
+  answerId?: string;
   answerText: string;
   voteCount: number;
   totalWeight: number;
+  exactWeight?: string;
   percentage: number;
   voters: Array<{ userId: string; weight: number }>;
 }
 
 export interface NamedProtocolPdfQuestion {
+  winningAnswerId?: string | null;
   questionText: string;
   questionDetails: string | null;
   questionType: string;
   totalVotes: number;
   totalWeight: number;
+  exactTotalWeight?: string;
   answers: NamedProtocolPdfAnswer[];
   nonVoterIds: string[];
 }
@@ -47,6 +54,7 @@ export interface NamedProtocolPdfInput {
   isOpenPoll: boolean;
   totalParticipants: number;
   totalParticipantWeight: number;
+  exactTotalParticipantWeight?: string;
   register: NamedProtocolPdfPerson[];
   questions: NamedProtocolPdfQuestion[];
 }
@@ -96,7 +104,7 @@ function fill(template: string, vars: Record<string, string | number>): string {
 // share is Decimal(9,8): 0.5 → "50", 0.3333 → "33.33". No trailing zeros —
 // "доля 50%" reads as a legal statement, "доля 50.00%" reads as a spreadsheet.
 function formatShare(share: number): string {
-  return String(Number((share * 100).toFixed(2)));
+  return String(Number((share * 100).toFixed(6)));
 }
 
 function formatHoldings(
@@ -105,7 +113,11 @@ function formatHoldings(
 ): string {
   return holdings
     .map((h) => {
-      const unit = t.sizeUnits[h.sizeUnitKey] ?? '';
+      const unit =
+        t.sizeUnits[h.sizeUnitKey] ??
+        (h.sizeUnitKey.startsWith('propertyAdmin.sizeUnit.')
+          ? ''
+          : h.sizeUnitKey);
       const base =
         `${h.propertyName}, ${h.assetName}, ${h.size} ${unit}`.trim();
 
@@ -116,30 +128,6 @@ function formatHoldings(
         : base;
     })
     .join('; ');
-}
-
-// Same rule as the existing protocol: single-choice only, and only when one
-// answer strictly leads. A tie is not a decision.
-function determineWinner(
-  question: NamedProtocolPdfQuestion
-): NamedProtocolPdfAnswer | null {
-  if (question.questionType !== 'single-choice') {
-    return null;
-  }
-
-  if (question.answers.length === 0) {
-    return null;
-  }
-
-  const maxWeight = Math.max(...question.answers.map((a) => a.totalWeight));
-
-  if (maxWeight <= 0) {
-    return null;
-  }
-
-  const top = question.answers.filter((a) => a.totalWeight === maxWeight);
-
-  return top.length === 1 ? top[0] : null;
 }
 
 function buildRegisterSection(
@@ -169,7 +157,7 @@ function buildRegisterSection(
     ...(data.isPropertyBased
       ? [{ text: formatHoldings(person.holdings, t) }]
       : []),
-    { text: person.weight.toFixed(2), alignment: 'center' as const },
+    { text: printWeight(person.weight), alignment: 'center' as const },
   ]);
 
   return [
@@ -198,7 +186,12 @@ function buildQuestionSection(
       ? t.singleChoice
       : t.multipleChoice;
 
-  const winner = determineWinner(question);
+  const winner = leadingAnswer(
+    question.questionType,
+    question.answers,
+    (answer) => answer.totalWeight,
+    question.winningAnswerId
+  );
 
   const items: Content[] = [
     {
@@ -227,7 +220,7 @@ function buildQuestionSection(
       number: i + 1,
       text: answer.answerText,
       votes: answer.voteCount,
-      weight: answer.totalWeight.toFixed(2),
+      weight: printWeight(answer.totalWeight, answer.exactWeight),
       percentage: answer.percentage.toFixed(2),
     });
 
@@ -242,7 +235,7 @@ function buildQuestionSection(
       ol: answer.voters.map((v) => {
         const person = registerById.get(v.userId);
 
-        return `${person?.fullName ?? v.userId} — ${v.weight.toFixed(2)}`;
+        return `${person?.fullName ?? v.userId} — ${printWeight(v.weight)}`;
       }),
       style: 'voterList',
       margin: [15, 0, 0, 6] as [number, number, number, number],
@@ -259,7 +252,7 @@ function buildQuestionSection(
       ol: question.nonVoterIds.map((userId) => {
         const person = registerById.get(userId);
 
-        return `${person?.fullName ?? userId} — ${(person?.weight ?? 0).toFixed(2)}`;
+        return `${person?.fullName ?? userId} — ${printWeight(person?.weight ?? 0)}`;
       }),
       style: 'voterList',
       margin: [15, 0, 0, 6] as [number, number, number, number],
@@ -274,7 +267,8 @@ function buildQuestionSection(
 
 export function buildNamedProtocolPdfDefinition(
   data: NamedProtocolPdfInput,
-  t: NamedProtocolPdfTranslations
+  t: NamedProtocolPdfTranslations,
+  evidence?: Content
 ): TDocumentDefinitions {
   const content: Content[] = [];
 
@@ -394,32 +388,6 @@ export function buildNamedProtocolPdfDefinition(
         fontSize: 9,
       },
     },
-    footer: (currentPage: number, pageCount: number) => {
-      const pageText = fill(t.pageOf, {
-        current: currentPage,
-        total: pageCount,
-      });
-
-      const dateText = fill(t.generatedOn, {
-        date: new Date().toISOString().split('T')[0],
-      });
-
-      return {
-        columns: [
-          {
-            text: pageText,
-            alignment: 'left' as const,
-            margin: [40, 0, 0, 0] as [number, number, number, number],
-          },
-          {
-            text: dateText,
-            alignment: 'right' as const,
-            margin: [0, 0, 40, 0] as [number, number, number, number],
-          },
-        ],
-        fontSize: 8,
-        color: '#888888',
-      };
-    },
+    ...protocolPageFooter(t, evidence),
   };
 }

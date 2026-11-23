@@ -1,11 +1,33 @@
 'use server';
 
+/** Authenticated voting entry points. Receipt output belongs only to the session
+ * user; result projections strip unauthorized voter/contact data before returning. */
+import { questionAttachmentFiles } from '@/web/lib/questionAttachmentFiles';
+import { createEvidenceMail } from '@/infrastructure/email/createEvidenceMail';
+import { PollId, BoardId, OrganizationId } from '@/domain/shared/EntityIds';
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
+import { CryptoReceiptSecretGenerator } from '@/infrastructure/repositories/CryptoReceiptSecretGenerator';
+import {
+  VoteReceiptView,
+  voteReceiptView,
+} from '@/application/poll/VoteReceiptView';
 import { getTranslations } from 'next-intl/server';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { SubmitDraftUseCase } from '@/application/poll/SubmitDraftUseCase';
 import { FinishVotingUseCase } from '@/application/poll/FinishVotingUseCase';
 import { GetUserVotingProgressUseCase } from '@/application/poll/GetUserVotingProgressUseCase';
-import { GetPollResultsUseCase } from '@/application/poll/GetPollResultsUseCase';
+import { readPollResults } from '@/web/lib/readPollResults';
+import { resultsViewerAccess } from '@/web/lib/resultsViewerAccess';
+import type { PollResultsView } from './PollResultsView';
+import {
+  VotingProgressView,
+  serializeVotingProgress,
+  CanVoteView,
+  votingEligibilityView,
+} from './VotingProgressView';
 import {
   prisma,
   PrismaPollRepository,
@@ -37,6 +59,9 @@ const organizationRepository = new PrismaOrganizationRepository(prisma);
 const boardRepository = new PrismaBoardRepository(prisma);
 const userRepository = new PrismaUserRepository(prisma);
 
+const ids = new CryptoIdGenerator();
+const clock = new SystemClock();
+
 // Use cases
 const submitDraftUseCase = new SubmitDraftUseCase(
   pollRepository,
@@ -45,7 +70,9 @@ const submitDraftUseCase = new SubmitDraftUseCase(
   draftRepository,
   organizationRepository,
   boardRepository,
-  userRepository
+  userRepository,
+  ids,
+  clock
 );
 const finishVotingUseCase = new FinishVotingUseCase(
   pollRepository,
@@ -54,23 +81,20 @@ const finishVotingUseCase = new FinishVotingUseCase(
   draftRepository,
   organizationRepository,
   boardRepository,
-  userRepository
+  userRepository,
+  new CryptoReceiptSecretGenerator(),
+  ids,
+  clock,
+  createEvidenceMail(prisma)
 );
 const getUserVotingProgressUseCase = new GetUserVotingProgressUseCase(
   pollRepository,
   participantRepository,
   voteRepository,
   draftRepository,
-  userRepository
+  userRepository,
+  organizationRepository
 );
-const getPollResultsUseCase = new GetPollResultsUseCase(
-  pollRepository,
-  participantRepository,
-  voteRepository,
-  organizationRepository,
-  userRepository
-);
-
 // Schema for draft submission
 const SubmitDraftSchema = z.object({
   pollId: z.string(),
@@ -153,13 +177,24 @@ export async function submitDraftAction(data: {
  * Get user's voting progress for a poll
  */
 export async function getUserVotingProgressAction(
-  pollId: string
-): Promise<ActionResult<any>> {
+  rawPollId: string
+): Promise<ActionResult<VotingProgressView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
     return rateLimited;
   }
+
+  const parsedId = PollId.safeParse(rawPollId);
+
+  if (!parsedId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const pollId = parsedId.data;
 
   const t = await getTranslations('common.errors');
 
@@ -189,7 +224,10 @@ export async function getUserVotingProgressAction(
 
     return {
       success: true,
-      data: result.value,
+      data: serializeVotingProgress(
+        result.value,
+        await questionAttachmentFiles(pollId, user.id)
+      ),
     };
   } catch (error) {
     console.error('Get voting progress error:', error);
@@ -205,14 +243,25 @@ export async function getUserVotingProgressAction(
  * Finish voting on a poll
  */
 export async function finishVotingAction(
-  pollId: string,
+  rawPollId: string,
   willingToSignProtocol: boolean
-): Promise<ActionResult<void>> {
+): Promise<ActionResult<VoteReceiptView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
     return rateLimited;
   }
+
+  const parsedId = PollId.safeParse(rawPollId);
+
+  if (!parsedId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const pollId = parsedId.data;
 
   const t = await getTranslations('common.errors');
 
@@ -241,7 +290,7 @@ export async function finishVotingAction(
       };
     }
 
-    return { success: true, data: undefined };
+    return { success: true, data: result.value };
   } catch (error) {
     console.error('Finish voting error:', error);
 
@@ -252,17 +301,78 @@ export async function finishVotingAction(
   }
 }
 
-/**
- * Get poll results
- */
-export async function getPollResultsAction(
-  pollId: string
-): Promise<ActionResult<any>> {
+/** Reads only the authenticated voter's committed snapshot, including after the poll closes. */
+export async function getMyVoteReceiptAction(
+  rawPollId: string
+): Promise<ActionResult<VoteReceiptView | null>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
     return rateLimited;
   }
+
+  const user = await getCurrentUser();
+
+  if (!user) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.unauthorized'),
+    };
+  }
+
+  const pollId = PollId.safeParse(rawPollId);
+
+  if (!pollId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const ballot = await participantRepository.getCastBallot(
+    pollId.data,
+    user.id
+  );
+
+  if (!ballot.success) {
+    return { success: false, error: await translateErrorCode(ballot.error) };
+  }
+
+  if (!ballot.value) {
+    return { success: true, data: null };
+  }
+
+  const view = voteReceiptView(ballot.value);
+
+  if (!view.success) {
+    return { success: false, error: await translateErrorCode(view.error) };
+  }
+
+  return { success: true, data: view.value };
+}
+
+/**
+ * Get poll results
+ */
+export async function getPollResultsAction(
+  rawPollId: string
+): Promise<ActionResult<PollResultsView>> {
+  const rateLimited = await checkRateLimit();
+
+  if (rateLimited) {
+    return rateLimited;
+  }
+
+  const parsedId = PollId.safeParse(rawPollId);
+
+  if (!parsedId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const pollId = parsedId.data;
 
   const t = await getTranslations('common.errors');
 
@@ -277,11 +387,16 @@ export async function getPollResultsAction(
       };
     }
 
-    // Execute use case
-    const result = await getPollResultsUseCase.execute({
-      pollId,
-      userId: user.id,
-    });
+    const access = await resultsViewerAccess(user);
+
+    if (!access.success) {
+      return {
+        success: false,
+        error: await translateErrorCode(access.error.code),
+      };
+    }
+
+    const result = await readPollResults(pollId, user.id);
 
     if (!result.success) {
       return {
@@ -290,9 +405,12 @@ export async function getPollResultsAction(
       };
     }
 
+    const { results, canViewVoterNames, canViewSignWillingness } =
+      result.value.data;
+
     return {
       success: true,
-      data: result.value,
+      data: { results, canViewVoterNames, canViewSignWillingness },
     };
   } catch (error) {
     console.error('Get poll results error:', error);
@@ -308,13 +426,24 @@ export async function getPollResultsAction(
  * Check if user can vote on a poll
  */
 export async function canUserVoteAction(
-  pollId: string
-): Promise<ActionResult<{ canVote: boolean; reasonCode?: string }>> {
+  rawPollId: string
+): Promise<ActionResult<CanVoteView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
     return rateLimited;
   }
+
+  const parsedId = PollId.safeParse(rawPollId);
+
+  if (!parsedId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const pollId = parsedId.data;
 
   const t = await getTranslations('common.errors');
 
@@ -387,32 +516,7 @@ export async function canUserVoteAction(
       hasFinishedVoting: hasFinishedResult.value,
     });
 
-    if (eligibility.success) {
-      return {
-        success: true,
-        data: {
-          canVote: true,
-        },
-      };
-    }
-
-    // Reason codes are keys under the `poll.voting` namespace — the vote page
-    // renders them with votingT().
-    const reasonByCode: Record<string, string> = {
-      [PollDomainCodes.POLL_FINISHED]: 'pollFinished',
-      [PollDomainCodes.POLL_NOT_ACTIVE]: 'pollNotActive',
-      [PollDomainCodes.NOT_PARTICIPANT]: 'cannotVote',
-      [PollDomainCodes.USER_NOT_CONFIRMED]: 'notConfirmed',
-      [PollDomainCodes.ALREADY_VOTED]: 'alreadyVoted',
-    };
-
-    return {
-      success: true,
-      data: {
-        canVote: false,
-        reasonCode: reasonByCode[eligibility.error] ?? 'cannotVote',
-      },
-    };
+    return { success: true, data: votingEligibilityView(eligibility) };
   } catch (error) {
     console.error('Can user vote error:', error);
 

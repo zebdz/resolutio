@@ -1,3 +1,4 @@
+/** Address clients exercise residence alternatives and boundary validation of persisted/form values. */
 import { describe, it, expect } from 'vitest';
 import { Address, AddressDomainCodes } from '../Address';
 import { SharedDomainCodes } from '../../shared/SharedDomainCodes';
@@ -13,6 +14,15 @@ describe('Address', () => {
   };
 
   describe('create', () => {
+    it('rejects a string house flag instead of bypassing apartment requirements', () => {
+      expect(() =>
+        Address.create({
+          ...validProps,
+          // @ts-expect-error Malformed JSON must not become a private-house state.
+          isPrivateHouse: 'false',
+        })
+      ).toThrow();
+    });
     it('should create address with all required fields', () => {
       const address = Address.create(validProps);
 
@@ -87,6 +97,7 @@ describe('Address', () => {
     const profaneChecker: ProfanityChecker = {
       containsProfanity: (text: string) =>
         text.toLowerCase().includes('badword'),
+      findProfaneWords: () => [],
     };
 
     it('should throw when country contains profanity', () => {
@@ -262,6 +273,15 @@ describe('Address', () => {
     // inheriting validProps' true would null out the apartment under test
     const flatProps = { ...validProps, isPrivateHouse: false, apartment: '2' };
 
+    it.each(['houseFiasId', 'flatFiasId'])(
+      'rejects malformed %s when loading an address',
+      (key) => {
+        expect(() =>
+          Address.create({ ...flatProps, [key]: 'invalid-id' })
+        ).toThrow();
+      }
+    );
+
     it('should store DaData provenance fields', () => {
       const address = Address.create({
         ...flatProps,
@@ -278,8 +298,14 @@ describe('Address', () => {
     });
 
     it('should treat two addresses differing only by flatFiasId as unequal', () => {
-      const a = Address.create({ ...flatProps, flatFiasId: 'aaa' });
-      const b = Address.create({ ...flatProps, flatFiasId: 'bbb' });
+      const a = Address.create({
+        ...flatProps,
+        flatFiasId: '9d9d7e0a-e49f-4ebf-a962-00cfa892b1ee',
+      });
+      const b = Address.create({
+        ...flatProps,
+        flatFiasId: '9d9d7e0a-e49f-4ebf-a962-00cfa892b1ef',
+      });
 
       expect(a.equals(b)).toBe(false);
     });

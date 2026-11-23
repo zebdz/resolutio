@@ -8,6 +8,14 @@ const appVersion = getGitVersion();
 const buildIdValue = getBuildId();
 
 const nextConfig: NextConfig = {
+  // Log route dependency tracing walks the project root. Legacy inputs are operator-only files.
+  outputFileTracingExcludes: {
+    '/*': [
+      './u1037625_decision_community.sql',
+      './storage.2026-11-22_*.zip',
+      './.berezka-private/**/*',
+    ],
+  },
   /* config options here */
   // Uncomment only if can't configure nginx to serve _next/static properly:
   // Ensure static files are served correctly

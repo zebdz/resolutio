@@ -1,10 +1,16 @@
-import { NotificationRepository } from '../../domain/notification/NotificationRepository';
-import { Result, success, failure } from '../../domain/shared/Result';
+/** Deletes a selection only after loading every notification and checking recipient ownership.
+ * Load/delete failures propagate explicitly; unauthorized or missing selections never reach writes. */
+import { NotificationFailure } from './NotificationErrors';
+import type { NotificationRecipientRepository } from '../../domain/notification/NotificationRecipientRepository';
+import { Result, failure } from '../../domain/shared/Result';
 import { NotificationErrors } from './NotificationErrors';
 import { DeleteNotificationsSchema } from './DeleteNotificationsSchema';
 
 export interface DeleteNotificationsDependencies {
-  notificationRepository: NotificationRepository;
+  notificationRepository: Pick<
+    NotificationRecipientRepository,
+    'findByIds' | 'deleteByIds'
+  >;
 }
 
 export class DeleteNotificationsUseCase {
@@ -13,7 +19,7 @@ export class DeleteNotificationsUseCase {
   async execute(input: {
     notificationIds: string[];
     userId: string;
-  }): Promise<Result<void, string>> {
+  }): Promise<Result<void, NotificationFailure>> {
     const parsed = DeleteNotificationsSchema.safeParse(input);
 
     if (!parsed.success) {
@@ -22,8 +28,14 @@ export class DeleteNotificationsUseCase {
 
     const { notificationIds, userId } = parsed.data;
 
-    const notifications =
+    const loaded =
       await this.deps.notificationRepository.findByIds(notificationIds);
+
+    if (!loaded.success) {
+      return loaded;
+    }
+
+    const notifications = loaded.value;
 
     if (notifications.length !== notificationIds.length) {
       return failure(NotificationErrors.SOME_NOT_FOUND);
@@ -35,8 +47,9 @@ export class DeleteNotificationsUseCase {
       return failure(NotificationErrors.NOT_OWNER);
     }
 
-    await this.deps.notificationRepository.deleteByIds(notificationIds);
-
-    return success(undefined);
+    return this.deps.notificationRepository.deleteByIds(
+      notificationIds,
+      userId
+    );
   }
 }

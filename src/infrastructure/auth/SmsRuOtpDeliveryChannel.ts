@@ -1,3 +1,17 @@
+/** Serializes validated OTP delivery values into the provider transport.
+ * Canonical phone numbers become digits-only SMS.RU request and response keys. */
+import {
+  SmsRuPhone,
+  SmsRuStatusCode,
+  SmsRuSendResponse,
+  SmsRuCostResponse,
+  SmsPriceRubles,
+  SmsCostLimitRubles,
+  parseSmsPrice,
+} from './SmsRuProtocol';
+import { ClientIp } from '@/domain/auth/AuthValues';
+import { OtpDigits, OtpRecipient } from '@/domain/otp/OtpValues';
+import { Language } from '@/domain/user/UserValues';
 import { Effect, Schedule, pipe } from 'effect';
 import {
   HttpClient,
@@ -8,12 +22,13 @@ import type {
   OtpDeliveryChannel,
   OtpDeliveryResult,
 } from '@/application/auth/OtpDeliveryChannel';
-import type { OtpChannel, OtpPurpose } from '@/domain/otp/OtpVerification';
+import type { OtpPurpose } from '@/domain/otp/OtpVerification';
 import {
   SmsRuApiError,
   SmsRuNetworkError,
   SmsRuCostExceededError,
   SmsRuUndeliverableError,
+  SmsRuInvalidResponseError,
   RETRYABLE_STATUS_CODES,
 } from './SmsRuErrors';
 import { SmsRuLogger } from './SmsRuLogger';
@@ -26,57 +41,25 @@ const MESSAGE_TEMPLATES: Record<string, string> = {
   en: 'Your verification code: {code}',
 };
 
-function buildMessage(code: string, locale: string): string {
+function buildMessage(code: OtpDigits, locale: Language): string {
   const template = MESSAGE_TEMPLATES[locale] ?? MESSAGE_TEMPLATES['ru'];
 
   return template.replace('{code}', code);
 }
 
-function isRetryableStatusCode(code: number): boolean {
-  return (RETRYABLE_STATUS_CODES as readonly number[]).includes(code);
-}
-
-interface SmsRuResponse {
-  status: string;
-  status_code: number;
-  status_text?: string;
-  sms?: Record<
-    string,
-    {
-      status: string;
-      status_code: number;
-      sms_id?: string;
-      status_text?: string;
-    }
-  >;
-  balance?: number;
-}
-
-interface SmsRuCostResponse {
-  status: string;
-  status_code: number;
-  status_text?: string;
-  sms?: Record<
-    string,
-    {
-      status: string;
-      status_code: number;
-      cost?: string | number;
-      status_text?: string;
-    }
-  >;
-  total_cost?: number;
+function isRetryableStatusCode(code: SmsRuStatusCode): boolean {
+  return RETRYABLE_STATUS_CODES.some((retryable) => retryable === code);
 }
 
 interface CostCheckResult {
-  cost: number;
+  cost: SmsPriceRubles | null;
 }
 
-export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
-  readonly channel: OtpChannel = 'sms';
+export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel<'sms'> {
+  readonly channel = 'sms' as const;
   private readonly apiId: string;
   private readonly testMode: boolean;
-  private readonly maxCost?: number;
+  private readonly maxCost?: SmsCostLimitRubles;
   private readonly logger: SmsRuLogger;
 
   constructor(config: { apiId: string; testMode?: boolean; maxCost?: number }) {
@@ -86,19 +69,32 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
 
     this.apiId = config.apiId;
     this.testMode = config.testMode ?? false;
-    this.maxCost = config.maxCost;
+    this.maxCost =
+      config.maxCost === undefined
+        ? undefined
+        : SmsCostLimitRubles.parse(config.maxCost);
     this.logger = new SmsRuLogger();
   }
 
   async send(
-    recipient: string,
-    code: string,
-    locale: string,
-    clientIp: string,
+    canonicalRecipient: OtpRecipient<'sms'>,
+    code: OtpDigits,
+    locale: Language,
+    clientIp: ClientIp,
     // SMS copy does not vary by purpose yet — accepted to satisfy the
     // interface, and available if that changes.
     _purpose: OtpPurpose
   ): Promise<OtpDeliveryResult> {
+    // Provider responses key each outcome by its digits-only destination.
+    // https://sms.ru/docs/api/api_group_sms/send
+    const phone = SmsRuPhone.safeParse(canonicalRecipient.replace(/^\+/, ''));
+
+    if (!phone.success) {
+      return { success: false };
+    }
+
+    const recipient = phone.data;
+
     if (!clientIp) {
       this.logger.logError({
         phone: recipient,
@@ -142,6 +138,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
             | SmsRuNetworkError
             | SmsRuCostExceededError
             | SmsRuUndeliverableError
+            | SmsRuInvalidResponseError
         ): Effect.Effect<OtpDeliveryResult> => {
           if (error._tag === 'SmsRuCostExceededError') {
             this.logger.logCostExceeded({
@@ -152,7 +149,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
               maxCost: error.maxCost,
               testMode: this.testMode,
               clientIp,
-              error: `SMS cost ${error.cost} exceeds max allowed ${error.maxCost}`,
+              error: `SMS cost ${error.cost ?? 'unknown'} exceeds max allowed ${error.maxCost}`,
               rawResponse: error.rawResponse,
             });
           } else if (error._tag === 'SmsRuUndeliverableError') {
@@ -169,7 +166,8 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
             const statusCode =
               error._tag === 'SmsRuApiError' ? error.statusCode : 0;
             const errorMessage =
-              error._tag === 'SmsRuApiError'
+              error._tag === 'SmsRuApiError' ||
+              error._tag === 'SmsRuInvalidResponseError'
                 ? error.message
                 : String(
                     error.cause instanceof Error
@@ -177,7 +175,10 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
                       : error.cause
                   );
             const rawResponse =
-              error._tag === 'SmsRuApiError' ? error.rawResponse : undefined;
+              error._tag === 'SmsRuApiError' ||
+              error._tag === 'SmsRuInvalidResponseError'
+                ? error.rawResponse
+                : undefined;
             this.logger.logError({
               phone: recipient,
               locale,
@@ -201,11 +202,11 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
 
   private buildSendSms(
     params: Record<string, string>,
-    recipient: string,
-    locale: string,
-    code: string,
+    recipient: SmsRuPhone,
+    locale: Language,
+    code: OtpDigits,
     costResult: CostCheckResult,
-    clientIp: string
+    clientIp: ClientIp
   ): Effect.Effect<OtpDeliveryResult, never, HttpClient.HttpClient> {
     const logger = this.logger;
     const testMode = this.testMode;
@@ -228,7 +229,18 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
         Effect.mapError((error) => new SmsRuNetworkError({ cause: error }))
       );
 
-      const data = json as SmsRuResponse;
+      const parsed = SmsRuSendResponse.safeParse(json);
+
+      if (!parsed.success) {
+        return yield* Effect.fail(
+          new SmsRuInvalidResponseError({
+            message: 'Malformed SMS.RU send response',
+            rawResponse: json,
+          })
+        );
+      }
+
+      const data = parsed.data;
 
       if (data.status_code !== 100) {
         return yield* Effect.fail(
@@ -243,6 +255,15 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
       // Top-level OK, but check per-number status — sms.ru can return
       // top-level 100 with a per-number ERROR (e.g. undeliverable number).
       const smsEntry = data.sms?.[recipient];
+
+      if (!smsEntry) {
+        return yield* Effect.fail(
+          new SmsRuInvalidResponseError({
+            message: 'SMS.RU send response has no recipient outcome',
+            rawResponse: json,
+          })
+        );
+      }
 
       if (smsEntry && smsEntry.status === 'ERROR') {
         return yield* Effect.fail(
@@ -264,7 +285,11 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
         times: 2,
         schedule: Schedule.exponential('500 millis'),
         while: (
-          error: SmsRuNetworkError | SmsRuApiError | SmsRuUndeliverableError
+          error:
+            | SmsRuNetworkError
+            | SmsRuApiError
+            | SmsRuUndeliverableError
+            | SmsRuInvalidResponseError
         ) => {
           if (error._tag === 'SmsRuNetworkError') {
             return true;
@@ -281,7 +306,7 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
 
     return pipe(
       retried,
-      Effect.map((data: SmsRuResponse): OtpDeliveryResult => {
+      Effect.map((data: SmsRuSendResponse): OtpDeliveryResult => {
         const smsEntry = data.sms?.[recipient];
         logger.logSuccess({
           phone: recipient,
@@ -301,7 +326,11 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
       }),
       Effect.catchAll(
         (
-          error: SmsRuApiError | SmsRuNetworkError | SmsRuUndeliverableError
+          error:
+            | SmsRuApiError
+            | SmsRuNetworkError
+            | SmsRuUndeliverableError
+            | SmsRuInvalidResponseError
         ): Effect.Effect<OtpDeliveryResult> => {
           if (error._tag === 'SmsRuUndeliverableError') {
             logger.logUndeliverable({
@@ -320,7 +349,8 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
           const statusCode =
             error._tag === 'SmsRuApiError' ? error.statusCode : 0;
           const errorMessage =
-            error._tag === 'SmsRuApiError'
+            error._tag === 'SmsRuApiError' ||
+            error._tag === 'SmsRuInvalidResponseError'
               ? error.message
               : String(
                   error.cause instanceof Error
@@ -328,7 +358,10 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
                     : error.cause
                 );
           const rawResponse =
-            error._tag === 'SmsRuApiError' ? error.rawResponse : undefined;
+            error._tag === 'SmsRuApiError' ||
+            error._tag === 'SmsRuInvalidResponseError'
+              ? error.rawResponse
+              : undefined;
           logger.logError({
             phone: recipient,
             locale,
@@ -348,13 +381,14 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
 
   private buildCostCheck(
     params: Record<string, string>,
-    recipient: string
+    recipient: SmsRuPhone
   ): Effect.Effect<
     CostCheckResult,
     | SmsRuApiError
     | SmsRuNetworkError
     | SmsRuCostExceededError
-    | SmsRuUndeliverableError,
+    | SmsRuUndeliverableError
+    | SmsRuInvalidResponseError,
     HttpClient.HttpClient
   > {
     const maxCost = this.maxCost;
@@ -377,7 +411,18 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
         Effect.mapError((error) => new SmsRuNetworkError({ cause: error }))
       );
 
-      const data = json as SmsRuCostResponse;
+      const parsed = SmsRuCostResponse.safeParse(json);
+
+      if (!parsed.success) {
+        return yield* Effect.fail(
+          new SmsRuInvalidResponseError({
+            message: 'Malformed SMS.RU cost response',
+            rawResponse: json,
+          })
+        );
+      }
+
+      const data = parsed.data;
 
       // Check top-level API error
       if (data.status_code !== 100) {
@@ -405,15 +450,14 @@ export class SmsRuOtpDeliveryChannel implements OtpDeliveryChannel {
         );
       }
 
-      // If cost is missing or invalid, assume the worst to avoid silent overspend.
+      // Missing or invalid cost cannot satisfy a configured cap.
       // Parse defensively: sms.ru may return cost as string or number (observed
       // numeric 0 for free SMS in prod). A truthy check would misclassify
       // numeric 0 as "missing" and block legitimate free SMS.
-      const parsedCost = parseFloat(String(smsEntry?.cost ?? ''));
-      const cost = Number.isFinite(parsedCost) ? parsedCost : Infinity;
+      const cost = parseSmsPrice(smsEntry?.cost);
 
       // Check cost against maxCost
-      if (maxCost !== undefined && cost > maxCost) {
+      if (maxCost !== undefined && (cost === null || cost > maxCost)) {
         return yield* Effect.fail(
           new SmsRuCostExceededError({
             phone: recipient,

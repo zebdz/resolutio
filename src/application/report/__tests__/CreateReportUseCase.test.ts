@@ -1,3 +1,4 @@
+import { testClock, testIds } from '@/domain/report/__tests__/reportTestValues';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CreateReportUseCase } from '../CreateReportUseCase';
 import { ReportVisibility } from '../../../domain/report/ReportVisibility';
@@ -51,7 +52,13 @@ describe('CreateReportUseCase', () => {
     orgs = new FakeOrgRepo();
     boards = new FakeBoardRepo();
 
-    uc = new CreateReportUseCase(repo as any, orgs as any, boards as any);
+    uc = new CreateReportUseCase(
+      repo as any,
+      orgs as any,
+      boards as any,
+      testIds,
+      testClock
+    );
   });
 
   it('creates a Draft report for an org member', async () => {

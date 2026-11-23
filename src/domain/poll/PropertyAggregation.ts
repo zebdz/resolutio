@@ -1,5 +1,5 @@
 import { Result, success, failure } from '../shared/Result';
-import { PollDomainCodes } from './PollDomainCodes';
+import { PollDomainCodes, PollDomainCode } from './PollDomainCodes';
 
 export const PropertyAggregation = {
   RAW_SUM: 'RAW_SUM',
@@ -11,7 +11,7 @@ export type PropertyAggregation =
 
 export function parsePropertyAggregation(
   value: string
-): Result<PropertyAggregation, string> {
+): Result<PropertyAggregation, PollDomainCode> {
   if (
     value === PropertyAggregation.RAW_SUM ||
     value === PropertyAggregation.NORMALIZE_PER_PROPERTY

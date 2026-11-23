@@ -1,3 +1,14 @@
+/** Verifies Login User behavior through typed core ports.
+ * User persistence doubles exclude obsolete moderation methods; access uses the checked moderation port. */
+import {
+  OtpCount,
+  OtpDestination,
+  OtpDigits,
+  OtpCodeHash,
+} from '@/domain/otp/OtpValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
+import { authTestDependencies } from '@/application/auth/__tests__/authTestValues';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   LoginUserUseCase,
@@ -23,6 +34,9 @@ import { AuthErrors } from '../AuthErrors';
 
 // Mock UserRepository
 class MockUserRepository implements UserRepository {
+  async findByEmail(): Promise<User | null> {
+    return null;
+  }
   private users: Map<string, User> = new Map();
   private superAdminIds: Set<string> = new Set();
 
@@ -76,22 +90,9 @@ class MockUserRepository implements UserRepository {
 
   async updatePrivacySettings(): Promise<void> {}
 
-  async isUserBlocked(): Promise<boolean> {
-    return false;
-  }
-
-  async blockUser(): Promise<void> {}
-  async unblockUser(): Promise<void> {}
-
   async confirmUser(): Promise<void> {}
 
-  async getBlockStatus(): Promise<null> {
-    return null;
-  }
   async deleteAddress(): Promise<void> {}
-  async getBlockedUserIds(): Promise<string[]> {
-    return [];
-  }
 
   addUser(user: User): void {
     this.users.set(user.id, user);
@@ -108,8 +109,7 @@ class MockOtpRepository implements OtpRepository {
   private nextId = 1;
 
   async save(otp: OtpVerification): Promise<OtpVerification> {
-    const id = `otp-${this.nextId++}`;
-    (otp as any).props.id = id;
+    const id = otp.id;
     this.otps.set(id, otp);
 
     return otp;
@@ -120,10 +120,10 @@ class MockOtpRepository implements OtpRepository {
   }
 
   async findLatestByIdentifier(
-    identifier: string,
-    channel: OtpChannel,
+    destination: OtpDestination,
     purpose: OtpPurpose
   ): Promise<OtpVerification | null> {
+    const { identifier, channel } = destination;
     const matches = Array.from(this.otps.values())
       .filter(
         (otp) =>
@@ -131,7 +131,11 @@ class MockOtpRepository implements OtpRepository {
           otp.channel === channel &&
           otp.purpose === purpose
       )
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .sort(
+        (a, b) =>
+          Instant.toDate(b.createdAt).getTime() -
+          Instant.toDate(a.createdAt).getTime()
+      );
 
     return matches[0] ?? null;
   }
@@ -150,7 +154,11 @@ class MockOtpRepository implements OtpRepository {
   ): Promise<OtpVerification | null> {
     const matches = Array.from(this.otps.values())
       .filter((otp) => otp.userId === userId && otp.purpose === purpose)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .sort(
+        (a, b) =>
+          Instant.toDate(b.createdAt).getTime() -
+          Instant.toDate(a.createdAt).getTime()
+      );
 
     return matches[0] ?? null;
   }
@@ -161,29 +169,31 @@ class MockOtpRepository implements OtpRepository {
     return otp;
   }
 
-  async countRecentByClientIp(): Promise<number> {
-    return 0;
+  async countRecentByClientIp(): Promise<OtpCount> {
+    return OtpCount.parse(0);
   }
 
   async countRecentByIdentifier(
-    identifier: string,
-    channel: OtpChannel,
+    destination: OtpDestination,
     purpose: OtpPurpose,
-    sinceHours: number
-  ): Promise<number> {
-    const since = Date.now() - sinceHours * 3600 * 1000;
+    cutoff: Instant
+  ): Promise<OtpCount> {
+    const { identifier, channel } = destination;
+    const since = Instant.toDate(cutoff).getTime();
 
-    return Array.from(this.otps.values()).filter(
-      (otp) =>
-        otp.identifier === identifier &&
-        otp.channel === channel &&
-        otp.purpose === purpose &&
-        otp.createdAt.getTime() >= since
-    ).length;
+    return OtpCount.parse(
+      Array.from(this.otps.values()).filter(
+        (otp) =>
+          otp.identifier === identifier &&
+          otp.channel === channel &&
+          otp.purpose === purpose &&
+          Instant.toDate(otp.createdAt).getTime() >= since
+      ).length
+    );
   }
 
-  async deleteAllForUser(): Promise<number> {
-    return 0;
+  async deleteAllForUser(): Promise<OtpCount> {
+    return OtpCount.parse(0);
   }
 
   async deleteExpired(): Promise<void> {}
@@ -191,8 +201,8 @@ class MockOtpRepository implements OtpRepository {
 
 // Mock OtpCodeHasher
 class MockOtpCodeHasher implements OtpCodeHasher {
-  hash(code: string): string {
-    return `hashed-${code}`;
+  hash(code: OtpDigits): OtpCodeHash {
+    return OtpCodeHash.parse(`hashed-${code}`);
   }
 
   verify(code: string, hash: string): boolean {
@@ -201,8 +211,8 @@ class MockOtpCodeHasher implements OtpCodeHasher {
 }
 
 // Mock OtpDeliveryChannel
-class MockOtpDeliveryChannel implements OtpDeliveryChannel {
-  channel: OtpChannel = 'sms';
+class MockOtpDeliveryChannel implements OtpDeliveryChannel<'sms'> {
+  readonly channel = 'sms' as const;
   shouldSucceed = true;
   sendCount = 0;
 
@@ -224,24 +234,11 @@ class MockSessionRepository implements SessionRepository {
   lastCreatedIpAddress: string | null = null;
   lastCreatedUserAgent: string | null = null;
 
-  async create(
-    userId: string,
-    expiresAt: Date,
-    ipAddress?: string,
-    userAgent?: string
-  ): Promise<Session> {
-    const session: Session = {
-      id: `session-${Date.now()}`,
-      userId,
-      expiresAt,
-      createdAt: new Date(),
-      ipAddress: ipAddress ?? null,
-      userAgent: userAgent ?? null,
-    };
+  async save(session: Session): Promise<Session> {
     this.sessions.set(session.id, session);
-    this.lastCreatedExpiresAt = expiresAt;
-    this.lastCreatedIpAddress = ipAddress ?? null;
-    this.lastCreatedUserAgent = userAgent ?? null;
+    this.lastCreatedExpiresAt = Instant.toDate(session.expiresAt);
+    this.lastCreatedIpAddress = session.ipAddress;
+    this.lastCreatedUserAgent = session.userAgent;
 
     return session;
   }
@@ -333,6 +330,7 @@ describe('LoginUserUseCase', () => {
     otpCodeHasher = new MockOtpCodeHasher();
     deliveryChannel = new MockOtpDeliveryChannel();
     useCase = new LoginUserUseCase({
+      ...authTestDependencies(),
       userRepository,
       sessionRepository,
       passwordVerifier,

@@ -1,9 +1,18 @@
 'use server';
 
+/** Composes authentication ports at the server boundary; domain code receives explicit time and randomness. */
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
+import { CryptoOtpCodeGenerator } from '@/infrastructure/auth/CryptoOtpCodeGenerator';
+import { CaptchaChallenge } from '@/domain/auth/AuthValues';
+import { otpExpiryMinutesFromEnv } from '@/infrastructure/auth/otpConfiguration';
+
 import { getTranslations } from 'next-intl/server';
 import { ConfirmPhoneUseCase } from '@/application/auth/ConfirmPhoneUseCase';
 import { RequestConfirmationOtpUseCase } from '@/application/auth/RequestConfirmationOtpUseCase';
-import { OtpErrors } from '@/application/auth/OtpErrors';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { AuthErrors } from '@/application/auth/AuthErrors';
 import {
   prisma,
@@ -31,32 +40,22 @@ const captchaVerifier = new TurnstileCaptchaVerifier(
 );
 
 const confirmPhoneUseCase = new ConfirmPhoneUseCase({
+  clock: new SystemClock(),
   otpRepository,
   otpCodeHasher,
   userRepository,
 });
 
 const requestConfirmationOtpUseCase = new RequestConfirmationOtpUseCase({
+  clock: new SystemClock(),
+  ids: new CryptoIdGenerator(),
+  otpCodeGenerator: new CryptoOtpCodeGenerator(),
   otpRepository,
   otpCodeHasher,
   deliveryChannel,
   userRepository,
-  expiryMinutes: parseInt(process.env.OTP_EXPIRY_MINUTES || '10', 10),
+  expiryMinutes: otpExpiryMinutesFromEnv(),
 });
-
-// Map OtpErrors codes to translation keys under otp.errors.*
-function getOtpErrorTranslationKey(error: string): string | null {
-  const map: Record<string, string> = {
-    [OtpErrors.EXPIRED]: 'expired',
-    [OtpErrors.INVALID]: 'invalid',
-    [OtpErrors.MAX_ATTEMPTS]: 'maxAttempts',
-    [OtpErrors.THROTTLED]: 'throttled',
-    [OtpErrors.NOT_FOUND]: 'notFound',
-    [OtpErrors.SEND_FAILED]: 'sendFailed',
-  };
-
-  return map[error] ?? null;
-}
 
 export async function confirmPhoneAction(
   formData: FormData
@@ -94,12 +93,9 @@ export async function confirmPhoneAction(
         return { success: false, error: tAuth('alreadyConfirmed') };
       }
 
-      const tOtp = await getTranslations('otp.errors');
-      const errorKey = getOtpErrorTranslationKey(result.error);
-
       return {
         success: false,
-        error: errorKey ? tOtp(errorKey) : result.error,
+        error: await translateErrorCode(result.error),
       };
     }
 
@@ -147,7 +143,12 @@ export async function requestConfirmationOtpAction(
     }
 
     if (captchaToken) {
-      const captchaValid = await captchaVerifier.verify(captchaToken, clientIp);
+      const challenge = CaptchaChallenge.safeParse({
+        token: captchaToken,
+        clientIp,
+      });
+      const captchaValid =
+        challenge.success && (await captchaVerifier.verify(challenge.data));
 
       if (!captchaValid) {
         const tOtp = await getTranslations('otp.errors');
@@ -162,12 +163,9 @@ export async function requestConfirmationOtpAction(
     });
 
     if (!result.success) {
-      const tOtp = await getTranslations('otp.errors');
-      const errorKey = getOtpErrorTranslationKey(result.error);
-
       return {
         success: false,
-        error: errorKey ? tOtp(errorKey) : result.error,
+        error: await translateErrorCode(result.error),
       };
     }
 

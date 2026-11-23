@@ -62,5 +62,12 @@ deploy.log
 /generated/
 
 /docs
-/plans
-CLAUDE.md
+
+# Added by ggshield
+.cache_ggshield
+
+# Private legacy migration inputs and working packages
+/u1037625_decision_community.sql
+/storage.2026-11-22_*.zip
+/.berezka-private/
+/scripts/berezka/__pycache__/

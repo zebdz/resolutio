@@ -1,3 +1,15 @@
+/** Invitation decision clients exercise authorization and membership/board effects.
+ * Acceptance persistence must use the injected clock in both upsert branches. */
+import { success } from '@/domain/shared/Result';
+import { Notification } from '@/domain/notification/Notification';
+import { BoardName } from '@/domain/board/BoardName';
+import { PrismaMembershipStore } from '@/infrastructure/repositories/PrismaMembershipStore';
+import { UserId } from '@/domain/shared/EntityIds';
+import { notificationTestInputs } from '@/application/notification/__tests__/notificationTestValues';
+import { BoardId, OrganizationId } from '@/domain/shared/EntityIds';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { Instant } from '@/domain/shared/Instant';
+import { Nickname } from '@/domain/user/Nickname';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HandleInviteUseCase } from '../HandleInviteUseCase';
 import { InvitationRepository } from '../../../domain/invitation/InvitationRepository';
@@ -59,16 +71,42 @@ class MockInvitationRepository implements InvitationRepository {
 }
 
 class MockOrganizationRepository implements OrganizationRepository {
+  async isUserExactMember(
+    ..._args: Parameters<OrganizationRepository['isUserExactMember']>
+  ): ReturnType<OrganizationRepository['isUserExactMember']> {
+    throw new Error('Unexpected test repository call: isUserExactMember');
+  }
+  async getAdminUserIds(
+    ..._args: Parameters<OrganizationRepository['getAdminUserIds']>
+  ): ReturnType<OrganizationRepository['getAdminUserIds']> {
+    throw new Error('Unexpected test repository call: getAdminUserIds');
+  }
+  async findAcceptedMemberUserIdsForOrgs(
+    ..._args: Parameters<
+      OrganizationRepository['findAcceptedMemberUserIdsForOrgs']
+    >
+  ): ReturnType<OrganizationRepository['findAcceptedMemberUserIdsForOrgs']> {
+    throw new Error(
+      'Unexpected test repository call: findAcceptedMemberUserIdsForOrgs'
+    );
+  }
+  async removeMemberFromOrganization(
+    ..._args: Parameters<OrganizationRepository['removeMemberFromOrganization']>
+  ): ReturnType<OrganizationRepository['removeMemberFromOrganization']> {
+    throw new Error(
+      'Unexpected test repository call: removeMemberFromOrganization'
+    );
+  }
   private organizations: Map<string, Organization> = new Map();
   private adminRoles: Map<string, Set<string>> = new Map();
 
   addAdmin = vi.fn<(orgId: string, userId: string) => Promise<void>>();
   removeUserFromOrganization =
     vi.fn<(userId: string, orgId: string) => Promise<void>>();
-  getFullTreeOrgIds = vi.fn<(orgId: string) => Promise<string[]>>();
+  getFullTreeOrgIds = vi.fn<OrganizationRepository['getFullTreeOrgIds']>();
   findMembershipsByUserId =
     vi.fn<(userId: string) => Promise<Organization[]>>();
-  findAdminUserIds = vi.fn<(orgId: string) => Promise<string[]>>();
+  findAdminUserIds = vi.fn<OrganizationRepository['findAdminUserIds']>();
 
   constructor() {
     this.addAdmin.mockResolvedValue(undefined);
@@ -93,10 +131,12 @@ class MockOrganizationRepository implements OrganizationRepository {
   async findByParentId(): Promise<Organization[]> {
     return [];
   }
-  async getAncestorIds(): Promise<string[]> {
+  async getAncestorIds(): ReturnType<OrganizationRepository['getAncestorIds']> {
     return [];
   }
-  async getDescendantIds(): Promise<string[]> {
+  async getDescendantIds(): ReturnType<
+    OrganizationRepository['getDescendantIds']
+  > {
     return [];
   }
   async isUserMember(): Promise<boolean> {
@@ -117,7 +157,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   async update(org: Organization): Promise<Organization> {
     return org;
   }
-  async findAcceptedMemberUserIdsIncludingDescendants(): Promise<string[]> {
+  async findAcceptedMemberUserIdsIncludingDescendants(): ReturnType<
+    OrganizationRepository['findAcceptedMemberUserIdsIncludingDescendants']
+  > {
     return [];
   }
   async findPendingRequestsByUserId(): Promise<Organization[]> {
@@ -132,12 +174,19 @@ class MockOrganizationRepository implements OrganizationRepository {
   async getHierarchyTree(): Promise<any> {
     return {
       ancestors: [],
-      tree: { id: '', name: '', memberCount: 0, children: [] },
+      tree: {
+        id: 'org-fixture',
+        name: 'Fixture organization',
+        memberCount: 0,
+        children: [],
+      },
     };
   }
   async setParentId(): Promise<void> {}
   async removeAdmin(): Promise<void> {}
-  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+  async searchByNameFuzzy(): ReturnType<
+    OrganizationRepository['searchByNameFuzzy']
+  > {
     return [];
   }
   async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
@@ -145,7 +194,9 @@ class MockOrganizationRepository implements OrganizationRepository {
   }
   async findUsersWithMultipleMembershipsInOrgs(
     _orgIds: string[]
-  ): Promise<string[]> {
+  ): ReturnType<
+    OrganizationRepository['findUsersWithMultipleMembershipsInOrgs']
+  > {
     return [];
   }
   async setAllowMultiTreeMembership(
@@ -173,8 +224,7 @@ class MockBoardRepository implements BoardRepository {
       (userId: string, boardId: string, addedBy?: string) => Promise<void>
     >();
   isUserMember = vi.fn<(userId: string, boardId: string) => Promise<boolean>>();
-  findBoardMembers =
-    vi.fn<(boardId: string) => Promise<{ userId: string }[]>>();
+  findBoardMembers = vi.fn<BoardRepository['findBoardMembers']>();
 
   constructor() {
     this.addUserToBoard.mockResolvedValue(undefined);
@@ -198,7 +248,7 @@ class MockBoardRepository implements BoardRepository {
 
   async findActiveBoardsByUserId(
     _userId: string
-  ): Promise<Array<{ id: string; name: string; organizationId: string }>> {
+  ): ReturnType<BoardRepository['findActiveBoardsByUserId']> {
     return [];
   }
 
@@ -242,19 +292,10 @@ class MockUserRepository implements UserRepository {
     return true;
   }
   async updatePrivacySettings(): Promise<void> {}
-  async isUserBlocked(): Promise<boolean> {
-    return false;
-  }
-  async blockUser(): Promise<void> {}
-  async unblockUser(): Promise<void> {}
+
   async confirmUser(): Promise<void> {}
-  async getBlockStatus(): Promise<null> {
-    return null;
-  }
+
   async deleteAddress(): Promise<void> {}
-  async getBlockedUserIds(): Promise<string[]> {
-    return [];
-  }
 
   addUser(user: User): void {
     this.users.set(user.id, user);
@@ -262,34 +303,28 @@ class MockUserRepository implements UserRepository {
   addSuperAdmin(userId: string): void {
     this.superAdmins.add(userId);
   }
+
+  async findByEmail(
+    ..._args: Parameters<UserRepository['findByEmail']>
+  ): ReturnType<UserRepository['findByEmail']> {
+    throw new Error('Unexpected test repository call: findByEmail');
+  }
 }
 
 class MockNotificationRepository implements NotificationRepository {
   private savedBatch: any[] = [];
 
-  async save(): Promise<any> {
-    return {};
+  async save(
+    notification: Notification
+  ): ReturnType<NotificationRepository['save']> {
+    return success(notification);
   }
-  async saveBatch(notifications: any[]): Promise<void> {
+  async saveBatch(
+    notifications: any[]
+  ): ReturnType<NotificationRepository['saveBatch']> {
     this.savedBatch.push(...notifications);
-  }
-  async findById(): Promise<any> {
-    return null;
-  }
-  async findByUserId(): Promise<any[]> {
-    return [];
-  }
-  async getUnreadCount(): Promise<number> {
-    return 0;
-  }
-  async markAsRead(): Promise<void> {}
-  async markAllAsRead(): Promise<void> {}
-  async findByIds(): Promise<any[]> {
-    return [];
-  }
-  async deleteByIds(): Promise<void> {}
-  async getCountByUserId(): Promise<number> {
-    return 0;
+
+    return success(undefined);
   }
 
   getSavedBatch() {
@@ -311,26 +346,34 @@ function makeOrg(id: string, archived = false): Organization {
 }
 
 function makeBoard(id: string, orgId: string): Board {
-  const result = Board.create('Test Board', orgId);
+  const result = Board.create(
+    BoardName.parse('Test Board'),
+    OrganizationId.parse(orgId),
+    testCreation(BoardId, id)
+  );
 
   if (!result.success) {
     throw new Error('Failed to create board');
   }
 
   const board = result.value;
-  (board as any).props.id = id;
 
   return board;
 }
 
 function makeUser(id: string): User {
-  const user = User.create({
-    firstName: 'John',
-    lastName: 'Doe',
-    phoneNumber: PhoneNumber.create('+1234567890'),
-    password: 'password123',
+  const user = User.reconstitute({
+    ...{
+      firstName: 'John',
+      lastName: 'Doe',
+      phoneNumber: PhoneNumber.create('+1234567890'),
+      password: 'password123',
+    },
+    id,
+    createdAt: new Date('2026-01-01'),
+    language: 'en',
+    nickname: Nickname.create('fixture_user'),
   });
-  (user as any).props.id = id;
 
   return user;
 }
@@ -388,7 +431,8 @@ describe('HandleInviteUseCase', () => {
     mockPrisma.organizationAdminUser.findUnique.mockResolvedValue(null);
 
     useCase = new HandleInviteUseCase({
-      prisma: mockPrisma,
+      ...notificationTestInputs,
+      memberships: new PrismaMembershipStore(mockPrisma),
       invitationRepository: invitationRepo,
       organizationRepository: orgRepo,
       boardRepository: boardRepo,
@@ -482,7 +526,10 @@ describe('HandleInviteUseCase', () => {
 
     const org = makeOrg('org-1');
     orgRepo.addOrganization(org);
-    orgRepo.findAdminUserIds.mockResolvedValue(['admin-1', 'admin-2']);
+    orgRepo.findAdminUserIds.mockResolvedValue([
+      UserId.parse('admin-1'),
+      UserId.parse('admin-2'),
+    ]);
 
     userRepo.addUser(makeUser('user-2'));
 
@@ -634,6 +681,11 @@ describe('HandleInviteUseCase', () => {
         acceptedByUserId: 'user-1',
       }),
     });
+
+    // Both upsert branches must use the supplied clock, including an existing row.
+    expect(
+      mockPrisma.organizationUser.upsert.mock.calls[0][0].update.acceptedAt
+    ).toEqual(Instant.toDate(notificationTestInputs.clock.now()));
 
     // Verify hierarchy cleanup was triggered
     expect(orgRepo.getFullTreeOrgIds).toHaveBeenCalledWith('org-1');

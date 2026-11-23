@@ -1,10 +1,11 @@
+import { OrganizationId, BoardId } from '../../domain/shared/EntityIds';
 import { Report } from '../../domain/report/Report';
 import { ReportVisibility } from '../../domain/report/ReportVisibility';
 import { PollState } from '../../domain/poll/PollState';
 
 export interface PollAudienceDescriptor {
-  organizationId: string;
-  boardId: string | null;
+  organizationId: OrganizationId;
+  boardId: BoardId | null;
   state: PollState;
 }
 

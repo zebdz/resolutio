@@ -1,3 +1,8 @@
+import { listHistory } from '@/infrastructure/history/history';
+import { HistoricalEntries } from '@/web/components/history/HistoricalEntries';
+/** Server report view resolves validated references and serializes only authorized content. */
+import { OrganizationId, UserId } from '@/domain/shared/EntityIds';
+import { PageSize } from '@/domain/shared/Pagination';
 import { getLocale, getTranslations } from 'next-intl/server';
 
 import { Link } from '@/src/i18n/routing';
@@ -25,19 +30,33 @@ interface ReportsPageProps {
 export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const currentUser = await getCurrentUser();
 
-  if (!currentUser) {
-    redirectLocalized(await getLocale(), '/login');
-  }
-
-  const t = await getTranslations('report.pages');
   const sp = await searchParams;
-
+  const t = await getTranslations('report.pages');
   const rawPage = parseInt(sp.page ?? '1', 10);
   const page = rawPage > 0 ? rawPage : 1;
 
   const organizationIds = sp.organizationIds
     ? sp.organizationIds.split(',').filter(Boolean)
     : undefined;
+
+  const history =
+    page === 1
+      ? await listHistory(currentUser?.id ?? null, 'report', {
+          orgIds: organizationIds,
+        })
+      : [];
+
+  if (!currentUser) {
+    if (!history.length) {
+      redirectLocalized(await getLocale(), '/login');
+    }
+
+    return (
+      <main className="mx-auto max-w-4xl px-4 py-8">
+        <HistoricalEntries kind="report" items={history} />
+      </main>
+    );
+  }
 
   const result = await listReportsAction({
     organizationIds,
@@ -50,7 +69,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
   const uniqueAuthorIds = [...new Set(reports.map((r) => r.createdById))];
-  const authors = await userRepo.findByIds(uniqueAuthorIds);
+  const authors = await userRepo.findByIds(
+    uniqueAuthorIds.map((id) => UserId.parse(id))
+  );
   const authorMap = new Map(authors.map((a) => [a.id, a]));
 
   function buildPageHref(p: number) {
@@ -76,14 +97,14 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           </Link>
         </div>
 
-        {reports.length === 0 ? (
+        {reports.length === 0 && history.length === 0 ? (
           <Text className="text-zinc-500 dark:text-zinc-400">
             {t('feedEmpty')}
           </Text>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {reports.map((report) => {
-              const author = authorMap.get(report.createdById);
+              const author = authorMap.get(UserId.parse(report.createdById));
               const authorInfo = author
                 ? {
                     firstName: author.firstName,
@@ -99,7 +120,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                     id: report.id,
                     title: report.title,
                     body: report.body,
-                    state: report.state as 'DRAFT' | 'PUBLISHED',
+                    state: report.state,
                     visibility: report.visibility,
                     lastPublishedAt: report.lastPublishedAt,
                     createdAt: report.createdAt,
@@ -140,6 +161,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             </Link>
           </div>
         )}
+        <HistoricalEntries kind="report" items={history} />
       </div>
     </AuthenticatedLayout>
   );

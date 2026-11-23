@@ -1,3 +1,15 @@
+/** Typed attachment persistence projections. Metadata never contains content bytes;
+ * adapters validate stored scalar values before they cross the port. */
+import { Instant } from '../shared/Instant';
+import {
+  PropertyClaimAttachmentId,
+  PropertyClaimId,
+} from '../shared/EntityIds';
+import {
+  AttachmentFileName,
+  AttachmentByteCount,
+} from '../shared/attachments/AttachmentValues';
+import { PropertyClaimAttachmentMimeType } from './PropertyClaimAttachment';
 import { Result } from '../shared/Result';
 import { PropertyClaimAttachment } from './PropertyClaimAttachment';
 
@@ -7,17 +19,17 @@ import { PropertyClaimAttachment } from './PropertyClaimAttachment';
 // bytes live behind a separate `findBytesById` call so we don't accidentally
 // stream them to clients that only need to render a list.
 export interface PropertyClaimAttachmentMetadata {
-  id: string;
-  claimId: string;
-  fileName: string;
-  mimeType: string;
-  sizeBytes: number;
-  createdAt: Date;
+  id: PropertyClaimAttachmentId;
+  claimId: PropertyClaimId;
+  fileName: AttachmentFileName;
+  mimeType: PropertyClaimAttachmentMimeType;
+  sizeBytes: AttachmentByteCount;
+  createdAt: Instant;
 }
 
 export interface PropertyClaimAttachmentBytes {
-  fileName: string;
-  mimeType: string;
+  fileName: AttachmentFileName;
+  mimeType: PropertyClaimAttachmentMimeType;
   bytes: Buffer;
 }
 
@@ -28,15 +40,21 @@ export interface PropertyClaimAttachmentRepository {
   save(
     attachment: PropertyClaimAttachment,
     bytes: Buffer
-  ): Promise<Result<PropertyClaimAttachmentMetadata, string>>;
+  ): Promise<
+    Result<PropertyClaimAttachmentMetadata, 'common.errors.unexpected'>
+  >;
 
   findByClaimId(
-    claimId: string
-  ): Promise<Result<PropertyClaimAttachmentMetadata[], string>>;
+    claimId: PropertyClaimId
+  ): Promise<
+    Result<PropertyClaimAttachmentMetadata[], 'common.errors.unexpected'>
+  >;
 
   // Bytes-bearing fetch — only call from the download route handler,
   // never from a Server Component.
   findBytesById(
-    id: string
-  ): Promise<Result<PropertyClaimAttachmentBytes | null, string>>;
+    id: PropertyClaimAttachmentId
+  ): Promise<
+    Result<PropertyClaimAttachmentBytes | null, 'common.errors.unexpected'>
+  >;
 }

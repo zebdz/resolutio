@@ -1,3 +1,28 @@
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { VotingWeight } from '@/domain/poll/VotingWeight';
+/** Poll use-case compatibility: explicit creation fixtures and repository ports
+ * preserve authorization, eligibility and expected user-visible outcomes. */
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
+import { createQuestionIds, questionClock } from './questionTestValues';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import {
+  PollId,
+  QuestionId,
+  AnswerId,
+  ParticipantId,
+  ParticipantWeightHistoryId,
+  VoteId,
+  VoteDraftId,
+  UserId,
+  OrganizationId,
+  BoardId,
+} from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GetParticipantsUseCase } from '../GetParticipantsUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -28,46 +53,53 @@ describe('GetParticipantsUseCase', () => {
   beforeEach(() => {
     // Create a poll
     const pollResult = Poll.create(
-      'Test Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'user-admin',
-      new Date('2026-01-15'),
-      new Date('2026-02-15')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-admin'),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(pollResult.success).toBe(true);
-    poll = pollResult.value;
-    (poll as any).props.id = 'poll-1';
+    poll = expectSuccess(pollResult);
 
     // Add question with answer so poll can transition to READY state
     const questionResult = Question.create(
-      'Test Q',
-      'poll-1',
-      1,
-      0,
+      QuestionText.parse('Test Q'),
+      PollId.parse('poll-1'),
+      testCreation(QuestionId, 'question-1'),
+      PageNumber.parse(1),
+      SortOrder.parse(0),
       'single-choice'
     );
-    const answerResult = Answer.create('Test A', 1, questionResult.value.id);
-    questionResult.value.addAnswer(answerResult.value);
-    poll.addQuestion(questionResult.value);
+    const answerResult = Answer.create(
+      AnswerText.parse('Test A'),
+      SortOrder.parse(1),
+      expectSuccess(questionResult).id,
+      testCreation(AnswerId, 'answer-1')
+    );
+    expectSuccess(questionResult).addAnswer(expectSuccess(answerResult));
+    poll.addQuestion(expectSuccess(questionResult));
     poll.submitToAdmin();
     poll.takeSnapshot();
     // Poll is now in READY state (canModify should be true if no votes)
 
     // Create participant
     const participantResult = PollParticipant.create(
-      'poll-1',
-      'user-1',
-      new Decimal(1.5).toNumber()
+      PollId.parse('poll-1'),
+      UserId.parse('user-1'),
+      testCreation(ParticipantId, 'participant-1'),
+      VotingWeight.parse(new Decimal(1.5).toNumber())
     );
     expect(participantResult.success).toBe(true);
-    participant = participantResult.value;
-    (participant as any).props.id = 'participant-1';
+    participant = expectSuccess(participantResult);
 
     // Mock repositories
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
     };
 
     participantRepository = {
@@ -96,13 +128,16 @@ describe('GetParticipantsUseCase', () => {
       },
     };
 
+    userRepository.findById = vi.fn(async (id) =>
+      prisma.user.findUnique({ where: { id } })
+    );
+
     useCase = new GetParticipantsUseCase(
       pollRepository as PollRepository,
       participantRepository as ParticipantRepository,
       voteRepository as VoteRepository,
       organizationRepository as OrganizationRepository,
-      userRepository as UserRepository,
-      prisma
+      userRepository as UserRepository
     );
   });
 
@@ -170,17 +205,23 @@ describe('GetParticipantsUseCase', () => {
   it('should indicate canModify=false when snapshot not taken', async () => {
     // Create poll without snapshot
     const pollWithoutSnapshot = Poll.create(
-      'Test Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'user-admin',
-      new Date('2026-01-15'),
-      new Date('2026-02-15')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-admin'),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
 
     if (pollWithoutSnapshot.success) {
-      (pollWithoutSnapshot.value as any).props.id = 'poll-2';
+      pollWithoutSnapshot.value = Poll.reconstitute({
+        ...pollWithoutSnapshot.value.toJSON(),
+        questions: pollWithoutSnapshot.value.questions,
+        id: 'poll-2',
+      });
       pollWithoutSnapshot.value.activate();
       pollRepository.getPollById = vi
         .fn()
@@ -225,7 +266,7 @@ describe('GetParticipantsUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(OrganizationErrors.NOT_ADMIN);
+      expect(expectFailure(result)).toBe(OrganizationErrors.NOT_ADMIN);
     });
   });
 });

@@ -1,11 +1,12 @@
+import { testClock, testIds } from '@/domain/report/__tests__/reportTestValues';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { DowngradeReportToDraftUseCase } from '../DowngradeReportToDraftUseCase';
-import { Report, ReportProps } from '../../../domain/report/Report';
+import { Report, ReportData } from '../../../domain/report/Report';
 import { ReportVisibility } from '../../../domain/report/ReportVisibility';
 import { ReportErrors } from '../ReportErrors';
 import { ReportDomainCodes } from '../../../domain/report/ReportDomainCodes';
 
-const makeReport = (overrides: Partial<ReportProps> = {}) =>
+const makeReport = (overrides: Partial<ReportData> = {}) =>
   Report.reconstitute({
     id: 'r1',
     organizationId: 'org-1',
@@ -24,6 +25,9 @@ const makeReport = (overrides: Partial<ReportProps> = {}) =>
     pollIds: [],
     attachmentIds: [],
     ...overrides,
+    ...(overrides.state === 'DRAFT'
+      ? { publishedById: null, notifyAudience: false }
+      : {}),
   });
 
 class FakeReports {
@@ -68,7 +72,8 @@ describe('DowngradeReportToDraftUseCase', () => {
     uc = new DowngradeReportToDraftUseCase(
       reports as any,
       orgs as any,
-      users as any
+      users as any,
+      testClock
     );
     reports.store.set('r1', makeReport());
   });

@@ -172,6 +172,7 @@ export default async function OrganizationModifyPage({
           showMemberRequests={isUserAdmin || isSuperAdmin}
           pendingMemberRequestCount={pendingMemberRequestCount}
           pendingMemberInviteCount={pendingMemberInviteCount}
+          canManageEligibility={isUserAdmin || isSuperAdmin}
           showMembersList={true}
           initialMembers={initialMembers}
           initialMembersTotalCount={initialMembersTotalCount}

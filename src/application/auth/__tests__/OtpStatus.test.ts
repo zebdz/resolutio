@@ -1,3 +1,4 @@
+import { Seconds } from '@/domain/auth/AuthValues';
 import { describe, it, expect } from 'vitest';
 import { shouldIssueCode } from '../OtpStatus';
 
@@ -6,19 +7,28 @@ import { shouldIssueCode } from '../OtpStatus';
 describe('shouldIssueCode', () => {
   it('issues when nothing is pending and the throttle allows', () => {
     expect(
-      shouldIssueCode({ hasPendingCode: false, retryAfterSeconds: 0 })
+      shouldIssueCode({
+        hasPendingCode: false,
+        retryAfterSeconds: Seconds.parse(0),
+      })
     ).toBe(true);
   });
 
   it('holds while a code can still be entered', () => {
     expect(
-      shouldIssueCode({ hasPendingCode: true, retryAfterSeconds: 0 })
+      shouldIssueCode({
+        hasPendingCode: true,
+        retryAfterSeconds: Seconds.parse(0),
+      })
     ).toBe(false);
   });
 
   it('holds while the throttle runs', () => {
     expect(
-      shouldIssueCode({ hasPendingCode: false, retryAfterSeconds: 300 })
+      shouldIssueCode({
+        hasPendingCode: false,
+        retryAfterSeconds: Seconds.parse(300),
+      })
     ).toBe(false);
   });
 });

@@ -1,28 +1,38 @@
+/** Confirms the current email using a purpose-scoped OTP at one supplied instant.
+ * Address changes invalidate older confirmation codes. */
+import { AuthenticationError } from './AuthenticationError';
+import { UserId } from '@/domain/shared/EntityIds';
+
+import { Clock } from '@/application/shared/EntityCreation';
+
 import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { OtpPurposes } from '@/domain/otp/OtpVerification';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { UserDomainCodes } from '@/domain/user/UserDomainCodes';
 import { Result, success, failure } from '@/domain/shared/Result';
-import { OtpCodeHasher } from './OtpCodeHasher';
+import { OtpCodeHasher, verifyEnteredOtpCode } from './OtpCodeHasher';
 import { OtpErrors } from './OtpErrors';
 
 export interface ConfirmEmailInput {
-  userId: string;
+  userId: UserId;
   code: string;
 }
 
 interface Dependencies {
+  clock: Clock;
   userRepository: UserRepository;
   otpRepository: OtpRepository;
   otpCodeHasher: OtpCodeHasher;
 }
 
 export class ConfirmEmailUseCase {
+  private readonly clock: Clock;
   private readonly userRepository: UserRepository;
   private readonly otpRepository: OtpRepository;
   private readonly otpCodeHasher: OtpCodeHasher;
 
   constructor(deps: Dependencies) {
+    this.clock = deps.clock;
     this.userRepository = deps.userRepository;
     this.otpRepository = deps.otpRepository;
     this.otpCodeHasher = deps.otpCodeHasher;
@@ -30,7 +40,8 @@ export class ConfirmEmailUseCase {
 
   async execute(
     input: ConfirmEmailInput
-  ): Promise<Result<{ confirmed: true }, string>> {
+  ): Promise<Result<{ confirmed: true }, AuthenticationError>> {
+    const now = this.clock.now();
     const user = await this.userRepository.findById(input.userId);
 
     if (!user) {
@@ -63,7 +74,7 @@ export class ConfirmEmailUseCase {
       return failure(OtpErrors.ALREADY_VERIFIED);
     }
 
-    if (otp.isExpired()) {
+    if (otp.isExpired(now)) {
       return failure(OtpErrors.EXPIRED);
     }
 
@@ -74,12 +85,18 @@ export class ConfirmEmailUseCase {
     const incremented = otp.incrementAttempts();
     await this.otpRepository.update(incremented);
 
-    if (!this.otpCodeHasher.verify(input.code, otp.code)) {
+    if (!verifyEnteredOtpCode(this.otpCodeHasher, input.code, otp.code)) {
       return failure(OtpErrors.INVALID);
     }
 
-    await this.otpRepository.update(incremented.markVerified());
-    await this.userRepository.save(user.confirmEmail());
+    const confirmed = user.confirmEmail(now);
+
+    if (!confirmed.success) {
+      return confirmed;
+    }
+
+    await this.otpRepository.update(incremented.markVerified(now));
+    await this.userRepository.save(confirmed.value);
 
     return success({ confirmed: true });
   }

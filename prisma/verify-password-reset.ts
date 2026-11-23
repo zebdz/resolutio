@@ -4,12 +4,36 @@
  * mocks its repositories, so this is what actually proves the `purpose` column
  * and `findByEmail` round-trip through Prisma.
  *
- * Creates a scratch user, exercises the flow, then deletes everything it made.
+ * Creates a scratch user with fresh generated passwords, exercises the flow,
+ * then deletes everything it made. No reusable scratch credentials are stored here.
  * Run with: npx tsx prisma/verify-password-reset.ts
  */
 // Must precede the prisma import — the client reads DATABASE_URL at module
 // load. Same convention as prisma/seed.ts.
 import 'dotenv/config';
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '../src/infrastructure/shared/SystemEntityCreation';
+import { CryptoOtpCodeGenerator } from '../src/infrastructure/auth/CryptoOtpCodeGenerator';
+import { CryptoPasswordGenerator } from '../src/infrastructure/auth/CryptoPasswordGenerator';
+import { CryptoSessionTokenGenerator } from '../src/infrastructure/auth/CryptoSessionTokenGenerator';
+import { entityCreation } from '../src/application/shared/EntityCreation';
+import { UserId, OtpVerificationId } from '../src/domain/shared/EntityIds';
+import {
+  Minutes,
+  Seconds,
+  ClientIp,
+  afterSeconds,
+} from '../src/domain/auth/AuthValues';
+import {
+  FirstName,
+  LastName,
+  PasswordHash,
+  Language,
+} from '../src/domain/user/UserValues';
+import { OtpDestination, OtpDigits } from '../src/domain/otp/OtpValues';
+import { Session } from '../src/domain/user/Session';
 import { prisma } from '../src/infrastructure/database/prisma';
 import { PrismaUserRepository } from '../src/infrastructure/repositories/PrismaUserRepository';
 import { PrismaOtpRepository } from '../src/infrastructure/repositories/PrismaOtpRepository';
@@ -35,17 +59,18 @@ import type { OtpPurpose } from '../src/domain/otp/OtpVerification';
 const STAMP = Date.now();
 const PHONE = '+799900' + String(STAMP).slice(-5);
 const EMAIL = `reset-verify-${STAMP}@example.test`;
-const OLD_PASSWORD = 'OldPassword-2026';
-const NEW_PASSWORD = 'Korova-Zabor-71';
+const passwords = new CryptoPasswordGenerator();
+const OLD_PASSWORD = passwords.generate();
+const NEW_PASSWORD = passwords.generate();
 
 // Captures the plaintext code the way the dev log would.
-let lastCode: string | null = null;
+let lastCode: OtpDigits | null = null;
 
 const templateRenderer = {
   async renderOtp(
     purpose: OtpPurpose,
-    _locale: string,
-    code: string
+    _locale: Language,
+    code: OtpDigits
   ): Promise<RenderedEmail> {
     lastCode = code;
 
@@ -56,6 +81,10 @@ const templateRenderer = {
   },
 };
 
+const ids = new CryptoIdGenerator();
+const clock = new SystemClock();
+const otpCodeGenerator = new CryptoOtpCodeGenerator();
+const sessionTokens = new CryptoSessionTokenGenerator();
 const userRepository = new PrismaUserRepository(prisma);
 const otpRepository = new PrismaOtpRepository(prisma);
 const sessionRepository = new PrismaSessionRepository(prisma);
@@ -66,18 +95,22 @@ const passwordVerifier = new Argon2PasswordVerifier();
 const deliveryChannel = new EmailOtpDeliveryChannel({
   emailSender: new StubEmailSender(),
   templateRenderer,
-  expiryMinutes: 10,
+  expiryMinutes: Minutes.parse(10),
 });
 
 const requestReset = new RequestPasswordResetUseCase({
+  ids,
+  clock,
+  otpCodeGenerator,
   userRepository,
   otpRepository,
   deliveryChannel,
   otpCodeHasher,
-  expiryMinutes: 10,
+  expiryMinutes: Minutes.parse(10),
 });
 
 const resetPassword = new ResetPasswordWithOtpUseCase({
+  clock,
   userRepository,
   otpRepository,
   sessionRepository,
@@ -95,23 +128,32 @@ function check(name: string, ok: boolean, detail?: string) {
 }
 
 async function main() {
-  let userId: string | null = null;
+  let userId: UserId | null = null;
 
   try {
     // --- Arrange: a real user with a confirmed email ---
     const created = await userRepository.save(
-      User.create({
-        firstName: 'Verify',
-        lastName: 'Scratch',
-        phoneNumber: PhoneNumber.create(PHONE),
-        password: await passwordHasher.hash(OLD_PASSWORD),
-        nickname: Nickname.create(`verify_${String(STAMP).slice(-6)}`),
-        email: EmailAddress.create(EMAIL),
-      })
+      User.create(
+        {
+          firstName: FirstName.parse('Verify'),
+          lastName: LastName.parse('Scratch'),
+          phoneNumber: PhoneNumber.create(PHONE),
+          password: PasswordHash.parse(await passwordHasher.hash(OLD_PASSWORD)),
+          nickname: Nickname.create(`verify_${String(STAMP).slice(-6)}`),
+          email: EmailAddress.create(EMAIL),
+        },
+        entityCreation(UserId, ids, clock)
+      )
     );
     userId = created.id;
 
-    await userRepository.save(created.confirmEmail());
+    const confirmed = created.confirmEmail(clock.now());
+
+    if (!confirmed.success) {
+      throw new Error(confirmed.error);
+    }
+
+    await userRepository.save(confirmed.value);
 
     const reloaded = await userRepository.findById(userId);
     check(
@@ -130,9 +172,16 @@ async function main() {
     );
 
     // A live session, to prove the reset revokes it.
-    const session = await sessionRepository.create(
-      userId,
-      new Date(Date.now() + 3600_000)
+    const session = await sessionRepository.save(
+      Session.create(
+        {
+          userId,
+          expiresAt: afterSeconds(clock.now(), Seconds.parse(3600)),
+          ipAddress: ClientIp.parse('127.0.0.1'),
+          userAgent: null,
+        },
+        { id: sessionTokens.generate(), now: clock.now() }
+      )
     );
 
     // --- Request by PHONE, reset by EMAIL: both resolve to one address ---
@@ -149,8 +198,7 @@ async function main() {
     );
 
     const storedOtp = await otpRepository.findLatestByIdentifier(
-      EMAIL,
-      'email',
+      OtpDestination.parse({ channel: 'email', identifier: EMAIL }),
       OtpPurposes.PASSWORD_RESET
     );
     check(
@@ -165,15 +213,17 @@ async function main() {
 
     // --- Cross-purpose replay must be blocked ---
     const confirmationOtp = await otpRepository.save(
-      OtpVerification.create({
-        identifier: EMAIL,
-        channel: 'email',
-        purpose: OtpPurposes.EMAIL_CONFIRMATION,
-        code: otpCodeHasher.hash('999999'),
-        clientIp: '127.0.0.1',
-        expiresAt: new Date(Date.now() + 600_000),
-        userId,
-      })
+      OtpVerification.create(
+        {
+          ...OtpDestination.parse({ channel: 'email', identifier: EMAIL }),
+          purpose: OtpPurposes.EMAIL_CONFIRMATION,
+          code: otpCodeHasher.hash(OtpDigits.parse('999999')),
+          clientIp: ClientIp.parse('127.0.0.1'),
+          expiresAt: afterSeconds(clock.now(), Seconds.parse(600)),
+          userId,
+        },
+        entityCreation(OtpVerificationId, ids, clock)
+      )
     );
     const replay = await resetPassword.execute({
       identifier: EMAIL,

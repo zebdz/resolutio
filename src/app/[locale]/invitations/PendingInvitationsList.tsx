@@ -8,7 +8,7 @@ import { Heading } from '@/src/web/components/catalyst/heading';
 import { Text } from '@/src/web/components/catalyst/text';
 import { handleInviteAction } from '@/src/web/actions/invitation/invitation';
 import { toast } from 'sonner';
-import type { InviteDetails } from '@/application/invitation/GetInviteDetailsUseCase';
+import type { InviteDetailsDto } from '@/web/actions/invitation/serializeInviteDetails';
 
 const TYPE_TITLE_KEY: Record<string, string> = {
   admin_invite: 'adminInvite',
@@ -17,7 +17,7 @@ const TYPE_TITLE_KEY: Record<string, string> = {
 };
 
 interface PendingInvitationsListProps {
-  initialInvites: InviteDetails[];
+  initialInvites: InviteDetailsDto[];
 }
 
 export function PendingInvitationsList({

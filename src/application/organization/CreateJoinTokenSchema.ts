@@ -1,4 +1,6 @@
+/** Join-link request validation retains the domain usage-limit unit after parsing. */
 import { z } from 'zod';
+import { JoinTokenMaxUses } from '../../domain/organization/JoinTokenValues';
 import { JOIN_TOKEN_DESCRIPTION_MAX_LENGTH } from '../../domain/organization/JoinToken';
 import { JoinTokenDomainCodes } from '../../domain/organization/JoinTokenDomainCodes';
 import { SharedDomainCodes } from '../../domain/shared/SharedDomainCodes';
@@ -18,12 +20,7 @@ export const createJoinTokenSchema = (profanityChecker: ProfanityChecker) =>
       .refine((val) => !profanityChecker.containsProfanity(val), {
         message: SharedDomainCodes.CONTAINS_PROFANITY,
       }),
-    maxUses: z
-      .number()
-      .int()
-      .positive(JoinTokenDomainCodes.MAX_USES_INVALID)
-      .nullable()
-      .optional(),
+    maxUses: JoinTokenMaxUses.nullable().optional(),
   });
 
 export type CreateJoinTokenInput = z.input<

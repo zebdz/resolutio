@@ -1,3 +1,6 @@
+/** Native poll search and access to imported meeting results. */
+import { listHistory } from '@/infrastructure/history/history';
+import { HistoricalEntries } from '@/web/components/history/HistoricalEntries';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/web/lib/session';
 import { Heading, Subheading } from '@/src/web/components/catalyst/heading';
@@ -194,6 +197,15 @@ export default async function PollsPage({ searchParams }: PollsPageProps) {
           adminOrgIds={adminOrgIds}
           isSuperAdmin={isSuperAdmin}
         />
+        {page === 1 && (
+          <HistoricalEntries
+            kind="poll"
+            items={await listHistory(user.id, 'poll', {
+              ...sp,
+              orgIds: orgId ? [orgId] : undefined,
+            })}
+          />
+        )}
       </div>
     </AuthenticatedLayout>
   );

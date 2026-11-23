@@ -1,7 +1,21 @@
+/** Decodes external report commands before authorization and domain behavior.
+ * Identity/time dependencies keep persistence and lifecycle changes deterministic. */
+import { ReportUseCaseFailure } from './ReportErrors';
+import { z } from 'zod';
+import {
+  ReportId,
+  OrganizationId,
+  UserId,
+  BoardId,
+  PollId,
+  ReportAttachmentId,
+} from '../../domain/shared/EntityIds';
+import { Clock, IdGenerator, entityCreation } from '../shared/EntityCreation';
 import { Result, failure } from '../../domain/shared/Result';
 import { ReportRepository } from '../../domain/report/ReportRepository';
 import {
   ReportAttachment,
+  parseReportAttachmentMetadata,
   REPORT_ATTACHMENT_COUNT_LIMIT,
 } from '../../domain/report/ReportAttachment';
 import { ReportAttachmentRepository } from '../../domain/report/ReportAttachmentRepository';
@@ -9,11 +23,11 @@ import { ReportDomainCodes } from '../../domain/report/ReportDomainCodes';
 import { ReportErrors } from './ReportErrors';
 
 export interface OrgRepoForAddAttachment {
-  isUserAdmin(userId: string, orgId: string): Promise<boolean>;
+  isUserAdmin(userId: UserId, orgId: OrganizationId): Promise<boolean>;
 }
 
 export interface UserRepoForAddAttachment {
-  isSuperAdmin(userId: string): Promise<boolean>;
+  isSuperAdmin(userId: UserId): Promise<boolean>;
 }
 
 export interface AddReportAttachmentInput {
@@ -25,7 +39,7 @@ export interface AddReportAttachmentInput {
 }
 
 export interface AddReportAttachmentOutput {
-  id: string;
+  id: ReportAttachmentId;
 }
 
 export class AddReportAttachmentUseCase {
@@ -33,13 +47,24 @@ export class AddReportAttachmentUseCase {
     private reports: ReportRepository,
     private orgs: OrgRepoForAddAttachment,
     private users: UserRepoForAddAttachment,
-    private attachmentRepo: ReportAttachmentRepository
+    private attachmentRepo: ReportAttachmentRepository,
+    private ids: IdGenerator,
+    private clock: Clock
   ) {}
 
   async execute(
     input: AddReportAttachmentInput
-  ): Promise<Result<AddReportAttachmentOutput, string>> {
-    const lookup = await this.reports.findByIdWithRelations(input.reportId);
+  ): Promise<Result<AddReportAttachmentOutput, ReportUseCaseFailure>> {
+    const decoded = z
+      .object({ reportId: ReportId, callerId: UserId })
+      .safeParse(input);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const command = { ...input, ...decoded.data };
+    const lookup = await this.reports.findByIdWithRelations(command.reportId);
 
     if (!lookup.success) {
       return failure(lookup.error);
@@ -51,12 +76,14 @@ export class AddReportAttachmentUseCase {
 
     const report = lookup.value;
 
-    const isAuthor = report.createdById === input.callerId;
+    const isAuthor = report.createdById === command.callerId;
     const isAdmin =
       !isAuthor &&
-      (await this.orgs.isUserAdmin(input.callerId, report.organizationId));
+      (await this.orgs.isUserAdmin(command.callerId, report.organizationId));
     const isSuper =
-      !isAuthor && !isAdmin && (await this.users.isSuperAdmin(input.callerId));
+      !isAuthor &&
+      !isAdmin &&
+      (await this.users.isSuperAdmin(command.callerId));
 
     if (!isAuthor && !isAdmin && !isSuper) {
       return failure(ReportErrors.NOT_AUTHOR_OR_ADMIN);
@@ -68,7 +95,7 @@ export class AddReportAttachmentUseCase {
     }
 
     const countResult = await this.attachmentRepo.countByReportId(
-      input.reportId
+      command.reportId
     );
 
     if (!countResult.success) {
@@ -79,12 +106,25 @@ export class AddReportAttachmentUseCase {
       return failure(ReportDomainCodes.REPORT_ATTACHMENT_LIMIT_REACHED);
     }
 
-    const attachmentResult = ReportAttachment.createWithBytes({
-      reportId: input.reportId,
-      fileName: input.fileName,
-      mimeType: input.mimeType,
-      bytes: input.bytes,
+    const metadata = parseReportAttachmentMetadata({
+      fileName: command.fileName,
+      mimeType: command.mimeType,
+      sizeBytes: command.bytes.length,
     });
+
+    if (!metadata.success) {
+      return metadata;
+    }
+
+    const attachmentResult = ReportAttachment.createWithBytes(
+      {
+        reportId: command.reportId,
+        fileName: metadata.value.fileName,
+        mimeType: metadata.value.mimeType,
+        bytes: command.bytes,
+      },
+      entityCreation(ReportAttachmentId, this.ids, this.clock)
+    );
 
     if (!attachmentResult.success) {
       return failure(attachmentResult.error);
@@ -92,7 +132,7 @@ export class AddReportAttachmentUseCase {
 
     const saveResult = await this.attachmentRepo.save(
       attachmentResult.value,
-      input.bytes
+      command.bytes
     );
 
     if (!saveResult.success) {
@@ -103,7 +143,7 @@ export class AddReportAttachmentUseCase {
 
     // We already verified isDraft() above, so attachAttachment cannot fail
     // with REPORT_CANNOT_EDIT_PUBLISHED. Propagate any unexpected error anyway.
-    const domainResult = report.attachAttachment(savedId);
+    const domainResult = report.attachAttachment(savedId, this.clock.now());
 
     if (!domainResult.success) {
       return failure(domainResult.error);

@@ -1,3 +1,5 @@
+/** Validates raw profile input before it enters application commands. */
+import { UserId } from '@/domain/shared/EntityIds';
 import { z } from 'zod';
 import {
   NICKNAME_MIN_LENGTH,
@@ -11,7 +13,7 @@ export const completePrivacySetupSchema = (
   profanityChecker: ProfanityChecker
 ) =>
   z.object({
-    userId: z.string().min(1),
+    userId: UserId,
     nickname: z
       .string()
       .min(NICKNAME_MIN_LENGTH, UserDomainCodes.NICKNAME_INVALID)

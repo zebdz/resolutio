@@ -6,6 +6,7 @@ import { MembersListContent, OrgMember } from './MembersListContent';
 
 type Props = {
   organizationId: string;
+  canManageEligibility?: boolean;
   initialMembers: OrgMember[];
   initialTotalCount: number;
   canRemoveMembers?: boolean;
@@ -14,6 +15,7 @@ type Props = {
 
 export function OrgMembersList({
   organizationId,
+  canManageEligibility = false,
   initialMembers,
   initialTotalCount,
   canRemoveMembers = false,
@@ -49,6 +51,7 @@ export function OrgMembersList({
 
       <div className="border-t border-zinc-200 px-6 py-4 dark:border-zinc-800">
         <MembersListContent
+          canManageEligibility={canManageEligibility}
           organizationId={organizationId}
           initialMembers={initialMembers}
           initialTotalCount={initialTotalCount}

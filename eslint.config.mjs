@@ -32,6 +32,8 @@ const eslintConfig = defineConfig([
     'build/**',
     'next-env.d.ts',
     'generated/**',
+    // These public paths link to the installed PDF.js distribution.
+    'public/pdfjs/**',
   ]),
 ]);
 

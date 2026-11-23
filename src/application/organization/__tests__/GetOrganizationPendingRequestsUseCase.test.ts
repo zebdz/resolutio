@@ -1,3 +1,8 @@
+/** Organization request tests cover authorization, ordering and optional pagination.
+ * Adapters decode simulated stored rows into typed core results. */
+import { PrismaClient } from '@/generated/prisma/client';
+import { PrismaOrganizationDirectory } from '@/infrastructure/repositories/PrismaOrganizationDirectory';
+import { PrismaOrganizationRepository } from '@/infrastructure/repositories/PrismaOrganizationRepository';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GetOrganizationPendingRequestsUseCase } from '../GetOrganizationPendingRequestsUseCase';
 import { OrganizationErrors } from '../OrganizationErrors';
@@ -73,7 +78,16 @@ class MockPrisma {
 
   // Helper methods for testing
   addOrganization(id: string, name: string): void {
-    this.organizations.set(id, { id, name });
+    this.organizations.set(id, {
+      id,
+      name,
+      description: 'Organization',
+      createdById: 'creator',
+      parentId: null,
+      createdAt: new Date('2026-01-01'),
+      archivedAt: null,
+      allowMultiTreeMembership: false,
+    });
   }
 
   addAdmin(organizationId: string, userId: string): void {
@@ -100,7 +114,7 @@ class MockPrisma {
       userId: user.id,
       status: 'pending',
       createdAt,
-      user,
+      user: { ...user, middleName: user.middleName ?? null },
     });
   }
 
@@ -133,8 +147,13 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
     prisma = new MockPrisma();
     userRepository = new MockUserRepository();
     useCase = new GetOrganizationPendingRequestsUseCase({
-      prisma: prisma as any,
-      userRepository: userRepository as any,
+      directory: new PrismaOrganizationDirectory(
+        prisma as unknown as PrismaClient
+      ),
+      organizationRepository: new PrismaOrganizationRepository(
+        prisma as unknown as PrismaClient
+      ),
+      userRepository,
     });
   });
 
@@ -228,7 +247,7 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
         expect(result.value.requests[0].userId).toBe('user-1');
         expect(result.value.requests[0].firstName).toBe('John');
         expect(result.value.requests[0].lastName).toBe('Doe');
-        expect(result.value.requests[0].middleName).toBeUndefined();
+        expect(result.value.requests[0].middleName).toBeNull();
 
         expect(result.value.requests[1].userId).toBe('user-2');
         expect(result.value.requests[1].middleName).toBe('Ann');
@@ -360,7 +379,7 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
           'org-1',
           {
             id: `user-${i}`,
-            firstName: `User${i}`,
+            firstName: ['Alice', 'Boris', 'Carol', 'David', 'Elena'][i - 1],
             lastName: 'Test',
             phoneNumber: `+${i}`,
           },
@@ -396,8 +415,8 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
       if (result1.success) {
         expect(result1.value.requests).toHaveLength(2);
         expect(result1.value.totalCount).toBe(5);
-        expect(result1.value.requests[0].firstName).toBe('User1');
-        expect(result1.value.requests[1].firstName).toBe('User2');
+        expect(result1.value.requests[0].firstName).toBe('Alice');
+        expect(result1.value.requests[1].firstName).toBe('Boris');
       }
 
       const result2 = await useCase.execute({
@@ -412,7 +431,7 @@ describe('GetOrganizationPendingRequestsUseCase', () => {
       if (result2.success) {
         expect(result2.value.requests).toHaveLength(2);
         expect(result2.value.totalCount).toBe(5);
-        expect(result2.value.requests[0].firstName).toBe('User3');
+        expect(result2.value.requests[0].firstName).toBe('Carol');
       }
 
       const result3 = await useCase.execute({

@@ -1,5 +1,9 @@
 'use client';
 
+/** Show the authorized voters for one answer. Sealed totals and row weights keep
+ * their six-place precision across both the summary and the detail table. */
+import type { AnswerResult } from '@/web/actions/poll/PollResultsView';
+import { printWeight } from '@/web/lib/protocolWeight';
 import { useTranslations } from 'next-intl';
 import {
   Dialog,
@@ -16,20 +20,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/src/web/components/catalyst/table';
-
-interface Voter {
-  userId: string;
-  userName: string;
-  weight: number;
-}
-
-interface AnswerResult {
-  answerId: string;
-  answerText: string;
-  voteCount: number;
-  weightedVotes: number;
-  voters: Voter[];
-}
 
 interface VoterBreakdownDialogProps {
   isOpen: boolean;
@@ -53,7 +43,10 @@ export default function VoterBreakdownDialog({
             {answer.answerText}
           </p>
           <p className="text-xs text-zinc-500 dark:text-zinc-500 mt-1">
-            {answer.voteCount} {t('votes')} • {answer.weightedVotes.toFixed(2)}{' '}
+            {answer.voteCount} {t('votes')} •{' '}
+            {answer.exactWeight === undefined
+              ? answer.weightedVotes.toFixed(2)
+              : printWeight(answer.weightedVotes, answer.exactWeight)}{' '}
             {t('voteWeight')}
           </p>
         </div>
@@ -75,7 +68,11 @@ export default function VoterBreakdownDialog({
                 {answer.voters.map((voter) => (
                   <TableRow key={voter.userId}>
                     <TableCell>{voter.userName}</TableCell>
-                    <TableCell>{voter.weight.toFixed(2)}</TableCell>
+                    <TableCell>
+                      {answer.exactWeight === undefined
+                        ? voter.weight.toFixed(2)
+                        : printWeight(voter.weight)}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

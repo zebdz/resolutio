@@ -1,202 +1,131 @@
-type ActionResult = { href: string; actionKey: string } | null;
+/** Notification navigation consumes a correlated event/payload and typed action keys.
+ * Every supported kind explicitly links somewhere or has no action. */
+import type {
+  NotificationContent,
+  NotificationType,
+} from '@/domain/notification/NotificationContent';
 
-type TypeConfigEntry =
-  | { dataKey: string; url: (id: string) => string; actionKey: string }
-  | {
-      urlFromData: (data: Record<string, unknown>) => string | null;
-      actionKey: string;
-    };
-
-const TYPE_CONFIG: Record<string, TypeConfigEntry> = {
-  join_request_received: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}/pending-requests`,
-    actionKey: 'viewPendingRequests',
-  },
-  join_request_accepted: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  join_request_rejected: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  join_parent_request_received: {
-    dataKey: 'parentOrgId',
-    url: (id) => `/organizations/${id}/parent-requests`,
-    actionKey: 'viewParentRequests',
-  },
-  join_parent_request_rejected: {
-    dataKey: 'childOrgId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  org_joined_parent: {
-    dataKey: 'parentOrgId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  org_archived: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  org_unarchived: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  org_name_changed: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  poll_activated: {
-    dataKey: 'pollId',
-    url: (id) => `/polls/${id}/vote`,
-    actionKey: 'voteNow',
-  },
-  poll_finished: {
-    dataKey: 'pollId',
-    url: (id) => `/polls/${id}/results`,
-    actionKey: 'viewResults',
-  },
-  // An admin reviewing a submitted poll cannot edit it, so they get the
-  // read-only page; the author whose poll came back is going to change
-  // something, so they get the editor.
-  poll_submitted: {
-    dataKey: 'pollId',
-    url: (id) => `/polls/${id}`,
-    actionKey: 'reviewPoll',
-  },
-  poll_returned_to_draft: {
-    dataKey: 'pollId',
-    url: (id) => `/polls/${id}/edit`,
-    actionKey: 'editPoll',
-  },
-  auto_join_failed: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  admin_invite_received: {
-    urlFromData: () => '/invitations',
-    actionKey: 'respondToInvite',
-  },
-  board_member_invite_received: {
-    urlFromData: () => '/invitations',
-    actionKey: 'respondToInvite',
-  },
-  member_invite_received: {
-    urlFromData: () => '/invitations',
-    actionKey: 'respondToInvite',
-  },
-  admin_invite_accepted: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}/modify`,
-    actionKey: 'viewOrganization',
-  },
-  board_member_invite_accepted: {
-    urlFromData: (data) => {
-      const orgId = data.organizationId;
-      const boardId = data.boardId;
-
-      if (typeof orgId !== 'string' || typeof boardId !== 'string') {
-        return null;
-      }
-
-      return `/organizations/${orgId}/boards/${boardId}/manage`;
-    },
-    actionKey: 'viewBoard',
-  },
-  member_invite_accepted: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  invite_revoked: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  admin_removed: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  board_member_removed: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  member_removed_from_organization: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  invite_declined: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  // Admin notification: a member submitted a property claim. Land directly
-  // on the queue so approve/deny is one click away.
-  property_claim_submitted: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}/property-claims`,
-    actionKey: 'viewPropertyClaims',
-  },
-  // Claimant notifications. Without propertyId in the payload we can't deep-
-  // link to the per-property claim view, so route to the org page where the
-  // user can navigate into "Properties" → their claim.
-  property_claim_approved: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  property_claim_denied: {
-    dataKey: 'organizationId',
-    url: (id) => `/organizations/${id}`,
-    actionKey: 'viewOrganization',
-  },
-  report_published: {
-    dataKey: 'reportId',
-    url: (id) => `/reports/${id}`,
-    actionKey: 'viewReport',
-  },
+export type NotificationActionSource = {
+  [Kind in NotificationType]: Pick<
+    Extract<NotificationContent, { type: Kind }>,
+    'type' | 'data'
+  >;
+}[NotificationType];
+export type NotificationActionKey =
+  | 'viewPendingRequests'
+  | 'viewOrganization'
+  | 'viewParentRequests'
+  | 'voteNow'
+  | 'viewResults'
+  | 'reviewPoll'
+  | 'editPoll'
+  | 'respondToInvite'
+  | 'viewBoard'
+  | 'viewPropertyClaims'
+  | 'viewReport';
+export type NotificationAction = {
+  href: string;
+  actionKey: NotificationActionKey;
 };
 
 export function getNotificationActionUrl(
-  type: string,
-  data: Record<string, unknown> | null
-): ActionResult {
-  const config = TYPE_CONFIG[type];
-
-  if (!config) {
-    return null;
-  }
-
-  if (!data) {
-    return null;
-  }
-
-  if ('urlFromData' in config) {
-    const href = config.urlFromData(data);
-
-    if (!href) {
+  source: NotificationActionSource
+): NotificationAction | null {
+  switch (source.type) {
+    case 'join_request_received':
+      return {
+        href: `/organizations/${source.data.organizationId}/pending-requests`,
+        actionKey: 'viewPendingRequests',
+      };
+    case 'join_parent_request_received':
+      return {
+        href: `/organizations/${source.data.parentOrgId}/parent-requests`,
+        actionKey: 'viewParentRequests',
+      };
+    case 'join_parent_request_rejected':
+      return {
+        href: `/organizations/${source.data.childOrgId}`,
+        actionKey: 'viewOrganization',
+      };
+    case 'org_joined_parent':
+      return {
+        href: `/organizations/${source.data.parentOrgId}`,
+        actionKey: 'viewOrganization',
+      };
+    case 'poll_activated':
+      return {
+        href: `/polls/${source.data.pollId}/vote`,
+        actionKey: 'voteNow',
+      };
+    case 'poll_finished':
+      return {
+        href: `/polls/${source.data.pollId}/results`,
+        actionKey: 'viewResults',
+      };
+    // An admin reviewing a submitted poll cannot edit it, so they get the
+    // read-only page; the author whose poll came back is going to change
+    // something, so they get the editor.
+    case 'poll_submitted':
+      return { href: `/polls/${source.data.pollId}`, actionKey: 'reviewPoll' };
+    case 'poll_returned_to_draft':
+      return {
+        href: `/polls/${source.data.pollId}/edit`,
+        actionKey: 'editPoll',
+      };
+    case 'admin_invite_received':
+    case 'board_member_invite_received':
+    case 'member_invite_received':
+      return { href: '/invitations', actionKey: 'respondToInvite' };
+    case 'admin_invite_accepted':
+      return {
+        href: `/organizations/${source.data.organizationId}/modify`,
+        actionKey: 'viewOrganization',
+      };
+    case 'board_member_invite_accepted':
+      return {
+        href: `/organizations/${source.data.organizationId}/boards/${source.data.boardId}/manage`,
+        actionKey: 'viewBoard',
+      };
+    // Admin notification: a member submitted a property claim. Land directly
+    // on the queue so approve/deny is one click away.
+    case 'property_claim_submitted':
+      return {
+        href: `/organizations/${source.data.organizationId}/property-claims`,
+        actionKey: 'viewPropertyClaims',
+      };
+    // Claimant notifications. Without propertyId in the payload we can't deep-
+    // link to the per-property claim view, so route to the org page where the
+    // user can navigate into "Properties" → their claim.
+    case 'property_claim_approved':
+    case 'property_claim_denied':
+    case 'join_request_accepted':
+    case 'join_request_rejected':
+    case 'org_archived':
+    case 'org_unarchived':
+    case 'org_name_changed':
+    case 'auto_join_failed':
+    case 'member_invite_accepted':
+    case 'invite_revoked':
+    case 'admin_removed':
+    case 'board_member_removed':
+    case 'member_removed_from_organization':
+    case 'invite_declined':
+      return {
+        href: `/organizations/${source.data.organizationId}`,
+        actionKey: 'viewOrganization',
+      };
+    case 'report_published':
+      return {
+        href: `/reports/${source.data.reportId}`,
+        actionKey: 'viewReport',
+      };
+    case 'member_left_board':
+    case 'member_left_organization':
+    case 'multi_membership_setting_changed':
       return null;
-    }
-
-    return { href, actionKey: config.actionKey };
   }
 
-  const id = data[config.dataKey];
+  const exhaustive: never = source;
 
-  if (typeof id !== 'string') {
-    return null;
-  }
-
-  return { href: config.url(id), actionKey: config.actionKey };
+  return exhaustive;
 }

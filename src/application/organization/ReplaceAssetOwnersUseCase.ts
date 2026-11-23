@@ -1,3 +1,17 @@
+/** Application boundary for authorized property changes. Raw request values are
+ * parsed before domain behavior; persistence receives validated domain values. */
+import {
+  ExternalOwnerLabel,
+  OwnershipShare,
+} from '../../domain/organization/PropertyValues';
+import { Clock, IdGenerator } from '../shared/EntityCreation';
+import { Instant } from '../../domain/shared/Instant';
+import {
+  AssetId,
+  OwnershipId,
+  UserId,
+  OrganizationId,
+} from '../../domain/shared/EntityIds';
 import {
   PropertyAssetRepository,
   OwnershipRowToInsert,
@@ -6,8 +20,11 @@ import { OrganizationPropertyRepository } from '../../domain/organization/Organi
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { PropertyAssetOwnership } from '../../domain/organization/PropertyAssetOwnership';
-import { Result, success, failure } from '../../domain/shared/Result';
-import { OrganizationErrors } from './OrganizationErrors';
+import { Result, failure } from '../../domain/shared/Result';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 import { OrganizationDomainCodes } from '../../domain/organization/OrganizationDomainCodes';
 
 export type OwnerInput =
@@ -23,6 +40,8 @@ export interface ReplaceAssetOwnersInput {
 const SUM_TOLERANCE = 1e-6;
 
 export interface ReplaceAssetOwnersDependencies {
+  ids: IdGenerator;
+  clock: Clock;
   assetRepository: PropertyAssetRepository;
   propertyRepository: OrganizationPropertyRepository;
   organizationRepository: OrganizationRepository;
@@ -32,8 +51,16 @@ export interface ReplaceAssetOwnersDependencies {
 export class ReplaceAssetOwnersUseCase {
   constructor(private deps: ReplaceAssetOwnersDependencies) {}
 
-  async execute(input: ReplaceAssetOwnersInput): Promise<Result<void, string>> {
-    const aRes = await this.deps.assetRepository.findAssetById(input.assetId);
+  async execute(
+    input: ReplaceAssetOwnersInput
+  ): Promise<Result<void, OrganizationUseCaseFailure>> {
+    const parsedId = AssetId.safeParse(input.assetId);
+
+    if (!parsedId.success) {
+      return failure(OrganizationDomainCodes.PROPERTY_ASSET_NOT_FOUND);
+    }
+
+    const aRes = await this.deps.assetRepository.findAssetById(parsedId.data);
 
     if (!aRes.success) {
       return failure(aRes.error);
@@ -50,7 +77,12 @@ export class ReplaceAssetOwnersUseCase {
       return failure(OrganizationDomainCodes.PROPERTY_NOT_FOUND);
     }
 
-    if (!(await this.authorize(input.adminUserId, pRes.value.organizationId))) {
+    const actor = UserId.safeParse(input.adminUserId);
+
+    if (
+      !actor.success ||
+      !(await this.authorize(actor.data, pRes.value.organizationId))
+    ) {
       return failure(OrganizationErrors.NOT_ADMIN);
     }
 
@@ -94,6 +126,7 @@ export class ReplaceAssetOwnersUseCase {
 
     // Validate each row with the entity; this catches share range + label emptiness.
     const inserts: OwnershipRowToInsert[] = [];
+    const at = this.deps.clock.now();
 
     for (const o of input.owners) {
       // Zero-share owner rows are never useful: they contribute nothing to
@@ -108,14 +141,25 @@ export class ReplaceAssetOwnersUseCase {
       if (o.kind === 'user') {
         // Catch missing userId at the use-case boundary instead of letting it
         // reach the DB FK and surface as a raw Prisma error.
-        if (!o.userId || o.userId.trim() === '') {
+        const userId = UserId.safeParse(o.userId);
+
+        if (!userId.success) {
           return failure(OrganizationDomainCodes.OWNERSHIP_USER_ID_REQUIRED);
         }
 
+        const share = OwnershipShare.safeParse(o.share);
+
+        if (!share.success) {
+          return failure(
+            OrganizationDomainCodes.PROPERTY_ASSET_OWNERSHIP_SHARE_OUT_OF_RANGE
+          );
+        }
+
         const r = PropertyAssetOwnership.createForUser(
-          input.assetId,
-          o.userId,
-          o.share
+          parsedId.data,
+          userId.data,
+          share.data,
+          { id: this.deps.ids.generate(OwnershipId), now: at }
         );
 
         if (!r.success) {
@@ -123,15 +167,31 @@ export class ReplaceAssetOwnersUseCase {
         }
 
         inserts.push({
-          userId: o.userId,
-          externalOwnerLabel: null,
-          share: o.share,
+          id: r.value.id,
+          owner: r.value.owner,
+          share: r.value.share,
+          createdAt: Instant.fromDate(r.value.createdAt),
         });
       } else {
+        const label = ExternalOwnerLabel.safeParse(o.label);
+
+        if (!label.success) {
+          return failure(OrganizationDomainCodes.EXTERNAL_OWNER_LABEL_EMPTY);
+        }
+
+        const share = OwnershipShare.safeParse(o.share);
+
+        if (!share.success) {
+          return failure(
+            OrganizationDomainCodes.PROPERTY_ASSET_OWNERSHIP_SHARE_OUT_OF_RANGE
+          );
+        }
+
         const r = PropertyAssetOwnership.createForExternalOwner(
-          input.assetId,
-          o.label,
-          o.share
+          parsedId.data,
+          label.data,
+          share.data,
+          { id: this.deps.ids.generate(OwnershipId), now: at }
         );
 
         if (!r.success) {
@@ -139,9 +199,10 @@ export class ReplaceAssetOwnersUseCase {
         }
 
         inserts.push({
-          userId: null,
-          externalOwnerLabel: r.value.externalOwnerLabel,
-          share: o.share,
+          id: r.value.id,
+          owner: r.value.owner,
+          share: r.value.share,
+          createdAt: Instant.fromDate(r.value.createdAt),
         });
       }
     }
@@ -156,13 +217,16 @@ export class ReplaceAssetOwnersUseCase {
     }
 
     return this.deps.assetRepository.replaceOwners({
-      assetId: input.assetId,
-      at: new Date(),
+      assetId: parsedId.data,
+      at,
       inserts,
     });
   }
 
-  private async authorize(userId: string, orgId: string): Promise<boolean> {
+  private async authorize(
+    userId: UserId,
+    orgId: OrganizationId
+  ): Promise<boolean> {
     if (await this.deps.userRepository.isSuperAdmin(userId)) {
       return true;
     }

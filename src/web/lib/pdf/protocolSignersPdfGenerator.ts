@@ -1,3 +1,5 @@
+/** Builds the admin signing protocol from consent-filtered entries and the record footer. */
+import { protocolPageFooter } from './sealFooter';
 import type { TDocumentDefinitions, Content } from 'pdfmake/interfaces';
 import { User } from '@/domain/user/User';
 
@@ -94,7 +96,8 @@ function buildSignersTable(
 
 export function buildProtocolSignersPdfDefinition(
   data: ProtocolSignersPdfData,
-  t: ProtocolSignersPdfTranslations
+  t: ProtocolSignersPdfTranslations,
+  evidence?: Content
 ): TDocumentDefinitions {
   const content: Content[] = [];
 
@@ -159,32 +162,6 @@ export function buildProtocolSignersPdfDefinition(
         fontSize: 9,
       },
     },
-    footer: (currentPage: number, pageCount: number) => {
-      const pageText = t.pageOf
-        .replace('{current}', String(currentPage))
-        .replace('{total}', String(pageCount));
-
-      const dateText = t.generatedOn.replace(
-        '{date}',
-        new Date().toISOString().split('T')[0]
-      );
-
-      return {
-        columns: [
-          {
-            text: pageText,
-            alignment: 'left' as const,
-            margin: [40, 0, 0, 0] as [number, number, number, number],
-          },
-          {
-            text: dateText,
-            alignment: 'right' as const,
-            margin: [0, 0, 40, 0] as [number, number, number, number],
-          },
-        ],
-        fontSize: 8,
-        color: '#888888',
-      };
-    },
+    ...protocolPageFooter(t, evidence),
   };
 }

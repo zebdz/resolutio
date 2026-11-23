@@ -1,3 +1,7 @@
+import {
+  expectSuccess,
+  expectFailure,
+} from '@/domain/shared/__tests__/resultAssertions';
 import { describe, it, expect } from 'vitest';
 import { PollType, parsePollType } from '../PollType';
 import { PollDomainCodes } from '../PollDomainCodes';
@@ -13,21 +17,21 @@ describe('PollType', () => {
       const result = parsePollType(v);
 
       expect(result.success).toBe(true);
-      expect(result.value).toBe(v);
+      expect(expectSuccess(result)).toBe(v);
     });
 
     it('rejects unknown values', () => {
       const result = parsePollType('PUBLIC');
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.POLL_TYPE_INVALID);
+      expect(expectFailure(result)).toBe(PollDomainCodes.POLL_TYPE_INVALID);
     });
 
     it('rejects empty string', () => {
       const result = parsePollType('');
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(PollDomainCodes.POLL_TYPE_INVALID);
+      expect(expectFailure(result)).toBe(PollDomainCodes.POLL_TYPE_INVALID);
     });
   });
 });

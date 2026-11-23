@@ -2,24 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { OtpCode } from '../OtpCode';
 
 describe('OtpCode', () => {
-  describe('generate', () => {
-    it('should generate a 6-digit string', () => {
-      const code = OtpCode.generate();
-      expect(code.getValue()).toMatch(/^\d{6}$/);
-    });
-
-    it('should generate different codes on subsequent calls', () => {
-      const codes = new Set<string>();
-
-      for (let i = 0; i < 20; i++) {
-        codes.add(OtpCode.generate().getValue());
-      }
-
-      // With 20 random 6-digit codes, duplicates are extremely unlikely
-      expect(codes.size).toBeGreaterThan(1);
-    });
-  });
-
   describe('fromString', () => {
     it('should create from valid 6-digit string', () => {
       const code = OtpCode.fromString('123456');

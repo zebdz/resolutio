@@ -1,5 +1,47 @@
 'use server';
 
+/** Organization server actions enforce authorization, validate request values,
+ * compose application ports, and serialize permitted fields for browser clients. */
+import { PrismaMembershipStore } from '@/infrastructure/repositories/PrismaMembershipStore';
+import { PrismaOrganizationDirectory } from '@/infrastructure/repositories/PrismaOrganizationDirectory';
+import {
+  serializeDirectoryAdmin,
+  serializeOrganizationSummary,
+  serializeDirectoryUserSearch,
+  serializeUserOrganizations,
+  serializeOrganizationPendingRequest,
+  serializeAdminPendingRequest,
+  serializeOrganizationDetails,
+  type OrganizationDetailsView,
+  type RootMembershipSettingView,
+} from '@/web/actions/organization/serializeDirectory';
+import {
+  OrganizationId,
+  NotificationId,
+  UserId,
+} from '@/domain/shared/EntityIds';
+import { OrganizationName } from '@/domain/organization/OrganizationValues';
+import type {
+  CreatedOrganizationView,
+  OrganizationListView,
+  OrganizationSearchView,
+  AllOrganizationsView,
+  AdminOrganizationsView,
+  UserOrganizationsView,
+  AdminPendingRequestsView,
+  OrganizationPendingRequestsView,
+  OrganizationReferenceView,
+  OrganizationPropertyView,
+  OrganizationPropertiesTreeView,
+  UserSearchView,
+} from './DirectoryViews';
+import { entityCreation } from '@/application/shared/EntityCreation';
+import { PageNumber, PageSize } from '@/domain/shared/Pagination';
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
+
 import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { CreateOrganizationUseCase } from '@/application/organization/CreateOrganizationUseCase';
@@ -59,9 +101,13 @@ const invitationRepository = new PrismaInvitationRepository(prisma);
 const propertyRepository = new PrismaOrganizationPropertyRepository(prisma);
 const propertyAssetRepository = new PrismaPropertyAssetRepository(prisma);
 const profanityChecker = LeoProfanityChecker.getInstance();
+const ids = new CryptoIdGenerator();
+const clock = new SystemClock();
 
 // Use cases
 const createOrganizationUseCase = new CreateOrganizationUseCase({
+  ids,
+  clock,
   organizationRepository,
   userRepository,
   profanityChecker,
@@ -76,59 +122,70 @@ const getAdminOrganizationsUseCase = new GetAdminOrganizationsUseCase({
 });
 
 const getUserOrganizationsUseCase = new GetUserOrganizationsUseCase({
-  prisma,
+  directory: new PrismaOrganizationDirectory(prisma),
 });
 
 const getPendingRequestsUseCase = new GetPendingRequestsUseCase({
-  prisma,
+  directory: new PrismaOrganizationDirectory(prisma),
 });
 
 const handleJoinRequestUseCase = new HandleJoinRequestUseCase({
-  prisma,
+  ids: ids,
+  clock,
+  memberships: new PrismaMembershipStore(prisma),
   organizationRepository,
   notificationRepository,
   userRepository,
 });
 
 const joinOrganizationUseCase = new JoinOrganizationUseCase({
+  ids: ids,
+  clock: clock,
   organizationRepository,
   invitationRepository,
   notificationRepository,
   userRepository,
-  prisma,
+  memberships: new PrismaMembershipStore(prisma),
 });
 
 const getOrganizationDetailsUseCase = new GetOrganizationDetailsUseCase({
   organizationRepository,
   boardRepository,
   userRepository,
-  prisma,
+  directory: new PrismaOrganizationDirectory(prisma),
 });
 
 const cancelJoinRequestUseCase = new CancelJoinRequestUseCase({
-  prisma,
+  memberships: new PrismaMembershipStore(prisma),
   organizationRepository,
 });
 
 const getOrganizationPendingRequestsUseCase =
   new GetOrganizationPendingRequestsUseCase({
-    prisma,
+    directory: new PrismaOrganizationDirectory(prisma),
+    organizationRepository,
     userRepository,
   });
 
 const archiveOrganizationUseCase = new ArchiveOrganizationUseCase({
+  ids: ids,
+  clock,
   organizationRepository,
   notificationRepository,
   userRepository,
 });
 
 const unarchiveOrganizationUseCase = new UnarchiveOrganizationUseCase({
+  ids: ids,
+  clock: clock,
   organizationRepository,
   notificationRepository,
   userRepository,
 });
 
 const updateOrganizationUseCase = new UpdateOrganizationUseCase({
+  ids: ids,
+  clock: clock,
   organizationRepository,
   userRepository,
   notificationRepository,
@@ -136,12 +193,16 @@ const updateOrganizationUseCase = new UpdateOrganizationUseCase({
 });
 
 const removeOrgAdminUseCase = new RemoveOrgAdminUseCase({
+  ids: ids,
+  clock: clock,
   organizationRepository,
   userRepository,
   notificationRepository,
 });
 
 const removeOrgMemberUseCase = new RemoveOrgMemberUseCase({
+  ids: ids,
+  clock: clock,
   organizationRepository,
   boardRepository,
   userRepository,
@@ -153,6 +214,8 @@ const searchOrganizationsUseCase = new SearchOrganizationsUseCase({
 });
 
 const leaveOrganizationUseCase = new LeaveOrganizationUseCase({
+  ids: ids,
+  clock: clock,
   boardRepository,
   organizationRepository,
   userRepository,
@@ -161,7 +224,7 @@ const leaveOrganizationUseCase = new LeaveOrganizationUseCase({
 
 export async function createOrganizationAction(
   formData: FormData
-): Promise<ActionResult<{ organizationId: string; autoJoinFailed?: boolean }>> {
+): Promise<ActionResult<CreatedOrganizationView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -253,13 +316,19 @@ export async function createOrganizationAction(
         console.error('Auto-join failed after org creation:', autoJoinError);
 
         // Notify user to join manually
-        const notification = Notification.create({
-          userId: user.id,
-          type: 'auto_join_failed',
-          title: 'notification.types.autoJoinFailed.title',
-          body: 'notification.types.autoJoinFailed.body',
-          data: { organizationId: orgId, organizationName: input.name },
-        });
+        const notification = Notification.create(
+          {
+            userId: user.id,
+            type: 'auto_join_failed',
+            title: 'notification.types.autoJoinFailed.title',
+            body: 'notification.types.autoJoinFailed.body',
+            data: {
+              organizationId: OrganizationId.parse(orgId),
+              organizationName: input.name,
+            },
+          },
+          entityCreation(NotificationId, ids, clock)
+        );
 
         if (notification.success) {
           await notificationRepository
@@ -324,21 +393,7 @@ export async function createOrganizationAndRedirect(
 }
 
 export async function listOrganizationsAction(): Promise<
-  ActionResult<{
-    organizations: Array<{
-      id: string;
-      name: string;
-      description: string;
-      memberCount: number;
-      firstAdmin: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        middleName: string | null;
-      } | null;
-      parentOrg: { id: string; name: string } | null;
-    }>;
-  }>
+  ActionResult<OrganizationListView>
 > {
   const rateLimited = await checkRateLimit();
 
@@ -361,14 +416,9 @@ export async function listOrganizationsAction(): Promise<
     return {
       success: true,
       data: {
-        organizations: result.value.organizations.map((item) => ({
-          id: item.organization.id,
-          name: item.organization.name,
-          description: item.organization.description,
-          memberCount: item.memberCount,
-          firstAdmin: item.firstAdmin,
-          parentOrg: item.parentOrg,
-        })),
+        organizations: result.value.organizations.map(
+          serializeOrganizationSummary
+        ),
       },
     };
   } catch (error) {
@@ -389,24 +439,7 @@ export interface SearchOrganizationsInput {
 
 export async function searchOrganizationsNotAlreadyMemberOfAction(
   input: SearchOrganizationsInput
-): Promise<
-  ActionResult<{
-    organizations: Array<{
-      id: string;
-      name: string;
-      description: string;
-      memberCount: number;
-      firstAdmin: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        middleName: string | null;
-      } | null;
-      parentOrg: { id: string; name: string } | null;
-    }>;
-    totalCount: number;
-  }>
-> {
+): Promise<ActionResult<OrganizationSearchView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -427,14 +460,9 @@ export async function searchOrganizationsNotAlreadyMemberOfAction(
     return {
       success: true,
       data: {
-        organizations: result.value.organizations.map((item) => ({
-          id: item.organization.id,
-          name: item.organization.name,
-          description: item.organization.description,
-          memberCount: item.memberCount,
-          firstAdmin: item.firstAdmin,
-          parentOrg: item.parentOrg,
-        })),
+        organizations: result.value.organizations.map(
+          serializeOrganizationSummary
+        ),
         totalCount: result.value.totalCount,
       },
     };
@@ -529,15 +557,7 @@ export async function joinOrganizationAction(
 }
 
 export async function getAdminOrganizationsAction(): Promise<
-  ActionResult<{
-    organizations: Array<{
-      id: string;
-      name: string;
-      description: string;
-      archivedAt: Date | null;
-      parentOrg: { id: string; name: string } | null;
-    }>;
-  }>
+  ActionResult<AdminOrganizationsView>
 > {
   const rateLimited = await checkRateLimit();
 
@@ -570,7 +590,7 @@ export async function getAdminOrganizationsAction(): Promise<
     // Fetch parent info for each org
     const organizations = await Promise.all(
       result.value.organizations.map(async (org) => {
-        let parentOrg: { id: string; name: string } | null = null;
+        let parentOrg: OrganizationReferenceView | null = null;
 
         if (org.parentId) {
           const parent = await organizationRepository.findById(org.parentId);
@@ -605,38 +625,7 @@ export async function getAdminOrganizationsAction(): Promise<
 }
 
 export async function getUserOrganizationsAction(): Promise<
-  ActionResult<{
-    member: Array<{
-      id: string;
-      name: string;
-      description: string;
-      joinedAt: Date;
-      archivedAt: Date | null;
-      parentOrg: { id: string; name: string } | null;
-      hasProperties: boolean;
-    }>;
-    pending: Array<{
-      id: string;
-      name: string;
-      description: string;
-      requestedAt: Date;
-      parentOrg: { id: string; name: string } | null;
-    }>;
-    rejected: Array<{
-      id: string;
-      name: string;
-      description: string;
-      rejectedAt: Date;
-      rejectionReason: string | null;
-      rejectedBy: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        middleName: string | null;
-      };
-      parentOrg: { id: string; name: string } | null;
-    }>;
-  }>
+  ActionResult<UserOrganizationsView>
 > {
   const rateLimited = await checkRateLimit();
 
@@ -673,37 +662,11 @@ export async function getUserOrganizationsAction(): Promise<
       await propertyRepository.hasAnyNonArchived(memberOrgIds);
     const hasPropertiesMap = hasPropertiesResult.success
       ? hasPropertiesResult.value
-      : new Map<string, boolean>();
+      : new Map<OrganizationId, boolean>();
 
     return {
       success: true,
-      data: {
-        member: result.value.member.map((item) => ({
-          id: item.organization.id,
-          name: item.organization.name,
-          description: item.organization.description,
-          joinedAt: item.joinedAt,
-          archivedAt: item.organization.archivedAt,
-          parentOrg: item.parentOrg,
-          hasProperties: hasPropertiesMap.get(item.organization.id) ?? false,
-        })),
-        pending: result.value.pending.map((item) => ({
-          id: item.organization.id,
-          name: item.organization.name,
-          description: item.organization.description,
-          requestedAt: item.requestedAt,
-          parentOrg: item.parentOrg,
-        })),
-        rejected: result.value.rejected.map((item) => ({
-          id: item.organization.id,
-          name: item.organization.name,
-          description: item.organization.description,
-          rejectedAt: item.rejectedAt,
-          rejectionReason: item.rejectionReason,
-          rejectedBy: item.rejectedBy,
-          parentOrg: item.parentOrg,
-        })),
-      },
+      data: serializeUserOrganizations(result.value, hasPropertiesMap),
     };
   } catch (error) {
     console.error('Error getting user organizations:', error);
@@ -718,22 +681,7 @@ export async function getUserOrganizationsAction(): Promise<
 export async function getPendingRequestsAction(
   page?: number,
   pageSize?: number
-): Promise<
-  ActionResult<{
-    requests: Array<{
-      organizationId: string;
-      organizationName: string;
-      requester: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        middleName: string | null;
-      };
-      requestedAt: Date;
-    }>;
-    totalCount: number;
-  }>
-> {
+): Promise<ActionResult<AdminPendingRequestsView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -766,7 +714,7 @@ export async function getPendingRequestsAction(
     return {
       success: true,
       data: {
-        requests: result.value.requests,
+        requests: result.value.requests.map(serializeAdminPendingRequest),
         totalCount: result.value.totalCount,
       },
     };
@@ -850,49 +798,7 @@ export async function handleJoinRequestAction(
 
 export async function getOrganizationDetailsAction(
   organizationId: string
-): Promise<
-  ActionResult<{
-    organization: {
-      id: string;
-      name: string;
-      description: string;
-      parentId: string | null;
-      allowMultiTreeMembership: boolean | null;
-      createdAt: Date;
-    };
-    boards: Array<{
-      id: string;
-      name: string;
-      memberCount: number;
-      members: Array<{
-        id: string;
-        firstName: string;
-        lastName: string;
-        middleName: string | null;
-      }>;
-      isUserMember: boolean;
-    }>;
-    isUserMember: boolean;
-    isUserAdmin: boolean;
-    firstAdmin: {
-      id: string;
-      firstName: string;
-      lastName: string;
-      middleName: string | null;
-    } | null;
-    ancestors: Array<{ id: string; name: string; memberCount: number }>;
-    hierarchyTree: {
-      id: string;
-      name: string;
-      memberCount: number;
-      children: any[];
-    };
-    rootOrgMultiMembershipSetting: {
-      allowed: boolean;
-      rootOrgName: string;
-    } | null;
-  }>
-> {
+): Promise<ActionResult<OrganizationDetailsView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -919,22 +825,14 @@ export async function getOrganizationDetailsAction(
     const org = result.value.organization;
 
     // For child orgs, fetch root's multi-membership setting
-    let rootOrgMultiMembershipSetting: {
-      allowed: boolean;
-      rootOrgName: string;
-    } | null = null;
+    let rootOrgMultiMembershipSetting: RootMembershipSettingView = null;
 
     if (org.parentId) {
       const allowed =
-        await organizationRepository.getRootAllowMultiTreeMembership(
-          organizationId
-        );
-      const ancestorIds =
-        await organizationRepository.getAncestorIds(organizationId);
+        await organizationRepository.getRootAllowMultiTreeMembership(org.id);
+      const ancestorIds = await organizationRepository.getAncestorIds(org.id);
       const rootId =
-        ancestorIds.length > 0
-          ? ancestorIds[ancestorIds.length - 1]
-          : organizationId;
+        ancestorIds.length > 0 ? ancestorIds[ancestorIds.length - 1] : org.id;
       const rootOrg = await organizationRepository.findById(rootId);
 
       rootOrgMultiMembershipSetting = {
@@ -945,29 +843,10 @@ export async function getOrganizationDetailsAction(
 
     return {
       success: true,
-      data: {
-        organization: {
-          id: org.id,
-          name: org.name,
-          description: org.description,
-          parentId: org.parentId,
-          allowMultiTreeMembership: org.allowMultiTreeMembership,
-          createdAt: org.createdAt,
-        },
-        boards: result.value.boards.map((b) => ({
-          id: b.board.id,
-          name: b.board.name,
-          memberCount: b.memberCount,
-          members: b.members,
-          isUserMember: b.isUserMember,
-        })),
-        isUserMember: result.value.isUserMember,
-        isUserAdmin: result.value.isUserAdmin,
-        firstAdmin: result.value.firstAdmin,
-        ancestors: result.value.ancestors,
-        hierarchyTree: result.value.hierarchyTree,
-        rootOrgMultiMembershipSetting,
-      },
+      data: serializeOrganizationDetails(
+        result.value,
+        rootOrgMultiMembershipSetting
+      ),
     };
   } catch (error) {
     console.error('Error getting organization details:', error);
@@ -983,18 +862,7 @@ export async function getOrganizationPendingRequestsAction(
   organizationId: string,
   page?: number,
   pageSize?: number
-): Promise<
-  ActionResult<{
-    requests: Array<{
-      userId: string;
-      firstName: string;
-      lastName: string;
-      middleName?: string;
-      requestedAt: Date;
-    }>;
-    totalCount: number;
-  }>
-> {
+): Promise<ActionResult<OrganizationPendingRequestsView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -1030,7 +898,9 @@ export async function getOrganizationPendingRequestsAction(
     return {
       success: true,
       data: {
-        requests: result.value.requests,
+        requests: result.value.requests.map(
+          serializeOrganizationPendingRequest
+        ),
         totalCount: result.value.totalCount,
       },
     };
@@ -1101,7 +971,7 @@ export async function cancelJoinRequestAction(
 }
 
 export async function getUserMemberOrganizationsAction(): Promise<
-  ActionResult<Array<{ id: string; name: string }>>
+  ActionResult<OrganizationReferenceView[]>
 > {
   const rateLimited = await checkRateLimit();
 
@@ -1124,8 +994,8 @@ export async function getUserMemberOrganizationsAction(): Promise<
     );
 
     // For each, get ancestor orgs
-    const allOrgIds = new Set<string>();
-    const orgMap = new Map<string, string>();
+    const allOrgIds = new Set<OrganizationId>();
+    const orgMap = new Map<OrganizationId, OrganizationName>();
 
     for (const org of memberships) {
       if (org.isArchived()) {
@@ -1248,25 +1118,7 @@ export async function unarchiveOrganizationAction(
 
 export async function searchAllOrganizationsAction(
   input: SearchOrganizationsInput
-): Promise<
-  ActionResult<{
-    organizations: Array<{
-      id: string;
-      name: string;
-      description: string;
-      memberCount: number;
-      firstAdmin: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        middleName: string | null;
-      } | null;
-      parentOrg: { id: string; name: string } | null;
-      archivedAt: Date | null;
-    }>;
-    totalCount: number;
-  }>
-> {
+): Promise<ActionResult<AllOrganizationsView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -1290,6 +1142,8 @@ export async function searchAllOrganizationsAction(
 
     const result = await organizationRepository.searchOrganizationsWithStats({
       ...input,
+      page: PageNumber.optional().parse(input.page),
+      pageSize: PageSize.optional().parse(input.pageSize),
       includeArchived: true,
     });
 
@@ -1297,12 +1151,7 @@ export async function searchAllOrganizationsAction(
       success: true,
       data: {
         organizations: result.organizations.map((item) => ({
-          id: item.organization.id,
-          name: item.organization.name,
-          description: item.organization.description,
-          memberCount: item.memberCount,
-          firstAdmin: item.firstAdmin,
-          parentOrg: item.parentOrg,
+          ...serializeOrganizationSummary(item),
           archivedAt: item.organization.archivedAt,
         })),
         totalCount: result.totalCount,
@@ -1504,7 +1353,7 @@ export async function getOrgAdminsPaginatedAction(
     }
 
     const useCase = new GetOrgAdminsPaginatedUseCase({
-      prisma,
+      directory: new PrismaOrganizationDirectory(prisma),
       organizationRepository,
       userRepository,
     });
@@ -1521,7 +1370,13 @@ export async function getOrgAdminsPaginatedAction(
       return { success: false as const, error: t('unexpected') };
     }
 
-    return { success: true as const, data: result.value };
+    return {
+      success: true as const,
+      data: {
+        admins: result.value.admins.map(serializeDirectoryAdmin),
+        totalCount: result.value.totalCount,
+      },
+    };
   } catch (error) {
     console.error('Error fetching org admins paginated:', error);
 
@@ -1532,7 +1387,7 @@ export async function getOrgAdminsPaginatedAction(
 export async function searchOrganizationsForJoinParentAction(
   query: string,
   excludeIds: string[]
-): Promise<ActionResult<Array<{ id: string; name: string }>>> {
+): Promise<ActionResult<OrganizationReferenceView[]>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -1566,23 +1421,14 @@ export async function searchOrganizationsForJoinParentAction(
   }
 }
 
-type UserSearchResult = Array<{
-  id: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  nickname: string;
-  address?: { city: string; street: string };
-}>;
-
 async function searchOrgUsers(
-  organizationId: string,
+  rawOrganizationId: string,
   query: string,
   opts: {
     scope: 'members' | 'non-members';
     excludeAdmins?: boolean;
   }
-): Promise<ActionResult<UserSearchResult>> {
+): Promise<ActionResult<UserSearchView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -1592,6 +1438,14 @@ async function searchOrgUsers(
   const t = await getTranslations('common.errors');
 
   try {
+    const parsedId = OrganizationId.safeParse(rawOrganizationId);
+
+    if (!parsedId.success) {
+      return { success: false, error: t('validationFailed') };
+    }
+
+    const organizationId = parsedId.data;
+
     const user = await getCurrentUser();
 
     if (!user) {
@@ -1620,7 +1474,7 @@ async function searchOrgUsers(
     });
 
     // Optionally exclude existing admins (used when inviting new admins)
-    let adminIdSet = new Set<string>();
+    let adminIdSet = new Set<UserId>();
 
     if (opts.excludeAdmins) {
       const adminIds =
@@ -1636,7 +1490,7 @@ async function searchOrgUsers(
       },
       select: { userId: true },
     });
-    const memberIdSet = new Set(orgMembers.map((m) => m.userId));
+    const memberIdSet = new Set(orgMembers.map((m) => UserId.parse(m.userId)));
 
     const filteredUsers = users
       .filter((u) => !adminIdSet.has(u.id))
@@ -1647,17 +1501,7 @@ async function searchOrgUsers(
 
         return !memberIdSet.has(u.id);
       })
-      .map((u) => ({
-        id: u.id,
-        firstName: u.firstName,
-        lastName: u.lastName,
-        middleName: u.middleName,
-        nickname: u.nickname.getValue(),
-        address:
-          u.allowFindByAddress && u.address
-            ? { city: u.address.city, street: u.address.street }
-            : undefined,
-      }));
+      .map(serializeDirectoryUserSearch);
 
     return { success: true, data: filteredUsers };
   } catch (error) {
@@ -1670,7 +1514,7 @@ async function searchOrgUsers(
 export async function searchUsersForMemberInviteAction(
   organizationId: string,
   query: string
-): Promise<ActionResult<UserSearchResult>> {
+): Promise<ActionResult<UserSearchView>> {
   return searchOrgUsers(organizationId, query, { scope: 'non-members' });
 }
 
@@ -1678,7 +1522,7 @@ export async function searchUsersForAdminInviteAction(
   organizationId: string,
   query: string,
   scope: 'members' | 'non-members'
-): Promise<ActionResult<UserSearchResult>> {
+): Promise<ActionResult<UserSearchView>> {
   return searchOrgUsers(organizationId, query, {
     scope,
     excludeAdmins: true,
@@ -1686,7 +1530,7 @@ export async function searchUsersForAdminInviteAction(
 }
 
 export async function getRootMultiMembershipInfoAction(
-  orgId: string
+  rawOrgId: string
 ): Promise<ActionResult<{ allowed: boolean; rootOrgName: string }>> {
   const rateLimited = await checkRateLimit();
 
@@ -1697,6 +1541,14 @@ export async function getRootMultiMembershipInfoAction(
   const t = await getTranslations('common.errors');
 
   try {
+    const parsedId = OrganizationId.safeParse(rawOrgId);
+
+    if (!parsedId.success) {
+      return { success: false, error: t('validationFailed') };
+    }
+
+    const orgId = parsedId.data;
+
     const user = await getCurrentUser();
 
     if (!user) {
@@ -1732,7 +1584,7 @@ export async function getRootMultiMembershipInfoAction(
  */
 export async function searchOrganizationsForFilterAction(input: {
   query: string;
-}): Promise<ActionResult<Array<{ id: string; name: string }>>> {
+}): Promise<ActionResult<OrganizationReferenceView[]>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -1774,7 +1626,13 @@ export async function searchOrganizationsForFilterAction(input: {
       take: 20,
     });
 
-    return { success: true, data: orgs };
+    return {
+      success: true,
+      data: orgs.map((org) => ({
+        id: OrganizationId.parse(org.id),
+        name: OrganizationName.parse(org.name),
+      })),
+    };
   } catch (error) {
     console.error('Error searching organizations for filter:', error);
 
@@ -1830,8 +1688,8 @@ export async function leaveOrganizationAction(
 }
 
 export async function getOrgPropertiesAction(
-  organizationId: string
-): Promise<ActionResult<Array<{ id: string; name: string }>>> {
+  rawOrganizationId: string
+): Promise<ActionResult<OrganizationPropertyView[]>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -1841,6 +1699,14 @@ export async function getOrgPropertiesAction(
   const t = await getTranslations('common.errors');
 
   try {
+    const parsedId = OrganizationId.safeParse(rawOrganizationId);
+
+    if (!parsedId.success) {
+      return { success: false, error: t('validationFailed') };
+    }
+
+    const organizationId = parsedId.data;
+
     const user = await getCurrentUser();
 
     if (!user) {
@@ -1885,17 +1751,8 @@ export async function getOrgPropertiesAction(
 // owned by a child org). Only admins of the root org (+superadmin) can see
 // descendant-org properties.
 export async function getOrgPropertiesTreeAction(
-  organizationId: string
-): Promise<
-  ActionResult<{
-    direct: Array<{ id: string; name: string }>;
-    descendantGroups: Array<{
-      orgId: string;
-      orgName: string;
-      properties: Array<{ id: string; name: string }>;
-    }>;
-  }>
-> {
+  rawOrganizationId: string
+): Promise<ActionResult<OrganizationPropertiesTreeView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -1905,6 +1762,14 @@ export async function getOrgPropertiesTreeAction(
   const t = await getTranslations('common.errors');
 
   try {
+    const parsedId = OrganizationId.safeParse(rawOrganizationId);
+
+    if (!parsedId.success) {
+      return { success: false, error: t('validationFailed') };
+    }
+
+    const organizationId = parsedId.data;
+
     const user = await getCurrentUser();
 
     if (!user) {
@@ -1948,7 +1813,7 @@ export async function getOrgPropertiesTreeAction(
 }
 
 export async function getOrgOwnershipStatusAction(
-  organizationId: string
+  rawOrganizationId: string
 ): Promise<
   ActionResult<{ orgHasOwnershipData: boolean; userHasOwnership: boolean }>
 > {
@@ -1961,6 +1826,14 @@ export async function getOrgOwnershipStatusAction(
   const t = await getTranslations('common.errors');
 
   try {
+    const parsedId = OrganizationId.safeParse(rawOrganizationId);
+
+    if (!parsedId.success) {
+      return { success: false, error: t('validationFailed') };
+    }
+
+    const organizationId = parsedId.data;
+
     const user = await getCurrentUser();
 
     if (!user) {

@@ -1,3 +1,18 @@
+/** Verifies Register User behavior through typed core ports.
+ * User persistence doubles exclude obsolete moderation methods; access uses the checked moderation port. */
+import { PasswordHash } from '@/domain/user/UserValues';
+import {
+  OtpCount,
+  OtpDestination,
+  OtpDigits,
+  OtpCodeHash,
+} from '@/domain/otp/OtpValues';
+import { authTestDependencies } from '@/application/auth/__tests__/authTestValues';
+/** Registration clients provide deterministic identity, time and nickname ports. */
+import { UserId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
+import { Clock, IdGenerator } from '@/application/shared/EntityCreation';
+import { NicknameGenerator } from '../NicknameGenerator';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { RegisterUserUseCase } from '../RegisterUserUseCase';
 import { SESSION_TTL_MS } from '../LoginUserUseCase';
@@ -8,6 +23,7 @@ import { UserRepository } from '@/domain/user/UserRepository';
 import { User } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
 import { Nickname } from '@/domain/user/Nickname';
+import { Address } from '@/domain/user/Address';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
 import {
   OtpVerification,
@@ -22,10 +38,26 @@ import { OtpCodeHasher } from '../OtpCodeHasher';
 import { OtpDeliveryChannel, OtpDeliveryResult } from '../OtpDeliveryChannel';
 import { UserDomainCodes } from '@/domain/user/UserDomainCodes';
 
+const registrationNow = Instant.parse('2026-10-26T10:30:00.123Z');
+
+function creationDependencies() {
+  let nextId = 1;
+  let nextNickname = 1;
+  const ids: IdGenerator = {
+    generate: (identity) => identity.parse(`user-${nextId++}`),
+  };
+  const clock: Clock = { now: () => registrationNow };
+  const nicknameGenerator: NicknameGenerator = {
+    generate: () =>
+      Nickname.create(`user_${(nextNickname++).toString(16).padStart(8, '0')}`),
+  };
+
+  return { ids, clock, nicknameGenerator };
+}
+
 // Mock UserRepository
 class MockUserRepository implements UserRepository {
-  private users: Map<string, User> = new Map();
-  private nextId = 1;
+  private users: Map<UserId, User> = new Map();
   nicknameAvailableResponses: boolean[] = [];
   isNicknameAvailableCalls: string[] = [];
 
@@ -33,7 +65,7 @@ class MockUserRepository implements UserRepository {
     this.users.set(user.id, user);
   }
 
-  async findById(id: string): Promise<User | null> {
+  async findById(id: UserId): Promise<User | null> {
     return this.users.get(id) || null;
   }
 
@@ -58,11 +90,6 @@ class MockUserRepository implements UserRepository {
   }
 
   async save(user: User): Promise<User> {
-    if (!user.id) {
-      const id = `user-${this.nextId++}`;
-      (user as any).props.id = id;
-    }
-
     this.users.set(user.id, user);
 
     return user;
@@ -92,8 +119,8 @@ class MockUserRepository implements UserRepository {
     return null;
   }
 
-  async isNicknameAvailable(nickname: string): Promise<boolean> {
-    this.isNicknameAvailableCalls.push(nickname);
+  async isNicknameAvailable(nickname: Nickname): Promise<boolean> {
+    this.isNicknameAvailableCalls.push(nickname.getValue());
 
     if (this.nicknameAvailableResponses.length > 0) {
       return this.nicknameAvailableResponses.shift()!;
@@ -103,18 +130,8 @@ class MockUserRepository implements UserRepository {
   }
 
   async updatePrivacySettings(): Promise<void> {}
-  async isUserBlocked(): Promise<boolean> {
-    return false;
-  }
-  async blockUser(): Promise<void> {}
-  async unblockUser(): Promise<void> {}
-  async getBlockStatus(): Promise<null> {
-    return null;
-  }
+
   async deleteAddress(): Promise<void> {}
-  async getBlockedUserIds(): Promise<string[]> {
-    return [];
-  }
 }
 
 // Mock OtpRepository
@@ -127,8 +144,7 @@ class MockOtpRepository implements OtpRepository {
   }
 
   async save(otp: OtpVerification): Promise<OtpVerification> {
-    const id = `otp-${this.nextId++}`;
-    (otp as any).props.id = id;
+    const id = otp.id;
     this.otps.set(id, otp);
 
     return otp;
@@ -143,10 +159,11 @@ class MockOtpRepository implements OtpRepository {
   }
 
   async findLatestByIdentifier(
-    identifier: string,
-    channel: OtpChannel,
+    destination: OtpDestination,
     purpose: OtpPurpose
   ): Promise<OtpVerification | null> {
+    const { identifier, channel } = destination;
+
     return this.latest(
       (o) =>
         o.identifier === identifier &&
@@ -168,29 +185,31 @@ class MockOtpRepository implements OtpRepository {
     return otp;
   }
 
-  async countRecentByClientIp(): Promise<number> {
-    return 0;
+  async countRecentByClientIp(): Promise<OtpCount> {
+    return OtpCount.parse(0);
   }
 
   async countRecentByIdentifier(
-    identifier: string,
-    channel: OtpChannel,
+    destination: OtpDestination,
     purpose: OtpPurpose,
-    sinceHours: number
-  ): Promise<number> {
-    const since = Date.now() - sinceHours * 3600 * 1000;
+    cutoff: Instant
+  ): Promise<OtpCount> {
+    const { identifier, channel } = destination;
+    const since = Instant.toDate(cutoff).getTime();
 
-    return Array.from(this.otps.values()).filter(
-      (o) =>
-        o.identifier === identifier &&
-        o.channel === channel &&
-        o.purpose === purpose &&
-        o.createdAt.getTime() >= since
-    ).length;
+    return OtpCount.parse(
+      Array.from(this.otps.values()).filter(
+        (o) =>
+          o.identifier === identifier &&
+          o.channel === channel &&
+          o.purpose === purpose &&
+          Instant.toDate(o.createdAt).getTime() >= since
+      ).length
+    );
   }
 
-  async deleteAllForUser(): Promise<number> {
-    return 0;
+  async deleteAllForUser(): Promise<OtpCount> {
+    return OtpCount.parse(0);
   }
 
   async deleteExpired(): Promise<void> {}
@@ -200,7 +219,11 @@ class MockOtpRepository implements OtpRepository {
   ): OtpVerification | null {
     const matches = Array.from(this.otps.values())
       .filter(match)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .sort(
+        (a, b) =>
+          Instant.toDate(b.createdAt).getTime() -
+          Instant.toDate(a.createdAt).getTime()
+      );
 
     return matches[0] ?? null;
   }
@@ -212,20 +235,7 @@ class MockSessionRepository implements SessionRepository {
   private nextId = 1;
   deletedUserSessions: string[] = [];
 
-  async create(
-    userId: string,
-    expiresAt: Date,
-    ipAddress?: string,
-    userAgent?: string
-  ): Promise<Session> {
-    const session: Session = {
-      id: `session-${this.nextId++}`,
-      userId,
-      expiresAt,
-      createdAt: new Date(),
-      ipAddress: ipAddress ?? null,
-      userAgent: userAgent ?? null,
-    };
+  async save(session: Session): Promise<Session> {
     this.sessions.set(session.id, session);
 
     return session;
@@ -252,15 +262,15 @@ class MockSessionRepository implements SessionRepository {
 
 // Mock PasswordHasher
 class MockPasswordHasher implements PasswordHasher {
-  async hash(password: string): Promise<string> {
-    return `hashed-${password}`;
+  async hash(password: string): Promise<PasswordHash> {
+    return PasswordHash.parse(`hashed-${password}`);
   }
 }
 
 // Mock OtpCodeHasher
 class MockOtpCodeHasher implements OtpCodeHasher {
-  hash(code: string): string {
-    return `hashed-${code}`;
+  hash(code: OtpDigits): OtpCodeHash {
+    return OtpCodeHash.parse(`hashed-${code}`);
   }
 
   verify(code: string, hash: string): boolean {
@@ -269,17 +279,18 @@ class MockOtpCodeHasher implements OtpCodeHasher {
 }
 
 // Mock OtpDeliveryChannel
-class MockOtpDeliveryChannel implements OtpDeliveryChannel {
-  channel: OtpChannel = 'sms';
+class MockOtpDeliveryChannel<
+  C extends OtpChannel,
+> implements OtpDeliveryChannel<C> {
+  constructor(readonly channel: C) {}
   shouldSucceed = true;
   sendCount = 0;
   lastSentCode: string | null = null;
 
   async send(
-    _recipient: string,
-    code: string,
-    _locale: string,
-    _clientIp: string
+    ...[_recipient, code, _locale, _clientIp]: Parameters<
+      OtpDeliveryChannel<C>['send']
+    >
   ): Promise<OtpDeliveryResult> {
     this.sendCount += 1;
     this.lastSentCode = code;
@@ -340,7 +351,7 @@ describe('RegisterUserUseCase', () => {
   let sessionRepository: MockSessionRepository;
   let passwordHasher: MockPasswordHasher;
   let otpCodeHasher: MockOtpCodeHasher;
-  let deliveryChannel: MockOtpDeliveryChannel;
+  let deliveryChannel: MockOtpDeliveryChannel<'sms'>;
 
   beforeEach(() => {
     userRepository = new MockUserRepository();
@@ -348,9 +359,11 @@ describe('RegisterUserUseCase', () => {
     sessionRepository = new MockSessionRepository();
     passwordHasher = new MockPasswordHasher();
     otpCodeHasher = new MockOtpCodeHasher();
-    deliveryChannel = new MockOtpDeliveryChannel();
+    deliveryChannel = new MockOtpDeliveryChannel('sms');
 
     useCase = new RegisterUserUseCase({
+      ...authTestDependencies(),
+      ...creationDependencies(),
       userRepository,
       passwordHasher,
       otpRepository,
@@ -369,6 +382,18 @@ describe('RegisterUserUseCase', () => {
     consentGiven: true,
     clientIp: '127.0.0.1',
   };
+
+  it('uses supplied identity and time before saving a newly registered user', async () => {
+    const result = await useCase.execute(validInput);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.user.id).toBe('user-1');
+      expect(result.value.user.createdAt).toBe(registrationNow);
+      expect(result.value.user.consentGivenAt).toBe(registrationNow);
+    }
+  });
 
   it('should fail when clientIp is empty and not create a session', async () => {
     const result = await useCase.execute({
@@ -409,7 +434,7 @@ describe('RegisterUserUseCase', () => {
       expect(result.value.user.lastName).toBe('Doe');
       expect(result.value.user.phoneNumber.getValue()).toBe('+79161234567');
       expect(result.value.user.isConfirmed()).toBe(false);
-      expect(result.value.user.consentGivenAt).toBeInstanceOf(Date);
+      expect(result.value.user.consentGivenAt).toBe(registrationNow);
       expect(result.value.session).toBeDefined();
       expect(result.value.session.userId).toBe(result.value.user.id);
     }
@@ -474,6 +499,30 @@ describe('RegisterUserUseCase', () => {
 
     // OTP sent
     expect(deliveryChannel.sendCount).toBe(1);
+  });
+
+  it('preserves the existing address and privacy choice when registration details change', async () => {
+    const address = Address.create({
+      country: 'Russia',
+      city: 'Moscow',
+      street: 'Main',
+      building: '1',
+      isPrivateHouse: true,
+    });
+    userRepository.addUser(
+      unconfirmedExisting()
+        .updateAddress(address)
+        .updatePrivacySettings({ allowFindByAddress: true })
+    );
+
+    const result = await useCase.execute(validInput);
+
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(result.value.user.address?.equals(address)).toBe(true);
+      expect(result.value.user.allowFindByAddress).toBe(true);
+    }
   });
 
   // Same rule as login: re-registering an unconfirmed phone must not pump SMS.
@@ -650,8 +699,8 @@ describe('RegisterUserUseCase with an email address', () => {
   let sessionRepository: MockSessionRepository;
   let passwordHasher: MockPasswordHasher;
   let otpCodeHasher: MockOtpCodeHasher;
-  let smsChannel: MockOtpDeliveryChannel;
-  let emailChannel: MockOtpDeliveryChannel;
+  let smsChannel: MockOtpDeliveryChannel<'sms'>;
+  let emailChannel: MockOtpDeliveryChannel<'email'>;
 
   const validInput = {
     firstName: 'John',
@@ -669,11 +718,12 @@ describe('RegisterUserUseCase with an email address', () => {
     sessionRepository = new MockSessionRepository();
     passwordHasher = new MockPasswordHasher();
     otpCodeHasher = new MockOtpCodeHasher();
-    smsChannel = new MockOtpDeliveryChannel();
-    emailChannel = new MockOtpDeliveryChannel();
-    emailChannel.channel = 'email';
+    smsChannel = new MockOtpDeliveryChannel('sms');
+    emailChannel = new MockOtpDeliveryChannel('email');
 
     useCase = new RegisterUserUseCase({
+      ...authTestDependencies(),
+      ...creationDependencies(),
       userRepository,
       passwordHasher,
       otpRepository,

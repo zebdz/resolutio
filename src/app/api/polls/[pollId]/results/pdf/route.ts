@@ -1,9 +1,5 @@
+/** Downloads a policy-authorized results protocol from the sealed tallies or a labeled live view. */
 import { stripMarkdownToPlainText } from '@/application/shared/StripMarkdownToPlainText';
-import fs from 'fs';
-import path from 'path';
-import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/web/lib/session';
-import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { GetPollResultsUseCase } from '@/application/poll/GetPollResultsUseCase';
 import { PollResultsPolicy } from '@/domain/poll/PollResultsPolicy';
 import type { QuestionType } from '@/src/domain/poll/QuestionType';
@@ -15,13 +11,15 @@ import {
   PrismaParticipantRepository,
   PrismaVoteRepository,
 } from '@/infrastructure/index';
-import { isValidLocale, defaultLocale } from '@/src/i18n/locales';
 import {
   buildPdfDocumentDefinition,
-  generatePdfBuffer,
   PdfInputData,
-  PdfTranslations,
 } from '@/web/lib/pdf/pollResultsPdfGenerator';
+
+import { success, failure } from '@/domain/shared/Result';
+import type { PollId, UserId } from '@/domain/shared/EntityIds';
+import { protocolDownload } from '@/web/lib/pdf/protocolDownload';
+import { getSealedProtocol } from '@/infrastructure/seal/getSealedProtocol';
 
 const pollRepository = new PrismaPollRepository(prisma);
 const participantRepository = new PrismaParticipantRepository(prisma);
@@ -37,166 +35,101 @@ const getPollResultsUseCase = new GetPollResultsUseCase(
   userRepository
 );
 
-function loadTranslations(
-  messages: Record<string, any>,
-  prefix: string
-): PdfTranslations {
-  const keys = prefix.split('.');
-  let obj: any = messages;
+async function readLive(pollId: PollId, userId: UserId) {
+  const result = await getPollResultsUseCase.execute({
+    pollId,
+    userId,
+  });
 
-  for (const k of keys) {
-    obj = obj?.[k];
+  if (!result.success) {
+    return result;
   }
 
-  return obj as PdfTranslations;
-}
+  const {
+    poll,
+    results,
+    totalParticipants,
+    totalParticipantWeight,
+    viewerFacts,
+  } = result.value;
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ pollId: string }> }
-) {
-  try {
-    // 1. Auth check
-    const user = await getCurrentUser();
+  // A named poll may be exported mid-vote; an anonymous one stays sealed
+  // until it finishes.
+  const exportable = PollResultsPolicy.canExportProtocol(poll, viewerFacts);
 
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  if (!exportable.success) {
+    return failure(exportable.error);
+  }
 
-    const { pollId } = await params;
+  // Resolve current organization and board for live exports.
+  const org = await prisma.organization.findUnique({
+    where: { id: poll.organizationId },
+    select: { name: true },
+  });
 
-    // 2. Fetch poll results via use case
-    const result = await getPollResultsUseCase.execute({
-      pollId,
-      userId: user.id,
-    });
+  let boardName: string | null = null;
 
-    if (!result.success) {
-      return NextResponse.json(
-        { error: await translateErrorCode(result.error) },
-        { status: 403 }
-      );
-    }
-
-    const {
-      poll,
-      results,
-      totalParticipants,
-      totalParticipantWeight,
-      viewerFacts,
-    } = result.value;
-
-    // 3. A named poll may be exported mid-vote; an anonymous one stays sealed
-    // until it finishes.
-    const exportable = PollResultsPolicy.canExportProtocol(poll, viewerFacts);
-
-    if (!exportable.success) {
-      return NextResponse.json(
-        { error: await translateErrorCode(exportable.error) },
-        { status: 403 }
-      );
-    }
-
-    // 4. Fetch org name + board name
-    const org = await prisma.organization.findUnique({
-      where: { id: poll.organizationId },
+  if (poll.boardId) {
+    const board = await prisma.board.findUnique({
+      where: { id: poll.boardId },
       select: { name: true },
     });
+    boardName = board?.name ?? null;
+  }
 
-    let boardName: string | null = null;
+  // A voter contributes their weight once even when choosing several answers.
+  const voterIds = new Set<string>();
+  let weightOfVoted = 0;
 
-    if (poll.boardId) {
-      const board = await prisma.board.findUnique({
-        where: { id: poll.boardId },
-        select: { name: true },
-      });
-      boardName = board?.name ?? null;
-    }
-
-    // 5. Load translations for requested locale
-    const localeParam = request.nextUrl.searchParams.get('locale');
-    const locale =
-      localeParam && isValidLocale(localeParam) ? localeParam : defaultLocale;
-    const messagesPath = path.join(process.cwd(), 'messages', `${locale}.json`);
-    const messages = JSON.parse(fs.readFileSync(messagesPath, 'utf-8'));
-    const t = loadTranslations(messages, 'poll.results.pdf');
-
-    // 6. Calculate votedParticipants + weightOfVoted
-    const voterIds = new Set<string>();
-    let weightOfVoted = 0;
-
-    for (const q of results) {
-      for (const a of q.answers) {
-        for (const v of a.voters) {
-          if (!voterIds.has(v.userId)) {
-            voterIds.add(v.userId);
-            weightOfVoted +=
-              typeof v.weight === 'object' ? Number(v.weight) : v.weight;
-          }
+  for (const q of results) {
+    for (const a of q.answers) {
+      for (const v of a.voters) {
+        if (!voterIds.has(v.userId)) {
+          voterIds.add(v.userId);
+          weightOfVoted +=
+            typeof v.weight === 'object' ? Number(v.weight) : v.weight;
         }
       }
     }
-
-    // 7. Build PDF input data
-    const pdfData: PdfInputData = {
-      organizationName: org?.name ?? '',
-      boardName,
-      pollTitle: poll.title ?? '',
-      pollDescription: stripMarkdownToPlainText(poll.description ?? ''),
-      startDate: poll.startDate
-        ? poll.startDate.toISOString().split('T')[0]
-        : '',
-      endDate: poll.endDate ? poll.endDate.toISOString().split('T')[0] : '',
-      totalParticipants,
-      votedParticipants: voterIds.size,
-      totalWeight: Number(totalParticipantWeight) || 0,
-      weightOfVoted: Number(weightOfVoted) || 0,
-      questions: results.map((q) => ({
-        questionText: q.questionText ?? '',
-        questionDetails: q.questionDetails,
-        questionType: (q.questionType ?? 'single-choice') as QuestionType,
-        totalVotes: q.totalVotes ?? 0,
-        totalWeight: q.answers.reduce(
-          (sum, a) => sum + (Number(a.totalWeight) || 0),
-          0
-        ),
-        answers: q.answers.map((a) => ({
-          answerText: a.answerText ?? '',
-          voteCount: a.voteCount ?? 0,
-          weightedVotes: Number(a.totalWeight) || 0,
-          percentage: Number(a.percentage) || 0,
-        })),
-      })),
-    };
-
-    // 8. Generate PDF
-    const docDefinition = buildPdfDocumentDefinition(pdfData, t);
-    const pdfBuffer = await generatePdfBuffer(docDefinition);
-
-    // 9. Return PDF response
-    // Keep letters (incl Cyrillic), digits, spaces, hyphens
-    const sanitizedTitle =
-      (poll.title ?? '').replace(/[^\p{L}\p{N}\s-]/gu, '').trim() || 'poll';
-    const filename = `${sanitizedTitle}-results.pdf`;
-
-    return new NextResponse(new Uint8Array(pdfBuffer), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="results.pdf"; filename*=UTF-8''${encodeURIComponent(filename)}`,
-      },
-    });
-  } catch (error) {
-    console.error(
-      'PDF generation error:',
-      error instanceof Error
-        ? { message: error.message, stack: error.stack }
-        : error
-    );
-
-    return NextResponse.json(
-      { error: 'common.errors.unexpected' },
-      { status: 500 }
-    );
   }
+
+  const pdfData: PdfInputData = {
+    organizationName: org?.name ?? '',
+    boardName,
+    pollTitle: poll.title ?? '',
+    pollDescription: stripMarkdownToPlainText(poll.description ?? ''),
+    startDate: poll.startDate ? poll.startDate.toISOString().split('T')[0] : '',
+    endDate: poll.endDate ? poll.endDate.toISOString().split('T')[0] : '',
+    totalParticipants,
+    votedParticipants: voterIds.size,
+    totalWeight: Number(totalParticipantWeight) || 0,
+    weightOfVoted: Number(weightOfVoted) || 0,
+    questions: results.map((q) => ({
+      questionText: q.questionText ?? '',
+      questionDetails: q.questionDetails,
+      questionType: (q.questionType ?? 'single-choice') as QuestionType,
+      totalVotes: q.totalVotes ?? 0,
+      totalWeight: q.answers.reduce(
+        (sum, a) => sum + (Number(a.totalWeight) || 0),
+        0
+      ),
+      answers: q.answers.map((a) => ({
+        answerText: a.answerText ?? '',
+        voteCount: a.voteCount ?? 0,
+        weightedVotes: Number(a.totalWeight) || 0,
+        percentage: Number(a.percentage) || 0,
+      })),
+    })),
+  };
+
+  return success(pdfData);
 }
+
+export const GET = protocolDownload<PdfInputData>({
+  filename: 'results.pdf',
+  readSource: (pollId, userId) =>
+    getSealedProtocol.execute(pollId, userId, 'resultsPdf'),
+  readLive,
+  build: (data, messages, footer) =>
+    buildPdfDocumentDefinition(data, messages.poll.results.pdf, footer),
+});

@@ -1,48 +1,45 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+/** Unread-count clients distinguish a valid zero from an unavailable count.
+ * Recipient validation and typed Result propagation precede presentation. */
+import { NotificationCount } from '@/domain/notification/NotificationContent';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { success, failure } from '@/domain/shared/Result';
 import { GetUnreadNotificationCountUseCase } from '../GetUnreadNotificationCountUseCase';
-import { NotificationRepository } from '../../../domain/notification/NotificationRepository';
-import { Notification } from '../../../domain/notification/Notification';
+import { NotificationReader } from '../../../domain/notification/NotificationReader';
+import { UserId } from '@/domain/shared/EntityIds';
 
-class MockNotificationRepository implements NotificationRepository {
-  private unreadCounts: Map<string, number> = new Map();
+class MockNotificationReader implements Pick<
+  NotificationReader,
+  'getUnreadCount'
+> {
+  private unreadCounts: Map<UserId, NotificationCount> = new Map();
 
-  async save(notification: Notification): Promise<Notification> {
-    return notification;
+  async getUnreadCount(
+    userId: UserId
+  ): ReturnType<NotificationReader['getUnreadCount']> {
+    return success(NotificationCount.parse(this.unreadCounts.get(userId) || 0));
   }
-  async saveBatch(): Promise<void> {}
-  async findById(): Promise<Notification | null> {
-    return null;
-  }
-  async findByUserId(): Promise<Notification[]> {
-    return [];
-  }
-  async getUnreadCount(userId: string): Promise<number> {
-    return this.unreadCounts.get(userId) || 0;
-  }
-  async markAsRead(): Promise<void> {}
-  async markAllAsRead(): Promise<void> {}
-  async findByIds(): Promise<Notification[]> {
-    return [];
-  }
-  async deleteByIds(): Promise<void> {}
-  async getCountByUserId(): Promise<number> {
-    return 0;
-  }
-
   setUnreadCount(userId: string, count: number) {
-    this.unreadCounts.set(userId, count);
+    this.unreadCounts.set(UserId.parse(userId), NotificationCount.parse(count));
   }
 }
 
 describe('GetUnreadNotificationCountUseCase', () => {
   let useCase: GetUnreadNotificationCountUseCase;
-  let notifRepo: MockNotificationRepository;
+  let notifRepo: MockNotificationReader;
 
   beforeEach(() => {
-    notifRepo = new MockNotificationRepository();
+    notifRepo = new MockNotificationReader();
     useCase = new GetUnreadNotificationCountUseCase({
-      notificationRepository: notifRepo,
+      notificationReader: notifRepo,
     });
+  });
+  it('propagates unavailable counts rather than returning a successful value', async () => {
+    vi.spyOn(notifRepo, 'getUnreadCount').mockResolvedValue(
+      failure('common.errors.unexpected')
+    );
+    expect(await useCase.execute({ userId: 'user-1' })).toEqual(
+      failure('common.errors.unexpected')
+    );
   });
 
   it('should return unread count', async () => {

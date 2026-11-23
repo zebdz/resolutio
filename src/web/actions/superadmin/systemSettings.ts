@@ -1,5 +1,16 @@
 'use server';
 
+/** Authorized configuration responses retain each setting's validated numeric unit.
+ * Application reads preserve key identity; validation and storage failures are translated explicitly. */
+import {
+  SystemSettingKey,
+  decodeStoredSetting,
+  type ChecksPerHour,
+  type DailyTokenCap,
+  type MinimumOrganizationSize,
+} from '@/domain/systemSetting/SystemSetting';
+import { readSystemSetting } from '@/application/systemSetting/readSystemSetting';
+import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { checkRateLimit } from '@/web/actions/rateLimit';
 import { requireSuperadmin } from '@/src/web/actions/superadmin/superadminAuth';
 import { isError } from '@/src/web/actions/superadmin/superadminAuthUtils';
@@ -8,38 +19,15 @@ import { PrismaSystemSettingRepository } from '@/infrastructure/repositories/Pri
 
 const systemSettingRepository = new PrismaSystemSettingRepository(prisma);
 
-// Per-key bounds. `0 = disabled` semantic for cap/size gates.
-// Hourly limit has min 1 to prevent locking all admins out via setting=0.
-const LEGAL_CHECK_SETTINGS = {
-  legal_check_max_per_admin_per_hour: { default: 10, min: 1, max: 1000 },
-  legal_check_daily_token_cap: { default: 100_000, min: 0, max: 10_000_000 },
-  legal_check_min_org_size: { default: 3, min: 0, max: 10_000 },
-} as const;
-
-type LegalCheckSettingKey = keyof typeof LEGAL_CHECK_SETTINGS;
-
 export interface LegalCheckSettings {
-  legalCheckMaxPerAdminPerHour: number;
-  legalCheckDailyTokenCap: number;
-  legalCheckMinOrgSize: number;
+  legalCheckMaxPerAdminPerHour: ChecksPerHour;
+  legalCheckDailyTokenCap: DailyTokenCap;
+  legalCheckMinOrgSize: MinimumOrganizationSize;
 }
 
 export type ActionResult<T = void> =
   | { success: true; data: T }
   | { success: false; error: string };
-
-async function readNumeric(key: LegalCheckSettingKey): Promise<number> {
-  const raw = await systemSettingRepository.get(key);
-  const fallback = LEGAL_CHECK_SETTINGS[key].default;
-
-  if (raw === null) {
-    return fallback;
-  }
-
-  const parsed = parseInt(raw, 10);
-
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
 
 export async function getSystemSettingsAction(): Promise<
   ActionResult<LegalCheckSettings>
@@ -56,14 +44,36 @@ export async function getSystemSettingsAction(): Promise<
     return auth;
   }
 
+  const [hourly, daily, organizationSize] = await Promise.all([
+    readSystemSetting(
+      systemSettingRepository,
+      'legal_check_max_per_admin_per_hour'
+    ),
+    readSystemSetting(systemSettingRepository, 'legal_check_daily_token_cap'),
+    readSystemSetting(systemSettingRepository, 'legal_check_min_org_size'),
+  ]);
+
+  if (!hourly.success) {
+    return { success: false, error: await translateErrorCode(hourly.error) };
+  }
+
+  if (!daily.success) {
+    return { success: false, error: await translateErrorCode(daily.error) };
+  }
+
+  if (!organizationSize.success) {
+    return {
+      success: false,
+      error: await translateErrorCode(organizationSize.error),
+    };
+  }
+
   return {
     success: true,
     data: {
-      legalCheckMaxPerAdminPerHour: await readNumeric(
-        'legal_check_max_per_admin_per_hour'
-      ),
-      legalCheckDailyTokenCap: await readNumeric('legal_check_daily_token_cap'),
-      legalCheckMinOrgSize: await readNumeric('legal_check_min_org_size'),
+      legalCheckMaxPerAdminPerHour: hourly.value.value,
+      legalCheckDailyTokenCap: daily.value.value,
+      legalCheckMinOrgSize: organizationSize.value.value,
     },
   };
 }
@@ -84,26 +94,26 @@ export async function updateSystemSettingAction(
     return auth;
   }
 
-  if (!(key in LEGAL_CHECK_SETTINGS)) {
-    return { success: false, error: 'Invalid setting key' };
-  }
+  const parsedKey = SystemSettingKey.safeParse(key);
 
-  const bounds = LEGAL_CHECK_SETTINGS[key as LegalCheckSettingKey];
-
-  const numValue = parseInt(value, 10);
-
-  if (
-    !Number.isFinite(numValue) ||
-    numValue < bounds.min ||
-    numValue > bounds.max
-  ) {
+  if (!parsedKey.success) {
     return {
       success: false,
-      error: `Value must be between ${bounds.min} and ${bounds.max}`,
+      error: await translateErrorCode('common.errors.validationFailed'),
     };
   }
 
-  await systemSettingRepository.set(key, String(numValue));
+  const setting = decodeStoredSetting(parsedKey.data, value);
+
+  if (!setting.success) {
+    return { success: false, error: await translateErrorCode(setting.error) };
+  }
+
+  const saved = await systemSettingRepository.set(setting.value);
+
+  if (!saved.success) {
+    return { success: false, error: await translateErrorCode(saved.error) };
+  }
 
   return { success: true, data: undefined };
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { QuestionFiles } from './QuestionFiles';
 import { useTranslations } from 'next-intl';
 import { MarkdownRenderer } from '@/web/components/markdown/MarkdownRenderer';
 import { POLL_ATTACHMENT_API_PREFIX } from '@/domain/poll/PollAttachment';
@@ -28,6 +29,12 @@ interface PollReadOnlyViewProps {
   pollType: string;
   attachmentIds: string[];
   questions: ReadOnlyQuestion[];
+  files?: {
+    id: string;
+    questionId: string | null;
+    fileName: string;
+    mimeType: string;
+  }[];
   annotations: LegalAnnotationType[];
 }
 
@@ -48,6 +55,7 @@ export function PollReadOnlyView({
   pollType,
   attachmentIds,
   questions,
+  files = [],
   annotations,
 }: PollReadOnlyViewProps) {
   const t = useTranslations('poll');
@@ -107,6 +115,9 @@ export function PollReadOnlyView({
                 {index + 1}. {question.text}
               </p>
 
+              <QuestionFiles
+                files={files.filter((f) => f.questionId === question.id)}
+              />
               {question.details && (
                 <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
                   {question.details}

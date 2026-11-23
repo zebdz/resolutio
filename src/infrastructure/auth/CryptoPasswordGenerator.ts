@@ -1,4 +1,6 @@
+/** Generates legible reset credentials with secure randomness and validates the port contract. */
 import { randomInt } from 'node:crypto';
+import { GeneratedPassword } from '@/domain/user/UserValues';
 import type { PasswordGenerator } from '@/application/auth/PasswordGenerator';
 
 // Ambiguous glyphs are excluded (0/O, 1/l/I): a generated password gets read
@@ -20,7 +22,7 @@ function pick(alphabet: string): string {
 }
 
 export class CryptoPasswordGenerator implements PasswordGenerator {
-  generate(): string {
+  generate(): GeneratedPassword {
     const length = GROUP_COUNT * GROUP_LENGTH;
     const chars = Array.from({ length }, () => pick(ALPHABET));
 
@@ -46,6 +48,6 @@ export class CryptoPasswordGenerator implements PasswordGenerator {
       groups.push(chars.slice(i, i + GROUP_LENGTH).join(''));
     }
 
-    return groups.join(GROUP_SEPARATOR);
+    return GeneratedPassword.parse(groups.join(GROUP_SEPARATOR));
   }
 }

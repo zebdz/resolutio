@@ -1,10 +1,15 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+/** Verifies Notify Report Published behavior through application ports.
+ * Notification doubles return explicit append outcomes, matching the production writer. */
+import { testClock, testIds } from '@/domain/report/__tests__/reportTestValues';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { success, failure } from '@/domain/shared/Result';
+import type { NotificationRepository } from '@/domain/notification/NotificationRepository';
 import { NotifyReportPublishedUseCase } from '../NotifyReportPublishedUseCase';
-import { Report, ReportProps } from '../../../domain/report/Report';
+import { Report, ReportData } from '../../../domain/report/Report';
 import { ReportVisibility } from '../../../domain/report/ReportVisibility';
 import { Notification } from '../../../domain/notification/Notification';
 
-const baseProps = (overrides: Partial<ReportProps> = {}): ReportProps => ({
+const baseProps = (overrides: Partial<ReportData> = {}): ReportData => ({
   id: 'r1',
   organizationId: 'org-1',
   createdById: 'author-1',
@@ -22,6 +27,13 @@ const baseProps = (overrides: Partial<ReportProps> = {}): ReportProps => ({
   pollIds: [],
   attachmentIds: [],
   ...overrides,
+  ...(overrides.state === 'DRAFT'
+    ? { publishedById: null, notifyAudience: false }
+    : {}),
+  ...(overrides.visibility === ReportVisibility.PUBLIC_ANON ||
+  overrides.visibility === ReportVisibility.PUBLIC_AUTH
+    ? { notifyAudience: false }
+    : {}),
 });
 
 class FakeOrgs {
@@ -52,15 +64,19 @@ class FakeBoards {
 
 class FakeNotifications {
   saved: Notification[] = [];
-  async save(n: Notification): Promise<Notification> {
+  async save(n: Notification): ReturnType<NotificationRepository['save']> {
     this.saved.push(n);
 
-    return n;
+    return success(n);
   }
-  async saveBatch(ns: Notification[]): Promise<void> {
+  async saveBatch(
+    ns: Notification[]
+  ): ReturnType<NotificationRepository['saveBatch']> {
     for (const n of ns) {
       this.saved.push(n);
     }
+
+    return success(undefined);
   }
 }
 
@@ -75,12 +91,23 @@ describe('NotifyReportPublishedUseCase', () => {
     boards = new FakeBoards();
     notifications = new FakeNotifications();
     uc = new NotifyReportPublishedUseCase({
+      ids: testIds,
+      clock: testClock,
       orgRepo: orgs as any,
 
       boardRepo: boards as any,
 
       notificationRepository: notifications as any,
     });
+  });
+  it('returns the failed append outcome instead of losing report delivery failures', async () => {
+    orgs.memberIdsForOrgs.set('org-1', ['recipient-1']);
+    vi.spyOn(notifications, 'saveBatch').mockResolvedValue(
+      failure('common.errors.unexpected')
+    );
+    expect(await uc.notifyPublished(Report.reconstitute(baseProps()))).toEqual(
+      failure('common.errors.unexpected')
+    );
   });
 
   it('WITHIN_ORG_ONLY: notifies exact-org members, skips author', async () => {

@@ -1,9 +1,8 @@
+import { SITE_ORIGIN } from '@/infrastructure/shared/siteOrigin';
 import { MetadataRoute } from 'next';
 import { prisma, PrismaReportRepository } from '@/infrastructure/index';
 
 export const dynamic = 'force-dynamic';
-
-const SITE_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? 'https://resolutio.site';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const repo = new PrismaReportRepository(prisma);

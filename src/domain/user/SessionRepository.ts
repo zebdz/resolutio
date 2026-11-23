@@ -1,20 +1,11 @@
-export interface Session {
-  id: string;
-  userId: string;
-  expiresAt: Date;
-  createdAt: Date;
-  ipAddress: string | null;
-  userAgent: string | null;
-}
+/** Session persistence stores complete domain state with identity assigned before save. */
+import { SessionId, UserId } from '../shared/EntityIds';
+import { Session } from './Session';
+export { Session } from './Session';
 
 export interface SessionRepository {
-  create(
-    userId: string,
-    expiresAt: Date,
-    ipAddress?: string,
-    userAgent?: string
-  ): Promise<Session>;
-  findById(id: string): Promise<Session | null>;
-  delete(id: string): Promise<void>;
-  deleteAllForUser(userId: string): Promise<void>;
+  save(session: Session): Promise<Session>;
+  findById(id: SessionId): Promise<Session | null>;
+  delete(id: SessionId): Promise<void>;
+  deleteAllForUser(userId: UserId): Promise<void>;
 }

@@ -1,8 +1,12 @@
-import { JoinToken } from '../../domain/organization/JoinToken';
+/** Join-link application boundary validates external values before invoking
+ * domain behavior and typed authorization/persistence ports. */
+import { JoinTokenValue } from '../../domain/organization/JoinTokenValues';
+import { UserId } from '../../domain/shared/EntityIds';
+import { OrganizationId } from '../../domain/shared/EntityIds';
 import { JoinTokenRepository } from '../../domain/organization/JoinTokenRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { JoinOrganizationUseCase } from './JoinOrganizationUseCase';
-import { JoinTokenErrors } from './JoinTokenErrors';
+import { JoinTokenErrors, JoinTokenUseCaseFailure } from './JoinTokenErrors';
 import { OrganizationErrors } from './OrganizationErrors';
 import { Result, success, failure } from '../../domain/shared/Result';
 
@@ -16,9 +20,26 @@ export class UseJoinTokenUseCase {
   constructor(private deps: UseJoinTokenDependencies) {}
 
   async execute(
-    tokenValue: string,
-    userId: string
-  ): Promise<Result<{ organizationId: string }, string>> {
+    rawTokenValue: string,
+    rawUserId: string
+  ): Promise<
+    Result<{ organizationId: OrganizationId }, JoinTokenUseCaseFailure>
+  > {
+    const parsedTokenValue = JoinTokenValue.safeParse(rawTokenValue);
+
+    if (!parsedTokenValue.success) {
+      return failure(JoinTokenErrors.NOT_FOUND);
+    }
+
+    const tokenValue = parsedTokenValue.data;
+    const parsedUserId = UserId.safeParse(rawUserId);
+
+    if (!parsedUserId.success) {
+      return failure(OrganizationErrors.USER_NOT_FOUND);
+    }
+
+    const userId = parsedUserId.data;
+
     // 1. Find token by value
     const token = await this.deps.joinTokenRepository.findByToken(tokenValue);
 
@@ -64,11 +85,8 @@ export class UseJoinTokenUseCase {
         const current = await this.deps.joinTokenRepository.findById(token.id);
 
         if (current && current.useCount > 0) {
-          const decremented = JoinToken.reconstitute({
-            ...current.toJSON(),
-            useCount: current.useCount - 1,
-          });
-          await this.deps.joinTokenRepository.update(decremented);
+          current.releaseUse();
+          await this.deps.joinTokenRepository.update(current);
         }
       } catch {
         // Swallow rollback errors

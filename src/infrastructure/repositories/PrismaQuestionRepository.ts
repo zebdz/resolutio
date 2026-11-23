@@ -1,4 +1,9 @@
-import { PrismaClient } from '@/generated/prisma/client';
+/** Maps question aggregates to Prisma without replacing identity or time.
+ * Persisted scalar fields are validated by aggregate reconstitution. */
+import { QuestionId, PollId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
+import { QuestionRepositoryFailure } from '@/domain/poll/QuestionRepository';
+import { PrismaClient, Prisma } from '@/generated/prisma/client';
 import { Question } from '../../domain/poll/Question';
 import { Answer } from '../../domain/poll/Answer';
 import {
@@ -6,15 +11,19 @@ import {
   UpdateQuestionOrderData,
 } from '../../domain/poll/QuestionRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { QuestionType } from '../../domain/poll/QuestionType';
 
 export class PrismaQuestionRepository implements QuestionRepository {
   constructor(private prisma: PrismaClient) {}
 
-  async createQuestion(question: Question): Promise<Result<Question, string>> {
+  async createQuestion(
+    question: Question
+  ): Promise<Result<Question, QuestionRepositoryFailure>> {
     try {
       const created = await this.prisma.question.create({
         data: {
+          id: question.id,
+          createdAt: question.createdAt,
+          archivedAt: question.archivedAt,
           text: question.text,
           details: question.details,
           pollId: question.pollId,
@@ -39,8 +48,8 @@ export class PrismaQuestionRepository implements QuestionRepository {
   }
 
   async getQuestionById(
-    questionId: string
-  ): Promise<Result<Question | null, string>> {
+    questionId: QuestionId
+  ): Promise<Result<Question | null, QuestionRepositoryFailure>> {
     try {
       const question = await this.prisma.question.findUnique({
         where: { id: questionId },
@@ -65,8 +74,8 @@ export class PrismaQuestionRepository implements QuestionRepository {
   }
 
   async getQuestionsByPollId(
-    pollId: string
-  ): Promise<Result<Question[], string>> {
+    pollId: PollId
+  ): Promise<Result<Question[], QuestionRepositoryFailure>> {
     try {
       const questions = await this.prisma.question.findMany({
         where: {
@@ -90,7 +99,9 @@ export class PrismaQuestionRepository implements QuestionRepository {
     }
   }
 
-  async updateQuestion(question: Question): Promise<Result<void, string>> {
+  async updateQuestion(
+    question: Question
+  ): Promise<Result<void, QuestionRepositoryFailure>> {
     try {
       await this.prisma.question.update({
         where: { id: question.id },
@@ -114,7 +125,7 @@ export class PrismaQuestionRepository implements QuestionRepository {
 
   async updateQuestionOrder(
     updates: UpdateQuestionOrderData[]
-  ): Promise<Result<void, string>> {
+  ): Promise<Result<void, QuestionRepositoryFailure>> {
     try {
       await this.prisma.$transaction(
         updates.map((update) =>
@@ -136,11 +147,14 @@ export class PrismaQuestionRepository implements QuestionRepository {
     }
   }
 
-  async deleteQuestion(questionId: string): Promise<Result<void, string>> {
+  async deleteQuestion(
+    questionId: QuestionId,
+    at: Instant
+  ): Promise<Result<void, QuestionRepositoryFailure>> {
     try {
       await this.prisma.question.update({
         where: { id: questionId },
-        data: { archivedAt: new Date() },
+        data: { archivedAt: Instant.toDate(at) },
       });
 
       return success(undefined);
@@ -151,9 +165,11 @@ export class PrismaQuestionRepository implements QuestionRepository {
     }
   }
 
-  private toDomainQuestion(prismaData: any): Question {
+  private toDomainQuestion(
+    prismaData: Prisma.QuestionGetPayload<{ include: { answers: true } }>
+  ): Question {
     const answers = prismaData.answers
-      ? prismaData.answers.map((a: any) => this.toDomainAnswer(a))
+      ? prismaData.answers.map((a) => this.toDomainAnswer(a))
       : [];
 
     return Question.reconstitute({
@@ -163,14 +179,14 @@ export class PrismaQuestionRepository implements QuestionRepository {
       pollId: prismaData.pollId,
       page: prismaData.page,
       order: prismaData.order,
-      questionType: prismaData.questionType as QuestionType,
+      questionType: prismaData.questionType,
       createdAt: prismaData.createdAt,
       archivedAt: prismaData.archivedAt,
       answers,
     });
   }
 
-  private toDomainAnswer(prismaData: any): Answer {
+  private toDomainAnswer(prismaData: Prisma.AnswerGetPayload<object>): Answer {
     return Answer.reconstitute({
       id: prismaData.id,
       text: prismaData.text,

@@ -1,3 +1,8 @@
+import { createOrganization } from './organizationTestValues';
+import {
+  NewOrganizationName,
+  OrganizationDescription,
+} from '../OrganizationValues';
 import { describe, it, expect } from 'vitest';
 import { Organization } from '../Organization';
 import { OrganizationDomainCodes } from '../OrganizationDomainCodes';
@@ -21,9 +26,16 @@ function makeOrg(
 }
 
 describe('Organization.updateName', () => {
+  it('rejects empty persisted organization names', () => {
+    expect(() => makeOrg({ name: '   ' })).toThrow();
+  });
+  it('preserves historical names when reconstituting organizations', () => {
+    const org = makeOrg({ name: 'Org <legacy> name' });
+    expect(org.name).toBe('Org <legacy> name');
+  });
   it('should update name when valid', () => {
     const org = makeOrg();
-    const result = org.updateName('New Name');
+    const result = org.updateName('New Name' as NewOrganizationName);
 
     expect(result.success).toBe(true);
     expect(org.name).toBe('New Name');
@@ -31,7 +43,7 @@ describe('Organization.updateName', () => {
 
   it('should trim whitespace', () => {
     const org = makeOrg();
-    const result = org.updateName('  Trimmed Name  ');
+    const result = org.updateName('  Trimmed Name  ' as NewOrganizationName);
 
     expect(result.success).toBe(true);
     expect(org.name).toBe('Trimmed Name');
@@ -39,7 +51,7 @@ describe('Organization.updateName', () => {
 
   it('should fail when empty', () => {
     const org = makeOrg();
-    const result = org.updateName('');
+    const result = org.updateName('' as NewOrganizationName);
 
     expect(result.success).toBe(false);
 
@@ -54,7 +66,7 @@ describe('Organization.updateName', () => {
 
   it('should fail when only whitespace', () => {
     const org = makeOrg();
-    const result = org.updateName('   ');
+    const result = org.updateName('   ' as NewOrganizationName);
 
     expect(result.success).toBe(false);
 
@@ -67,7 +79,7 @@ describe('Organization.updateName', () => {
 
   it('should succeed with single character name', () => {
     const org = makeOrg();
-    const result = org.updateName('A');
+    const result = org.updateName('A' as NewOrganizationName);
 
     expect(result.success).toBe(true);
     expect(org.name).toBe('A');
@@ -75,7 +87,7 @@ describe('Organization.updateName', () => {
 
   it('should fail when name contains special characters', () => {
     const org = makeOrg();
-    const result = org.updateName('Org@Name!');
+    const result = org.updateName('Org@Name!' as NewOrganizationName);
 
     expect(result.success).toBe(false);
 
@@ -90,7 +102,7 @@ describe('Organization.updateName', () => {
 
   it('should allow unicode letters', () => {
     const org = makeOrg();
-    const result = org.updateName('Организация');
+    const result = org.updateName('Организация' as NewOrganizationName);
 
     expect(result.success).toBe(true);
     expect(org.name).toBe('Организация');
@@ -98,7 +110,7 @@ describe('Organization.updateName', () => {
 
   it('should allow hyphens and double quotes', () => {
     const org = makeOrg();
-    const result = org.updateName('Org "Name" - Test');
+    const result = org.updateName('Org "Name" - Test' as NewOrganizationName);
 
     expect(result.success).toBe(true);
     expect(org.name).toBe('Org "Name" - Test');
@@ -106,7 +118,7 @@ describe('Organization.updateName', () => {
 
   it('should allow digits in name', () => {
     const org = makeOrg();
-    const result = org.updateName('Org 123');
+    const result = org.updateName('Org 123' as NewOrganizationName);
 
     expect(result.success).toBe(true);
     expect(org.name).toBe('Org 123');
@@ -114,7 +126,7 @@ describe('Organization.updateName', () => {
 
   it('should fail when longer than 255 chars', () => {
     const org = makeOrg();
-    const result = org.updateName('a'.repeat(256));
+    const result = org.updateName('a'.repeat(256) as NewOrganizationName);
 
     expect(result.success).toBe(false);
 
@@ -131,7 +143,9 @@ describe('Organization.updateName', () => {
 describe('Organization.updateDescription', () => {
   it('should update description when valid', () => {
     const org = makeOrg();
-    const result = org.updateDescription('New description');
+    const result = org.updateDescription(
+      'New description' as OrganizationDescription
+    );
 
     expect(result.success).toBe(true);
     expect(org.description).toBe('New description');
@@ -139,7 +153,9 @@ describe('Organization.updateDescription', () => {
 
   it('should trim whitespace', () => {
     const org = makeOrg();
-    const result = org.updateDescription('  Trimmed  ');
+    const result = org.updateDescription(
+      '  Trimmed  ' as OrganizationDescription
+    );
 
     expect(result.success).toBe(true);
     expect(org.description).toBe('Trimmed');
@@ -147,7 +163,7 @@ describe('Organization.updateDescription', () => {
 
   it('should fail when empty', () => {
     const org = makeOrg();
-    const result = org.updateDescription('');
+    const result = org.updateDescription('' as OrganizationDescription);
 
     expect(result.success).toBe(false);
 
@@ -162,7 +178,7 @@ describe('Organization.updateDescription', () => {
 
   it('should fail when only whitespace', () => {
     const org = makeOrg();
-    const result = org.updateDescription('   ');
+    const result = org.updateDescription('   ' as OrganizationDescription);
 
     expect(result.success).toBe(false);
 
@@ -175,7 +191,9 @@ describe('Organization.updateDescription', () => {
 
   it('should fail when longer than 2000 chars', () => {
     const org = makeOrg();
-    const result = org.updateDescription('a'.repeat(2001));
+    const result = org.updateDescription(
+      'a'.repeat(2001) as OrganizationDescription
+    );
 
     expect(result.success).toBe(false);
 
@@ -191,7 +209,7 @@ describe('Organization.updateDescription', () => {
 
 describe('Organization.allowMultiTreeMembership', () => {
   it('should default to false when created without parentId', () => {
-    const result = Organization.create('Test Org', 'Test desc', 'creator-1');
+    const result = createOrganization('Test Org', 'Test desc', 'creator-1');
     expect(result.success).toBe(true);
 
     if (result.success) {
@@ -200,7 +218,7 @@ describe('Organization.allowMultiTreeMembership', () => {
   });
 
   it('should be null when created with parentId', () => {
-    const result = Organization.create(
+    const result = createOrganization(
       'Test Org',
       'Test desc',
       'creator-1',
@@ -214,7 +232,7 @@ describe('Organization.allowMultiTreeMembership', () => {
   });
 
   it('should accept explicit value when no parentId', () => {
-    const result = Organization.create(
+    const result = createOrganization(
       'Test Org',
       'Test desc',
       'creator-1',
@@ -229,7 +247,7 @@ describe('Organization.allowMultiTreeMembership', () => {
   });
 
   it('should ignore explicit value when parentId is provided', () => {
-    const result = Organization.create(
+    const result = createOrganization(
       'Test Org',
       'Test desc',
       'creator-1',
@@ -256,13 +274,13 @@ describe('Organization.allowMultiTreeMembership', () => {
 
 describe('Organization.create name validation', () => {
   it('should succeed with single character name', () => {
-    const result = Organization.create('A', 'Valid desc', 'user-1');
+    const result = createOrganization('A', 'Valid desc', 'user-1');
 
     expect(result.success).toBe(true);
   });
 
   it('should fail when name contains special characters', () => {
-    const result = Organization.create('Org@Name!', 'Valid desc', 'user-1');
+    const result = createOrganization('Org@Name!', 'Valid desc', 'user-1');
 
     expect(result.success).toBe(false);
 
@@ -274,13 +292,13 @@ describe('Organization.create name validation', () => {
   });
 
   it('should succeed with valid unicode name', () => {
-    const result = Organization.create('Организация', 'Valid desc', 'user-1');
+    const result = createOrganization('Организация', 'Valid desc', 'user-1');
 
     expect(result.success).toBe(true);
   });
 
   it('should allow guillemets, typographic quotes and parentheses', () => {
-    const result = Organization.create(
+    const result = createOrganization(
       'ТСЖ «Гвардейский 13» (демо поимённого протокола)',
       'Valid desc',
       'user-1'
@@ -291,13 +309,14 @@ describe('Organization.create name validation', () => {
 });
 
 const mockProfanityChecker: ProfanityChecker = {
+  findProfaneWords: () => [],
   containsProfanity: (text: string) => text.includes('badword'),
 };
 
 describe('Organization profanity check', () => {
   describe('create', () => {
     it('should reject name with profanity', () => {
-      const result = Organization.create(
+      const result = createOrganization(
         'badword org',
         'Valid desc',
         'user-1',
@@ -313,7 +332,7 @@ describe('Organization profanity check', () => {
     });
 
     it('should reject description with profanity', () => {
-      const result = Organization.create(
+      const result = createOrganization(
         'Valid Org',
         'has badword here',
         'user-1',
@@ -329,7 +348,7 @@ describe('Organization profanity check', () => {
     });
 
     it('should pass clean text with profanityChecker', () => {
-      const result = Organization.create(
+      const result = createOrganization(
         'Clean Org',
         'Clean desc',
         'user-1',
@@ -341,7 +360,7 @@ describe('Organization profanity check', () => {
     });
 
     it('should pass without profanityChecker (backward compat)', () => {
-      const result = Organization.create('Any Org', 'Any desc', 'user-1');
+      const result = createOrganization('Any Org', 'Any desc', 'user-1');
       expect(result.success).toBe(true);
     });
   });
@@ -349,7 +368,10 @@ describe('Organization profanity check', () => {
   describe('updateName', () => {
     it('should reject name with profanity', () => {
       const org = makeOrg();
-      const result = org.updateName('badword name', mockProfanityChecker);
+      const result = org.updateName(
+        'badword name' as NewOrganizationName,
+        mockProfanityChecker
+      );
       expect(result.success).toBe(false);
 
       if (!result.success) {
@@ -364,7 +386,7 @@ describe('Organization profanity check', () => {
     it('should reject description with profanity', () => {
       const org = makeOrg();
       const result = org.updateDescription(
-        'badword text',
+        'badword text' as OrganizationDescription,
         mockProfanityChecker
       );
       expect(result.success).toBe(false);

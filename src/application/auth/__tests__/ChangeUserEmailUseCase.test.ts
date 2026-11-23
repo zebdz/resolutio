@@ -1,3 +1,10 @@
+/** Mail contracts retain validated addresses and serialize only inside the delivery adapter. */
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { UserId } from '@/domain/shared/EntityIds';
+import {
+  authTestDependencies,
+  authTestNow,
+} from '@/application/auth/__tests__/authTestValues';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ChangeUserEmailUseCase } from '../ChangeUserEmailUseCase';
 import type { EmailSender } from '../EmailSender';
@@ -31,7 +38,7 @@ describe('ChangeUserEmailUseCase', () => {
       user = user.changeEmail(EmailAddress.create(email));
 
       if (confirmed) {
-        user = user.confirmEmail();
+        user = expectSuccess(user.confirmEmail(authTestNow()));
       }
     }
 
@@ -54,6 +61,7 @@ describe('ChangeUserEmailUseCase', () => {
     };
 
     useCase = new ChangeUserEmailUseCase({
+      ...authTestDependencies(),
       userRepository: userRepository as UserRepository,
       emailSender,
       templateRenderer,
@@ -62,7 +70,7 @@ describe('ChangeUserEmailUseCase', () => {
 
   it('stores the new address unconfirmed', async () => {
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       email: 'ivan@mail.ru',
     });
 
@@ -75,7 +83,10 @@ describe('ChangeUserEmailUseCase', () => {
   });
 
   it('normalizes the address before storing it', async () => {
-    await useCase.execute({ userId: 'user-1', email: '  Ivan@Mail.RU ' });
+    await useCase.execute({
+      userId: UserId.parse('user-1'),
+      email: '  Ivan@Mail.RU ',
+    });
 
     const saved = (userRepository.save as ReturnType<typeof vi.fn>).mock
       .calls[0][0] as User;
@@ -84,7 +95,7 @@ describe('ChangeUserEmailUseCase', () => {
 
   it('rejects an invalid address', async () => {
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       email: 'not-an-email',
     });
 
@@ -103,7 +114,7 @@ describe('ChangeUserEmailUseCase', () => {
     );
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       email: 'ivan@mail.ru',
     });
 
@@ -125,7 +136,7 @@ describe('ChangeUserEmailUseCase', () => {
     );
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       email: 'ivan@mail.ru',
     });
 
@@ -142,7 +153,10 @@ describe('ChangeUserEmailUseCase', () => {
       buildUser('ivan@mail.ru', true)
     );
 
-    await useCase.execute({ userId: 'user-1', email: 'ivan@mail.ru' });
+    await useCase.execute({
+      userId: UserId.parse('user-1'),
+      email: 'ivan@mail.ru',
+    });
 
     expect(emailSender.send).not.toHaveBeenCalled();
   });
@@ -153,14 +167,17 @@ describe('ChangeUserEmailUseCase', () => {
       buildUser('old@mail.ru', true)
     );
 
-    await useCase.execute({ userId: 'user-1', email: 'new@mail.ru' });
+    await useCase.execute({
+      userId: UserId.parse('user-1'),
+      email: 'new@mail.ru',
+    });
 
     expect(templateRenderer.renderEmailChangedNotice).toHaveBeenCalledWith(
       'ru',
       'n•••@mail.ru'
     );
     expect(emailSender.send).toHaveBeenCalledWith(
-      expect.objectContaining({ to: 'old@mail.ru' })
+      expect.objectContaining({ to: EmailAddress.create('old@mail.ru') })
     );
   });
 
@@ -169,13 +186,19 @@ describe('ChangeUserEmailUseCase', () => {
       buildUser('old@mail.ru', false)
     );
 
-    await useCase.execute({ userId: 'user-1', email: 'new@mail.ru' });
+    await useCase.execute({
+      userId: UserId.parse('user-1'),
+      email: 'new@mail.ru',
+    });
 
     expect(emailSender.send).not.toHaveBeenCalled();
   });
 
   it('does not notify when there was no previous address', async () => {
-    await useCase.execute({ userId: 'user-1', email: 'new@mail.ru' });
+    await useCase.execute({
+      userId: UserId.parse('user-1'),
+      email: 'new@mail.ru',
+    });
 
     expect(emailSender.send).not.toHaveBeenCalled();
   });
@@ -190,7 +213,7 @@ describe('ChangeUserEmailUseCase', () => {
     });
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       email: 'new@mail.ru',
     });
 
@@ -207,7 +230,7 @@ describe('ChangeUserEmailUseCase', () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const result = await useCase.execute({
-      userId: 'user-1',
+      userId: UserId.parse('user-1'),
       email: 'new@mail.ru',
     });
 
@@ -221,7 +244,7 @@ describe('ChangeUserEmailUseCase', () => {
     );
 
     const result = await useCase.execute({
-      userId: 'missing',
+      userId: UserId.parse('missing'),
       email: 'ivan@mail.ru',
     });
 

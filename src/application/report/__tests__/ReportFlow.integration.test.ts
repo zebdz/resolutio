@@ -1,3 +1,7 @@
+/** Verifies report flow behavior through application ports.
+ * Notification doubles return explicit append outcomes, matching the production writer. */
+import { testClock, testIds } from '@/domain/report/__tests__/reportTestValues';
+import { success } from '@/domain/shared/Result';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CreateReportUseCase } from '../CreateReportUseCase';
 import { PublishReportUseCase } from '../PublishReportUseCase';
@@ -61,7 +65,9 @@ class InMemoryUsers {
 }
 
 class NoopNotify {
-  async notifyPublished(_r: Report) {}
+  async notifyPublished(_r: Report) {
+    return success(undefined);
+  }
 }
 
 describe('Report flow integration smoke test', () => {
@@ -88,19 +94,32 @@ describe('Report flow integration smoke test', () => {
     orgs.members.add(`${admin}:${orgId}`);
     orgs.admins.add(`${admin}:${orgId}`);
 
-    createUC = new CreateReportUseCase(reports as any, orgs, boards);
+    createUC = new CreateReportUseCase(
+      reports as any,
+      orgs,
+      boards,
+      testIds,
+      testClock
+    );
     publishUC = new PublishReportUseCase(
       reports as any,
       orgs,
       users,
-      new NoopNotify()
+      new NoopNotify(),
+      testClock
     );
     downgradeUC = new DowngradeReportToDraftUseCase(
       reports as any,
       orgs,
-      users
+      users,
+      testClock
     );
-    archiveUC = new ArchiveReportUseCase(reports as any, orgs, users);
+    archiveUC = new ArchiveReportUseCase(
+      reports as any,
+      orgs,
+      users,
+      testClock
+    );
   });
 
   it('full state machine: create → publish → downgrade → republish → archive', async () => {

@@ -1,16 +1,19 @@
+import { AuthenticationError } from './AuthenticationError';
+import { OtpCount } from '@/domain/otp/OtpValues';
+import { UserId } from '@/domain/shared/EntityIds';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { OtpRepository } from '@/domain/otp/OtpRepository';
 import { UserDomainCodes } from '@/domain/user/UserDomainCodes';
 import { Result, success, failure } from '@/domain/shared/Result';
 
 export interface ResetUserOtpInput {
-  userId: string;
+  userId: UserId;
 }
 
 export interface ResetUserOtpResult {
   // Codes removed, shown to the superadmin as confirmation that the reset
   // touched something.
-  deleted: number;
+  deleted: OtpCount;
 }
 
 interface Dependencies {
@@ -35,7 +38,7 @@ export class ResetUserOtpUseCase {
 
   async execute(
     input: ResetUserOtpInput
-  ): Promise<Result<ResetUserOtpResult, string>> {
+  ): Promise<Result<ResetUserOtpResult, AuthenticationError>> {
     const user = await this.userRepository.findById(input.userId);
 
     if (!user) {

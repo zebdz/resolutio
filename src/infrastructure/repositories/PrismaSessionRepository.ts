@@ -1,71 +1,38 @@
-import { randomBytes } from 'crypto';
-import type {
-  SessionRepository,
-  Session,
-} from '@/domain/user/SessionRepository';
+/** Maps complete session state to Prisma without generating tokens or choosing time. */
+import { SessionRepository, Session } from '@/domain/user/SessionRepository';
+import { SessionId, UserId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
 import { PrismaClient } from '@/generated/prisma/client';
-
-export function generateSessionId(): string {
-  return randomBytes(32).toString('hex');
-}
 
 export class PrismaSessionRepository implements SessionRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async create(
-    userId: string,
-    expiresAt: Date,
-    ipAddress?: string,
-    userAgent?: string
-  ): Promise<Session> {
-    const session = await this.prisma.session.create({
+  async save(session: Session): Promise<Session> {
+    const saved = await this.prisma.session.create({
       data: {
-        id: generateSessionId(),
-        userId,
-        expiresAt,
-        ipAddress: ipAddress ?? null,
-        userAgent: userAgent ?? null,
+        id: session.id,
+        userId: session.userId,
+        expiresAt: Instant.toDate(session.expiresAt),
+        createdAt: Instant.toDate(session.createdAt),
+        ipAddress: session.ipAddress,
+        userAgent: session.userAgent,
       },
     });
 
-    return {
-      id: session.id,
-      userId: session.userId,
-      expiresAt: session.expiresAt,
-      createdAt: session.createdAt,
-      ipAddress: session.ipAddress,
-      userAgent: session.userAgent,
-    };
+    return Session.reconstitute(saved);
   }
 
-  async findById(id: string): Promise<Session | null> {
-    const session = await this.prisma.session.findUnique({
-      where: { id },
-    });
+  async findById(id: SessionId): Promise<Session | null> {
+    const row = await this.prisma.session.findUnique({ where: { id } });
 
-    if (!session) {
-      return null;
-    }
-
-    return {
-      id: session.id,
-      userId: session.userId,
-      expiresAt: session.expiresAt,
-      createdAt: session.createdAt,
-      ipAddress: session.ipAddress,
-      userAgent: session.userAgent,
-    };
+    return row ? Session.reconstitute(row) : null;
   }
 
-  async delete(id: string): Promise<void> {
-    await this.prisma.session.delete({
-      where: { id },
-    });
+  async delete(id: SessionId): Promise<void> {
+    await this.prisma.session.delete({ where: { id } });
   }
 
-  async deleteAllForUser(userId: string): Promise<void> {
-    await this.prisma.session.deleteMany({
-      where: { userId },
-    });
+  async deleteAllForUser(userId: UserId): Promise<void> {
+    await this.prisma.session.deleteMany({ where: { userId } });
   }
 }

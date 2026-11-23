@@ -1,19 +1,36 @@
-import { PrismaClient } from '@/generated/prisma/client';
+/** Authorizes a membership request, invokes the domain renewal policy and persists
+ * its explicit transition through a typed store before arranging notifications. */
+import { IdGenerator, Clock } from '../shared/EntityCreation';
+import {
+  OrganizationId,
+  UserId,
+  JoinTokenId,
+} from '../../domain/shared/EntityIds';
+import { MembershipStore } from './MembershipStore';
+import {
+  MembershipReference,
+  requestMembership,
+} from '../../domain/organization/MembershipPolicy';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { InvitationRepository } from '../../domain/invitation/InvitationRepository';
 import { NotificationRepository } from '../../domain/notification/NotificationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
 import { JoinOrganizationInput } from './JoinOrganizationSchema';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 import { NotifyJoinRequestReceivedUseCase } from '../notification/NotifyJoinRequestReceivedUseCase';
 
 export interface JoinOrganizationDependencies {
+  clock: Clock;
+  ids: IdGenerator;
   organizationRepository: OrganizationRepository;
   invitationRepository: InvitationRepository;
   notificationRepository: NotificationRepository;
   userRepository: UserRepository;
-  prisma: PrismaClient;
+  memberships: Pick<MembershipStore, 'findStatus' | 'saveRequest'>;
 }
 
 export class JoinOrganizationUseCase {
@@ -21,9 +38,37 @@ export class JoinOrganizationUseCase {
 
   async execute(
     input: JoinOrganizationInput,
-    userId: string
-  ): Promise<Result<void, string>> {
-    const { organizationId } = input;
+    rawUserId: string
+  ): Promise<Result<void, OrganizationUseCaseFailure>> {
+    const parsedUserId = UserId.safeParse(rawUserId);
+
+    if (!parsedUserId.success) {
+      return failure(OrganizationErrors.USER_NOT_FOUND);
+    }
+
+    const userId = parsedUserId.data;
+
+    const parsedOrganizationId = OrganizationId.safeParse(input.organizationId);
+
+    if (!parsedOrganizationId.success) {
+      return failure(OrganizationErrors.NOT_FOUND);
+    }
+
+    const parsedJoinTokenId = JoinTokenId.optional().safeParse(
+      input.joinTokenId
+    );
+
+    if (!parsedJoinTokenId.success) {
+      return failure(OrganizationErrors.NOT_FOUND);
+    }
+
+    const command = {
+      ...input,
+      organizationId: parsedOrganizationId.data,
+      joinTokenId: parsedJoinTokenId.data,
+    };
+
+    const { organizationId } = command;
 
     // Check if organization exists
     const organization =
@@ -37,25 +82,22 @@ export class JoinOrganizationUseCase {
       return failure(OrganizationErrors.ARCHIVED);
     }
 
-    // Check if user is already a member or has a pending request
-    const existingMembership =
-      await this.deps.prisma.organizationUser.findUnique({
-        where: {
-          organizationId_userId: {
-            organizationId,
-            userId,
-          },
-        },
-      });
+    // Check membership conflicts through the domain policy before other join checks.
+    const reference = MembershipReference.parse({ organizationId, userId });
+    const existing = await this.deps.memberships.findStatus(reference);
 
-    if (existingMembership) {
-      if (existingMembership.status === 'accepted') {
-        return failure(OrganizationErrors.ALREADY_MEMBER);
-      }
+    if (!existing.success) {
+      return existing;
+    }
 
-      if (existingMembership.status === 'pending') {
-        return failure(OrganizationErrors.PENDING_REQUEST);
-      }
+    const request = requestMembership(
+      existing.value,
+      command.joinTokenId ?? null,
+      this.deps.clock.now()
+    );
+
+    if (!request.success) {
+      return request;
     }
 
     // Check if user has a pending member invite for this org
@@ -94,40 +136,33 @@ export class JoinOrganizationUseCase {
       }
     }
 
-    if (existingMembership && existingMembership.status === 'rejected') {
-      // Re-request: reset existing record back to pending
-      await this.deps.prisma.organizationUser.update({
-        where: {
-          organizationId_userId: { organizationId, userId },
-        },
-        data: {
-          status: 'pending',
-          rejectedAt: null,
-          rejectedByUserId: null,
-          rejectionReason: null,
-          joinTokenId: input.joinTokenId ?? null,
-        },
-      });
-    } else {
-      // New request: create membership with pending status
-      await this.deps.prisma.organizationUser.create({
-        data: {
-          organizationId,
-          userId,
-          status: 'pending',
-          joinTokenId: input.joinTokenId ?? null,
-        },
-      });
+    const saved = await this.deps.memberships.saveRequest(
+      reference,
+      request.value
+    );
+
+    if (!saved.success) {
+      return saved;
     }
 
     // Notify admins about the new join request
     const notifyUseCase = new NotifyJoinRequestReceivedUseCase({
+      ids: this.deps.ids,
+      clock: this.deps.clock,
       organizationRepository: this.deps.organizationRepository,
       notificationRepository: this.deps.notificationRepository,
       userRepository: this.deps.userRepository,
     });
     await notifyUseCase
       .execute({ organizationId, requesterUserId: userId })
+      .then((outcome) => {
+        if (!outcome.success) {
+          console.error(
+            'Notification delivery failed (NotifyJoinRequestReceivedUseCase):',
+            outcome.error
+          );
+        }
+      })
       .catch((err) => {
         console.error('Failed to send join request notifications:', err);
       });

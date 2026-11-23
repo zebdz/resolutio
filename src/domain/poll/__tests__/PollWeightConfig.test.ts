@@ -1,3 +1,4 @@
+import { PropertyId } from '@/domain/shared/EntityIds';
 import { describe, it, expect } from 'vitest';
 import { PollWeightConfig } from '../PollWeightConfig';
 import { DistributionType } from '../DistributionType';
@@ -48,12 +49,12 @@ describe('PollWeightConfig', () => {
     const a = PollWeightConfig.create({
       distributionType: DistributionType.EQUAL,
       propertyAggregation: PropertyAggregation.RAW_SUM,
-      propertyIds: ['a', 'b'],
+      propertyIds: [PropertyId.parse('a'), PropertyId.parse('b')],
     });
     const b = PollWeightConfig.create({
       distributionType: DistributionType.EQUAL,
       propertyAggregation: PropertyAggregation.RAW_SUM,
-      propertyIds: ['b', 'a'],
+      propertyIds: [PropertyId.parse('b'), PropertyId.parse('a')],
     });
     expect(a.equals(b)).toBe(true);
   });

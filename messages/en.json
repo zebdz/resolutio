@@ -1,4 +1,27 @@
 {
+  "history": {
+    "profiles": "Historical profile details",
+    "ownership": "Ownership evidence",
+    "job": "Job",
+    "unknown": "Unknown",
+    "original": "Original protocol (PDF)",
+    "meetings": "Historical meetings and proposals",
+    "reports": "Historical reports",
+    "provenance": "Read-only historical results. Weights reflect ownership in the source snapshot.",
+    "start": "Start (Moscow)",
+    "finish": "Finish (Moscow)",
+    "attendance": "Participants / source denominator",
+    "export": "Download historical results",
+    "score": "Rating: {score}",
+    "answer": "Answer",
+    "count": "Ballots",
+    "percent": "Percentage",
+    "weight": "Snapshot weight",
+    "register": "Named votes",
+    "parent": "View collection or meeting results",
+    "report": "View report",
+    "importDate": "(import date)"
+  },
   "app": {
     "title": "NOMOS",
     "description": "Unite in organizations, vote, and formalize legally binding decisions"
@@ -254,6 +277,23 @@
     }
   },
   "organization": {
+    "eligibility": {
+      "close": "Close",
+      "switchLabel": "Voting eligibility for {name}",
+      "eligible": "Eligible to vote",
+      "ineligible": "Ineligible to vote",
+      "ownEligible": "Your membership is eligible for organization-wide polls.",
+      "ownIneligible": "Your membership is ineligible for organization-wide polls.",
+      "enable": "Enable voting for {name}?",
+      "disable": "Disable voting for {name}?",
+      "effective": "This applies when the voter list for an organization-wide poll is prepared. Administrators can see your reason.",
+      "reason": "Reason for this change (required)",
+      "invalidReason": "Enter a reason of 1 to 500 characters.",
+      "history": "Voting eligibility history",
+      "changedBy": "Changed by {name}",
+      "empty": "No eligibility changes recorded.",
+      "older": "Show older changes"
+    },
     "title": "Organization",
     "description": "Description",
     "admin": "Administrator",
@@ -793,6 +833,7 @@
       "pollNotFound": "Poll not found",
       "questionNotFound": "Question not found",
       "answerNotFound": "Answer not found",
+      "participantNotFound": "Participant not found",
       "cannotModifyFinished": "Cannot modify a finished poll",
       "cannotModifyActive": "Cannot modify an active poll",
       "cannotModifyHasVotes": "Cannot modify a poll that has votes",
@@ -939,8 +980,8 @@
         "questionNumber": "Question {number}",
         "questionType": "Type",
         "questionDetails": "Details",
-        "votedOnQuestion": "Voted",
-        "weightOfVotedOnQuestion": "Weight",
+        "votedOnQuestion": "Selections",
+        "weightOfVotedOnQuestion": "Total selection weight",
         "answerNumber": "#",
         "answerText": "Answer",
         "votes": "Votes",
@@ -1065,6 +1106,18 @@
     },
     "descriptionCharacterCount": "You typed {current} characters, the limit is {max}.",
     "attachments": {
+      "questionHint": "Attach up to three PDFs or images to this question.",
+      "previewFile": "Preview {name}",
+      "closePreview": "Close preview",
+      "previewUnavailable": "Preview unavailable",
+      "previousPage": "Previous page",
+      "nextPage": "Next page",
+      "previewPage": "Page {page} of {count}",
+      "questionLabel": "Question files",
+      "draftQuestionHint": "{count}/{limit} files. Selected files upload when you save the question.",
+      "saveUploadFailed": "Draft saved. These files could not be uploaded.",
+      "retry": "Retry uploads",
+      "openDraft": "Open saved draft",
       "label": "Attached files",
       "uploadButton": "Attach a file",
       "uploading": "Uploading…",
@@ -1171,6 +1224,7 @@
         "body": "\"{pollTitle}\" was returned to you by an administrator"
       },
       "pollFinished": {
+        "sealedBody": "Voting has ended for {pollTitle}. Sealed record: {rootDigest}.",
         "title": "Poll has ended",
         "body": "Voting has ended for \"{pollTitle}\""
       },
@@ -1299,6 +1353,26 @@
     "notifications": "Notifications"
   },
   "domain": {
+    "seal": {
+      "pollNotFinished": "Only eligible finished polls can be sealed.",
+      "inconsistentRecord": "The poll record is inconsistent.",
+      "missingReceiptSecret": "A voter is missing a receipt secret.",
+      "anchorIllegalTransition": "This anchor transition is not allowed.",
+      "versionUnsupported": "This seal format version is not supported.",
+      "algorithmUnsupported": "This seal hashing algorithm is not supported.",
+      "leafNotFound": "The vote is not present in the supplied record.",
+      "invalidWeight": "The sealed weight has an invalid value or format.",
+      "invalidCanonical": "The supplied data is not in canonical form.",
+      "invalidBundle": "Invalid evidence bundle.",
+      "manifestMismatch": "The manifest or its digest differs between files.",
+      "sectionMismatch": "A disclosed section does not match its commitment.",
+      "receiptMismatch": "The sealed votes differ from the original receipt.",
+      "labelMismatch": "The ballot labels differ from the sealed poll.",
+      "codeMismatch": "The receipt code does not match these votes.",
+      "invalidPath": "A vote does not match its inclusion proof.",
+      "proofDigestMismatch": "This timestamp is for a different digest.",
+      "invalidProof": "The supplied anchor evidence is invalid."
+    },
     "organization": {
       "organizationNameEmpty": "Organization name cannot be empty",
       "organizationNameTooLong": "Organization name cannot exceed {maxLength} characters",
@@ -1344,21 +1418,25 @@
       "propertyClaimAttachmentFileNameEmpty": "Proof file name is required",
       "propertyClaimAttachmentNotFound": "Proof file not found",
       "notOrgMember": "You are not a member of this organization",
-      "lastAdmin": "Cannot remove the last admin of an organization"
+      "lastAdmin": "Cannot remove the last admin of an organization",
+      "notOrgAdmin": "You are not an administrator of this organization."
     },
     "joinParentRequest": {
       "messageEmpty": "Message cannot be empty",
       "messageTooLong": "Message cannot exceed {maxLength} characters",
       "notPending": "Join parent request is not pending",
-      "rejectionReasonRequired": "Rejection reason is required"
+      "rejectionReasonRequired": "Rejection reason is required",
+      "rejectionReasonTooLong": "Rejection reason must not exceed 500 characters"
     },
     "invitation": {
-      "notPending": "Invitation is no longer pending"
+      "notPending": "Invitation is no longer pending",
+      "invalidData": "The invitation data is invalid."
     },
     "board": {
       "boardNameEmpty": "Board name cannot be empty",
       "boardNameTooLong": "Board name cannot exceed {maxLength} characters",
-      "boardAlreadyArchived": "Board is already archived"
+      "boardAlreadyArchived": "Board is already archived",
+      "boardInvalidData": "The board data is invalid."
     },
     "otp": {
       "invalidCodeFormat": "Code must be 6 digits"
@@ -1368,6 +1446,8 @@
       "answerTextTooLong": "Answer text cannot exceed {maxLength} characters",
       "answerOrderNegative": "Answer order must be a positive number",
       "answerAlreadyArchived": "Answer is already archived",
+      "questionInvalidData": "The question data is invalid.",
+      "answerInvalidData": "The answer data is invalid.",
       "questionTextEmpty": "Question text cannot be empty",
       "questionTextTooLong": "Question text cannot exceed {maxLength} characters",
       "questionDetailsTooLong": "Question details cannot exceed {maxLength} characters",
@@ -1408,6 +1488,9 @@
       "alreadyVoted": "You have already voted in this poll",
       "notParticipant": "You are not a participant in this poll",
       "mustAnswerAllQuestions": "You must answer all questions before finishing",
+      "receiptSecretImmutable": "The receipt code cannot be changed.",
+      "invalidBallot": "The ballot contains invalid selections. Reload the poll and try again.",
+      "stale": "The poll changed. Reload it and try again.",
       "invalidWeight": "Invalid vote weight",
       "cannotModifyParticipantsHasVotes": "Cannot modify participants - poll already has votes",
       "questionInvalidPage": "Invalid question page number",
@@ -1435,10 +1518,12 @@
       "attachmentTypeNotAllowed": "Only PNG, JPEG, WebP images and PDF files can be attached",
       "attachmentTooLarge": "File is too large. Images may be up to {maxImageMb} MB, PDFs up to {maxPdfMb} MB",
       "attachmentMagicMismatch": "File contents do not match its type",
+      "questionAttachmentLimitReached": "A question may have at most three attachments",
       "attachmentLimitReached": "A poll may have at most {limit} attachments",
       "attachmentNotFound": "Attachment not found",
       "descriptionInvalidAttachmentRef": "The description references a file that does not belong to this poll",
-      "cannotChangeAttachmentsActive": "Attachments cannot be changed once voting has started"
+      "cannotChangeAttachmentsActive": "Attachments cannot be changed once voting has started",
+      "invalidId": "Invalid poll identifier"
     },
     "user": {
       "userNotFound": "User not found",
@@ -1466,8 +1551,10 @@
         "cityRequired": "City is required",
         "streetRequired": "Street is required",
         "buildingRequired": "Building is required",
-        "apartmentRequired": "Apartment number is required"
-      }
+        "apartmentRequired": "Apartment number is required",
+        "registryIdInvalid": "Select the address again: its registry reference is invalid"
+      },
+      "languageInvalid": "The language is invalid."
     },
     "joinToken": {
       "descriptionEmpty": "Token description is required",
@@ -1497,11 +1584,22 @@
       "attachmentMagicMismatch": "File contents do not match the declared type",
       "attachmentLimitReached": "Maximum {maxCount} attachments per report",
       "pollAudienceTooNarrow": "Poll audience must cover the report's audience",
-      "pollNotFound": "Poll not found"
+      "pollNotFound": "Poll not found",
+      "invalidData": "The report data is invalid."
     },
     "shared": {
       "containsProfanity": "Contains inappropriate language",
-      "containsProfanityWithWords": "Contains inappropriate language: {words}"
+      "containsProfanityWithWords": "Contains inappropriate language: {words}",
+      "invalidAttachmentMetadata": "The attachment metadata is invalid."
+    },
+    "notification": {
+      "invalidData": "The notification data is invalid."
+    },
+    "legalCheck": {
+      "checkedByRequired": "The user requesting the check is required.",
+      "invalidData": "The legal check data is invalid.",
+      "pollNotFound": "Poll not found.",
+      "alreadyInProgress": "A legal check is already in progress."
     }
   },
   "phone": {
@@ -2361,6 +2459,14 @@
     "externalImageBlocked": "External image not allowed — upload it via the attachment uploader instead."
   },
   "email": {
+    "voteReceipt": {
+      "subject": "Vote receipt",
+      "body": "Poll: {title}\nCast at {time}\n{choices}\nReceipt code: {code}\nKeep the original receipt.json to compare your ballot after sealing.\n{url}"
+    },
+    "sealBundle": {
+      "subject": "Your sealed ballot",
+      "body": "{title}\nSealed at {time}\nSHA-256: {digest}\n{status, select, pending {The timestamp is pending. Confirmation usually takes hours and depends on the public calendars.} simulated {Simulated timestamp.} bitcoin {Bitcoin timestamp confirmed.} other {Timestamp status unavailable.}}\n{url}"
+    },
     "otp": {
       "phoneConfirmation": {
         "subject": "Your Resolutio confirmation code",
@@ -2381,5 +2487,127 @@
         "body": "The email address on your account was changed to {newEmail}.\n\nIf this was not you, contact an administrator immediately — whoever made the change can now request password resets."
       }
     }
+  },
+  "seal": {
+    "pdf": {
+      "digest": "Poll record SHA-256",
+      "coverage": "Compare this PDF with the sealed poll record. An edited PDF can carry the same record digest.",
+      "verifyAt": "Verify the record",
+      "preliminary": "Preliminary results · Poll has not been sealed."
+    },
+    "errors": {
+      "claimLost": "This sealing work is now owned by another worker or its lease expired.",
+      "notFound": "No sealed record exists for this poll.",
+      "anchorUnavailable": "A timestamp proof is not yet available.",
+      "forbidden": "Access to this evidence is restricted.",
+      "notAVoter": "No sealed votes belong to this account.",
+      "anchorSubmissionFailed": "The timestamp calendars did not accept the submission.",
+      "anchorUpgradeFailed": "The timestamp calendars could not be reached for a proof upgrade.",
+      "anchorVerificationFailed": "Bitcoin proof verification is pending.",
+      "providerMismatch": "The saved anchor uses a different timestamp provider."
+    }
+  },
+  "sealStatus": {
+    "awaitingSubmission": "Waiting for timestamp submission",
+    "bitcoin": "Bitcoin block {height} · {date}",
+    "failed": "Timestamp attempt failed",
+    "simulated": "Simulated timestamp",
+    "pending": "Bitcoin confirmation pending",
+    "unsealed": "Unsealed",
+    "sealing": "Sealing pending",
+    "copy": "Copy digest",
+    "copied": "Digest copied",
+    "copyFailed": "Select the digest and copy it manually.",
+    "record": "Verify poll record",
+    "myVote": "Check my vote",
+    "download": "Download permitted sections",
+    "unavailable": "Seal status unavailable"
+  },
+  "sealPrivate": {
+    "title": "Verify my vote",
+    "downloadBundle": "Download my proof bundle",
+    "publicSeal": "View the public seal and independent verification steps",
+    "localOnly": "Your browser checks the files on this device. Your receipt and any code you enter stay here.",
+    "method": "What would you like to check?",
+    "receipt": "Compare my original receipt",
+    "current": "Check current inclusion only",
+    "receiptFile": "Original receipt (receipt.json) saved or emailed when you voted",
+    "code": "Your saved receipt code (optional)",
+    "useStored": "Leave blank to use the code stored with your ballot.",
+    "noStored": "Without a code, this checks only that the supplied choices appear in the sealed record.",
+    "retainedLabels": "Use a saved copy of the poll questions and answers",
+    "labelsFile": "Saved sections export (sections.json) or canonical poll section (poll.json)",
+    "check": "Verify my vote",
+    "checking": "Checking the evidence…",
+    "originalReceiptMatches": "Your original receipt matches the sealed ballot.",
+    "codeMatchesCurrentRecord": "Your code matches the choices in the sealed record. No original receipt was compared.",
+    "includedLeaves": "These choices are included in the sealed record. No original receipt was compared.",
+    "labelsVerified": "Question and answer texts match the sealed poll.",
+    "labelsUnverified": "Sealed question and answer texts are unavailable. The IDs below were verified.",
+    "pending": "The timestamp proof matches the seal. Bitcoin confirmation is pending.",
+    "simulated": "This is a simulated timestamp. It provides no Bitcoin confirmation.",
+    "notProvided": "No timestamp proof is available for this check.",
+    "bitcoinAttestationUnverified": "The timestamp proof matches the seal and contains a Bitcoin attestation. Verify its block independently.",
+    "choice": "Question ID {question} · Answer ID {answer} · Weight {weight}",
+    "receiptClaim": "text from your original receipt",
+    "fileUnreadable": "Could not read the file as UTF-8. Select the original JSON file and try again."
+  },
+  "sealPublic": {
+    "title": "Verify the poll seal",
+    "missing": "No public seal is available for this poll yet.",
+    "loadError": "The published seal could not be loaded.",
+    "root": "Manifest SHA-256",
+    "sectionsTitle": "Section commitments",
+    "poll": "Poll definition",
+    "tallies": "Weighted tallies",
+    "register": "Participant register",
+    "votes": "Ballot Merkle root",
+    "signers": "Protocol signers",
+    "manifestDownload": "Download manifest",
+    "proofDownload": "Download timestamp proof",
+    "sectionsDownload": "Download permitted record sections",
+    "proofUnavailable": "No timestamp proof is available to download yet.",
+    "myVote": "Verify my vote",
+    "signInVote": "Sign in to verify my vote",
+    "signInSections": "Sign in to access permitted record sections",
+    "explorer": "View Bitcoin block {height} on Blockchair",
+    "browserTitle": "Check the published record",
+    "browserInfo": "The check runs in this browser. Saved files stay on your device.",
+    "sectionsFile": "Saved sections.json (optional)",
+    "check": "Check available evidence",
+    "checking": "Checking evidence…",
+    "manifestChecked": "Manifest digest checked.",
+    "checked": "Verified sections: {sections}.",
+    "noSections": "Only the public commitments were checked. No record sections were provided.",
+    "pending": "Timestamp proof matches. Bitcoin confirmation is pending.",
+    "simulated": "Simulated timestamp proof. It provides no Bitcoin confirmation.",
+    "bitcoinAttestationUnverified": "The proof matches the manifest and contains a Bitcoin attestation. Use OpenTimestamps to verify it against the chain.",
+    "notProvided": "Timestamp proof unavailable.",
+    "downloadUnavailable": "Evidence could not be downloaded. Check your access and try again.",
+    "readError": "The selected file could not be read.",
+    "recipeTitle": "Verify independently",
+    "recipeIntro": "Resolutio serves this page and its verifier. For an independent check, build the standalone verifier from reviewed source with yarn build:seal-verifier. Copy build/verify-seal.mjs and your downloaded files into one folder and run these commands there with Node 22 or newer.",
+    "otsInfo": "For a real timestamp, work on a copy of the proof. The OpenTimestamps client uses a calendar to upgrade the proof and a synced Bitcoin node to verify the block. Use -f with the downloaded manifest file. Use -d with the hexadecimal digest itself. A text file containing the digest has a different hash.",
+    "otsClient": "OpenTimestamps client instructions"
+  },
+  "sealReceipt": {
+    "title": "Your ballot receipt",
+    "recorded": "Vote recorded",
+    "legacy": "This vote was recorded before ballot receipts were available.",
+    "retain": "Your vote is recorded. Save this file now to check your original selections after the poll closes. It contains your private ballot and verification code.",
+    "replay": "This is the app’s current copy of your receipt. Use the copy you saved or received when you voted to check what was recorded at that time.",
+    "download": "Download receipt.json",
+    "sent": "A copy was sent to your confirmed email address.",
+    "failed": "Your vote is recorded. Email delivery failed. Save the receipt here.",
+    "unconfirmed": "Email delivery requires a confirmed address. Save your receipt here.",
+    "confirmEmail": "Confirm your email in account settings",
+    "privateCode": "Private verification code",
+    "copyCode": "Copy code",
+    "copied": "Code copied.",
+    "copyFailed": "Select the code and copy it manually.",
+    "answers": "Your recorded choices",
+    "leafHash": "Selection hash (SHA-256)",
+    "verify": "Check my vote",
+    "back": "Back to polls"
   }
 }

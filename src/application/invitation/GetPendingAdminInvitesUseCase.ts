@@ -1,9 +1,17 @@
+/** Decodes invitation request references before authorization and domain transitions. */
+import { z } from 'zod';
+import {
+  OrganizationId,
+  UserId,
+  InvitationId,
+  BoardId,
+} from '@/domain/shared/EntityIds';
 import { InvitationRepository } from '../../domain/invitation/InvitationRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { Invitation } from '../../domain/invitation/Invitation';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { InvitationErrors } from './InvitationErrors';
+import { InvitationErrors, InvitationUseCaseFailure } from './InvitationErrors';
 
 export interface GetPendingAdminInvitesDependencies {
   invitationRepository: InvitationRepository;
@@ -14,10 +22,20 @@ export interface GetPendingAdminInvitesDependencies {
 export class GetPendingAdminInvitesUseCase {
   constructor(private deps: GetPendingAdminInvitesDependencies) {}
 
-  async execute(input: {
+  async execute(rawInput: {
     organizationId: string;
     actorUserId: string;
-  }): Promise<Result<Invitation[], string>> {
+  }): Promise<Result<Invitation[], InvitationUseCaseFailure>> {
+    const parsed = z
+      .object({ organizationId: OrganizationId, actorUserId: UserId })
+      .safeParse(rawInput);
+
+    if (!parsed.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = { ...rawInput, ...parsed.data };
+
     const { organizationId, actorUserId } = input;
 
     const isSuperAdmin =

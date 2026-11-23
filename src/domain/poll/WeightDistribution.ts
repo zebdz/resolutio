@@ -7,34 +7,73 @@
 // A single asset's total contribution never exceeds its effective_size: co-owners split the asset's
 // contribution by their shares (if 2 people each own 50%, each gets 0.5× — not 1× each).
 
+import { z } from 'zod';
+import { AssetId, PropertyId, UserId } from '../shared/EntityIds';
+import { AssetSize, OwnershipShare } from '../organization/PropertyValues';
+import { VotingWeight } from './VotingWeight';
+import { PollDomainCode, PollDomainCodes } from './PollDomainCodes';
+import { Result, failure, success } from '../shared/Result';
 import { DistributionType } from './DistributionType';
 import { PropertyAggregation } from './PropertyAggregation';
 
 export interface WeightAsset {
-  id: string;
-  propertyId: string;
-  size: number;
+  id: AssetId;
+  propertyId: PropertyId;
+  size: AssetSize;
 }
 
 export interface WeightOwnership {
-  assetId: string;
-  userId: string;
-  share: number;
+  assetId: AssetId;
+  userId: UserId;
+  share: OwnershipShare;
 }
 
 export interface WeightDistributionInput {
-  candidates: string[];
+  candidates: UserId[];
   distributionType: DistributionType;
   // Empty propertyIds = no filter (all assets considered).
   propertyAggregation: PropertyAggregation;
-  propertyIds: string[];
+  propertyIds: PropertyId[];
   assets: WeightAsset[];
   ownerships: WeightOwnership[];
 }
 
+export const WeightDistributionInput = z.object({
+  candidates: z.array(UserId),
+  distributionType: z.enum(DistributionType),
+  propertyAggregation: z.enum(PropertyAggregation),
+  propertyIds: z.array(PropertyId),
+  assets: z.array(
+    z.object({ id: AssetId, propertyId: PropertyId, size: AssetSize })
+  ),
+  ownerships: z.array(
+    z.object({ assetId: AssetId, userId: UserId, share: OwnershipShare })
+  ),
+});
+
 export function computeWeights(
   input: WeightDistributionInput
-): Map<string, number> {
+): Result<Map<UserId, VotingWeight>, PollDomainCode> {
+  const values = WeightDistributionInput.safeParse(input);
+
+  if (!values.success) {
+    return failure(PollDomainCodes.INVALID_WEIGHT);
+  }
+
+  try {
+    const weights = calculateWeights(values.data);
+
+    return success(
+      new Map(
+        [...weights].map(([id, weight]) => [id, VotingWeight.parse(weight)])
+      )
+    );
+  } catch {
+    return failure(PollDomainCodes.INVALID_WEIGHT);
+  }
+}
+
+function calculateWeights(input: WeightDistributionInput): Map<UserId, number> {
   const inScopeAssets = filterAssets(input.assets, input.propertyIds);
   const inScopeAssetIdSet = new Set(inScopeAssets.map((a) => a.id));
   const ownershipByUser = groupOwnershipByUser(
@@ -42,7 +81,7 @@ export function computeWeights(
     inScopeAssetIdSet
   );
 
-  const out = new Map<string, number>();
+  const out = new Map<UserId, number>();
 
   if (input.distributionType === DistributionType.EQUAL) {
     // EQUAL with empty scope: every candidate votes (membership is enough).
@@ -68,12 +107,12 @@ export function computeWeights(
       ? 1
       : a.size;
 
-  const assetById = new Map<string, WeightAsset>(
+  const assetById = new Map<AssetId, WeightAsset>(
     inScopeAssets.map((a) => [a.id, a])
   );
 
   // Pre-group assets by property — needed for per-property normalization (denominator).
-  const assetsByProperty = new Map<string, WeightAsset[]>();
+  const assetsByProperty = new Map<PropertyId, WeightAsset[]>();
 
   for (const a of inScopeAssets) {
     const list = assetsByProperty.get(a.propertyId) ?? [];
@@ -108,6 +147,10 @@ export function computeWeights(
         weight += o.share * effectiveSize(a);
       }
 
+      if (!Number.isFinite(weight)) {
+        throw new Error(PollDomainCodes.INVALID_WEIGHT);
+      }
+
       if (weight > 0) {
         out.set(userId, weight);
       }
@@ -119,7 +162,7 @@ export function computeWeights(
     // Solves the mixed-unit problem (e.g., apartments in m² + parking spots as counts):
     // a user's share of each property is normalized to [0, 1] regardless of that property's
     // absolute scale, then added across properties.
-    const userByProp = new Map<string, WeightOwnership[]>();
+    const userByProp = new Map<PropertyId, WeightOwnership[]>();
 
     for (const o of userOwnerships) {
       const a = assetById.get(o.assetId);
@@ -142,6 +185,10 @@ export function computeWeights(
       // dilute the weight rather than being ignored.
       const denom = propAssets.reduce((s, a) => s + effectiveSize(a), 0);
 
+      if (!Number.isFinite(denom)) {
+        throw new Error(PollDomainCodes.INVALID_WEIGHT);
+      }
+
       if (denom === 0) {
         continue;
       }
@@ -161,6 +208,10 @@ export function computeWeights(
       weight += num / denom;
     }
 
+    if (!Number.isFinite(weight)) {
+      throw new Error(PollDomainCodes.INVALID_WEIGHT);
+    }
+
     if (weight > 0) {
       out.set(userId, weight);
     }
@@ -171,7 +222,7 @@ export function computeWeights(
 
 function filterAssets(
   assets: WeightAsset[],
-  propertyIds: string[]
+  propertyIds: PropertyId[]
 ): WeightAsset[] {
   if (propertyIds.length === 0) {
     return assets;
@@ -184,9 +235,9 @@ function filterAssets(
 
 function groupOwnershipByUser(
   ownerships: WeightOwnership[],
-  inScopeAssetIds: Set<string>
-): Map<string, WeightOwnership[]> {
-  const map = new Map<string, WeightOwnership[]>();
+  inScopeAssetIds: Set<AssetId>
+): Map<UserId, WeightOwnership[]> {
+  const map = new Map<UserId, WeightOwnership[]>();
 
   for (const o of ownerships) {
     if (!inScopeAssetIds.has(o.assetId)) {

@@ -3,6 +3,7 @@ export const JoinParentRequestDomainCodes = {
   MESSAGE_TOO_LONG: 'domain.joinParentRequest.messageTooLong',
   NOT_PENDING: 'domain.joinParentRequest.notPending',
   REJECTION_REASON_REQUIRED: 'domain.joinParentRequest.rejectionReasonRequired',
+  REJECTION_REASON_TOO_LONG: 'domain.joinParentRequest.rejectionReasonTooLong',
 } as const;
 
 export type JoinParentRequestDomainCode =

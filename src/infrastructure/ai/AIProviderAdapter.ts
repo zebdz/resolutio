@@ -1,3 +1,5 @@
+/** Provider lookup consumes a validated stable model key; SDK types stay in infrastructure. */
+import { AIModelKey } from '@/domain/ai/LegalAnalysis';
 import type { LanguageModel } from 'ai';
 import { AVAILABLE_MODEL_KEYS } from '@/application/ai/modelRegistry';
 import { getDeepSeekModel } from './providers/deepseek';
@@ -14,7 +16,7 @@ const MODEL_REGISTRY: Record<string, ModelFactory> = {
 export const AVAILABLE_MODELS = AVAILABLE_MODEL_KEYS;
 
 export class AIProviderAdapter {
-  getModel(modelKey: string): LanguageModel {
+  getModel(modelKey: AIModelKey): LanguageModel {
     const factory = MODEL_REGISTRY[modelKey];
 
     if (!factory) {

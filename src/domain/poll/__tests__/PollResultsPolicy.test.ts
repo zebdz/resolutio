@@ -1,3 +1,15 @@
+/** Results visibility and export rules for persisted polls across their lifecycle. */
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { PollInstant } from '@/domain/poll/PollValues';
+import { QuestionText, AnswerText } from '@/domain/poll/QuestionValues';
+import { PageNumber, SortOrder } from '@/domain/poll/QuestionValues';
+import { UserId } from '@/domain/shared/EntityIds';
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { OrganizationId } from '@/domain/shared/EntityIds';
+import { expectFailure } from '@/domain/shared/__tests__/resultAssertions';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import { PollId, QuestionId, AnswerId } from '@/domain/shared/EntityIds';
 import { describe, it, expect } from 'vitest';
 import { Poll } from '../Poll';
 import { Question } from '../Question';
@@ -12,21 +24,48 @@ function makePoll(
   state: PollState,
   opts: { anonymous?: boolean; pollType?: Kind } = {}
 ): Poll {
-  const poll = Poll.create(
-    'Title',
-    'Description',
-    'org-1',
-    null,
-    'user-admin',
-    new Date('2026-01-01'),
-    new Date('2026-02-01'),
-    undefined,
-    opts.pollType ?? 'ORGANIZATION',
-    opts.anonymous ?? false
-  ).value;
+  const created = expectSuccess(
+    Poll.create(
+      PollTitle.parse('Title'),
+      PollDescription.parse('Description'),
+      OrganizationId.parse('org-1'),
+      null,
+      UserId.parse('user-admin'),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-01'), new Date('2026-02-01'))
+      ),
+      testCreation(PollId, 'poll-1'),
+      undefined,
+      opts.pollType ?? 'ORGANIZATION',
+      opts.anonymous ?? false
+    )
+  );
+  const poll = Poll.reconstitute({
+    ...created.toJSON(),
+    id: 'poll-1',
+    questions: created.questions,
+  });
 
-  const question = Question.create('Q1', 'poll-1', 1, 0, 'single-choice').value;
-  question.addAnswer(Answer.create('A1', 1, 'question-1').value);
+  const question = expectSuccess(
+    Question.create(
+      QuestionText.parse('Q1'),
+      PollId.parse('poll-1'),
+      testCreation(QuestionId, 'question-1'),
+      PageNumber.parse(1),
+      SortOrder.parse(0),
+      'single-choice'
+    )
+  );
+  question.addAnswer(
+    expectSuccess(
+      Answer.create(
+        AnswerText.parse('A1'),
+        SortOrder.parse(1),
+        QuestionId.parse('question-1'),
+        testCreation(AnswerId, 'answer-1')
+      )
+    )
+  );
   poll.addQuestion(question);
 
   if (state !== PollState.DRAFT) {
@@ -39,7 +78,9 @@ function makePoll(
   }
 
   if (state === PollState.FINISHED) {
-    poll.finish();
+    expect(
+      poll.finish(PollInstant.parse(new Date().toISOString())).success
+    ).toBe(true);
   }
 
   return poll;
@@ -83,7 +124,7 @@ describe('PollResultsPolicy.canViewResults', () => {
     );
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_RESULTS_ADMIN_ONLY);
+    expect(expectFailure(result)).toBe(PollDomainCodes.POLL_RESULTS_ADMIN_ONLY);
   });
 
   it('lets a member read an active named poll', () => {
@@ -111,7 +152,9 @@ describe('PollResultsPolicy.canViewResults', () => {
     );
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_RESULTS_NOT_ORG_MEMBER);
+    expect(expectFailure(result)).toBe(
+      PollDomainCodes.POLL_RESULTS_NOT_ORG_MEMBER
+    );
   });
 
   it('lets an open-poll voter read a finished open poll', () => {
@@ -139,7 +182,7 @@ describe('PollResultsPolicy.canViewResults', () => {
     );
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_RESULTS_ADMIN_ONLY);
+    expect(expectFailure(result)).toBe(PollDomainCodes.POLL_RESULTS_ADMIN_ONLY);
   });
 
   it('refuses a poll voter on a non-open poll they are not a member of', () => {
@@ -149,7 +192,9 @@ describe('PollResultsPolicy.canViewResults', () => {
     );
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe(PollDomainCodes.POLL_RESULTS_NOT_ORG_MEMBER);
+    expect(expectFailure(result)).toBe(
+      PollDomainCodes.POLL_RESULTS_NOT_ORG_MEMBER
+    );
   });
 
   it('lets a member read DRAFT and READY polls of either kind', () => {
@@ -213,9 +258,9 @@ describe('PollResultsPolicy.canExportProtocol', () => {
   it('refuses everyone before FINISHED on an anonymous poll', () => {
     const poll = makePoll(PollState.ACTIVE, { anonymous: true });
 
-    expect(PollResultsPolicy.canExportProtocol(poll, admin).error).toBe(
-      PollDomainCodes.POLL_PROTOCOL_NOT_AVAILABLE
-    );
+    expect(
+      expectFailure(PollResultsPolicy.canExportProtocol(poll, admin))
+    ).toBe(PollDomainCodes.POLL_PROTOCOL_NOT_AVAILABLE);
   });
 
   it('allows an admin on a finished anonymous poll', () => {
@@ -236,17 +281,20 @@ describe('PollResultsPolicy.canExportProtocol', () => {
 
   it('refuses on a READY named poll — nothing has been voted yet', () => {
     expect(
-      PollResultsPolicy.canExportProtocol(makePoll(PollState.READY), admin)
-        .error
+      expectFailure(
+        PollResultsPolicy.canExportProtocol(makePoll(PollState.READY), admin)
+      )
     ).toBe(PollDomainCodes.POLL_PROTOCOL_NOT_AVAILABLE);
   });
 
   it('propagates the read refusal for an outsider', () => {
     expect(
-      PollResultsPolicy.canExportProtocol(
-        makePoll(PollState.FINISHED),
-        outsider
-      ).error
+      expectFailure(
+        PollResultsPolicy.canExportProtocol(
+          makePoll(PollState.FINISHED),
+          outsider
+        )
+      )
     ).toBe(PollDomainCodes.POLL_RESULTS_NOT_ORG_MEMBER);
   });
 });
@@ -254,10 +302,12 @@ describe('PollResultsPolicy.canExportProtocol', () => {
 describe('PollResultsPolicy.canExportNamedProtocol', () => {
   it('refuses on an anonymous poll even for an admin', () => {
     expect(
-      PollResultsPolicy.canExportNamedProtocol(
-        makePoll(PollState.FINISHED, { anonymous: true }),
-        admin
-      ).error
+      expectFailure(
+        PollResultsPolicy.canExportNamedProtocol(
+          makePoll(PollState.FINISHED, { anonymous: true }),
+          admin
+        )
+      )
     ).toBe(PollDomainCodes.POLL_IS_ANONYMOUS);
   });
 
@@ -281,17 +331,23 @@ describe('PollResultsPolicy.canExportNamedProtocol', () => {
 
   it('refuses on a READY named poll', () => {
     expect(
-      PollResultsPolicy.canExportNamedProtocol(makePoll(PollState.READY), admin)
-        .error
+      expectFailure(
+        PollResultsPolicy.canExportNamedProtocol(
+          makePoll(PollState.READY),
+          admin
+        )
+      )
     ).toBe(PollDomainCodes.POLL_PROTOCOL_NOT_AVAILABLE);
   });
 
   it('refuses an outsider on a named poll', () => {
     expect(
-      PollResultsPolicy.canExportNamedProtocol(
-        makePoll(PollState.FINISHED),
-        outsider
-      ).error
+      expectFailure(
+        PollResultsPolicy.canExportNamedProtocol(
+          makePoll(PollState.FINISHED),
+          outsider
+        )
+      )
     ).toBe(PollDomainCodes.POLL_RESULTS_ADMIN_ONLY);
   });
 

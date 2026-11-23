@@ -1,3 +1,5 @@
+import { HistoricalRecord } from '@/web/components/history/HistoricalRecord';
+import { HistoricalPollId } from '@/domain/history/HistoryIds';
 import { AuthenticatedLayout } from '@/src/web/components/layout/AuthenticatedLayout';
 import { EditPollForm } from './edit/EditPollForm';
 
@@ -12,7 +14,17 @@ import { EditPollForm } from './edit/EditPollForm';
  * stay identical on both. `readOnly` only forces the view; who may see the
  * poll at all is still decided from the server's permissions.
  */
-export default function PollPage() {
+export default async function PollPage({
+  params,
+}: {
+  params: Promise<{ pollId: string; locale: string }>;
+}) {
+  const { pollId: id, locale } = await params;
+
+  if (HistoricalPollId.safeParse(id).success) {
+    return <HistoricalRecord kind="poll" id={id} locale={locale} />;
+  }
+
   return (
     <AuthenticatedLayout>
       <EditPollForm readOnly />

@@ -14,6 +14,22 @@ import { describe, it, expect, vi } from 'vitest';
 import { Prisma } from '@/generated/prisma/client';
 import { PrismaPropertyAssetRepository } from '../PrismaPropertyAssetRepository';
 import { OrganizationDomainCodes } from '../../../domain/organization/OrganizationDomainCodes';
+import { PropertyAsset } from '../../../domain/organization/PropertyAsset';
+import {
+  AssetId,
+  PropertyId,
+  OwnershipId,
+  UserId,
+} from '../../../domain/shared/EntityIds';
+import { Instant } from '../../../domain/shared/Instant';
+import {
+  AssetName,
+  AssetSize,
+  ExternalOwnerLabel,
+  OwnershipShare,
+} from '../../../domain/organization/PropertyValues';
+
+const at = Instant.parse('2026-01-01T00:00:00.000Z');
 
 const ACTIVE_USER_OWNERSHIP_INDEX =
   'property_asset_ownerships_active_user_unique';
@@ -43,6 +59,7 @@ function p2002WithIndexName(indexName: string) {
 
 function createMockPrisma() {
   return {
+    propertyAsset: { create: vi.fn(), findUnique: vi.fn() },
     propertyAssetOwnership: {
       update: vi.fn(),
       create: vi.fn(),
@@ -50,6 +67,133 @@ function createMockPrisma() {
     $transaction: vi.fn(),
   } as any;
 }
+
+describe('PrismaPropertyAssetRepository — validated persistence boundary', () => {
+  it('preserves caller-supplied identity and creation time when saving', async () => {
+    const prisma = createMockPrisma();
+    prisma.propertyAsset.create.mockImplementation(async ({ data }: any) => ({
+      id: 'database-generated',
+      createdAt: new Date('2025-01-01T00:00:00.000Z'),
+      archivedAt: null,
+      ...data,
+    }));
+    const asset = PropertyAsset.create(
+      PropertyId.parse('p-1'),
+      AssetName.parse('Unit'),
+      AssetSize.parse(15),
+      { id: AssetId.parse('caller-created'), now: at }
+    );
+
+    if (!asset.success) {
+      throw new Error(asset.error);
+    }
+
+    const saved = await new PrismaPropertyAssetRepository(prisma).saveAsset(
+      asset.value
+    );
+    expect(saved.success).toBe(true);
+
+    if (saved.success) {
+      expect(saved.value.id).toBe('caller-created');
+      expect(saved.value.createdAt).toEqual(Instant.toDate(at));
+    }
+  });
+
+  it('returns a stable code when a stored asset has an invalid size', async () => {
+    const prisma = createMockPrisma();
+    prisma.propertyAsset.findUnique.mockResolvedValue({
+      id: 'a-1',
+      propertyId: 'p-1',
+      name: 'Unit',
+      size: Infinity,
+      createdAt: Instant.toDate(at),
+      archivedAt: null,
+    });
+    expect(
+      await new PrismaPropertyAssetRepository(prisma).findAssetById(
+        AssetId.parse('a-1')
+      )
+    ).toEqual({ success: false, error: 'common.errors.unexpected' });
+  });
+
+  it('round-trips replacement owner identities, alternatives and transition time', async () => {
+    const prisma = createMockPrisma();
+    const stored: any[] = [];
+    const ownership = {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      createMany: async ({ data }: any) => {
+        stored.push(
+          ...data.map((row: any) => ({
+            id: 'database-generated',
+            createdAt: new Date('2025-01-01T00:00:00.000Z'),
+            effectiveFrom: new Date('2025-01-01T00:00:00.000Z'),
+            effectiveUntil: null,
+            ...row,
+          }))
+        );
+
+        return { count: data.length };
+      },
+      findMany: async () => stored,
+    };
+    prisma.propertyAssetOwnership = ownership;
+    prisma.$transaction.mockImplementation(async (callback: any) =>
+      callback(prisma)
+    );
+    const repo = new PrismaPropertyAssetRepository(prisma);
+    expect(
+      (
+        await repo.replaceOwners({
+          assetId: AssetId.parse('a-1'),
+          at,
+          inserts: [
+            {
+              id: OwnershipId.parse('o-user'),
+              owner: { kind: 'user', userId: UserId.parse('u-1') },
+              share: OwnershipShare.parse(0.5),
+              createdAt: at,
+            },
+            {
+              id: OwnershipId.parse('o-external'),
+              owner: {
+                kind: 'external',
+                label: ExternalOwnerLabel.parse('Recorded owner'),
+              },
+              share: OwnershipShare.parse(0.5),
+              createdAt: at,
+            },
+          ],
+        })
+      ).success
+    ).toBe(true);
+    const result = await repo.findActiveOwnershipForAsset(AssetId.parse('a-1'));
+    expect(result.success).toBe(true);
+
+    if (result.success) {
+      expect(
+        result.value.map((row) => ({
+          id: row.id,
+          owner: row.owner,
+          createdAt: row.createdAt,
+          effectiveFrom: row.effectiveFrom,
+        }))
+      ).toEqual([
+        {
+          id: 'o-user',
+          owner: { kind: 'user', userId: 'u-1' },
+          createdAt: Instant.toDate(at),
+          effectiveFrom: Instant.toDate(at),
+        },
+        {
+          id: 'o-external',
+          owner: { kind: 'external', label: 'Recorded owner' },
+          createdAt: Instant.toDate(at),
+          effectiveFrom: Instant.toDate(at),
+        },
+      ]);
+    }
+  });
+});
 
 describe('PrismaPropertyAssetRepository — duplicate-active-owner constraint', () => {
   describe('linkOwnershipToUser', () => {
@@ -60,8 +204,8 @@ describe('PrismaPropertyAssetRepository — duplicate-active-owner constraint', 
       );
       const repo = new PrismaPropertyAssetRepository(prisma);
       const r = await repo.linkOwnershipToUser({
-        ownershipId: 'o-1',
-        userId: 'u-1',
+        ownershipId: OwnershipId.parse('o-1'),
+        userId: UserId.parse('u-1'),
       });
       expect(r.success).toBe(false);
 
@@ -82,8 +226,8 @@ describe('PrismaPropertyAssetRepository — duplicate-active-owner constraint', 
       );
       const repo = new PrismaPropertyAssetRepository(prisma);
       const r = await repo.linkOwnershipToUser({
-        ownershipId: 'o-1',
-        userId: 'u-1',
+        ownershipId: OwnershipId.parse('o-1'),
+        userId: UserId.parse('u-1'),
       });
       expect(r.success).toBe(false);
 
@@ -105,9 +249,11 @@ describe('PrismaPropertyAssetRepository — duplicate-active-owner constraint', 
       );
       const repo = new PrismaPropertyAssetRepository(prisma);
       const r = await repo.createOwnershipForUser({
-        assetId: 'a-1',
-        userId: 'u-1',
-        share: 1,
+        ownershipId: OwnershipId.parse('o-created'),
+        at,
+        assetId: AssetId.parse('a-1'),
+        userId: UserId.parse('u-1'),
+        share: OwnershipShare.parse(1),
       });
       expect(r.success).toBe(false);
 
@@ -129,11 +275,21 @@ describe('PrismaPropertyAssetRepository — duplicate-active-owner constraint', 
       );
       const repo = new PrismaPropertyAssetRepository(prisma);
       const r = await repo.replaceOwners({
-        assetId: 'a-1',
-        at: new Date(),
+        assetId: AssetId.parse('a-1'),
+        at,
         inserts: [
-          { userId: 'u-1', externalOwnerLabel: null, share: 0.5 },
-          { userId: 'u-1', externalOwnerLabel: null, share: 0.5 },
+          {
+            id: OwnershipId.parse('o-1'),
+            owner: { kind: 'user', userId: UserId.parse('u-1') },
+            share: OwnershipShare.parse(0.5),
+            createdAt: at,
+          },
+          {
+            id: OwnershipId.parse('o-2'),
+            owner: { kind: 'user', userId: UserId.parse('u-1') },
+            share: OwnershipShare.parse(0.5),
+            createdAt: at,
+          },
         ],
       });
       expect(r.success).toBe(false);

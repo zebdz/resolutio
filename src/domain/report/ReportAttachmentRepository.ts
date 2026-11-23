@@ -1,18 +1,28 @@
+/** Typed attachment persistence projections. Metadata never contains content bytes;
+ * adapters validate stored scalar values before they cross the port. */
+import { Instant } from '../shared/Instant';
+import { ReportAttachmentId, ReportId } from '../shared/EntityIds';
+import {
+  AttachmentFileName,
+  AttachmentByteCount,
+  AttachmentCount,
+} from '../shared/attachments/AttachmentValues';
+import { ReportAttachmentMimeType } from './ReportAttachment';
 import { ReportAttachment } from './ReportAttachment';
 import { Result } from '../shared/Result';
 
 export interface ReportAttachmentMetadata {
-  id: string;
-  reportId: string;
-  fileName: string;
-  mimeType: string;
-  sizeBytes: number;
-  createdAt: Date;
+  id: ReportAttachmentId;
+  reportId: ReportId;
+  fileName: AttachmentFileName;
+  mimeType: ReportAttachmentMimeType;
+  sizeBytes: AttachmentByteCount;
+  createdAt: Instant;
 }
 
 export interface ReportAttachmentBytes {
-  fileName: string;
-  mimeType: string;
+  fileName: AttachmentFileName;
+  mimeType: ReportAttachmentMimeType;
   bytes: Buffer;
 }
 
@@ -20,16 +30,22 @@ export interface ReportAttachmentRepository {
   save(
     attachment: ReportAttachment,
     bytes: Buffer
-  ): Promise<Result<ReportAttachmentMetadata, string>>;
+  ): Promise<Result<ReportAttachmentMetadata, 'common.errors.unexpected'>>;
   findByReportId(
-    reportId: string
-  ): Promise<Result<ReportAttachmentMetadata[], string>>;
+    reportId: ReportId
+  ): Promise<Result<ReportAttachmentMetadata[], 'common.errors.unexpected'>>;
   findBytesById(
-    id: string
-  ): Promise<Result<ReportAttachmentBytes | null, string>>;
+    id: ReportAttachmentId
+  ): Promise<Result<ReportAttachmentBytes | null, 'common.errors.unexpected'>>;
   findById(
-    id: string
-  ): Promise<Result<ReportAttachmentMetadata | null, string>>;
-  countByReportId(reportId: string): Promise<Result<number, string>>;
-  deleteById(id: string): Promise<Result<void, string>>;
+    id: ReportAttachmentId
+  ): Promise<
+    Result<ReportAttachmentMetadata | null, 'common.errors.unexpected'>
+  >;
+  countByReportId(
+    reportId: ReportId
+  ): Promise<Result<AttachmentCount, 'common.errors.unexpected'>>;
+  deleteById(
+    id: ReportAttachmentId
+  ): Promise<Result<void, 'common.errors.unexpected'>>;
 }

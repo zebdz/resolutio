@@ -1,5 +1,7 @@
 // Poll-related error codes
 // These should be translated at the presentation layer
+import { PollFailure } from '../../domain/poll/Poll';
+import { PollWriteFailure } from '../../domain/poll/PollWriteFailure';
 export const PollErrors = {
   // Poll
   NOT_FOUND: 'poll.errors.pollNotFound',
@@ -22,6 +24,7 @@ export const PollErrors = {
 
   // Answer
   ANSWER_NOT_FOUND: 'poll.errors.answerNotFound',
+  PARTICIPANT_NOT_FOUND: 'poll.errors.participantNotFound',
 
   CANNOT_CHANGE_WEIGHT_CONFIG: 'poll.errors.cannotChangeWeightConfig',
 
@@ -31,3 +34,11 @@ export const PollErrors = {
 } as const;
 
 export type PollError = (typeof PollErrors)[keyof typeof PollErrors];
+
+/** Common poll application failures; cross-context operations add their own
+ * dependency failures explicitly rather than widening the contract to string. */
+export type PollUseCaseFailure =
+  | PollError
+  | PollFailure
+  | PollWriteFailure
+  | 'common.errors.validationFailed';

@@ -1,5 +1,7 @@
 'use client';
 
+/** Edits a typed poll snapshot, retaining incomplete editor drafts until submission. */
+
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
@@ -42,6 +44,9 @@ import { PlusIcon } from '@heroicons/react/20/solid';
 import { MarkdownEditor } from '@/web/components/markdown/MarkdownEditor';
 import { POLL_ATTACHMENT_API_PREFIX } from '@/domain/poll/PollAttachment';
 import { POLL_DESCRIPTION_MAX_LENGTH } from '@/domain/poll/Poll';
+import { DraftQuestionFiles } from '@/web/components/polls/draft/DraftQuestionFiles';
+import { useQuestionFileUploads } from '@/web/components/polls/draft/useQuestionFileUploads';
+import type { QuestionFileUpload } from '@/web/components/polls/draft/questionFileUploads';
 import { PollAttachmentUploader } from '@/web/components/polls/PollAttachmentUploader';
 import {
   listPollAttachmentsAction,
@@ -60,6 +65,7 @@ interface Answer {
 }
 
 interface Question {
+  files?: File[];
   id: string;
   text: string;
   details?: string;
@@ -118,6 +124,7 @@ export function EditPollForm({ readOnly = false }: EditPollFormProps = {}) {
   const [originalTitle, setOriginalTitle] = useState('');
   const [originalDescription, setOriginalDescription] = useState('');
   const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
+  const questionUploads = useQuestionFileUploads();
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -168,12 +175,19 @@ export function EditPollForm({ readOnly = false }: EditPollFormProps = {}) {
   // are not bound by the 12 MB serverActions body limit. The route returns an
   // already-localized message on failure.
   const handleUploadAttachment = useCallback(
-    async (file: File): Promise<{ id: string } | { error: string }> => {
+    async (
+      file: File,
+      questionId?: string
+    ): Promise<{ id: string } | { error: string }> => {
       setAttachmentError(null);
 
       const formData = new FormData();
       formData.append('pollId', pollId);
       formData.append('file', file);
+
+      if (questionId) {
+        formData.append('questionId', questionId);
+      }
 
       try {
         const res = await fetch('/api/poll-attachments', {
@@ -399,15 +413,15 @@ export function EditPollForm({ readOnly = false }: EditPollFormProps = {}) {
 
         // Load questions
         if (poll.questions && poll.questions.length > 0) {
-          const loadedQuestions = poll.questions.map((q: any) => ({
+          const loadedQuestions = poll.questions.map((q) => ({
             id: q.id,
             text: q.text,
             details: q.details || '',
-            questionType: q.questionType as QuestionType,
+            questionType: q.questionType,
             page: q.page,
             order: q.order,
             answers: q.answers
-              ? q.answers.map((a: any) => ({
+              ? q.answers.map((a) => ({
                   id: a.id,
                   text: a.text,
                   order: a.order,
@@ -417,7 +431,11 @@ export function EditPollForm({ readOnly = false }: EditPollFormProps = {}) {
 
           setQuestions(loadedQuestions);
           setOriginalQuestions(JSON.parse(JSON.stringify(loadedQuestions))); // Deep copy
-          setActiveQuestionId(loadedQuestions[0].id);
+          const requested = window.location.hash.slice('#question-'.length);
+          setActiveQuestionId(
+            loadedQuestions.find((q) => q.id === requested)?.id ??
+              loadedQuestions[0].id
+          );
         }
 
         // Load latest persisted legal check (admin-only; errors ignored)
@@ -609,6 +627,8 @@ export function EditPollForm({ readOnly = false }: EditPollFormProps = {}) {
         return;
       }
 
+      const files: QuestionFileUpload[] = [];
+      let savedActiveQuestion: string | undefined;
       // Track question changes
       const currentQuestionIds = new Set(questions.map((q) => q.id));
       const originalQuestionIds = new Set(originalQuestions.map((q) => q.id));
@@ -674,6 +694,14 @@ export function EditPollForm({ readOnly = false }: EditPollFormProps = {}) {
             }
 
             return;
+          }
+
+          for (const file of question.files ?? []) {
+            files.push({ file, questionId: addResult.data.questionId });
+          }
+
+          if (question.id === activeQuestionId) {
+            savedActiveQuestion = addResult.data.questionId;
           }
         } else {
           // Check if question was modified
@@ -902,7 +930,19 @@ export function EditPollForm({ readOnly = false }: EditPollFormProps = {}) {
       }
 
       // Reload to sync original state (so unsaved-change detection resets)
-      await loadPoll();
+      await questionUploads.finish(
+        pollId,
+        files,
+        handleUploadAttachment,
+        async () => {
+          await loadPoll();
+          await refreshAttachments();
+
+          if (savedActiveQuestion) {
+            setActiveQuestionId(savedActiveQuestion);
+          }
+        }
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -926,6 +966,10 @@ export function EditPollForm({ readOnly = false }: EditPollFormProps = {}) {
       ],
     };
   };
+
+  if (questionUploads.recovery) {
+    return questionUploads.recovery;
+  }
 
   if (isLoading) {
     return (
@@ -1062,6 +1106,7 @@ export function EditPollForm({ readOnly = false }: EditPollFormProps = {}) {
           pollType={pollData.pollType}
           attachmentIds={pollData.attachmentIds}
           questions={questions}
+          files={attachments}
           annotations={legalAnnotations}
         />
 
@@ -1179,7 +1224,7 @@ export function EditPollForm({ readOnly = false }: EditPollFormProps = {}) {
             </p>
           )}
           <PollAttachmentUploader
-            attachments={attachments}
+            attachments={attachments.filter((f) => !f.questionId)}
             uploading={uploadingAttachment}
             removingId={removingAttachmentId}
             error={attachmentError}
@@ -1275,7 +1320,45 @@ export function EditPollForm({ readOnly = false }: EditPollFormProps = {}) {
                     ? questionFieldErrors.errors
                     : undefined
                 }
-              />
+              >
+                {originalQuestions.some((q) => q.id === activeQuestion.id) ? (
+                  <PollAttachmentUploader
+                    key={activeQuestion.id}
+                    question
+                    attachments={attachments.filter(
+                      (f) => f.questionId === activeQuestion.id
+                    )}
+                    uploading={uploadingAttachment}
+                    removingId={removingAttachmentId}
+                    error={attachmentError}
+                    onPickFile={async (file) => {
+                      setUploadingAttachment(true);
+
+                      try {
+                        const result = await handleUploadAttachment(
+                          file,
+                          activeQuestion.id
+                        );
+
+                        if ('id' in result) {
+                          await refreshAttachments();
+                        }
+                      } finally {
+                        setUploadingAttachment(false);
+                      }
+                    }}
+                    onRemove={handleRemoveAttachment}
+                  />
+                ) : (
+                  <DraftQuestionFiles
+                    files={activeQuestion.files ?? []}
+                    disabled={isSaving}
+                    onChange={(files) =>
+                      handleQuestionUpdate(activeQuestion.id, { files })
+                    }
+                  />
+                )}
+              </QuestionForm>
 
               {/* Inline legal annotations for this question */}
               {legalAnnotations

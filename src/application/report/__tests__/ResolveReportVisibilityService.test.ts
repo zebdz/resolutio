@@ -1,6 +1,7 @@
+import { UserId, OrganizationId } from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ResolveReportVisibilityService } from '../ResolveReportVisibilityService';
-import { Report, ReportProps } from '../../../domain/report/Report';
+import { Report, ReportData } from '../../../domain/report/Report';
 import { ReportVisibility } from '../../../domain/report/ReportVisibility';
 
 class FakeOrgRepo {
@@ -17,13 +18,19 @@ class FakeOrgRepo {
     return this.admins.get(orgId)?.has(userId) ?? false;
   }
   async getAncestorIds(orgId: string) {
-    return this.ancestors.get(orgId) ?? [];
+    return (this.ancestors.get(orgId) ?? []).map((id) =>
+      OrganizationId.parse(id)
+    );
   }
   async getDescendantIds(orgId: string) {
-    return this.descendants.get(orgId) ?? [];
+    return (this.descendants.get(orgId) ?? []).map((id) =>
+      OrganizationId.parse(id)
+    );
   }
   async getFullTreeOrgIds(orgId: string) {
-    return this.treeMinusSelf.get(orgId) ?? [];
+    return (this.treeMinusSelf.get(orgId) ?? []).map((id) =>
+      OrganizationId.parse(id)
+    );
   }
 }
 
@@ -41,7 +48,7 @@ class FakeUserRepo {
   }
 }
 
-const baseProps = (overrides: Partial<ReportProps> = {}): ReportProps => ({
+const baseProps = (overrides: Partial<ReportData> = {}): ReportData => ({
   id: 'r1',
   organizationId: 'org-1',
   createdById: 'author-1',
@@ -59,6 +66,9 @@ const baseProps = (overrides: Partial<ReportProps> = {}): ReportProps => ({
   pollIds: [],
   attachmentIds: [],
   ...overrides,
+  ...(overrides.state === 'DRAFT'
+    ? { publishedById: null, notifyAudience: false }
+    : {}),
 });
 
 describe('ResolveReportVisibilityService.canRead', () => {
@@ -99,7 +109,7 @@ describe('ResolveReportVisibilityService.canRead', () => {
     const r = Report.reconstitute(
       baseProps({ visibility: ReportVisibility.PUBLIC_AUTH })
     );
-    expect(await svc.canRead(r, 'random-user')).toBe(true);
+    expect(await svc.canRead(r, UserId.parse('random-user'))).toBe(true);
   });
 
   it('WITHIN_ORG_ONLY: org member can read; non-member cannot; descendant-org member does NOT see', async () => {
@@ -108,9 +118,9 @@ describe('ResolveReportVisibilityService.canRead', () => {
     orgs.descendants.set('org-1', ['child-1']);
     orgs.exactMembers.set('child-1', new Set(['u-child']));
     const r = Report.reconstitute(baseProps());
-    expect(await svc.canRead(r, 'u1')).toBe(true);
-    expect(await svc.canRead(r, 'u2')).toBe(false);
-    expect(await svc.canRead(r, 'u-child')).toBe(false);
+    expect(await svc.canRead(r, UserId.parse('u1'))).toBe(true);
+    expect(await svc.canRead(r, UserId.parse('u2'))).toBe(false);
+    expect(await svc.canRead(r, UserId.parse('u-child'))).toBe(false);
   });
 
   it('WITHIN_ORG_ANCESTORS: ancestor-org member can read; descendant-org member cannot', async () => {
@@ -120,9 +130,9 @@ describe('ResolveReportVisibilityService.canRead', () => {
     const r = Report.reconstitute(
       baseProps({ visibility: ReportVisibility.WITHIN_ORG_ANCESTORS })
     );
-    expect(await svc.canRead(r, 'u-parent')).toBe(true);
-    expect(await svc.canRead(r, 'u-org')).toBe(true);
-    expect(await svc.canRead(r, 'random')).toBe(false);
+    expect(await svc.canRead(r, UserId.parse('u-parent'))).toBe(true);
+    expect(await svc.canRead(r, UserId.parse('u-org'))).toBe(true);
+    expect(await svc.canRead(r, UserId.parse('random'))).toBe(false);
   });
 
   it('WITHIN_ORG_DESCENDANTS: descendant-org member can read; ancestor-org member cannot', async () => {
@@ -132,9 +142,9 @@ describe('ResolveReportVisibilityService.canRead', () => {
     const r = Report.reconstitute(
       baseProps({ visibility: ReportVisibility.WITHIN_ORG_DESCENDANTS })
     );
-    expect(await svc.canRead(r, 'u-child')).toBe(true);
-    expect(await svc.canRead(r, 'u-org')).toBe(true);
-    expect(await svc.canRead(r, 'random')).toBe(false);
+    expect(await svc.canRead(r, UserId.parse('u-child'))).toBe(true);
+    expect(await svc.canRead(r, UserId.parse('u-org'))).toBe(true);
+    expect(await svc.canRead(r, UserId.parse('random'))).toBe(false);
   });
 
   it('WITHIN_ORG_TREE: any tree-member can read', async () => {
@@ -145,10 +155,10 @@ describe('ResolveReportVisibilityService.canRead', () => {
     const r = Report.reconstitute(
       baseProps({ visibility: ReportVisibility.WITHIN_ORG_TREE })
     );
-    expect(await svc.canRead(r, 'u-parent')).toBe(true);
-    expect(await svc.canRead(r, 'u-child')).toBe(true);
-    expect(await svc.canRead(r, 'u-org')).toBe(true);
-    expect(await svc.canRead(r, 'random')).toBe(false);
+    expect(await svc.canRead(r, UserId.parse('u-parent'))).toBe(true);
+    expect(await svc.canRead(r, UserId.parse('u-child'))).toBe(true);
+    expect(await svc.canRead(r, UserId.parse('u-org'))).toBe(true);
+    expect(await svc.canRead(r, UserId.parse('random'))).toBe(false);
   });
 
   it('WITHIN_BOARDS: member of any listed board can read', async () => {
@@ -160,9 +170,9 @@ describe('ResolveReportVisibilityService.canRead', () => {
         boardIds: ['b1', 'b2'],
       })
     );
-    expect(await svc.canRead(r, 'u-b1')).toBe(true);
-    expect(await svc.canRead(r, 'u-b2')).toBe(true);
-    expect(await svc.canRead(r, 'u-other')).toBe(false);
+    expect(await svc.canRead(r, UserId.parse('u-b1'))).toBe(true);
+    expect(await svc.canRead(r, UserId.parse('u-b2'))).toBe(true);
+    expect(await svc.canRead(r, UserId.parse('u-other'))).toBe(false);
   });
 
   it('override: author reads own report in any state', async () => {
@@ -173,25 +183,25 @@ describe('ResolveReportVisibilityService.canRead', () => {
         state: 'DRAFT',
       })
     );
-    expect(await svc.canRead(r, 'author-1')).toBe(true);
+    expect(await svc.canRead(r, UserId.parse('author-1'))).toBe(true);
   });
 
   it('override: org admin reads draft', async () => {
     orgs.admins.set('org-1', new Set(['admin-1']));
     const r = Report.reconstitute(baseProps({ state: 'DRAFT' }));
-    expect(await svc.canRead(r, 'admin-1')).toBe(true);
+    expect(await svc.canRead(r, UserId.parse('admin-1'))).toBe(true);
   });
 
   it('override: superadmin reads any', async () => {
     users.superadmins.add('su');
     const r = Report.reconstitute(baseProps({ state: 'DRAFT' }));
-    expect(await svc.canRead(r, 'su')).toBe(true);
+    expect(await svc.canRead(r, UserId.parse('su'))).toBe(true);
   });
 
   it('archived report: nobody reads except author/admin/superadmin', async () => {
     orgs.exactMembers.set('org-1', new Set(['u1']));
     const r = Report.reconstitute(baseProps({ archivedAt: new Date() }));
-    expect(await svc.canRead(r, 'u1')).toBe(false);
-    expect(await svc.canRead(r, 'author-1')).toBe(true);
+    expect(await svc.canRead(r, UserId.parse('u1'))).toBe(false);
+    expect(await svc.canRead(r, UserId.parse('author-1'))).toBe(true);
   });
 });

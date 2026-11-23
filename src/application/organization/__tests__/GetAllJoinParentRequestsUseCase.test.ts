@@ -1,3 +1,6 @@
+import { UserId } from '../../../domain/shared/EntityIds';
+import { OrganizationName } from '../../../domain/organization/OrganizationValues';
+import { OrganizationId } from '../../../domain/shared/EntityIds';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GetAllJoinParentRequestsUseCase } from '../GetAllJoinParentRequestsUseCase';
 import { OrganizationErrors } from '../OrganizationErrors';
@@ -10,30 +13,40 @@ class MockJoinParentRequestRepository implements JoinParentRequestRepository {
   private allByChild: Map<string, JoinParentRequest[]> = new Map();
   private allByParent: Map<string, JoinParentRequest[]> = new Map();
 
-  async save(request: JoinParentRequest): Promise<JoinParentRequest> {
+  async save(
+    request: JoinParentRequest
+  ): ReturnType<JoinParentRequestRepository['save']> {
     return request;
   }
-  async findById(): Promise<JoinParentRequest | null> {
+  async findById(): ReturnType<JoinParentRequestRepository['findById']> {
     return null;
   }
-  async findPendingByChildOrgId(): Promise<JoinParentRequest | null> {
+  async findPendingByChildOrgId(): ReturnType<
+    JoinParentRequestRepository['findPendingByChildOrgId']
+  > {
     return null;
   }
-  async findPendingByParentOrgId(): Promise<JoinParentRequest[]> {
+  async findPendingByParentOrgId(): ReturnType<
+    JoinParentRequestRepository['findPendingByParentOrgId']
+  > {
     return [];
   }
-  async findAllByChildOrgId(childOrgId: string): Promise<JoinParentRequest[]> {
+  async findAllByChildOrgId(
+    childOrgId: string
+  ): ReturnType<JoinParentRequestRepository['findAllByChildOrgId']> {
     return this.allByChild.get(childOrgId) || [];
   }
   async findAllByParentOrgId(
     parentOrgId: string
-  ): Promise<JoinParentRequest[]> {
+  ): ReturnType<JoinParentRequestRepository['findAllByParentOrgId']> {
     return this.allByParent.get(parentOrgId) || [];
   }
-  async update(request: JoinParentRequest): Promise<JoinParentRequest> {
+  async update(
+    request: JoinParentRequest
+  ): ReturnType<JoinParentRequestRepository['update']> {
     return request;
   }
-  async delete(): Promise<void> {}
+  async delete(): ReturnType<JoinParentRequestRepository['delete']> {}
 
   setAllForChildOrg(childOrgId: string, requests: JoinParentRequest[]) {
     this.allByChild.set(childOrgId, requests);
@@ -75,10 +88,10 @@ class MockOrganizationRepository {
     return [];
   }
   async getAncestorIds() {
-    return [];
+    return OrganizationId.array().parse([]);
   }
   async getDescendantIds() {
-    return [];
+    return OrganizationId.array().parse([]);
   }
   async isUserMember() {
     return false;
@@ -96,7 +109,7 @@ class MockOrganizationRepository {
     return null as any;
   }
   async findAcceptedMemberUserIdsIncludingDescendants() {
-    return [];
+    return UserId.array().parse([]);
   }
   async removeUserFromOrganization() {}
   async findPendingRequestsByUserId() {
@@ -111,12 +124,17 @@ class MockOrganizationRepository {
   async getHierarchyTree() {
     return {
       ancestors: [],
-      tree: { id: '', name: '', memberCount: 0, children: [] },
+      tree: {
+        id: OrganizationId.parse('org-fixture'),
+        name: OrganizationName.parse('Fixture organization'),
+        memberCount: 0,
+        children: [],
+      },
     };
   }
   async setParentId() {}
   async findAdminUserIds(): Promise<string[]> {
-    return [];
+    return UserId.array().parse([]);
   }
 
   async removeAdmin(): Promise<void> {}
@@ -127,13 +145,13 @@ class MockOrganizationRepository {
     return [];
   }
   async getFullTreeOrgIds() {
-    return [];
+    return OrganizationId.array().parse([]);
   }
   async getRootAllowMultiTreeMembership() {
     return false;
   }
   async findUsersWithMultipleMembershipsInOrgs() {
-    return [];
+    return UserId.array().parse([]);
   }
   async setAllowMultiTreeMembership() {}
 }

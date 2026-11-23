@@ -1,15 +1,26 @@
+/** AddBoardMember application flow decodes request identities before domain/repository use.
+ * Authorization and persistence stay coordinated here; lifecycle decisions belong to Board. */
+import { z } from 'zod';
+import { BoardId, UserId } from '@/domain/shared/EntityIds';
 import { BoardRepository } from '../../domain/board/BoardRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { BoardErrors } from './BoardErrors';
+import { BoardErrors, BoardUseCaseError } from './BoardErrors';
 import { OrganizationErrors } from '../organization/OrganizationErrors';
 
+/** Raw request values, decoded once at the application boundary. */
 export interface AddBoardMemberInput {
   boardId: string;
   userId: string;
   adminUserId: string;
 }
+
+const request = z.object({
+  boardId: BoardId,
+  userId: UserId,
+  adminUserId: UserId,
+});
 
 export interface AddBoardMemberDependencies {
   boardRepository: BoardRepository;
@@ -28,7 +39,17 @@ export class AddBoardMemberUseCase {
     this.userRepository = dependencies.userRepository;
   }
 
-  async execute(input: AddBoardMemberInput): Promise<Result<void, string>> {
+  async execute(
+    rawInput: AddBoardMemberInput
+  ): Promise<Result<void, BoardUseCaseError>> {
+    const decoded = request.safeParse(rawInput);
+
+    if (!decoded.success) {
+      return failure('common.errors.validationFailed');
+    }
+
+    const input = decoded.data;
+
     // Find the board
     const board = await this.boardRepository.findById(input.boardId);
 

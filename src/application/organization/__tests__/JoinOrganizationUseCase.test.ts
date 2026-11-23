@@ -1,3 +1,22 @@
+/** Membership request clients exercise authorization, renewal and notification flow.
+ * Typed store mapping retains explicit request times and rejection clearing. */
+import { success } from '@/domain/shared/Result';
+import { Instant } from '@/domain/shared/Instant';
+import { PrismaClient } from '@/generated/prisma/client';
+import { PrismaMembershipStore } from '@/infrastructure/repositories/PrismaMembershipStore';
+import { MemberCount } from '@/domain/organization/OrganizationValues';
+import { ResultCount } from '@/domain/shared/Pagination';
+import {
+  notificationIds,
+  notificationClock,
+} from '@/application/shared/__tests__/notificationCreation';
+import { UserId } from '../../../domain/shared/EntityIds';
+import { OrganizationName } from '../../../domain/organization/OrganizationValues';
+import { OrganizationId } from '../../../domain/shared/EntityIds';
+import {
+  createOrganization,
+  organizationTestInstant,
+} from '../../../domain/organization/__tests__/organizationTestValues';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { JoinOrganizationUseCase } from '../JoinOrganizationUseCase';
 import { Organization } from '../../../domain/organization/Organization';
@@ -40,18 +59,21 @@ class MockOrganizationRepository implements OrganizationRepository {
   private memberships: Map<string, Set<string>> = new Map(); // userId -> Set<orgId>
   private pendingRequests: Map<string, Set<string>> = new Map(); // userId -> Set<orgId>
 
-  async save(organization: Organization): Promise<Organization> {
-    (organization as any).props.id = `org-${Date.now()}`;
+  async save(
+    organization: Organization
+  ): ReturnType<OrganizationRepository['save']> {
     this.organizations.set(organization.id, organization);
 
     return organization;
   }
 
-  async findById(id: string): Promise<Organization | null> {
+  async findById(id: string): ReturnType<OrganizationRepository['findById']> {
     return this.organizations.get(id) || null;
   }
 
-  async findByName(name: string): Promise<Organization | null> {
+  async findByName(
+    name: string
+  ): ReturnType<OrganizationRepository['findByName']> {
     for (const org of this.organizations.values()) {
       if (org.name === name) {
         return org;
@@ -61,32 +83,40 @@ class MockOrganizationRepository implements OrganizationRepository {
     return null;
   }
 
-  async findByCreatorId(creatorId: string): Promise<Organization[]> {
+  async findByCreatorId(
+    creatorId: string
+  ): ReturnType<OrganizationRepository['findByCreatorId']> {
     return Array.from(this.organizations.values()).filter(
       (org) => org.createdById === creatorId
     );
   }
 
-  async findByParentId(parentId: string): Promise<Organization[]> {
+  async findByParentId(
+    parentId: string
+  ): ReturnType<OrganizationRepository['findByParentId']> {
     return Array.from(this.organizations.values()).filter(
       (org) => org.parentId === parentId
     );
   }
 
-  async getAncestorIds(organizationId: string): Promise<string[]> {
+  async getAncestorIds(
+    organizationId: string
+  ): ReturnType<OrganizationRepository['getAncestorIds']> {
     const org = await this.findById(organizationId);
 
     if (!org || !org.parentId) {
-      return [];
+      return OrganizationId.array().parse([]);
     }
 
     const ancestors: string[] = [org.parentId];
     const parentAncestors = await this.getAncestorIds(org.parentId);
 
-    return [...ancestors, ...parentAncestors];
+    return OrganizationId.array().parse([...ancestors, ...parentAncestors]);
   }
 
-  async getDescendantIds(organizationId: string): Promise<string[]> {
+  async getDescendantIds(
+    organizationId: string
+  ): ReturnType<OrganizationRepository['getDescendantIds']> {
     const children = await this.findByParentId(organizationId);
     const descendants: string[] = children.map((c) => c.id);
 
@@ -95,10 +125,12 @@ class MockOrganizationRepository implements OrganizationRepository {
       descendants.push(...childDescendants);
     }
 
-    return descendants;
+    return OrganizationId.array().parse(descendants);
   }
 
-  async getFullTreeOrgIds(organizationId: string): Promise<string[]> {
+  async getFullTreeOrgIds(
+    organizationId: string
+  ): ReturnType<OrganizationRepository['getFullTreeOrgIds']> {
     const ancestorIds = await this.getAncestorIds(organizationId);
     const rootId =
       ancestorIds.length > 0
@@ -106,10 +138,15 @@ class MockOrganizationRepository implements OrganizationRepository {
         : organizationId;
     const allDescendants = await this.getDescendantIds(rootId);
 
-    return [rootId, ...allDescendants].filter((id) => id !== organizationId);
+    return OrganizationId.array().parse(
+      [rootId, ...allDescendants].filter((id) => id !== organizationId)
+    );
   }
 
-  async isUserMember(userId: string, organizationId: string): Promise<boolean> {
+  async isUserMember(
+    userId: string,
+    organizationId: string
+  ): ReturnType<OrganizationRepository['isUserMember']> {
     const userOrgs = this.memberships.get(userId);
 
     return userOrgs ? userOrgs.has(organizationId) : false;
@@ -118,11 +155,13 @@ class MockOrganizationRepository implements OrganizationRepository {
   async isUserAdmin(
     _userId: string,
     _organizationId: string
-  ): Promise<boolean> {
+  ): ReturnType<OrganizationRepository['isUserAdmin']> {
     return false;
   }
 
-  async findMembershipsByUserId(userId: string): Promise<Organization[]> {
+  async findMembershipsByUserId(
+    userId: string
+  ): ReturnType<OrganizationRepository['findMembershipsByUserId']> {
     const userOrgIds = this.memberships.get(userId) || new Set();
     const orgs: Organization[] = [];
 
@@ -139,30 +178,24 @@ class MockOrganizationRepository implements OrganizationRepository {
 
   async findAdminOrganizationsByUserId(
     _userId: string
-  ): Promise<Organization[]> {
+  ): ReturnType<OrganizationRepository['findAdminOrganizationsByUserId']> {
     return [];
   }
 
-  async findAllWithStats(): Promise<
-    Array<{
-      organization: Organization;
-      memberCount: number;
-      firstAdmin: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        middleName: string | null;
-      } | null;
-    }>
+  async findAllWithStats(): ReturnType<
+    OrganizationRepository['findAllWithStats']
   > {
     return Array.from(this.organizations.values()).map((org) => ({
       organization: org,
-      memberCount: 0,
+      memberCount: MemberCount.parse(0),
       firstAdmin: null,
+      parentOrg: null,
     }));
   }
 
-  async update(organization: Organization): Promise<Organization> {
+  async update(
+    organization: Organization
+  ): ReturnType<OrganizationRepository['update']> {
     this.organizations.set(organization.id, organization);
 
     return organization;
@@ -170,14 +203,16 @@ class MockOrganizationRepository implements OrganizationRepository {
 
   async findAcceptedMemberUserIdsIncludingDescendants(
     _organizationId: string
-  ): Promise<string[]> {
-    return [];
+  ): ReturnType<
+    OrganizationRepository['findAcceptedMemberUserIdsIncludingDescendants']
+  > {
+    return UserId.array().parse([]);
   }
 
   async removeUserFromOrganization(
     userId: string,
     organizationId: string
-  ): Promise<void> {
+  ): ReturnType<OrganizationRepository['removeUserFromOrganization']> {
     const userOrgs = this.memberships.get(userId);
 
     if (userOrgs) {
@@ -185,7 +220,9 @@ class MockOrganizationRepository implements OrganizationRepository {
     }
   }
 
-  async findPendingRequestsByUserId(userId: string): Promise<Organization[]> {
+  async findPendingRequestsByUserId(
+    userId: string
+  ): ReturnType<OrganizationRepository['findPendingRequestsByUserId']> {
     const pendingOrgIds = this.pendingRequests.get(userId) || new Set();
     const orgs: Organization[] = [];
 
@@ -221,134 +258,158 @@ class MockOrganizationRepository implements OrganizationRepository {
     this.organizations.set(org.id, org);
   }
 
-  async getAncestors(): Promise<
-    { id: string; name: string; memberCount: number }[]
+  async getAncestors(): ReturnType<OrganizationRepository['getAncestors']> {
+    return [];
+  }
+
+  async getChildrenWithStats(): ReturnType<
+    OrganizationRepository['getChildrenWithStats']
   > {
     return [];
   }
 
-  async getChildrenWithStats(): Promise<
-    { id: string; name: string; memberCount: number }[]
+  async getHierarchyTree(): ReturnType<
+    OrganizationRepository['getHierarchyTree']
   > {
-    return [];
-  }
-
-  async getHierarchyTree(): Promise<{
-    ancestors: { id: string; name: string; memberCount: number }[];
-    tree: { id: string; name: string; memberCount: number; children: any[] };
-  }> {
     return {
       ancestors: [],
-      tree: { id: '', name: '', memberCount: 0, children: [] },
+      tree: {
+        id: OrganizationId.parse('org-fixture'),
+        name: OrganizationName.parse('Fixture organization'),
+        memberCount: MemberCount.parse(0),
+        children: [],
+      },
     };
   }
-  async searchOrganizationsWithStats(): Promise<{
-    organizations: any[];
-    totalCount: number;
-  }> {
-    return { organizations: [], totalCount: 0 };
+  async searchOrganizationsWithStats(): ReturnType<
+    OrganizationRepository['searchOrganizationsWithStats']
+  > {
+    return { organizations: [], totalCount: ResultCount.parse(0) };
   }
   async setParentId(
     organizationId: string,
     parentId: string | null
-  ): Promise<void> {}
-  async findAdminUserIds(): Promise<string[]> {
-    return [];
+  ): ReturnType<OrganizationRepository['setParentId']> {}
+  async findAdminUserIds(): ReturnType<
+    OrganizationRepository['findAdminUserIds']
+  > {
+    return UserId.array().parse([]);
   }
 
-  async addAdmin(): Promise<void> {}
-  async removeAdmin(): Promise<void> {}
-  async searchByNameFuzzy(): Promise<Array<{ id: string; name: string }>> {
+  async addAdmin(): ReturnType<OrganizationRepository['addAdmin']> {}
+  async removeAdmin(): ReturnType<OrganizationRepository['removeAdmin']> {}
+  async searchByNameFuzzy(): ReturnType<
+    OrganizationRepository['searchByNameFuzzy']
+  > {
     return [];
   }
-  async getRootAllowMultiTreeMembership(_orgId: string): Promise<boolean> {
+  async getRootAllowMultiTreeMembership(
+    _orgId: string
+  ): ReturnType<OrganizationRepository['getRootAllowMultiTreeMembership']> {
     return false;
   }
   async findUsersWithMultipleMembershipsInOrgs(
     _orgIds: string[]
-  ): Promise<string[]> {
-    return [];
+  ): ReturnType<
+    OrganizationRepository['findUsersWithMultipleMembershipsInOrgs']
+  > {
+    return UserId.array().parse([]);
   }
   async setAllowMultiTreeMembership(
     _organizationId: string,
     _value: boolean | null
-  ): Promise<void> {}
+  ): ReturnType<OrganizationRepository['setAllowMultiTreeMembership']> {}
+
+  async isUserExactMember(
+    ..._args: Parameters<OrganizationRepository['isUserExactMember']>
+  ): ReturnType<OrganizationRepository['isUserExactMember']> {
+    throw new Error('Unexpected isUserExactMember in this test');
+  }
+
+  async getAdminUserIds(
+    ..._args: Parameters<OrganizationRepository['getAdminUserIds']>
+  ): ReturnType<OrganizationRepository['getAdminUserIds']> {
+    throw new Error('Unexpected getAdminUserIds in this test');
+  }
+
+  async findAcceptedMemberUserIdsForOrgs(
+    ..._args: Parameters<
+      OrganizationRepository['findAcceptedMemberUserIdsForOrgs']
+    >
+  ): ReturnType<OrganizationRepository['findAcceptedMemberUserIdsForOrgs']> {
+    throw new Error('Unexpected findAcceptedMemberUserIdsForOrgs in this test');
+  }
+
+  async removeMemberFromOrganization(
+    ..._args: Parameters<OrganizationRepository['removeMemberFromOrganization']>
+  ): ReturnType<OrganizationRepository['removeMemberFromOrganization']> {
+    throw new Error('Unexpected removeMemberFromOrganization in this test');
+  }
 }
 
 // Mock NotificationRepository
 class MockNotificationRepository implements NotificationRepository {
-  async save(notification: Notification): Promise<Notification> {
-    return notification;
+  async save(
+    notification: Notification
+  ): ReturnType<NotificationRepository['save']> {
+    return success(notification);
   }
-  async saveBatch(): Promise<void> {}
-  async findById(): Promise<Notification | null> {
-    return null;
-  }
-  async findByUserId(): Promise<Notification[]> {
-    return [];
-  }
-  async getUnreadCount(): Promise<number> {
-    return 0;
-  }
-  async markAsRead(): Promise<void> {}
-  async markAllAsRead(): Promise<void> {}
-  async findByIds(): Promise<Notification[]> {
-    return [];
-  }
-  async deleteByIds(): Promise<void> {}
-  async getCountByUserId(): Promise<number> {
-    return 0;
+  async saveBatch(): ReturnType<NotificationRepository['saveBatch']> {
+    return success(undefined);
   }
 }
 
 // Mock UserRepository
 class MockUserRepository implements UserRepository {
-  async findById(): Promise<any> {
+  async findById(): ReturnType<UserRepository['findById']> {
     return null;
   }
-  async findByIds(): Promise<any[]> {
+  async findByIds(): ReturnType<UserRepository['findByIds']> {
     return [];
   }
-  async findByPhoneNumber(): Promise<any> {
+  async findByPhoneNumber(): ReturnType<UserRepository['findByPhoneNumber']> {
     return null;
   }
-  async save(user: any): Promise<any> {
+  async save(user: any): ReturnType<UserRepository['save']> {
     return user;
   }
-  async exists(): Promise<boolean> {
+  async exists(): ReturnType<UserRepository['exists']> {
     return false;
   }
-  async searchUsers(): Promise<any[]> {
+  async searchUsers(): ReturnType<UserRepository['searchUsers']> {
     return [];
   }
-  async searchUserByPhone(_phone: string): Promise<User | null> {
+  async searchUserByPhone(
+    _phone: Parameters<UserRepository['searchUserByPhone']>[0]
+  ): ReturnType<UserRepository['searchUserByPhone']> {
     return null;
   }
-  async isSuperAdmin(): Promise<boolean> {
+  async isSuperAdmin(): ReturnType<UserRepository['isSuperAdmin']> {
     return false;
   }
 
-  async findByNickname(): Promise<User | null> {
+  async findByNickname(): ReturnType<UserRepository['findByNickname']> {
     return null;
   }
 
-  async isNicknameAvailable(): Promise<boolean> {
+  async isNicknameAvailable(): ReturnType<
+    UserRepository['isNicknameAvailable']
+  > {
     return true;
   }
 
-  async updatePrivacySettings(): Promise<void> {}
-  async isUserBlocked(): Promise<boolean> {
-    return false;
-  }
-  async blockUser(): Promise<void> {}
-  async unblockUser(): Promise<void> {}
-  async confirmUser(): Promise<void> {}
-  async getBlockStatus(): Promise<null> {
-    return null;
-  }
-  async deleteAddress(): Promise<void> {}
-  async getBlockedUserIds(): Promise<string[]> {
-    return [];
+  async updatePrivacySettings(): ReturnType<
+    UserRepository['updatePrivacySettings']
+  > {}
+
+  async confirmUser(): ReturnType<UserRepository['confirmUser']> {}
+
+  async deleteAddress(): ReturnType<UserRepository['deleteAddress']> {}
+
+  async findByEmail(
+    ..._args: Parameters<UserRepository['findByEmail']>
+  ): ReturnType<UserRepository['findByEmail']> {
+    throw new Error('Unexpected findByEmail in this test');
   }
 }
 
@@ -361,28 +422,40 @@ class MockInvitationRepository implements InvitationRepository {
     this.findPendingMemberInvite.mockResolvedValue(null);
   }
 
-  async save(invitation: Invitation): Promise<Invitation> {
+  async save(invitation: Invitation): ReturnType<InvitationRepository['save']> {
     return invitation;
   }
-  async update(invitation: Invitation): Promise<Invitation> {
+  async update(
+    invitation: Invitation
+  ): ReturnType<InvitationRepository['update']> {
     return invitation;
   }
-  async findById(): Promise<Invitation | null> {
+  async findById(): ReturnType<InvitationRepository['findById']> {
     return null;
   }
-  async findPendingByInviteeId(): Promise<Invitation[]> {
+  async findPendingByInviteeId(): ReturnType<
+    InvitationRepository['findPendingByInviteeId']
+  > {
     return [];
   }
-  async findPendingByOrganizationId(): Promise<Invitation[]> {
+  async findPendingByOrganizationId(): ReturnType<
+    InvitationRepository['findPendingByOrganizationId']
+  > {
     return [];
   }
-  async findPendingByBoardId(): Promise<Invitation[]> {
+  async findPendingByBoardId(): ReturnType<
+    InvitationRepository['findPendingByBoardId']
+  > {
     return [];
   }
-  async findPendingAdminInvite(): Promise<Invitation | null> {
+  async findPendingAdminInvite(): ReturnType<
+    InvitationRepository['findPendingAdminInvite']
+  > {
     return null;
   }
-  async findPendingBoardMemberInvite(): Promise<Invitation | null> {
+  async findPendingBoardMemberInvite(): ReturnType<
+    InvitationRepository['findPendingBoardMemberInvite']
+  > {
     return null;
   }
 }
@@ -402,16 +475,18 @@ describe('JoinOrganizationUseCase', () => {
     invitationRepository = new MockInvitationRepository();
     prisma = new MockPrismaClient();
     useCase = new JoinOrganizationUseCase({
+      ids: notificationIds,
+      clock: notificationClock,
       organizationRepository,
       notificationRepository,
       userRepository,
       invitationRepository,
-      prisma: prisma as any,
+      memberships: new PrismaMembershipStore(prisma as unknown as PrismaClient),
     });
   });
 
   it('should successfully create a join request', async () => {
-    const orgResult = Organization.create(
+    const orgResult = createOrganization(
       'Test Organization',
       'Test description',
       'creator-123'
@@ -419,8 +494,10 @@ describe('JoinOrganizationUseCase', () => {
     expect(orgResult.success).toBe(true);
 
     if (orgResult.success) {
-      const org = orgResult.value;
-      (org as any).props.id = 'org-123';
+      const org = Organization.reconstitute({
+        ...orgResult.value.toJSON(),
+        id: 'org-123',
+      });
       organizationRepository.addOrganization(org);
 
       const result = await useCase.execute(
@@ -446,7 +523,7 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should fail if organization is archived', async () => {
-    const orgResult = Organization.create(
+    const orgResult = createOrganization(
       'Archived Organization',
       'Test description',
       'creator-123'
@@ -454,9 +531,11 @@ describe('JoinOrganizationUseCase', () => {
     expect(orgResult.success).toBe(true);
 
     if (orgResult.success) {
-      const org = orgResult.value;
-      (org as any).props.id = 'org-archived';
-      org.archive();
+      const org = Organization.reconstitute({
+        ...orgResult.value.toJSON(),
+        id: 'org-archived',
+      });
+      org.archive(organizationTestInstant);
       organizationRepository.addOrganization(org);
 
       const result = await useCase.execute(
@@ -473,7 +552,7 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should fail if user is already a member', async () => {
-    const orgResult = Organization.create(
+    const orgResult = createOrganization(
       'Test Organization',
       'Test description',
       'creator-123'
@@ -481,8 +560,10 @@ describe('JoinOrganizationUseCase', () => {
     expect(orgResult.success).toBe(true);
 
     if (orgResult.success) {
-      const org = orgResult.value;
-      (org as any).props.id = 'org-123';
+      const org = Organization.reconstitute({
+        ...orgResult.value.toJSON(),
+        id: 'org-123',
+      });
       organizationRepository.addOrganization(org);
 
       prisma.organizationUser.findUnique = async () => ({
@@ -507,7 +588,7 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should fail if user has a pending request', async () => {
-    const orgResult = Organization.create(
+    const orgResult = createOrganization(
       'Test Organization',
       'Test description',
       'creator-123'
@@ -515,8 +596,10 @@ describe('JoinOrganizationUseCase', () => {
     expect(orgResult.success).toBe(true);
 
     if (orgResult.success) {
-      const org = orgResult.value;
-      (org as any).props.id = 'org-123';
+      const org = Organization.reconstitute({
+        ...orgResult.value.toJSON(),
+        id: 'org-123',
+      });
       organizationRepository.addOrganization(org);
 
       prisma.organizationUser.findUnique = async () => ({
@@ -541,7 +624,7 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should fail if user has a pending member invite', async () => {
-    const orgResult = Organization.create(
+    const orgResult = createOrganization(
       'Test Organization',
       'Test description',
       'creator-123'
@@ -549,8 +632,10 @@ describe('JoinOrganizationUseCase', () => {
     expect(orgResult.success).toBe(true);
 
     if (orgResult.success) {
-      const org = orgResult.value;
-      (org as any).props.id = 'org-123';
+      const org = Organization.reconstitute({
+        ...orgResult.value.toJSON(),
+        id: 'org-123',
+      });
       organizationRepository.addOrganization(org);
 
       // User has a pending member invite for this org
@@ -582,7 +667,7 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should pass joinTokenId to create when provided', async () => {
-    const orgResult = Organization.create(
+    const orgResult = createOrganization(
       'Test Organization',
       'Test description',
       'creator-123'
@@ -590,8 +675,10 @@ describe('JoinOrganizationUseCase', () => {
     expect(orgResult.success).toBe(true);
 
     if (orgResult.success) {
-      const org = orgResult.value;
-      (org as any).props.id = 'org-123';
+      const org = Organization.reconstitute({
+        ...orgResult.value.toJSON(),
+        id: 'org-123',
+      });
       organizationRepository.addOrganization(org);
 
       const createSpy = vi.fn(prisma.organizationUser.create);
@@ -608,6 +695,7 @@ describe('JoinOrganizationUseCase', () => {
           organizationId: 'org-123',
           userId: 'user-456',
           status: 'pending',
+          createdAt: Instant.toDate(notificationClock.now()),
           joinTokenId: 'token-abc',
         },
       });
@@ -615,7 +703,7 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should pass joinTokenId as null when not provided', async () => {
-    const orgResult = Organization.create(
+    const orgResult = createOrganization(
       'Test Organization',
       'Test description',
       'creator-123'
@@ -623,8 +711,10 @@ describe('JoinOrganizationUseCase', () => {
     expect(orgResult.success).toBe(true);
 
     if (orgResult.success) {
-      const org = orgResult.value;
-      (org as any).props.id = 'org-123';
+      const org = Organization.reconstitute({
+        ...orgResult.value.toJSON(),
+        id: 'org-123',
+      });
       organizationRepository.addOrganization(org);
 
       const createSpy = vi.fn(prisma.organizationUser.create);
@@ -641,6 +731,7 @@ describe('JoinOrganizationUseCase', () => {
           organizationId: 'org-123',
           userId: 'user-456',
           status: 'pending',
+          createdAt: Instant.toDate(notificationClock.now()),
           joinTokenId: null,
         },
       });
@@ -648,7 +739,7 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should allow join request when member of parent org', async () => {
-    const parentResult = Organization.create(
+    const parentResult = createOrganization(
       'Parent Organization',
       'Parent description',
       'creator-123'
@@ -656,11 +747,13 @@ describe('JoinOrganizationUseCase', () => {
     expect(parentResult.success).toBe(true);
 
     if (parentResult.success) {
-      const parent = parentResult.value;
-      (parent as any).props.id = 'org-parent';
+      const parent = Organization.reconstitute({
+        ...parentResult.value.toJSON(),
+        id: 'org-parent',
+      });
       organizationRepository.addOrganization(parent);
 
-      const childResult = Organization.create(
+      const childResult = createOrganization(
         'Child Organization',
         'Child description',
         'creator-123',
@@ -669,8 +762,10 @@ describe('JoinOrganizationUseCase', () => {
       expect(childResult.success).toBe(true);
 
       if (childResult.success) {
-        const child = childResult.value;
-        (child as any).props.id = 'org-child';
+        const child = Organization.reconstitute({
+          ...childResult.value.toJSON(),
+          id: 'org-child',
+        });
         organizationRepository.addOrganization(child);
 
         // User is member of parent
@@ -688,7 +783,7 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should allow join request when member of child org', async () => {
-    const parentResult = Organization.create(
+    const parentResult = createOrganization(
       'Parent Organization',
       'Parent description',
       'creator-123'
@@ -696,11 +791,13 @@ describe('JoinOrganizationUseCase', () => {
     expect(parentResult.success).toBe(true);
 
     if (parentResult.success) {
-      const parent = parentResult.value;
-      (parent as any).props.id = 'org-parent';
+      const parent = Organization.reconstitute({
+        ...parentResult.value.toJSON(),
+        id: 'org-parent',
+      });
       organizationRepository.addOrganization(parent);
 
-      const childResult = Organization.create(
+      const childResult = createOrganization(
         'Child Organization',
         'Child description',
         'creator-123',
@@ -709,8 +806,10 @@ describe('JoinOrganizationUseCase', () => {
       expect(childResult.success).toBe(true);
 
       if (childResult.success) {
-        const child = childResult.value;
-        (child as any).props.id = 'org-child';
+        const child = Organization.reconstitute({
+          ...childResult.value.toJSON(),
+          id: 'org-child',
+        });
         organizationRepository.addOrganization(child);
 
         // User is member of child
@@ -728,7 +827,7 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should fail if pending request in ancestor org', async () => {
-    const parentResult = Organization.create(
+    const parentResult = createOrganization(
       'Parent Organization',
       'Parent description',
       'creator-123'
@@ -736,11 +835,13 @@ describe('JoinOrganizationUseCase', () => {
     expect(parentResult.success).toBe(true);
 
     if (parentResult.success) {
-      const parent = parentResult.value;
-      (parent as any).props.id = 'org-parent';
+      const parent = Organization.reconstitute({
+        ...parentResult.value.toJSON(),
+        id: 'org-parent',
+      });
       organizationRepository.addOrganization(parent);
 
-      const childResult = Organization.create(
+      const childResult = createOrganization(
         'Child Organization',
         'Child description',
         'creator-123',
@@ -749,8 +850,10 @@ describe('JoinOrganizationUseCase', () => {
       expect(childResult.success).toBe(true);
 
       if (childResult.success) {
-        const child = childResult.value;
-        (child as any).props.id = 'org-child';
+        const child = Organization.reconstitute({
+          ...childResult.value.toJSON(),
+          id: 'org-child',
+        });
         organizationRepository.addOrganization(child);
 
         // User has pending request in parent
@@ -774,7 +877,7 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should allow re-request when previously rejected', async () => {
-    const orgResult = Organization.create(
+    const orgResult = createOrganization(
       'Test Organization',
       'Test description',
       'creator-123'
@@ -782,8 +885,10 @@ describe('JoinOrganizationUseCase', () => {
     expect(orgResult.success).toBe(true);
 
     if (orgResult.success) {
-      const org = orgResult.value;
-      (org as any).props.id = 'org-123';
+      const org = Organization.reconstitute({
+        ...orgResult.value.toJSON(),
+        id: 'org-123',
+      });
       organizationRepository.addOrganization(org);
 
       prisma.organizationUser.findUnique = async () => ({
@@ -825,7 +930,7 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should check hierarchy constraints when re-requesting after rejection', async () => {
-    const parentResult = Organization.create(
+    const parentResult = createOrganization(
       'Parent Organization',
       'Parent description',
       'creator-123'
@@ -833,11 +938,13 @@ describe('JoinOrganizationUseCase', () => {
     expect(parentResult.success).toBe(true);
 
     if (parentResult.success) {
-      const parent = parentResult.value;
-      (parent as any).props.id = 'org-parent';
+      const parent = Organization.reconstitute({
+        ...parentResult.value.toJSON(),
+        id: 'org-parent',
+      });
       organizationRepository.addOrganization(parent);
 
-      const childResult = Organization.create(
+      const childResult = createOrganization(
         'Child Organization',
         'Child description',
         'creator-123',
@@ -846,8 +953,10 @@ describe('JoinOrganizationUseCase', () => {
       expect(childResult.success).toBe(true);
 
       if (childResult.success) {
-        const child = childResult.value;
-        (child as any).props.id = 'org-child';
+        const child = Organization.reconstitute({
+          ...childResult.value.toJSON(),
+          id: 'org-child',
+        });
         organizationRepository.addOrganization(child);
 
         // User was rejected from child org
@@ -882,7 +991,7 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should fail if pending request in sibling org', async () => {
-    const parentResult = Organization.create(
+    const parentResult = createOrganization(
       'Parent Organization',
       'Parent description',
       'creator-123'
@@ -890,11 +999,13 @@ describe('JoinOrganizationUseCase', () => {
     expect(parentResult.success).toBe(true);
 
     if (parentResult.success) {
-      const parent = parentResult.value;
-      (parent as any).props.id = 'org-parent';
+      const parent = Organization.reconstitute({
+        ...parentResult.value.toJSON(),
+        id: 'org-parent',
+      });
       organizationRepository.addOrganization(parent);
 
-      const siblingAResult = Organization.create(
+      const siblingAResult = createOrganization(
         'Sibling A',
         'Sibling A description',
         'creator-123',
@@ -902,7 +1013,7 @@ describe('JoinOrganizationUseCase', () => {
       );
       expect(siblingAResult.success).toBe(true);
 
-      const siblingBResult = Organization.create(
+      const siblingBResult = createOrganization(
         'Sibling B',
         'Sibling B description',
         'creator-123',
@@ -911,12 +1022,16 @@ describe('JoinOrganizationUseCase', () => {
       expect(siblingBResult.success).toBe(true);
 
       if (siblingAResult.success && siblingBResult.success) {
-        const siblingA = siblingAResult.value;
-        (siblingA as any).props.id = 'org-sibling-a';
+        const siblingA = Organization.reconstitute({
+          ...siblingAResult.value.toJSON(),
+          id: 'org-sibling-a',
+        });
         organizationRepository.addOrganization(siblingA);
 
-        const siblingB = siblingBResult.value;
-        (siblingB as any).props.id = 'org-sibling-b';
+        const siblingB = Organization.reconstitute({
+          ...siblingBResult.value.toJSON(),
+          id: 'org-sibling-b',
+        });
         organizationRepository.addOrganization(siblingB);
 
         // User has pending request in sibling A
@@ -940,7 +1055,7 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should skip hierarchy blocking when multi-tree membership allowed', async () => {
-    const rootResult = Organization.create(
+    const rootResult = createOrganization(
       'Root Organization',
       'Root description',
       'creator-123'
@@ -948,11 +1063,13 @@ describe('JoinOrganizationUseCase', () => {
     expect(rootResult.success).toBe(true);
 
     if (rootResult.success) {
-      const root = rootResult.value;
-      (root as any).props.id = 'org-root';
+      const root = Organization.reconstitute({
+        ...rootResult.value.toJSON(),
+        id: 'org-root',
+      });
       organizationRepository.addOrganization(root);
 
-      const childResult = Organization.create(
+      const childResult = createOrganization(
         'Child Organization',
         'Child description',
         'creator-123',
@@ -961,8 +1078,10 @@ describe('JoinOrganizationUseCase', () => {
       expect(childResult.success).toBe(true);
 
       if (childResult.success) {
-        const child = childResult.value;
-        (child as any).props.id = 'org-child';
+        const child = Organization.reconstitute({
+          ...childResult.value.toJSON(),
+          id: 'org-child',
+        });
         organizationRepository.addOrganization(child);
 
         // User has pending request in child org
@@ -984,7 +1103,7 @@ describe('JoinOrganizationUseCase', () => {
   });
 
   it('should fail if pending request in descendant org', async () => {
-    const parentResult = Organization.create(
+    const parentResult = createOrganization(
       'Parent Organization',
       'Parent description',
       'creator-123'
@@ -992,11 +1111,13 @@ describe('JoinOrganizationUseCase', () => {
     expect(parentResult.success).toBe(true);
 
     if (parentResult.success) {
-      const parent = parentResult.value;
-      (parent as any).props.id = 'org-parent';
+      const parent = Organization.reconstitute({
+        ...parentResult.value.toJSON(),
+        id: 'org-parent',
+      });
       organizationRepository.addOrganization(parent);
 
-      const childResult = Organization.create(
+      const childResult = createOrganization(
         'Child Organization',
         'Child description',
         'creator-123',
@@ -1005,8 +1126,10 @@ describe('JoinOrganizationUseCase', () => {
       expect(childResult.success).toBe(true);
 
       if (childResult.success) {
-        const child = childResult.value;
-        (child as any).props.id = 'org-child';
+        const child = Organization.reconstitute({
+          ...childResult.value.toJSON(),
+          id: 'org-child',
+        });
         organizationRepository.addOrganization(child);
 
         // User has pending request in child

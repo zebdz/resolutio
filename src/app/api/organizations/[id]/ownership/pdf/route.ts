@@ -4,6 +4,7 @@
 // the active-only / owner-name / asset-name filters honored via query
 // params. Filename includes the org name for filing.
 
+import { OrganizationId } from '@/domain/shared/EntityIds';
 import fs from 'fs';
 import path from 'path';
 import { NextRequest, NextResponse } from 'next/server';
@@ -52,7 +53,16 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id: organizationId } = await params;
+    const identity = OrganizationId.safeParse((await params).id);
+
+    if (!identity.success) {
+      return NextResponse.json(
+        { error: 'common.errors.validationFailed' },
+        { status: 400 }
+      );
+    }
+
+    const organizationId = identity.data;
 
     const isSuper = await userRepository.isSuperAdmin(user.id);
     const isAdmin =
@@ -98,10 +108,8 @@ export async function GET(
       const row = {
         ownerLabel,
         sharePercent: r.share * 100,
-        effectiveFrom: r.effectiveFrom.toISOString(),
-        effectiveUntil: r.effectiveUntil
-          ? r.effectiveUntil.toISOString()
-          : null,
+        effectiveFrom: r.effectiveFrom,
+        effectiveUntil: r.effectiveUntil,
       };
 
       if (existing) {

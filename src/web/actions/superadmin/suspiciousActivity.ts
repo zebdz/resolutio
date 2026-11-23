@@ -1,5 +1,9 @@
 'use server';
 
+/** Superadmin-only activity and user projections use explicit ORM query contracts.
+ * Moderation commands use a validated append-only port; expected failures are translated explicitly. */
+import type { Prisma } from '@/generated/prisma/client';
+
 import { getTranslations } from 'next-intl/server';
 import { prisma, PrismaUserRepository } from '@/infrastructure/index';
 import { checkRateLimit } from '@/web/actions/rateLimit';
@@ -9,10 +13,37 @@ import { LeoProfanityChecker } from '@/infrastructure/profanity/LeoProfanityChec
 import { SharedDomainCodes } from '@/domain/shared/SharedDomainCodes';
 import { translateErrorCode } from '@/web/actions/utils/translateErrorCode';
 import { getLimiterByLabel } from '@/infrastructure/rateLimit/registry';
+import { UserId } from '@/domain/shared/EntityIds';
+import { failure, success, type Result } from '@/domain/shared/Result';
+import {
+  serializeUserBlockStatus,
+  serializeUserBlockStatusIso,
+  type UserBlockStatusView,
+  type SerializedUserBlockStatusView,
+} from './UserModerationViews';
+export type { UserBlockStatusView } from './UserModerationViews';
+import { Instant } from '@/domain/shared/Instant';
+import type {
+  UserModerationHistory,
+  UserBlockStatus,
+} from '@/domain/user/UserModeration';
+import { ModerateUserUseCase } from '@/application/user/ModerateUserUseCase';
+import { PrismaUserModerationRepository } from '@/infrastructure/repositories/PrismaUserModerationRepository';
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
 
 const profanityChecker = LeoProfanityChecker.getInstance();
 const userRepository = new PrismaUserRepository(prisma);
-
+const moderationRepository = new PrismaUserModerationRepository(prisma);
+const moderateUser = new ModerateUserUseCase({
+  userRepository,
+  moderationRepository,
+  ids: new CryptoIdGenerator(),
+  clock: new SystemClock(),
+  profanityChecker,
+});
 export type ActionResult<T = void> =
   | { success: true; data: T }
   | { success: false; error: string; fieldErrors?: Record<string, string[]> };
@@ -33,7 +64,7 @@ export interface SuspiciousKeySummary {
     middleName: string | null;
     phoneNumber: string;
   };
-  blockStatus?: { blocked: boolean; reason?: string; blockedAt?: Date } | null;
+  blockStatus?: UserBlockStatusView | null;
 }
 
 export interface AdminUserResult {
@@ -44,7 +75,7 @@ export interface AdminUserResult {
   phoneNumber: string;
   nickname: string;
   createdAt: Date;
-  blockStatus: { blocked: boolean; reason?: string; blockedAt?: Date } | null;
+  blockStatus: UserBlockStatusView | null;
 }
 
 export interface SerializedAdminUserResult {
@@ -60,39 +91,22 @@ export interface SerializedAdminUserResult {
   organizations: { id: string; name: string }[];
   organizationCount: number;
   pollCount: number;
-  blockStatus: {
-    blocked: boolean;
-    reason?: string;
-    blockedAt?: string;
-  } | null;
+  blockStatus: SerializedUserBlockStatusView | null;
 }
 
-async function getBlockStatusForUser(
-  userId: string
-): Promise<{ blocked: boolean; reason?: string; blockedAt?: Date } | null> {
-  const latest = await prisma.userBlockStatus.findFirst({
-    where: { userId },
-    orderBy: { createdAt: 'desc' },
-    select: { status: true, reason: true, createdAt: true },
-  });
+// Decode raw ORM identity projections before using the typed moderation port.
+async function readModerationStatuses(
+  userIds: readonly string[]
+): Promise<
+  Result<ReadonlyMap<UserId, UserBlockStatus>, 'common.errors.unexpected'>
+> {
+  const ids = UserId.array().safeParse(userIds);
 
-  if (!latest) {
-    return null;
+  if (!ids.success) {
+    return failure('common.errors.unexpected');
   }
 
-  if (latest.status === 'blocked') {
-    return {
-      blocked: true,
-      reason: latest.reason ?? undefined,
-      blockedAt: latest.createdAt,
-    };
-  }
-
-  return { blocked: false };
-}
-
-async function getBlockedUserIds(): Promise<string[]> {
-  return userRepository.getBlockedUserIds();
+  return moderationRepository.getStatuses(ids.data);
 }
 
 export async function getSuspiciousActivitySummaryAction(input: {
@@ -123,7 +137,7 @@ export async function getSuspiciousActivitySummaryAction(input: {
 
   // Build where clause from filters
 
-  const whereAnd: any[] = [];
+  const whereAnd: Prisma.RateLimitEventWhereInput[] = [];
 
   if (input.search?.trim()) {
     const search = input.search.trim();
@@ -141,7 +155,7 @@ export async function getSuspiciousActivitySummaryAction(input: {
     });
     const userIds = matchingUsers.map((u) => u.id);
 
-    const orConditions: any[] = [
+    const orConditions: Prisma.RateLimitEventWhereInput[] = [
       { key: { contains: search, mode: 'insensitive' } },
     ];
 
@@ -166,10 +180,12 @@ export async function getSuspiciousActivitySummaryAction(input: {
 
   // Build having clause from min/max blocked
 
-  let having: any = undefined;
+  let having:
+    | { id: { _count: Prisma.NestedIntFilter<'RateLimitEvent'> } }
+    | undefined;
 
   if (input.minBlocked || input.maxBlocked) {
-    const countFilter: any = {};
+    const countFilter: Prisma.NestedIntFilter<'RateLimitEvent'> = {};
 
     if (input.minBlocked) {
       countFilter.gte = input.minBlocked;
@@ -205,9 +221,9 @@ export async function getSuspiciousActivitySummaryAction(input: {
     .filter((id): id is string => id !== null);
   const uniqueUserIds = [...new Set(userIds)];
 
-  const users =
+  const [users, statuses] = await Promise.all([
     uniqueUserIds.length > 0
-      ? await prisma.user.findMany({
+      ? prisma.user.findMany({
           where: { id: { in: uniqueUserIds } },
           select: {
             id: true,
@@ -217,38 +233,44 @@ export async function getSuspiciousActivitySummaryAction(input: {
             phoneNumber: true,
           },
         })
-      : [];
+      : Promise.resolve([]),
+    readModerationStatuses(uniqueUserIds),
+  ]);
+
+  if (!statuses.success) {
+    return { success: false, error: await translateErrorCode(statuses.error) };
+  }
 
   const userMap = new Map(users.map((u) => [u.id, u]));
 
   // Build summaries
-  const items: SuspiciousKeySummary[] = await Promise.all(
-    groupedEvents.map(async (event) => {
-      const limiterEntry = getLimiterByLabel(event.limiterLabel);
-      const summary: SuspiciousKeySummary = {
-        key: event.key,
-        userId: event.userId,
-        limiterLabel: event.limiterLabel,
-        totalEvents: event._count.id,
-        maxRequests: limiterEntry?.maxRequests ?? null,
-        windowMs: limiterEntry?.windowMs ?? null,
-        firstEventAt: event._min.createdAt!,
-        lastEventAt: event._max.createdAt!,
-      };
+  const items: SuspiciousKeySummary[] = groupedEvents.map((event) => {
+    const limiterEntry = getLimiterByLabel(event.limiterLabel);
+    const summary: SuspiciousKeySummary = {
+      key: event.key,
+      userId: event.userId,
+      limiterLabel: event.limiterLabel,
+      totalEvents: event._count.id,
+      maxRequests: limiterEntry?.maxRequests ?? null,
+      windowMs: limiterEntry?.windowMs ?? null,
+      firstEventAt: event._min.createdAt!,
+      lastEventAt: event._max.createdAt!,
+    };
 
-      if (event.userId) {
-        const user = userMap.get(event.userId);
+    if (event.userId) {
+      const user = userMap.get(event.userId);
 
-        if (user) {
-          summary.resolvedUser = user;
-        }
-
-        summary.blockStatus = await getBlockStatusForUser(event.userId);
+      if (user) {
+        summary.resolvedUser = user;
       }
 
-      return summary;
-    })
-  );
+      summary.blockStatus = serializeUserBlockStatus(
+        statuses.value.get(UserId.parse(event.userId)) ?? null
+      );
+    }
+
+    return summary;
+  });
 
   return { success: true, data: { items, totalCount } };
 }
@@ -310,30 +332,20 @@ export async function blockUserAction(input: {
     return auth;
   }
 
-  const t = await getTranslations('superadmin.users');
-
-  if (!input.reason.trim()) {
-    return { success: false, error: t('reasonRequired') };
-  }
-
-  if (profanityChecker.containsProfanity(input.reason)) {
-    const msg = await translateErrorCode(SharedDomainCodes.CONTAINS_PROFANITY);
-
-    return {
-      success: false,
-      error: msg,
-      fieldErrors: { reason: [msg] },
-    };
-  }
-
-  await prisma.userBlockStatus.create({
-    data: {
-      userId: input.userId,
-      status: 'blocked',
-      statusChangedBySuperadminId: auth.userId,
-      reason: input.reason,
-    },
+  const result = await moderateUser.execute({
+    userId: input.userId,
+    actorId: auth.userId,
+    status: 'blocked',
+    reason: input.reason,
   });
+
+  if (!result.success) {
+    const error = await translateErrorCode(result.error);
+
+    return result.error === SharedDomainCodes.CONTAINS_PROFANITY
+      ? { success: false, error, fieldErrors: { reason: [error] } }
+      : { success: false, error };
+  }
 
   console.log(
     `[UserBlock] ${new Date().toISOString()} blocked userId=${input.userId} reason="${input.reason}" by superadmin=${auth.userId}`
@@ -358,30 +370,20 @@ export async function unblockUserAction(input: {
     return auth;
   }
 
-  const t = await getTranslations('superadmin.users');
-
-  if (!input.reason.trim()) {
-    return { success: false, error: t('reasonRequired') };
-  }
-
-  if (profanityChecker.containsProfanity(input.reason)) {
-    const msg = await translateErrorCode(SharedDomainCodes.CONTAINS_PROFANITY);
-
-    return {
-      success: false,
-      error: msg,
-      fieldErrors: { reason: [msg] },
-    };
-  }
-
-  await prisma.userBlockStatus.create({
-    data: {
-      userId: input.userId,
-      status: 'unblocked',
-      statusChangedBySuperadminId: auth.userId,
-      reason: input.reason,
-    },
+  const result = await moderateUser.execute({
+    userId: input.userId,
+    actorId: auth.userId,
+    status: 'unblocked',
+    reason: input.reason,
   });
+
+  if (!result.success) {
+    const error = await translateErrorCode(result.error);
+
+    return result.error === SharedDomainCodes.CONTAINS_PROFANITY
+      ? { success: false, error, fieldErrors: { reason: [error] } }
+      : { success: false, error };
+  }
 
   console.log(
     `[UserBlock] ${new Date().toISOString()} unblocked userId=${input.userId} reason="${input.reason}" by superadmin=${auth.userId}`
@@ -392,9 +394,7 @@ export async function unblockUserAction(input: {
 
 export async function getUserBlockStatusAction(input: {
   userId: string;
-}): Promise<
-  ActionResult<{ blocked: boolean; reason?: string; blockedAt?: Date }>
-> {
+}): Promise<ActionResult<UserBlockStatusView>> {
   const rateLimited = await checkRateLimit();
 
   if (rateLimited) {
@@ -407,22 +407,30 @@ export async function getUserBlockStatusAction(input: {
     return auth;
   }
 
-  const status = await getBlockStatusForUser(input.userId);
+  const userId = UserId.safeParse(input.userId);
 
-  return { success: true, data: status ?? { blocked: false } };
-}
+  if (!userId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
 
-export interface UserBlockHistoryEntry {
-  id: string;
-  status: string;
-  reason: string | null;
-  createdAt: Date;
-  statusChangedBy: {
-    firstName: string;
-    lastName: string;
-    middleName: string | null;
+  const status = await moderationRepository.getStatus(userId.data);
+
+  if (!status.success) {
+    return { success: false, error: await translateErrorCode(status.error) };
+  }
+
+  return {
+    success: true,
+    data: serializeUserBlockStatus(status.value) ?? { blocked: false },
   };
 }
+
+export type UserBlockHistoryEntry = Omit<UserModerationHistory, 'createdAt'> & {
+  createdAt: Date;
+};
 
 export async function getUserBlockHistoryAction(input: {
   userId: string;
@@ -439,21 +447,35 @@ export async function getUserBlockHistoryAction(input: {
     return auth;
   }
 
-  const history = await prisma.userBlockStatus.findMany({
-    where: { userId: input.userId },
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      status: true,
-      reason: true,
-      createdAt: true,
-      statusChangedBy: {
-        select: { firstName: true, lastName: true, middleName: true },
-      },
-    },
-  });
+  const userId = UserId.safeParse(input.userId);
 
-  return { success: true, data: history };
+  if (!userId.success) {
+    return {
+      success: false,
+      error: await translateErrorCode('common.errors.validationFailed'),
+    };
+  }
+
+  const history = await moderationRepository.getHistory(userId.data);
+
+  if (!history.success) {
+    return { success: false, error: await translateErrorCode(history.error) };
+  }
+
+  return {
+    success: true,
+    data: history.value.map((entry) => ({
+      id: entry.id,
+      status: entry.status,
+      reason: entry.reason,
+      createdAt: Instant.toDate(entry.createdAt),
+      statusChangedBy: {
+        firstName: entry.statusChangedBy.firstName,
+        lastName: entry.statusChangedBy.lastName,
+        middleName: entry.statusChangedBy.middleName,
+      },
+    })),
+  };
 }
 
 export async function searchUsersForAdminAction(input: {
@@ -500,13 +522,19 @@ export async function searchUsersForAdminAction(input: {
     take: 50,
   });
 
-  // Attach block status for each
-  const results: AdminUserResult[] = await Promise.all(
-    users.map(async (user) => ({
-      ...user,
-      blockStatus: await getBlockStatusForUser(user.id),
-    }))
-  );
+  // Resolve statuses in one typed read instead of one query per user.
+  const statuses = await readModerationStatuses(users.map((user) => user.id));
+
+  if (!statuses.success) {
+    return { success: false, error: await translateErrorCode(statuses.error) };
+  }
+
+  const results: AdminUserResult[] = users.map((user) => ({
+    ...user,
+    blockStatus: serializeUserBlockStatus(
+      statuses.value.get(UserId.parse(user.id)) ?? null
+    ),
+  }));
 
   return { success: true, data: results };
 }
@@ -544,7 +572,7 @@ export async function listUsersForAdminAction(input: {
   const pageSize = input.pageSize ?? 10;
 
   // Build WHERE clauses
-  const whereAnd: any[] = [];
+  const whereAnd: Prisma.UserWhereInput[] = [];
 
   if (input.search?.trim()) {
     const search = input.search.trim();
@@ -583,11 +611,17 @@ export async function listUsersForAdminAction(input: {
 
   // Block status filter: get blocked user IDs, then filter
   if (input.blockStatus) {
-    const blockedIds = await getBlockedUserIds();
+    const blocked = await moderationRepository.getBlockedUserIds();
+
+    if (!blocked.success) {
+      return { success: false, error: await translateErrorCode(blocked.error) };
+    }
+
+    const blockedIds = blocked.value;
 
     if (input.blockStatus === 'blocked') {
       whereAnd.push({
-        id: { in: blockedIds.length > 0 ? blockedIds : ['__none__'] },
+        id: { in: blockedIds },
       });
     } else {
       if (blockedIds.length > 0) {
@@ -641,18 +675,8 @@ export async function listUsersForAdminAction(input: {
   const [blockStatuses, orgMemberships, pollCounts] =
     userIds.length > 0
       ? await Promise.all([
-          // Latest block status per user
-          prisma.userBlockStatus.findMany({
-            where: { userId: { in: userIds } },
-            orderBy: { createdAt: 'desc' },
-            distinct: ['userId'],
-            select: {
-              userId: true,
-              status: true,
-              reason: true,
-              createdAt: true,
-            },
-          }),
+          // Latest decoded block status per user
+          readModerationStatuses(userIds),
           // Org memberships
           prisma.organizationUser.findMany({
             where: { userId: { in: userIds }, status: 'accepted' },
@@ -668,19 +692,20 @@ export async function listUsersForAdminAction(input: {
             _count: { _all: true },
           }),
         ])
-      : [[], [], []];
+      : [success(new Map<UserId, UserBlockStatus>()), [], []];
 
-  // Build lookup maps
+  if (!blockStatuses.success) {
+    return {
+      success: false,
+      error: await translateErrorCode(blockStatuses.error),
+    };
+  }
+
+  // Build lookup maps with the existing ISO timestamp representation.
   const blockStatusMap = new Map(
-    blockStatuses.map((bs) => [
-      bs.userId,
-      bs.status === 'blocked'
-        ? {
-            blocked: true as const,
-            reason: bs.reason ?? undefined,
-            blockedAt: bs.createdAt.toISOString(),
-          }
-        : { blocked: false as const },
+    [...blockStatuses.value].map(([id, status]) => [
+      id,
+      serializeUserBlockStatusIso(status),
     ])
   );
 
@@ -713,7 +738,7 @@ export async function listUsersForAdminAction(input: {
       organizations: orgs,
       organizationCount: orgs.length,
       pollCount: pollCountMap.get(user.id) ?? 0,
-      blockStatus: blockStatusMap.get(user.id) ?? null,
+      blockStatus: blockStatusMap.get(UserId.parse(user.id)) ?? null,
     };
   });
 

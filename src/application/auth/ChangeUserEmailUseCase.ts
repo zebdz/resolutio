@@ -1,3 +1,7 @@
+/** Changes a validated email and sends a best-effort notice to the former confirmed address. */
+import { Language } from '@/domain/user/UserValues';
+import { AuthenticationError } from './AuthenticationError';
+import { UserId } from '@/domain/shared/EntityIds';
 import { UserRepository } from '@/domain/user/UserRepository';
 import { EmailAddress } from '@/domain/user/EmailAddress';
 import { UserDomainCodes } from '@/domain/user/UserDomainCodes';
@@ -7,7 +11,7 @@ import { EmailTemplateRenderer } from './EmailTemplateRenderer';
 import { maskEmail } from './maskEmail';
 
 export interface ChangeUserEmailInput {
-  userId: string;
+  userId: UserId;
   email: string;
 }
 
@@ -30,7 +34,7 @@ export class ChangeUserEmailUseCase {
 
   async execute(
     input: ChangeUserEmailInput
-  ): Promise<Result<{ changed: true }, string>> {
+  ): Promise<Result<{ changed: true }, AuthenticationError>> {
     const user = await this.userRepository.findById(input.userId);
 
     if (!user) {
@@ -60,11 +64,7 @@ export class ChangeUserEmailUseCase {
     // to; an unconfirmed one was never proven to belong to anyone. Re-saving
     // the same address is not a move, so it earns no notice.
     if (previous && previous.getValue() !== email.getValue()) {
-      await this.notifyPreviousAddress(
-        previous.getValue(),
-        email.getValue(),
-        user.language
-      );
+      await this.notifyPreviousAddress(previous, email, user.language);
     }
 
     return success({ changed: true });
@@ -76,15 +76,15 @@ export class ChangeUserEmailUseCase {
    * swallowed after logging.
    */
   private async notifyPreviousAddress(
-    previousAddress: string,
-    newAddress: string,
-    locale: string
+    previousAddress: EmailAddress,
+    newAddress: EmailAddress,
+    locale: Language
   ): Promise<void> {
     try {
       const { subject, text } =
         await this.templateRenderer.renderEmailChangedNotice(
           locale,
-          maskEmail(newAddress)
+          maskEmail(newAddress.getValue())
         );
 
       await this.emailSender.send({ to: previousAddress, subject, text });

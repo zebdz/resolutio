@@ -55,12 +55,12 @@ enum ReportState {
 
 // Authentication Models
 model User {
-  id          String   @id @default(cuid())
-  firstName   String   @map("first_name")
-  lastName    String   @map("last_name")
-  middleName  String?  @map("middle_name")
-  phoneNumber String   @unique @map("phone_number")
-  password    String
+  id                    String    @id @default(cuid())
+  firstName             String    @map("first_name")
+  lastName              String    @map("last_name")
+  middleName            String?   @map("middle_name")
+  phoneNumber           String    @unique @map("phone_number")
+  password              String
   language              String    @default("ru")
   consentGivenAt        DateTime? @map("consent_given_at")
   createdAt             DateTime  @default(now()) @map("created_at")
@@ -74,64 +74,67 @@ model User {
   emailConfirmedAt      DateTime? @map("email_confirmed_at")
 
   // Relations
-  sessions           Session[]
-  organizationsOwned Organization[]
-  memberships        OrganizationUser[]
-  adminRoles         OrganizationAdminUser[]
-  boardMemberships   BoardUser[]
-  boardMembersAdded  BoardUser[]        @relation("AddedBoardMember")
-  boardMembersRemoved BoardUser[]       @relation("RemovedBoardMember")
-  votes              Vote[]
-  pollsCreated       Poll[]
-  superAdmin         SuperAdmin?
-  acceptedRequests   OrganizationUser[] @relation("AcceptedByAdmin")
-  rejectedRequests   OrganizationUser[] @relation("RejectedByAdmin")
-  pollParticipants   PollParticipant[]
-  voteDrafts         VoteDraft[]
-  weightChanges      ParticipantWeightHistory[] @relation("WeightChangedBy")
+  sealBundleDeliveries        SealBundleDelivery[]
+  sessions                    Session[]
+  organizationsOwned          Organization[]
+  memberships                 OrganizationUser[]
+  adminRoles                  OrganizationAdminUser[]
+  boardMemberships            BoardUser[]
+  boardMembersAdded           BoardUser[]                     @relation("AddedBoardMember")
+  boardMembersRemoved         BoardUser[]                     @relation("RemovedBoardMember")
+  votes                       Vote[]
+  pollsCreated                Poll[]
+  superAdmin                  SuperAdmin?
+  acceptedRequests            OrganizationUser[]              @relation("AcceptedByAdmin")
+  rejectedRequests            OrganizationUser[]              @relation("RejectedByAdmin")
+  pollParticipants            PollParticipant[]
+  voteDrafts                  VoteDraft[]
+  weightChanges               ParticipantWeightHistory[]      @relation("WeightChangedBy")
   requestedParentJoinRequests OrganizationJoinParentRequest[] @relation("RequestingAdmin")
   handledParentJoinRequests   OrganizationJoinParentRequest[] @relation("HandlingAdmin")
-  notifications              Notification[]
-  privacyAuditLogs           UserPrivacyAuditLog[]
-  rateLimitEvents            RateLimitEvent[]
-  blockStatuses              UserBlockStatus[] @relation("BlockedUser")
-  changedUserBlockStatuses   UserBlockStatus[] @relation("StatusChangedBySuperadmin")
-  changedIpBlockStatuses     IpBlockStatus[]   @relation("IpBlockStatusChangedBy")
-  otpVerifications           OtpVerification[]
-  invitationsSent            Invitation[] @relation("InvitationInviter")
-  invitationsReceived        Invitation[] @relation("InvitationInvitee")
-  joinTokensCreated          OrganizationJoinToken[] @relation("JoinTokenCreator")
-  address            Address?
-  legalChecks        PollLegalCheck[]    @relation("LegalChecks")
-  legalCheckLogs     PollLegalCheckLog[] @relation("LegalCheckLogs")
-  propertyOwnerships PropertyAssetOwnership[]
-  pollEligibilities  PollEligibleMember[]
-  propertyClaimsSubmitted PropertyClaim[] @relation("PropertyClaimUser")
-  propertyClaimsDecided   PropertyClaim[] @relation("PropertyClaimDecidedBy")
-  reportsAuthored         Report[]        @relation("ReportAuthor")
-  reportsPublished        Report[]        @relation("ReportPublisher")
-  orgMemberRemovals       OrganizationMemberRemoval[] @relation("RemovedOrgMember")
-  orgMemberRemovalsActed  OrganizationMemberRemoval[] @relation("RemovedOrgMemberBy")
+  notifications               Notification[]
+  privacyAuditLogs            UserPrivacyAuditLog[]
+  rateLimitEvents             RateLimitEvent[]
+  blockStatuses               UserBlockStatus[]               @relation("BlockedUser")
+  changedUserBlockStatuses    UserBlockStatus[]               @relation("StatusChangedBySuperadmin")
+  changedIpBlockStatuses      IpBlockStatus[]                 @relation("IpBlockStatusChangedBy")
+  otpVerifications            OtpVerification[]
+  invitationsSent             Invitation[]                    @relation("InvitationInviter")
+  invitationsReceived         Invitation[]                    @relation("InvitationInvitee")
+  joinTokensCreated           OrganizationJoinToken[]         @relation("JoinTokenCreator")
+  address                     Address?
+  legalChecks                 PollLegalCheck[]                @relation("LegalChecks")
+  legalCheckLogs              PollLegalCheckLog[]             @relation("LegalCheckLogs")
+  propertyOwnerships          PropertyAssetOwnership[]
+  pollEligibilities           PollEligibleMember[]
+  propertyClaimsSubmitted     PropertyClaim[]                 @relation("PropertyClaimUser")
+  propertyClaimsDecided       PropertyClaim[]                 @relation("PropertyClaimDecidedBy")
+  reportsAuthored             Report[]                        @relation("ReportAuthor")
+  reportsPublished            Report[]                        @relation("ReportPublisher")
+  eligibilityChangesReceived MembershipEligibilityChange[] @relation("EligibilityMember")
+  eligibilityChangesMade MembershipEligibilityChange[] @relation("EligibilityActor")
+  orgMemberRemovals           OrganizationMemberRemoval[]     @relation("RemovedOrgMember")
+  orgMemberRemovalsActed      OrganizationMemberRemoval[]     @relation("RemovedOrgMemberBy")
 
   @@map("users")
 }
 
 model Address {
-  id         String   @id @default(cuid())
-  userId     String   @unique @map("user_id")
-  country    String
-  region     String?
-  city       String
-  street     String
-  building   String
-  apartment  String?
+  id             String   @id @default(cuid())
+  userId         String   @unique @map("user_id")
+  country        String
+  region         String?
+  city           String
+  street         String
+  building       String?
+  apartment      String?
   postalCode     String?  @map("postal_code")
-  isPrivateHouse Boolean  @default(false) @map("is_private_house")
+  isPrivateHouse Boolean? @default(false) @map("is_private_house")
   oneLine        String?  @map("one_line")
   houseFiasId    String?  @map("house_fias_id")
   flatFiasId     String?  @map("flat_fias_id")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -163,55 +166,76 @@ model SuperAdmin {
 
 // Organization Models
 model Organization {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  description String
-  parentId    String?  @map("parent_id")
-  createdById String   @map("created_by_id")
-  createdAt   DateTime @default(now()) @map("created_at")
-  archivedAt  DateTime? @map("archived_at")
-  allowMultiTreeMembership Boolean? @default(false) @map("allow_multi_tree_membership")
+  id                       String    @id @default(cuid())
+  name                     String    @unique
+  description              String
+  parentId                 String?   @map("parent_id")
+  createdById              String    @map("created_by_id")
+  createdAt                DateTime  @default(now()) @map("created_at")
+  archivedAt               DateTime? @map("archived_at")
+  allowMultiTreeMembership Boolean?  @default(false) @map("allow_multi_tree_membership")
 
   // Relations
-  createdBy           User                    @relation(fields: [createdById], references: [id])
-  parent              Organization?           @relation("OrganizationHierarchy", fields: [parentId], references: [id])
-  children            Organization[]          @relation("OrganizationHierarchy")
-  members             OrganizationUser[]
-  admins              OrganizationAdminUser[]
-  boards              Board[]
-  polls               Poll[]
-  childJoinRequests   OrganizationJoinParentRequest[] @relation("ChildOrgJoinParent")
-  parentJoinRequests  OrganizationJoinParentRequest[] @relation("ParentOrgJoinParent")
-  invitations         Invitation[]
-  joinTokens          OrganizationJoinToken[]
-  properties          OrganizationProperty[]
-  propertyClaims      PropertyClaim[]
-  reports             Report[]
-  memberRemovals      OrganizationMemberRemoval[]
+  createdBy          User                            @relation(fields: [createdById], references: [id])
+  parent             Organization?                   @relation("OrganizationHierarchy", fields: [parentId], references: [id])
+  children           Organization[]                  @relation("OrganizationHierarchy")
+  members            OrganizationUser[]
+  admins             OrganizationAdminUser[]
+  boards             Board[]
+  polls              Poll[]
+  childJoinRequests  OrganizationJoinParentRequest[] @relation("ChildOrgJoinParent")
+  parentJoinRequests OrganizationJoinParentRequest[] @relation("ParentOrgJoinParent")
+  invitations        Invitation[]
+  joinTokens         OrganizationJoinToken[]
+  properties         OrganizationProperty[]
+  propertyClaims     PropertyClaim[]
+  reports            Report[]
+  eligibilityChanges MembershipEligibilityChange[]
+  memberRemovals     OrganizationMemberRemoval[]
 
   @@index([parentId])
   @@index([createdById])
   @@map("organizations")
 }
 
-model OrganizationUser {
-  id                String    @id @default(cuid())
-  organizationId    String    @map("organization_id")
-  userId            String    @map("user_id")
-  status            String    @default("pending") // "pending" | "accepted" | "rejected"
-  createdAt         DateTime  @default(now()) @map("created_at")
-  acceptedAt        DateTime? @map("accepted_at")
-  rejectedAt        DateTime? @map("rejected_at")
-  rejectionReason   String?   @map("rejection_reason")
-  acceptedByUserId  String?   @map("accepted_by_user_id")
-  rejectedByUserId  String?   @map("rejected_by_user_id")
-  joinTokenId       String?   @map("join_token_id")
+/// Voting eligibility decisions survive removal of the membership link.
+model MembershipEligibilityChange {
+  id BigInt @id @default(autoincrement())
+  organizationId String @map("organization_id")
+  memberId String @map("member_id")
+  actorId String @map("actor_id")
+  wasEligible Boolean @map("was_eligible")
+  eligible Boolean
+  reason String @db.VarChar(500)
+  changedAt DateTime @default(now()) @map("changed_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  member User @relation("EligibilityMember", fields: [memberId], references: [id], onDelete: Restrict)
+  actor User @relation("EligibilityActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, id])
+  @@map("membership_eligibility_changes")
+}
+
+model OrganizationUser {
+  votingEligible   Boolean   @default(true) @map("voting_eligible")
+  id               String    @id @default(cuid())
+  organizationId   String    @map("organization_id")
+  userId           String    @map("user_id")
+  status           String    @default("pending") // "pending" | "accepted" | "rejected"
+  createdAt        DateTime  @default(now()) @map("created_at")
+  acceptedAt       DateTime? @map("accepted_at")
+  rejectedAt       DateTime? @map("rejected_at")
+  rejectionReason  String?   @map("rejection_reason")
+  acceptedByUserId String?   @map("accepted_by_user_id")
+  rejectedByUserId String?   @map("rejected_by_user_id")
+  joinTokenId      String?   @map("join_token_id")
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   joinToken    OrganizationJoinToken? @relation(fields: [joinTokenId], references: [id])
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  acceptedBy   User?        @relation("AcceptedByAdmin", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
-  rejectedBy   User?        @relation("RejectedByAdmin", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  acceptedBy   User?                  @relation("AcceptedByAdmin", fields: [acceptedByUserId], references: [id], onDelete: SetNull)
+  rejectedBy   User?                  @relation("RejectedByAdmin", fields: [rejectedByUserId], references: [id], onDelete: SetNull)
 
   @@unique([organizationId, userId])
   @@index([userId])
@@ -231,8 +255,8 @@ model OrganizationJoinToken {
   createdAt      DateTime  @default(now()) @map("created_at")
   expiredAt      DateTime? @map("expired_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id])
-  createdBy    User         @relation("JoinTokenCreator", fields: [createdById], references: [id])
+  organization Organization       @relation(fields: [organizationId], references: [id])
+  createdBy    User               @relation("JoinTokenCreator", fields: [createdById], references: [id])
   usages       OrganizationUser[]
 
   @@index([organizationId])
@@ -278,7 +302,7 @@ model Board {
   createdAt      DateTime  @default(now()) @map("created_at")
   archivedAt     DateTime? @map("archived_at")
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   members      BoardUser[]
   polls        Poll[]
   invitations  Invitation[]
@@ -314,29 +338,33 @@ model BoardUser {
 
 // Poll Models
 model Poll {
-  id             String    @id @default(cuid())
-  title          String
-  description    String
-  organizationId String    @map("organization_id")
-  boardId        String?   @map("board_id")
-  pollType       PollType  @default(ORGANIZATION) @map("poll_type")
-  startDate      DateTime  @map("start_date")
-  endDate        DateTime  @map("end_date")
-  state                PollState @default(DRAFT)
-  weightCriteria       String?   @map("weight_criteria")
-  distributionType     String    @default("EQUAL")   @map("distribution_type")
-  propertyAggregation  String    @default("RAW_SUM") @map("property_aggregation")
+  sealWorkClaim       SealWorkClaim?
+  seal                PollSeal?
+  id                  String         @id @default(cuid())
+  title               String
+  description         String
+  organizationId      String         @map("organization_id")
+  boardId             String?        @map("board_id")
+  pollType            PollType       @default(ORGANIZATION) @map("poll_type")
+  startDate           DateTime       @map("start_date")
+  endDate             DateTime       @map("end_date")
+  state               PollState      @default(DRAFT)
+  finishedAt          DateTime?      @map("finished_at")
+  revision            Int            @default(0)
+  weightCriteria      String?        @map("weight_criteria")
+  distributionType    String         @default("EQUAL") @map("distribution_type")
+  propertyAggregation String         @default("RAW_SUM") @map("property_aggregation")
   // Opt-in secrecy. Default false = named: voter identities are part of the
   // record and the org can read them while the poll runs. Set once at
   // creation; there is deliberately no update path.
-  anonymous            Boolean   @default(false)
-  createdBy      String    @map("created_by")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  archivedAt     DateTime? @map("archived_at")
+  anonymous           Boolean        @default(false)
+  createdBy           String         @map("created_by")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  archivedAt          DateTime?      @map("archived_at")
 
-  organization    Organization                    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  board           Board?                          @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  creator         User                            @relation(fields: [createdBy], references: [id])
+  organization    Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  board           Board?               @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  creator         User                 @relation(fields: [createdBy], references: [id])
   questions       Question[]
   participants    PollParticipant[]
   voteDrafts      VoteDraft[]
@@ -367,8 +395,11 @@ model PollAttachment {
   bytes     Bytes
   createdAt DateTime @default(now()) @map("created_at")
 
-  poll Poll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  questionId String?   @map("question_id")
+  question   Question? @relation(fields: [questionId, pollId], references: [id, pollId], onDelete: NoAction, onUpdate: NoAction)
+  poll       Poll      @relation(fields: [pollId], references: [id], onDelete: Cascade)
 
+  @@index([pollId, questionId])
   @@index([pollId])
   @@map("poll_attachments")
 }
@@ -384,11 +415,14 @@ model Question {
   createdAt    DateTime  @default(now()) @map("created_at")
   archivedAt   DateTime? @map("archived_at")
 
-  poll    Poll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
-  answers Answer[]
-  votes   Vote[]
+  poll       Poll        @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  answers    Answer[]
+  votes      Vote[]
   voteDrafts VoteDraft[]
 
+  attachments PollAttachment[]
+
+  @@unique([id, pollId])
   @@index([pollId])
   @@index([pollId, page, order])
   @@map("questions")
@@ -402,8 +436,8 @@ model Answer {
   createdAt  DateTime  @default(now()) @map("created_at")
   archivedAt DateTime? @map("archived_at")
 
-  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  votes    Vote[]
+  question   Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  votes      Vote[]
   voteDrafts VoteDraft[]
 
   @@index([questionId])
@@ -429,16 +463,19 @@ model Vote {
 }
 
 model PollParticipant {
-  id         String   @id @default(cuid())
-  pollId     String   @map("poll_id")
-  userId     String   @map("user_id")
-  userWeight          Decimal  @default(1.0) @map("user_weight") @db.Decimal(15, 6)
+  id                    String   @id @default(cuid())
+  pollId                String   @map("poll_id")
+  userId                String   @map("user_id")
+  userWeight            Decimal  @default(1.0) @map("user_weight") @db.Decimal(15, 6)
   willingToSignProtocol Boolean? @map("willing_to_sign_protocol")
-  snapshotAt          DateTime @default(now()) @map("snapshot_at")
-  createdAt           DateTime @default(now()) @map("created_at")
+  receiptSecret         String?  @map("receipt_secret")
+  // Versioned original cast data; null for voters migrated from older writers.
+  ballotSnapshot        Json?    @map("ballot_snapshot")
+  snapshotAt            DateTime @default(now()) @map("snapshot_at")
+  createdAt             DateTime @default(now()) @map("created_at")
 
-  poll          Poll                           @relation(fields: [pollId], references: [id], onDelete: Cascade)
-  user          User                           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  poll          Poll                       @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   weightHistory ParticipantWeightHistory[]
 
   @@unique([pollId, userId])
@@ -452,14 +489,14 @@ model ParticipantWeightHistory {
   participantId String   @map("participant_id")
   pollId        String   @map("poll_id")
   userId        String   @map("user_id")
-  oldWeight     Decimal  @db.Decimal(15, 6) @map("old_weight")
-  newWeight     Decimal  @db.Decimal(15, 6) @map("new_weight")
+  oldWeight     Decimal  @map("old_weight") @db.Decimal(15, 6)
+  newWeight     Decimal  @map("new_weight") @db.Decimal(15, 6)
   changedBy     String   @map("changed_by")
   reason        String?
   changedAt     DateTime @default(now()) @map("changed_at")
 
-  participant    PollParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  changedByUser  User            @relation("WeightChangedBy", fields: [changedBy], references: [id])
+  participant   PollParticipant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  changedByUser User            @relation("WeightChangedBy", fields: [changedBy], references: [id])
 
   @@index([participantId])
   @@index([pollId])
@@ -518,10 +555,10 @@ model OrganizationJoinParentRequest {
 // OTP Verification
 model OtpVerification {
   id          String    @id @default(cuid())
-  identifier  String    // phone number (E.164 format)
+  identifier  String // phone number (E.164 format)
   channel     String    @default("sms") // "sms" | "email"
   purpose     String    @default("phone_confirmation") // "phone_confirmation" | "email_confirmation" | "password_reset"
-  code        String    // hashed code
+  code        String // hashed code
   clientIp    String    @map("client_ip")
   userId      String    @map("user_id")
   attempts    Int       @default(0)
@@ -559,12 +596,12 @@ model Notification {
 
 // Privacy Audit Log
 model UserPrivacyAuditLog {
-  id               String   @id @default(cuid())
-  userId           String   @map("user_id")
-  allowFindByName  Boolean  @map("allow_find_by_name")
-  allowFindByPhone Boolean  @map("allow_find_by_phone")
-  allowFindByAddress Boolean @map("allow_find_by_address")
-  changedAt        DateTime @default(now()) @map("changed_at")
+  id                 String   @id @default(cuid())
+  userId             String   @map("user_id")
+  allowFindByName    Boolean  @map("allow_find_by_name")
+  allowFindByPhone   Boolean  @map("allow_find_by_phone")
+  allowFindByAddress Boolean  @map("allow_find_by_address")
+  changedAt          DateTime @default(now()) @map("changed_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -591,9 +628,9 @@ model RateLimitEvent {
 
 // User Block Status (append-only log)
 model UserBlockStatus {
-  id                    String   @id @default(cuid())
-  userId                String   @map("user_id")
-  status                String   // "blocked" | "unblocked"
+  id                          String   @id @default(cuid())
+  userId                      String   @map("user_id")
+  status                      String // "blocked" | "unblocked"
   statusChangedBySuperadminId String   @map("status_changed_by_superadmin_id")
   reason                      String?
   createdAt                   DateTime @default(now()) @map("created_at")
@@ -610,7 +647,7 @@ model UserBlockStatus {
 model IpBlockStatus {
   id                          String   @id @default(cuid())
   ipAddress                   String   @map("ip_address")
-  status                      String   // "blocked" | "unblocked"
+  status                      String // "blocked" | "unblocked"
   statusChangedBySuperadminId String   @map("status_changed_by_superadmin_id")
   reason                      String?
   createdAt                   DateTime @default(now()) @map("created_at")
@@ -629,7 +666,7 @@ model Invitation {
   boardId        String?   @map("board_id")
   inviterId      String    @map("inviter_id")
   inviteeId      String    @map("invitee_id")
-  type           String    // "admin_invite" | "board_member_invite" | "member_invite"
+  type           String // "admin_invite" | "board_member_invite" | "member_invite"
   status         String    @default("pending") // "pending" | "accepted" | "declined" | "revoked"
   createdAt      DateTime  @default(now()) @map("created_at")
   handledAt      DateTime? @map("handled_at")
@@ -667,12 +704,12 @@ model PollLegalCheck {
 }
 
 model PollLegalCheckLog {
-  id          String   @id @default(cuid())
-  pollId      String   @map("poll_id")
-  checkedBy   String   @map("checked_by")
-  checkedAt   DateTime @default(now()) @map("checked_at")
-  inputTokens  Int     @default(0) @map("input_tokens")
-  outputTokens Int     @default(0) @map("output_tokens")
+  id           String   @id @default(cuid())
+  pollId       String   @map("poll_id")
+  checkedBy    String   @map("checked_by")
+  checkedAt    DateTime @default(now()) @map("checked_at")
+  inputTokens  Int      @default(0) @map("input_tokens")
+  outputTokens Int      @default(0) @map("output_tokens")
 
   poll Poll @relation(fields: [pollId], references: [id], onDelete: Cascade)
   user User @relation("LegalCheckLogs", fields: [checkedBy], references: [id], onDelete: Cascade)
@@ -710,12 +747,12 @@ model OrganizationProperty {
 }
 
 model PropertyAsset {
-  id          String    @id @default(cuid())
-  propertyId  String    @map("property_id")
-  name        String
-  size        Decimal   @db.Decimal(15, 6)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  archivedAt  DateTime? @map("archived_at")
+  id         String    @id @default(cuid())
+  propertyId String    @map("property_id")
+  name       String
+  size       Decimal   @db.Decimal(15, 6)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  archivedAt DateTime? @map("archived_at")
 
   property   OrganizationProperty     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   ownerships PropertyAssetOwnership[]
@@ -790,10 +827,10 @@ model PropertyClaim {
   decidedAt      DateTime? @map("decided_at")
   createdAt      DateTime  @default(now()) @map("created_at")
 
-  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user          User          @relation("PropertyClaimUser", fields: [userId], references: [id], onDelete: Cascade)
-  asset         PropertyAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  decidedByUser User?         @relation("PropertyClaimDecidedBy", fields: [decidedBy], references: [id])
+  organization  Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user          User                      @relation("PropertyClaimUser", fields: [userId], references: [id], onDelete: Cascade)
+  asset         PropertyAsset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  decidedByUser User?                     @relation("PropertyClaimDecidedBy", fields: [decidedBy], references: [id])
   attachments   PropertyClaimAttachment[]
 
   @@index([organizationId, status])
@@ -837,9 +874,9 @@ model Report {
   updatedAt       DateTime         @updatedAt @map("updated_at")
   archivedAt      DateTime?        @map("archived_at")
 
-  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  createdBy    User                @relation("ReportAuthor", fields: [createdById], references: [id])
-  publishedBy  User?               @relation("ReportPublisher", fields: [publishedById], references: [id], onDelete: SetNull)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User               @relation("ReportAuthor", fields: [createdById], references: [id])
+  publishedBy  User?              @relation("ReportPublisher", fields: [publishedById], references: [id], onDelete: SetNull)
   attachments  ReportAttachment[]
   boards       ReportBoard[]
   polls        ReportPoll[]
@@ -890,3 +927,73 @@ model ReportPoll {
   @@map("report_polls")
 }
 
+// Operational ownership, independent of immutable seal contents and anchor state.
+model SealWorkClaim {
+  pollId       String    @id @map("poll_id")
+  owner        String
+  leaseUntil   DateTime  @map("lease_until")
+  fencingToken BigInt    @map("fencing_token")
+  lastNudgedAt DateTime? @map("last_nudged_at")
+  poll         Poll      @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  @@index([leaseUntil])
+  @@map("seal_work_claims")
+}
+
+/// Canonical record bytes are immutable; mutation trigger lives in the migration.
+model PollSeal {
+  deliveries      SealBundleDelivery[]
+  anchors         SealAnchor[]
+  pollId          String               @id @map("poll_id")
+  rootDigest      String               @unique @map("root_digest")
+  manifest        String
+  sectionPoll     String               @map("section_poll")
+  sectionTallies  String               @map("section_tallies")
+  sectionRegister String               @map("section_register")
+  sectionSigners  String               @map("section_signers")
+  votes           Json
+  sealedAt        DateTime             @map("sealed_at")
+  poll            Poll                 @relation(fields: [pollId], references: [id], onDelete: Restrict)
+
+  @@map("poll_seals")
+}
+
+/// Active-anchor uniqueness and state checks are enforced by the SQL migration.
+model SealAnchor {
+  id             String    @id
+  pollId         String    @map("poll_id")
+  provider       String
+  status         String
+  pendingProof   Bytes?    @map("pending_proof")
+  confirmedProof Bytes?    @map("confirmed_proof")
+  bitcoinHeight  Int?      @map("bitcoin_height")
+  bitcoinTime    DateTime? @map("bitcoin_time")
+  attempts       Int
+  lastError      String?   @map("last_error")
+  nextAttemptAt  DateTime? @map("next_attempt_at")
+  submittedAt    DateTime? @map("submitted_at")
+  confirmedAt    DateTime? @map("confirmed_at")
+  createdAt      DateTime  @map("created_at")
+  seal           PollSeal  @relation(fields: [pollId], references: [pollId], onDelete: Restrict)
+
+  @@index([nextAttemptAt], map: "seal_anchors_due")
+  @@map("seal_anchors")
+}
+
+/// Durable one-time SMTP handoff. State and timestamp combinations are checked by SQL.
+model SealBundleDelivery {
+  pollId           String    @map("poll_id")
+  userId           String    @map("user_id")
+  status           String    @default("PENDING")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  lastSelectedAt   DateTime? @map("last_selected_at")
+  attemptStartedAt DateTime? @map("attempt_started_at")
+  completedAt      DateTime? @map("completed_at")
+  lastError        String?   @map("last_error")
+  seal             PollSeal  @relation(fields: [pollId], references: [pollId], onDelete: Restrict)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([pollId, userId])
+  @@index([status, attemptStartedAt, createdAt], map: "seal_bundle_delivery_work")
+  @@map("seal_bundle_deliveries")
+}

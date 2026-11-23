@@ -1,3 +1,24 @@
+/** Poll use-case compatibility: explicit creation fixtures and repository ports
+ * preserve authorization, eligibility and expected user-visible outcomes. */
+import { PollPeriod } from '@/domain/poll/PollPeriod';
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { PollTitle, PollDescription } from '@/domain/poll/PollContent';
+import { VotingWeight } from '@/domain/poll/VotingWeight';
+import { expectFailure } from '@/domain/shared/__tests__/resultAssertions';
+import { createQuestionIds, questionClock } from './questionTestValues';
+import { testCreation } from '@/domain/shared/__tests__/creation';
+import {
+  PollId,
+  QuestionId,
+  AnswerId,
+  ParticipantId,
+  ParticipantWeightHistoryId,
+  VoteId,
+  VoteDraftId,
+  UserId,
+  OrganizationId,
+  BoardId,
+} from '@/domain/shared/EntityIds';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GetWeightHistoryUseCase } from '../GetWeightHistoryUseCase';
 import { Poll } from '../../../domain/poll/Poll';
@@ -26,19 +47,21 @@ describe('GetWeightHistoryUseCase', () => {
   beforeEach(() => {
     // Create a poll
     const pollResult = Poll.create(
-      'Test Poll',
-      'Test Description',
-      'org-1',
-      'board-1',
-      'user-admin',
-      new Date('2026-01-15'),
-      new Date('2026-02-15')
+      PollTitle.parse('Test Poll'),
+      PollDescription.parse('Test Description'),
+      OrganizationId.parse('org-1'),
+      BoardId.parse('board-1'),
+      UserId.parse('user-admin'),
+      expectSuccess(
+        PollPeriod.create(new Date('2026-01-15'), new Date('2026-02-15'))
+      ),
+      testCreation(PollId, 'poll-1')
     );
     expect(pollResult.success).toBe(true);
 
     if (pollResult.success) {
       poll = pollResult.value;
-      (poll as any).props.id = 'poll-1';
+
       poll.submitToAdmin();
       poll.takeSnapshot();
       poll.activate();
@@ -46,37 +69,37 @@ describe('GetWeightHistoryUseCase', () => {
 
     // Create participant
     const participantResult = PollParticipant.create(
-      'poll-1',
-      'user-1',
-      new Decimal(1.0).toNumber()
+      PollId.parse('poll-1'),
+      UserId.parse('user-1'),
+      testCreation(ParticipantId, 'participant-1'),
+      VotingWeight.parse(new Decimal(1.0).toNumber())
     );
     expect(participantResult.success).toBe(true);
 
     if (participantResult.success) {
       participant = participantResult.value;
-      (participant as any).props.id = 'participant-1';
     }
 
     // Create history entry
     const historyResult = ParticipantWeightHistory.create(
-      'participant-1',
-      'poll-1',
-      'user-1',
-      1.0,
-      2.0,
-      'user-admin',
+      ParticipantId.parse('participant-1'),
+      PollId.parse('poll-1'),
+      UserId.parse('user-1'),
+      VotingWeight.parse(1.0),
+      VotingWeight.parse(2.0),
+      UserId.parse('user-admin'),
+      testCreation(ParticipantWeightHistoryId, 'history-1'),
       'Weight adjustment'
     );
     expect(historyResult.success).toBe(true);
 
     if (historyResult.success) {
       historyEntry = historyResult.value;
-      (historyEntry as any).props.id = 'history-1';
     }
 
     // Mock repositories
     pollRepository = {
-      getPollById: vi.fn().mockResolvedValue(success(poll)),
+      getPollById: vi.fn().mockImplementation(async () => success(poll)),
     };
 
     participantRepository = {
@@ -118,12 +141,15 @@ describe('GetWeightHistoryUseCase', () => {
       },
     };
 
+    userRepository.findById = vi.fn(async (id) =>
+      prisma.user.findUnique({ where: { id } })
+    );
+
     useCase = new GetWeightHistoryUseCase(
       pollRepository as PollRepository,
       participantRepository as ParticipantRepository,
       organizationRepository as OrganizationRepository,
-      userRepository as UserRepository,
-      prisma
+      userRepository as UserRepository
     );
   });
 
@@ -192,19 +218,19 @@ describe('GetWeightHistoryUseCase', () => {
 
   it('should handle multiple history entries', async () => {
     const history2Result = ParticipantWeightHistory.create(
-      'participant-1',
-      'poll-1',
-      'user-1',
-      2.0,
-      3.0,
-      'user-admin',
+      ParticipantId.parse('participant-1'),
+      PollId.parse('poll-1'),
+      UserId.parse('user-1'),
+      VotingWeight.parse(2.0),
+      VotingWeight.parse(3.0),
+      UserId.parse('user-admin'),
+      testCreation(ParticipantWeightHistoryId, 'history-2'),
       'Another adjustment'
     );
     expect(history2Result.success).toBe(true);
 
     if (history2Result.success) {
       const history2 = history2Result.value;
-      (history2 as any).props.id = 'history-2';
       participantRepository.getWeightHistory = vi
         .fn()
         .mockResolvedValue(success([historyEntry, history2]));
@@ -248,7 +274,7 @@ describe('GetWeightHistoryUseCase', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe(OrganizationErrors.NOT_ADMIN);
+      expect(expectFailure(result)).toBe(OrganizationErrors.NOT_ADMIN);
     });
   });
 });

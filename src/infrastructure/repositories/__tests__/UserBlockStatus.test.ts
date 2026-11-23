@@ -1,140 +1,123 @@
+/** Checked moderation persistence supplies authenticated access decisions and append-only history.
+ * These former generic-user repository clients now use the dedicated Result-based port. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-import { PrismaUserRepository } from '../PrismaUserRepository';
-
-const mockPrisma = {
-  user: {
-    findUnique: vi.fn(),
-    findMany: vi.fn(),
-    count: vi.fn(),
-    upsert: vi.fn(),
-    findFirst: vi.fn(),
-  },
-  superAdmin: { findUnique: vi.fn() },
-  userBlockStatus: {
-    findFirst: vi.fn(),
-    create: vi.fn(),
-  },
-  userPrivacyAuditLog: { create: vi.fn() },
-  $transaction: vi.fn(),
-} as unknown as Parameters<
-  typeof PrismaUserRepository extends new (p: infer P) => unknown
-    ? never
-    : never
->[0];
-
-// We need the actual type
+import { UserId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
+import {
+  UserBlockEntryId,
+  createUserModerationEntry,
+} from '@/domain/user/UserModeration';
+import { expectSuccess } from '@/domain/shared/__tests__/resultAssertions';
+import { getUserModerationAccess } from '@/application/user/getUserModerationAccess';
 import type { PrismaClient } from '@/generated/prisma/client';
+import { PrismaUserModerationRepository } from '../PrismaUserModerationRepository';
 
-describe('UserBlockStatus methods', () => {
-  let repo: PrismaUserRepository;
+const findFirst = vi.fn();
+const create = vi.fn();
+const prisma = {
+  userBlockStatus: { findFirst, create },
+} as unknown as PrismaClient;
+const repository = new PrismaUserModerationRepository(prisma);
+const userId = UserId.parse('user-1');
+const at = Instant.parse('2026-03-01T00:00:00.000Z');
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    repo = new PrismaUserRepository(mockPrisma as unknown as PrismaClient);
-  });
+beforeEach(() => {
+  vi.resetAllMocks();
+});
 
-  describe('isUserBlocked', () => {
-    it('returns true when latest entry has status "blocked"', async () => {
-      (mockPrisma as any).userBlockStatus.findFirst.mockResolvedValue({
-        id: '1',
-        status: 'blocked',
-        reason: 'spam',
-        createdAt: new Date(),
-      });
-
-      expect(await repo.isUserBlocked('user-1')).toBe(true);
-      expect(
-        (mockPrisma as any).userBlockStatus.findFirst
-      ).toHaveBeenCalledWith({
-        where: { userId: 'user-1' },
+describe('authenticated user access', () => {
+  it('returns blocked when the latest entry has status blocked', async () => {
+    findFirst.mockResolvedValue({
+      status: 'blocked',
+      reason: 'spam',
+      createdAt: new Date(at),
+    });
+    expect(
+      expectSuccess(await getUserModerationAccess(repository, userId))
+    ).toBe('blocked');
+    expect(findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId },
         orderBy: { createdAt: 'desc' },
-        select: { status: true },
-      });
-    });
-
-    it('returns false when latest entry has status "unblocked"', async () => {
-      (mockPrisma as any).userBlockStatus.findFirst.mockResolvedValue({
-        status: 'unblocked',
-      });
-
-      expect(await repo.isUserBlocked('user-1')).toBe(false);
-    });
-
-    it('returns false when no entries exist', async () => {
-      (mockPrisma as any).userBlockStatus.findFirst.mockResolvedValue(null);
-
-      expect(await repo.isUserBlocked('user-1')).toBe(false);
-    });
+      })
+    );
   });
+  it('returns allowed when the latest entry has status unblocked', async () => {
+    findFirst.mockResolvedValue({
+      status: 'unblocked',
+      reason: null,
+      createdAt: new Date(at),
+    });
+    expect(
+      expectSuccess(await getUserModerationAccess(repository, userId))
+    ).toBe('allowed');
+  });
+  it('returns allowed when no entries exist', async () => {
+    findFirst.mockResolvedValue(null);
+    expect(
+      expectSuccess(await getUserModerationAccess(repository, userId))
+    ).toBe('allowed');
+  });
+});
 
-  describe('blockUser', () => {
-    it('creates entry with status "blocked"', async () => {
-      (mockPrisma as any).userBlockStatus.create.mockResolvedValue({});
-
-      await repo.blockUser('user-1', 'admin-1', 'spam activity');
-
-      expect((mockPrisma as any).userBlockStatus.create).toHaveBeenCalledWith({
+describe('moderation history writes', () => {
+  it.each(['blocked', 'unblocked'] as const)(
+    'appends a %s entry with supplied identity, actor and time',
+    async (status) => {
+      create.mockResolvedValue({});
+      const id = UserBlockEntryId.parse('entry-1');
+      const entry = expectSuccess(
+        createUserModerationEntry(
+          { userId, actorId: 'admin-1', status, reason: 'spam activity' },
+          { id, now: at }
+        )
+      );
+      expectSuccess(await repository.append(entry));
+      expect(create).toHaveBeenCalledWith({
         data: {
-          userId: 'user-1',
-          status: 'blocked',
+          id,
+          userId,
+          status,
           statusChangedBySuperadminId: 'admin-1',
           reason: 'spam activity',
+          createdAt: new Date(at),
         },
       });
+    }
+  );
+});
+
+describe('checked block status reads', () => {
+  it('returns blocked status with its reason and immutable date', async () => {
+    findFirst.mockResolvedValue({
+      status: 'blocked',
+      reason: 'suspicious',
+      createdAt: new Date(at),
+    });
+    expect(expectSuccess(await repository.getStatus(userId))).toEqual({
+      blocked: true,
+      reason: 'suspicious',
+      blockedAt: at,
     });
   });
-
-  describe('unblockUser', () => {
-    it('creates entry with status "unblocked"', async () => {
-      (mockPrisma as any).userBlockStatus.create.mockResolvedValue({});
-
-      await repo.unblockUser('user-1', 'admin-1', 'no longer suspicious');
-
-      expect((mockPrisma as any).userBlockStatus.create).toHaveBeenCalledWith({
-        data: {
-          userId: 'user-1',
-          status: 'unblocked',
-          statusChangedBySuperadminId: 'admin-1',
-          reason: 'no longer suspicious',
-        },
-      });
+  it('returns an explicit unblocked status', async () => {
+    findFirst.mockResolvedValue({
+      status: 'unblocked',
+      reason: null,
+      createdAt: new Date(at),
+    });
+    expect(expectSuccess(await repository.getStatus(userId))).toEqual({
+      blocked: false,
     });
   });
-
-  describe('getBlockStatus', () => {
-    it('returns blocked status with reason and date', async () => {
-      const blockedAt = new Date('2026-03-01');
-      (mockPrisma as any).userBlockStatus.findFirst.mockResolvedValue({
-        status: 'blocked',
-        reason: 'suspicious',
-        createdAt: blockedAt,
-      });
-
-      const result = await repo.getBlockStatus('user-1');
-
-      expect(result).toEqual({
-        blocked: true,
-        reason: 'suspicious',
-        blockedAt,
-      });
-    });
-
-    it('returns unblocked status', async () => {
-      (mockPrisma as any).userBlockStatus.findFirst.mockResolvedValue({
-        status: 'unblocked',
-        reason: null,
-        createdAt: new Date(),
-      });
-
-      const result = await repo.getBlockStatus('user-1');
-      expect(result).toEqual({ blocked: false });
-    });
-
-    it('returns null when no entries exist', async () => {
-      (mockPrisma as any).userBlockStatus.findFirst.mockResolvedValue(null);
-
-      expect(await repo.getBlockStatus('user-1')).toBeNull();
+  it('distinguishes missing history from a failed read', async () => {
+    findFirst
+      .mockResolvedValueOnce(null)
+      .mockRejectedValueOnce(new Error('offline'));
+    expect(expectSuccess(await repository.getStatus(userId))).toBeNull();
+    expect(await repository.getStatus(userId)).toEqual({
+      success: false,
+      error: 'common.errors.unexpected',
     });
   });
 });

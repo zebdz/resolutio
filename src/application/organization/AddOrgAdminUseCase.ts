@@ -1,7 +1,13 @@
+/** Organization application boundary validates external request identities/units
+ * before querying ports or invoking domain policies. */
+import { OrganizationId, UserId } from '../../domain/shared/EntityIds';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 
 export interface AddOrgAdminInput {
   organizationId: string;
@@ -23,9 +29,36 @@ export class AddOrgAdminUseCase {
     this.userRepository = dependencies.userRepository;
   }
 
-  async execute(input: AddOrgAdminInput): Promise<Result<void, string>> {
+  async execute(
+    input: AddOrgAdminInput
+  ): Promise<Result<void, OrganizationUseCaseFailure>> {
+    const parsedOrganizationId = OrganizationId.safeParse(input.organizationId);
+
+    if (!parsedOrganizationId.success) {
+      return failure(OrganizationErrors.NOT_FOUND);
+    }
+
+    const parsedTargetUserId = UserId.safeParse(input.targetUserId);
+
+    if (!parsedTargetUserId.success) {
+      return failure(OrganizationErrors.USER_NOT_FOUND);
+    }
+
+    const parsedActorUserId = UserId.safeParse(input.actorUserId);
+
+    if (!parsedActorUserId.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
+    }
+
+    const command = {
+      ...input,
+      organizationId: parsedOrganizationId.data,
+      targetUserId: parsedTargetUserId.data,
+      actorUserId: parsedActorUserId.data,
+    };
+
     const organization = await this.organizationRepository.findById(
-      input.organizationId
+      command.organizationId
     );
 
     if (!organization) {
@@ -38,11 +71,11 @@ export class AddOrgAdminUseCase {
 
     // Check authorization
     const isSuperAdmin = await this.userRepository.isSuperAdmin(
-      input.actorUserId
+      command.actorUserId
     );
     const isOrgAdmin = await this.organizationRepository.isUserAdmin(
-      input.actorUserId,
-      input.organizationId
+      command.actorUserId,
+      command.organizationId
     );
 
     if (!isOrgAdmin && !isSuperAdmin) {
@@ -50,7 +83,7 @@ export class AddOrgAdminUseCase {
     }
 
     // Check target user exists
-    const targetUser = await this.userRepository.findById(input.targetUserId);
+    const targetUser = await this.userRepository.findById(command.targetUserId);
 
     if (!targetUser) {
       return failure(OrganizationErrors.USER_NOT_FOUND);
@@ -58,8 +91,8 @@ export class AddOrgAdminUseCase {
 
     // Check target is not already admin
     const isTargetAdmin = await this.organizationRepository.isUserAdmin(
-      input.targetUserId,
-      input.organizationId
+      command.targetUserId,
+      command.organizationId
     );
 
     if (isTargetAdmin) {
@@ -67,8 +100,8 @@ export class AddOrgAdminUseCase {
     }
 
     await this.organizationRepository.addAdmin(
-      input.organizationId,
-      input.targetUserId
+      command.organizationId,
+      command.targetUserId
     );
 
     return success(undefined);

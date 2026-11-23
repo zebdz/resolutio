@@ -1,3 +1,13 @@
+/** Property/claim boundary regressions exercise authorized flows with explicit
+ * creation inputs while keeping raw persistence fixtures distinct from domain values. */
+import {
+  propertyTestCreation,
+  propertyTestInstant,
+  submitTestClaim,
+} from './propertyTestValues';
+import { UserId, AssetId, PropertyId } from '../../../domain/shared/EntityIds';
+import { Instant } from '../../../domain/shared/Instant';
+import { ClaimDenialReason } from '../../../domain/organization/PropertyValues';
 import { describe, it, expect } from 'vitest';
 import { ArchivePropertyUseCase } from '../ArchivePropertyUseCase';
 import { OrganizationProperty } from '../../../domain/organization/OrganizationProperty';
@@ -35,6 +45,7 @@ describe('ArchivePropertyUseCase', () => {
     let autoDenyCalled = false;
 
     const uc = new ArchivePropertyUseCase({
+      ...propertyTestCreation(),
       propertyRepository: {
         findById: async () => success(p),
         update: async () => success(undefined),
@@ -52,6 +63,8 @@ describe('ArchivePropertyUseCase', () => {
       autoDenyClaims: {
         executeForProperty: async () => {
           autoDenyCalled = true;
+
+          return success(undefined);
         },
       } as any,
     });

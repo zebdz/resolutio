@@ -1,3 +1,5 @@
+import { UserId } from '@/domain/shared/EntityIds';
+import { authTestDependencies } from '@/application/auth/__tests__/authTestValues';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ConfirmEmailUseCase } from '../ConfirmEmailUseCase';
 import { OtpErrors } from '../OtpErrors';
@@ -69,6 +71,7 @@ describe('ConfirmEmailUseCase', () => {
     otpCodeHasher = { hash: vi.fn(), verify: vi.fn().mockReturnValue(true) };
 
     useCase = new ConfirmEmailUseCase({
+      ...authTestDependencies(),
       userRepository: userRepository as UserRepository,
       otpRepository: otpRepository as OtpRepository,
       otpCodeHasher,
@@ -76,7 +79,7 @@ describe('ConfirmEmailUseCase', () => {
   });
 
   function run(code = '123456') {
-    return useCase.execute({ userId: 'user-1', code });
+    return useCase.execute({ userId: UserId.parse('user-1'), code });
   }
 
   it('marks the email confirmed on a valid code', async () => {

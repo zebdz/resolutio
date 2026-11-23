@@ -1,3 +1,11 @@
+/** Authenticated analysis adapter decodes request/provider values before core persistence.
+ * Configuration failures become server errors before any provider request is made. */
+import { AIModelKey, TokenCount } from '@/domain/ai/LegalAnalysis';
+import { LegalCheckId } from '@/domain/shared/EntityIds';
+import {
+  CryptoIdGenerator,
+  SystemClock,
+} from '@/infrastructure/shared/SystemEntityCreation';
 import { NextRequest, NextResponse } from 'next/server';
 import { generateText, Output } from 'ai';
 import { getLocale } from 'next-intl/server';
@@ -36,7 +44,10 @@ const userRepository = new PrismaUserRepository(prisma);
 const aiProvider = new AIProviderAdapter();
 const aiLogger = new AILogger();
 
+const ids = new CryptoIdGenerator();
+const clock = new SystemClock();
 const useCase = new AnalyzePollLegalityUseCase({
+  clock,
   pollRepository,
   organizationRepository,
   legalCheckRepository,
@@ -56,7 +67,10 @@ export async function POST(
   const user = await getCurrentUser();
 
   if (!user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json(
+      { error: await translateErrorCode('common.errors.unauthorized') },
+      { status: 401 }
+    );
   }
 
   let body: { model?: unknown };
@@ -65,26 +79,26 @@ export async function POST(
     body = await _request.json();
   } catch {
     return NextResponse.json(
-      { error: 'Invalid request body' },
+      { error: await translateErrorCode('common.errors.validationFailed') },
       { status: 400 }
     );
   }
 
   const model = typeof body.model === 'string' ? body.model : '';
 
-  if (!AVAILABLE_MODELS.includes(model)) {
+  if (!AVAILABLE_MODELS.some((key) => key === model)) {
     return NextResponse.json(
       { error: await translateErrorCode(AIErrors.INVALID_MODEL) },
       { status: 400 }
     );
   }
 
-  const { pollId } = await params;
+  const { pollId: requestedPollId } = await params;
   const locale = await getLocale();
   const isSuperadmin = await userRepository.isSuperAdmin(user.id);
 
   const validation = await useCase.validate({
-    pollId,
+    pollId: requestedPollId,
     userId: user.id,
     model,
     locale,
@@ -93,14 +107,16 @@ export async function POST(
 
   if (!validation.success) {
     const status =
-      validation.error === AIErrors.RATE_LIMIT_EXCEEDED ||
-      validation.error === AIErrors.TOKEN_CAP_EXCEEDED
-        ? 429
-        : validation.error === AIErrors.NOT_ADMIN
-          ? 403
-          : validation.error === AIErrors.POLL_NOT_FOUND
-            ? 404
-            : 400;
+      validation.error === 'common.errors.unexpected'
+        ? 500
+        : validation.error === AIErrors.RATE_LIMIT_EXCEEDED ||
+            validation.error === AIErrors.TOKEN_CAP_EXCEEDED
+          ? 429
+          : validation.error === AIErrors.NOT_ADMIN
+            ? 403
+            : validation.error === AIErrors.POLL_NOT_FOUND
+              ? 404
+              : 400;
 
     return NextResponse.json(
       { error: await translateErrorCode(validation.error) },
@@ -109,6 +125,7 @@ export async function POST(
   }
 
   const { poll } = validation.value;
+  const pollId = poll.id;
 
   const pollData = {
     title: poll.title,
@@ -125,21 +142,21 @@ export async function POST(
 
   try {
     const result = await generateText({
-      model: aiProvider.getModel(model),
+      model: aiProvider.getModel(validation.value.model),
       system: systemPrompt,
       prompt: userPrompt,
       output: Output.object({ schema: legalAnalysisResultSchema }),
     });
 
     const analysisResult = result.output;
-    const inputTokens = result.usage.inputTokens ?? 0;
-    const outputTokens = result.usage.outputTokens ?? 0;
+    const inputTokens = TokenCount.parse(result.usage.inputTokens ?? 0);
+    const outputTokens = TokenCount.parse(result.usage.outputTokens ?? 0);
 
     await legalCheckRepository.logCheckAttempt(
       pollId,
       user.id,
-      inputTokens,
-      outputTokens
+      { input: inputTokens, output: outputTokens },
+      clock.now()
     );
 
     if (!analysisResult) {
@@ -156,13 +173,17 @@ export async function POST(
       );
     }
 
-    const created = LegalCheck.create({
-      pollId,
-      model,
-      annotations: analysisResult.annotations,
-      summary: analysisResult.summary,
-      checkedBy: user.id,
-    });
+    const existing = await legalCheckRepository.findByPollId(pollId);
+    const created = LegalCheck.create(
+      {
+        pollId,
+        model: validation.value.model,
+        annotations: analysisResult.annotations,
+        summary: analysisResult.summary,
+        checkedBy: user.id,
+      },
+      { id: existing?.check.id ?? ids.generate(LegalCheckId), now: clock.now() }
+    );
 
     if (created.success) {
       await legalCheckRepository.upsert(created.value);
@@ -195,7 +216,12 @@ export async function POST(
       stack: error instanceof Error ? error.stack : undefined,
     });
     await legalCheckRepository
-      .logCheckAttempt(pollId, user.id, 0, 0)
+      .logCheckAttempt(
+        pollId,
+        user.id,
+        { input: TokenCount.parse(0), output: TokenCount.parse(0) },
+        clock.now()
+      )
       .catch(() => undefined);
 
     return NextResponse.json(

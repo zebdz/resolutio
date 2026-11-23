@@ -1,10 +1,26 @@
+/** Application boundary validates raw requests before invoking property/claim
+ * behavior, and supplies explicit identity/time through injected dependencies. */
+import {
+  OrganizationId,
+  PropertyClaimId,
+  OwnershipId,
+  UserId,
+} from '../../domain/shared/EntityIds';
+import {
+  ClaimDenialReason,
+  OwnershipShare,
+} from '../../domain/organization/PropertyValues';
+import { Clock, IdGenerator } from '../shared/EntityCreation';
 import { PropertyClaimRepository } from '../../domain/organization/PropertyClaimRepository';
 import { PropertyAssetRepository } from '../../domain/organization/PropertyAssetRepository';
 import { OrganizationPropertyRepository } from '../../domain/organization/OrganizationPropertyRepository';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
 import { Result, success, failure } from '../../domain/shared/Result';
-import { OrganizationErrors } from './OrganizationErrors';
+import {
+  OrganizationErrors,
+  OrganizationUseCaseFailure,
+} from './OrganizationErrors';
 import { OrganizationDomainCodes } from '../../domain/organization/OrganizationDomainCodes';
 import { NotifyPropertyClaimApprovedUseCase } from '../notification/NotifyPropertyClaimApprovedUseCase';
 import { NotifyPropertyClaimDeniedUseCase } from '../notification/NotifyPropertyClaimDeniedUseCase';
@@ -20,6 +36,8 @@ export interface ApprovePropertyClaimInput {
 }
 
 export interface ApprovePropertyClaimDependencies {
+  ids: IdGenerator;
+  clock: Clock;
   claimRepository: PropertyClaimRepository;
   assetRepository: PropertyAssetRepository;
   propertyRepository: OrganizationPropertyRepository;
@@ -34,8 +52,20 @@ export class ApprovePropertyClaimUseCase {
 
   async execute(
     input: ApprovePropertyClaimInput
-  ): Promise<Result<void, string>> {
-    const cRes = await this.deps.claimRepository.findById(input.claimId);
+  ): Promise<Result<void, OrganizationUseCaseFailure>> {
+    const claimId = PropertyClaimId.safeParse(input.claimId);
+
+    if (!claimId.success) {
+      return failure(OrganizationDomainCodes.PROPERTY_CLAIM_NOT_FOUND);
+    }
+
+    const adminUserId = UserId.safeParse(input.adminUserId);
+
+    if (!adminUserId.success) {
+      return failure(OrganizationErrors.NOT_ADMIN);
+    }
+
+    const cRes = await this.deps.claimRepository.findById(claimId.data);
 
     if (!cRes.success) {
       return failure(cRes.error);
@@ -47,7 +77,7 @@ export class ApprovePropertyClaimUseCase {
 
     const claim = cRes.value;
 
-    if (!(await this.authorize(input.adminUserId, claim.organizationId))) {
+    if (!(await this.authorize(adminUserId.data, claim.organizationId))) {
       return failure(OrganizationErrors.NOT_ADMIN);
     }
 
@@ -82,7 +112,7 @@ export class ApprovePropertyClaimUseCase {
     // The target is validated WHENEVER it's provided, not only when there
     // are multiple placeholders. A registered-owner row id passed by a
     // tampered request would otherwise silently steal that user's slot.
-    let resolvedPlaceholderId: string | null = null;
+    let resolvedPlaceholderId: OwnershipId | null = null;
 
     if (input.targetOwnershipId) {
       const target = active.value.find((o) => o.id === input.targetOwnershipId);
@@ -102,7 +132,38 @@ export class ApprovePropertyClaimUseCase {
       );
     }
 
-    const transition = claim.approve(input.adminUserId, new Date());
+    const existingForClaimant = active.value.find(
+      (o) => o.userId === claim.userId
+    );
+    const placeholder = active.value.find(
+      (o) => o.id === resolvedPlaceholderId
+    );
+    let merge: {
+      existingId: OwnershipId;
+      placeholderId: OwnershipId;
+      share: OwnershipShare;
+    } | null = null;
+
+    if (existingForClaimant && placeholder) {
+      const share = OwnershipShare.safeParse(
+        existingForClaimant.share + placeholder.share
+      );
+
+      if (!share.success) {
+        return failure(
+          OrganizationDomainCodes.PROPERTY_ASSET_OWNERSHIP_SHARE_OUT_OF_RANGE
+        );
+      }
+
+      merge = {
+        existingId: existingForClaimant.id,
+        placeholderId: placeholder.id,
+        share: share.data,
+      };
+    }
+
+    const at = this.deps.clock.now();
+    const transition = claim.approve(adminUserId.data, at);
 
     if (!transition.success) {
       return failure(transition.error);
@@ -122,19 +183,13 @@ export class ApprovePropertyClaimUseCase {
       // fold its share into their existing row. Otherwise the asset
       // would carry two effective rows for the same user — corrupts the
       // weight calc and the "one row per owner" invariant.
-      const existingForClaimant = active.value.find(
-        (o) => o.userId === claim.userId
-      );
-      const placeholder = active.value.find(
-        (o) => o.id === resolvedPlaceholderId
-      );
-
-      if (existingForClaimant && placeholder) {
+      if (merge) {
         const merged =
           await this.deps.assetRepository.mergePlaceholderIntoExistingOwner({
-            placeholderOwnershipId: placeholder.id,
-            existingOwnershipId: existingForClaimant.id,
-            newShare: existingForClaimant.share + placeholder.share,
+            at,
+            placeholderOwnershipId: merge.placeholderId,
+            existingOwnershipId: merge.existingId,
+            newShare: merge.share,
           });
 
         if (!merged.success) {
@@ -154,9 +209,11 @@ export class ApprovePropertyClaimUseCase {
       // Ownerless → first claimant becomes the 100% owner. If the building
       // later has co-owners, an admin can use Edit owners to redistribute.
       const created = await this.deps.assetRepository.createOwnershipForUser({
+        ownershipId: this.deps.ids.generate(OwnershipId),
+        at,
         assetId: claim.assetId,
         userId: claim.userId,
-        share: 1,
+        share: OwnershipShare.parse(1),
       });
 
       if (!created.success) {
@@ -175,21 +232,39 @@ export class ApprovePropertyClaimUseCase {
           continue;
         }
 
-        const auto = s.autoDeny('another claim approved', new Date());
+        const auto = s.autoDeny(
+          ClaimDenialReason.parse('another claim approved'),
+          at
+        );
 
         if (auto.success) {
           await this.deps.claimRepository.update(s);
-          await this.deps.notifyDenied.execute({ claimId: s.id });
+          const delivery = await this.deps.notifyDenied.execute({
+            claimId: s.id,
+          });
+
+          if (!delivery.success) {
+            return failure('common.errors.unexpected');
+          }
         }
       }
     }
 
-    await this.deps.notifyApproved.execute({ claimId: claim.id });
+    const delivery = await this.deps.notifyApproved.execute({
+      claimId: claim.id,
+    });
+
+    if (!delivery.success) {
+      return failure('common.errors.unexpected');
+    }
 
     return success(undefined);
   }
 
-  private async authorize(userId: string, orgId: string): Promise<boolean> {
+  private async authorize(
+    userId: UserId,
+    orgId: OrganizationId
+  ): Promise<boolean> {
     if (await this.deps.userRepository.isSuperAdmin(userId)) {
       return true;
     }

@@ -1,9 +1,14 @@
+/** Seeds named-poll protocol demo records with weights derived from ownership facts.
+ * Run explicitly against the intended demo database; construction validates calculation inputs. */
 import 'dotenv/config';
 import { PrismaClient, PollState } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { hash } from '@node-rs/argon2';
-import { computeWeights } from '../src/domain/poll/WeightDistribution';
+import {
+  computeWeights,
+  WeightDistributionInput,
+} from '../src/domain/poll/WeightDistribution';
 import { DistributionType } from '../src/domain/poll/DistributionType';
 import { PropertyAggregation } from '../src/domain/poll/PropertyAggregation';
 
@@ -447,14 +452,22 @@ async function main() {
   });
 
   // ── Snapshot: weights via the real domain calculation ─────────
-  const weights = computeWeights({
-    candidates: memberIds,
-    distributionType: DistributionType.OWNERSHIP_SIZE_WEIGHTED,
-    propertyAggregation: PropertyAggregation.RAW_SUM,
-    propertyIds: [],
-    assets,
-    ownerships,
-  });
+  const computedWeights = computeWeights(
+    WeightDistributionInput.parse({
+      candidates: memberIds,
+      distributionType: DistributionType.OWNERSHIP_SIZE_WEIGHTED,
+      propertyAggregation: PropertyAggregation.RAW_SUM,
+      propertyIds: [],
+      assets,
+      ownerships,
+    })
+  );
+
+  if (!computedWeights.success) {
+    throw new Error(computedWeights.error);
+  }
+
+  const weights = computedWeights.value;
 
   const snapshotAt = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 

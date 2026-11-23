@@ -1,7 +1,13 @@
+/** Persists assigned OTP identities and maps validated records and explicit cutoffs.
+ * The adapter never chooses domain identity, verification state or evaluation time. */
+import { UserId, OtpVerificationId } from '@/domain/shared/EntityIds';
+import { Instant } from '@/domain/shared/Instant';
+import { ClientIp } from '@/domain/auth/AuthValues';
+import { OtpDestination, OtpCount } from '@/domain/otp/OtpValues';
 import type { OtpRepository } from '@/domain/otp/OtpRepository';
 import {
   OtpVerification,
-  type OtpChannel,
+  type RawOtpVerificationProps,
   type OtpPurpose,
 } from '@/domain/otp/OtpVerification';
 import type { PrismaClient } from '@/generated/prisma/client';
@@ -12,6 +18,7 @@ export class PrismaOtpRepository implements OtpRepository {
   async save(otp: OtpVerification): Promise<OtpVerification> {
     const saved = await this.prisma.otpVerification.create({
       data: {
+        id: otp.id,
         identifier: otp.identifier,
         channel: otp.channel,
         purpose: otp.purpose,
@@ -20,16 +27,17 @@ export class PrismaOtpRepository implements OtpRepository {
         userId: otp.userId,
         attempts: otp.attempts,
         maxAttempts: otp.maxAttempts,
-        expiresAt: otp.expiresAt,
-        verifiedAt: otp.verifiedAt,
-        createdAt: otp.createdAt,
+        expiresAt: Instant.toDate(otp.expiresAt),
+        verifiedAt:
+          otp.verifiedAt === null ? null : Instant.toDate(otp.verifiedAt),
+        createdAt: Instant.toDate(otp.createdAt),
       },
     });
 
     return this.toDomain(saved);
   }
 
-  async findById(id: string): Promise<OtpVerification | null> {
+  async findById(id: OtpVerificationId): Promise<OtpVerification | null> {
     const record = await this.prisma.otpVerification.findUnique({
       where: { id },
     });
@@ -42,12 +50,11 @@ export class PrismaOtpRepository implements OtpRepository {
   }
 
   async findLatestByIdentifier(
-    identifier: string,
-    channel: OtpChannel,
+    destination: OtpDestination,
     purpose: OtpPurpose
   ): Promise<OtpVerification | null> {
     const record = await this.prisma.otpVerification.findFirst({
-      where: { identifier, channel, purpose },
+      where: { ...destination, purpose },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -59,7 +66,7 @@ export class PrismaOtpRepository implements OtpRepository {
   }
 
   async findLatestByUserId(
-    userId: string,
+    userId: UserId,
     purpose: OtpPurpose
   ): Promise<OtpVerification | null> {
     const record = await this.prisma.otpVerification.findFirst({
@@ -79,85 +86,58 @@ export class PrismaOtpRepository implements OtpRepository {
       where: { id: otp.id },
       data: {
         attempts: otp.attempts,
-        verifiedAt: otp.verifiedAt,
+        verifiedAt:
+          otp.verifiedAt === null ? null : Instant.toDate(otp.verifiedAt),
       },
     });
 
     return this.toDomain(updated);
   }
 
-  async countRecentByClientIp(ip: string, sinceHours: number): Promise<number> {
-    const since = new Date(Date.now() - sinceHours * 3600 * 1000);
-
-    return this.prisma.otpVerification.count({
+  async countRecentByClientIp(ip: ClientIp, since: Instant): Promise<OtpCount> {
+    const count = await this.prisma.otpVerification.count({
       where: {
         clientIp: ip,
-        createdAt: { gte: since },
+        createdAt: { gte: Instant.toDate(since) },
       },
     });
+
+    return OtpCount.parse(count);
   }
 
   async countRecentByIdentifier(
-    identifier: string,
-    channel: OtpChannel,
+    destination: OtpDestination,
     purpose: OtpPurpose,
-    sinceHours: number
-  ): Promise<number> {
-    const since = new Date(Date.now() - sinceHours * 3600 * 1000);
-
-    return this.prisma.otpVerification.count({
+    since: Instant
+  ): Promise<OtpCount> {
+    const count = await this.prisma.otpVerification.count({
       where: {
-        identifier,
-        channel,
+        ...destination,
         purpose,
-        createdAt: { gte: since },
+        createdAt: { gte: Instant.toDate(since) },
       },
     });
+
+    return OtpCount.parse(count);
   }
 
-  async deleteAllForUser(userId: string): Promise<number> {
+  async deleteAllForUser(userId: UserId): Promise<OtpCount> {
     const result = await this.prisma.otpVerification.deleteMany({
       where: { userId },
     });
 
-    return result.count;
+    return OtpCount.parse(result.count);
   }
 
-  async deleteExpired(): Promise<void> {
+  async deleteExpired(now: Instant): Promise<void> {
     await this.prisma.otpVerification.deleteMany({
       where: {
-        expiresAt: { lt: new Date() },
+        expiresAt: { lt: Instant.toDate(now) },
       },
     });
   }
 
-  private toDomain(record: {
-    id: string;
-    identifier: string;
-    channel: string;
-    purpose: string;
-    code: string;
-    clientIp: string;
-    userId: string;
-    attempts: number;
-    maxAttempts: number;
-    expiresAt: Date;
-    verifiedAt: Date | null;
-    createdAt: Date;
-  }): OtpVerification {
-    return OtpVerification.reconstitute({
-      id: record.id,
-      identifier: record.identifier,
-      channel: record.channel as OtpChannel,
-      purpose: record.purpose as OtpPurpose,
-      code: record.code,
-      clientIp: record.clientIp,
-      attempts: record.attempts,
-      maxAttempts: record.maxAttempts,
-      expiresAt: record.expiresAt,
-      verifiedAt: record.verifiedAt,
-      createdAt: record.createdAt,
-      userId: record.userId,
-    });
+  private toDomain(record: RawOtpVerificationProps): OtpVerification {
+    return OtpVerification.reconstitute(record);
   }
 }

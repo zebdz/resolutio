@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Scope format+lint+re-stage to staged files only (excluding deleted ones).
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=d)
+# Only format regular files. Formatting a symlink can overwrite its target.
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=d | while IFS= read -r path; do
+  if [[ ! -L "$path" ]]; then
+    printf '%s\n' "$path"
+  fi
+done)
 
 if [ -n "$STAGED_FILES" ]; then
   LINT_FILES=$(echo "$STAGED_FILES" | grep -E '\.(js|jsx|ts|tsx|mjs|cjs)$' || true)
