@@ -151,7 +151,7 @@ jobs:
           for name in DATABASE_URL ANCHOR_POLLER_SECRET TURNSTILE_SECRET_KEY OTP_CODE_SECRET OTP_EXPIRY_MINUTES OTP_MAX_ATTEMPTS SMS_RU_API_ID SMS_RU_TEST_MODE SMS_RU_MAX_COST_RUBLES DEEPSEEK_API_KEY GOOGLE_GENERATIVE_AI_KEY DADATA_API_KEY SMTP_HOST SMTP_PORT SMTP_SECURE SMTP_USER SMTP_PASSWORD SMTP_FROM PORT; do
             printf '%s=%s\n' "$name" "${!name}" >> "$runtime_env"
           done
-          printf 'ANCHOR_PROVIDER=opentimestamps\nNEXT_PUBLIC_API_URL=%s\n' "$SITE_URL" >> "$runtime_env"
+          printf 'ANCHOR_PROVIDER=opentimestamps\nNEXT_PUBLIC_API_URL=%s\nNEXT_PUBLIC_APP_URL=%s\n' "$SITE_URL" "$SITE_URL" >> "$runtime_env"
           for name in OTS_CALENDAR_URLS OTS_ESPLORA_URL OTS_TIMEOUT_MS; do
             if [[ -n "${!name}" ]]; then printf '%s=%s\n' "$name" "${!name}" >> "$runtime_env"; fi
           done
@@ -178,35 +178,13 @@ jobs:
           scp -i ~/.ssh/id_ed25519 deploy.tar.gz "$target:$remote_archive"
           ssh -i ~/.ssh/id_ed25519 "$target" "cd '$DEPLOY_DIR' && tar -xzf '$remote_archive' deploy-on-server.sh && ./deploy-on-server.sh '$remote_archive'" <<< "$MIGRATION_DATABASE_URL"
 
-      - name: Health check
+      - name: Check public login page and browser assets
         run: |
-          echo "🏥 Running health check..."
-          echo "Waiting for server to fully start..."
-          sleep 10
-
-          # Try multiple times in case server is still starting
-          MAX_ATTEMPTS=3
-          ATTEMPT=1
-
-          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            echo "Attempt $ATTEMPT of $MAX_ATTEMPTS..."
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" ${{ env.SITE_URL }}/ru || echo "000")
-
-            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
-              echo "✅ Site is responding (HTTP $HTTP_CODE)"
-              break
-            else
-              echo "⚠️  Site returned HTTP $HTTP_CODE"
-              if [ $ATTEMPT -lt $MAX_ATTEMPTS ]; then
-                echo "Waiting 5 seconds before retrying..."
-                sleep 5
-              else
-                echo "Site health check failed"
-                exit 1
-              fi
-            fi
-            ATTEMPT=$((ATTEMPT + 1))
+          for attempt in 1 2 3; do
+            if python3 scripts/check-deployed-assets.py "$SITE_URL"; then exit 0; fi
+            if [ "$attempt" -lt 3 ]; then sleep 5; fi
           done
+          exit 1
 
       - name: Cleanup
         if: always()

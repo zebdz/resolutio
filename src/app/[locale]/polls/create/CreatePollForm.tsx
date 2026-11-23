@@ -1,7 +1,8 @@
 'use client';
 
+/** Save poll drafts, questions and attachments, then open the current locale’s poll list. */
+
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { Heading } from '@/src/web/components/catalyst/heading';
 import { Button } from '@/src/web/components/catalyst/button';
@@ -15,7 +16,7 @@ import { Select } from '@/src/web/components/catalyst/select';
 import { Switch, SwitchField } from '@/src/web/components/catalyst/switch';
 import { PollSidebar } from '@/src/web/components/polls/draft/PollSidebar';
 import { QuestionForm } from '@/src/web/components/polls/draft/QuestionForm';
-import { Link } from '@/src/i18n/routing';
+import { Link, useRouter } from '@/src/i18n/routing';
 import { PlusIcon } from '@heroicons/react/20/solid';
 import { QuestionType } from '@/domain/poll/QuestionType';
 import {
