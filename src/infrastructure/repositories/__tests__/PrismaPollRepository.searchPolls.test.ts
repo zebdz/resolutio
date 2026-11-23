@@ -303,7 +303,11 @@ describe('PrismaPollRepository.searchPolls', () => {
       expect.objectContaining({
         include: {
           properties: true,
-          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
+          attachments: {
+            where: { questionId: null },
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          },
           questions: {
             where: { archivedAt: null },
             include: {

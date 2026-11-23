@@ -69,6 +69,8 @@ export const pollSchema = z.strictObject({
   attachments: z.array(
     z.strictObject({
       id: AttachmentId.schema,
+      questionId: QuestionId.schema.nullable(),
+      sha256: Digest.schema,
       fileName: z.string(),
       size: RecordByteCount.schema,
       mimeType: z.string(),

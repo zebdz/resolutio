@@ -386,3 +386,29 @@ it.each([0, 1, 2])(
     expect(input).toEqual(before);
   }
 );
+
+it('commits both file bytes and the owning question and rejects a foreign question', () => {
+  const input = sampleInput();
+  const build = () =>
+    SealedRecordBuilder.build(input, new Date(fixture.sealedAt));
+  const initial = expectRoot();
+
+  function expectRoot() {
+    const built = build();
+    expect(built.success).toBe(true);
+
+    if (!built.success) {
+      throw new Error(built.error);
+    }
+
+    return built.value.rootDigest;
+  }
+
+  input.poll.attachments[0].questionId = 'q1';
+  const moved = expectRoot();
+  expect(moved).not.toBe(initial);
+  input.poll.attachments[0].sha256 = 'bb'.repeat(32);
+  expect(expectRoot()).not.toBe(moved);
+  input.poll.attachments[0].questionId = 'foreign';
+  expect(build().success).toBe(false);
+});

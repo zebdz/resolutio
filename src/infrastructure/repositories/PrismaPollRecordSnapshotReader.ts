@@ -27,9 +27,6 @@ export class PrismaPollRecordSnapshotReader implements PollRecordSnapshotReader 
         organization: { select: { name: true } },
         board: { select: { name: true } },
         properties: { select: { propertyId: true } },
-        attachments: {
-          select: { id: true, fileName: true, sizeBytes: true, mimeType: true },
-        },
         questions: { include: { answers: true, votes: true } },
         participants: {
           include: {
@@ -49,6 +46,20 @@ export class PrismaPollRecordSnapshotReader implements PollRecordSnapshotReader 
     if (!row) {
       return success(null);
     }
+
+    // Hash stored bytes inside PostgreSQL in the sealing transaction. Large files
+    // never need to enter the worker's heap or the exported record.
+    const attachments = await this.tx.$queryRaw<
+      {
+        id: string;
+        questionId: string | null;
+        fileName: string;
+        size: number;
+        mimeType: string;
+        sha256: string;
+      }[]
+    >`select id, question_id as "questionId", file_name as "fileName", octet_length(bytes) as size,
+       mime_type as "mimeType", encode(sha256(bytes),'hex') as sha256 from poll_attachments where poll_id=${pollId}`;
 
     const poll = pollSchema
       .extend({ finishedAt: dateSchema.nullable() })
@@ -86,12 +97,7 @@ export class PrismaPollRecordSnapshotReader implements PollRecordSnapshotReader 
             archivedAt: a.archivedAt?.toISOString() ?? null,
           })),
         })),
-        attachments: row.attachments.map((a) => ({
-          id: a.id,
-          fileName: a.fileName,
-          size: a.sizeBytes,
-          mimeType: a.mimeType,
-        })),
+        attachments,
       });
 
     if (!poll.success) {

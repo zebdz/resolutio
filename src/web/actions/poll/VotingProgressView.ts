@@ -1,5 +1,6 @@
 /** Authorized voting payloads retain validated poll references, content and position units.
  * Explicit mapping keeps nested entities, actor identities and persistence times on the server. */
+import type { QuestionFile } from '@/web/lib/questionAttachmentFiles';
 import type { GetUserVotingProgressResult } from '@/application/poll/GetUserVotingProgressUseCase';
 import type {
   PollId,
@@ -48,6 +49,7 @@ export function votingEligibilityView(
 }
 
 export interface VotingQuestionView {
+  files?: QuestionFile[];
   id: QuestionId;
   text: QuestionText;
   details: QuestionDetails | null;
@@ -86,7 +88,8 @@ export interface VotingProgressView {
 }
 
 export function serializeVotingProgress(
-  source: GetUserVotingProgressResult
+  source: GetUserVotingProgressResult,
+  files: QuestionFile[] = []
 ): VotingProgressView {
   const { poll } = source;
 
@@ -103,6 +106,7 @@ export function serializeVotingProgress(
         poll.distributionType === 'OWNERSHIP_SIZE_WEIGHTED',
       questions: poll.questions.map((question) => ({
         id: question.id,
+        files: files.filter((f) => f.questionId === question.id),
         text: question.text,
         details: question.details,
         page: question.page,

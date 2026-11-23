@@ -18,7 +18,7 @@ type UserResult = {
   lastName: string;
   middleName?: string;
   nickname: string;
-  address?: { city: string; street: string };
+  address?: { city?: string; street: string };
 };
 
 type InviteOutsideMemberSectionProps = {
@@ -188,7 +188,9 @@ export default function InviteOutsideMemberSection({
                 </p>
                 {user.address && (
                   <p className="text-xs text-zinc-500">
-                    {user.address.city}, {user.address.street}
+                    {[user.address.city, user.address.street]
+                      .filter(Boolean)
+                      .join(', ')}
                   </p>
                 )}
               </div>

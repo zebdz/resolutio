@@ -141,7 +141,8 @@ export class TakeSnapshotUseCase {
       // Org-wide poll: use org members + descendants (deduplicated)
       memberUserIds =
         await this.organizationRepository.findAcceptedMemberUserIdsIncludingDescendants(
-          poll.organizationId
+          poll.organizationId,
+          { votingEligibleOnly: true }
         );
     }
 

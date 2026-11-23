@@ -160,7 +160,8 @@ export interface OrganizationRepository {
    * Used for org-wide poll snapshots. Returns deduplicated user IDs.
    */
   findAcceptedMemberUserIdsIncludingDescendants(
-    organizationId: OrganizationId
+    organizationId: OrganizationId,
+    options?: { votingEligibleOnly: boolean }
   ): Promise<UserId[]>;
 
   /**

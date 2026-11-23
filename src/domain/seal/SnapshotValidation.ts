@@ -70,7 +70,13 @@ export function validateSnapshot(
   unique(poll.questions.map((q) => q.id));
   unique(poll.questions.flatMap((q) => q.answers.map((a) => a.id)));
   unique(poll.propertyIds);
+  const questions = new Map(poll.questions.map((q) => [q.id, q]));
   unique(poll.attachments.map((a) => a.id));
+  requireSeal(
+    poll.attachments.every(
+      (a) => a.questionId === null || questions.has(a.questionId)
+    )
+  );
   unique(participants.map((p) => p.userId));
   unique(votes.map((v) => `${v.userId}:${v.questionId}:${v.answerId}`));
   const active = poll.questions.filter((q) => q.archivedAt === null);
@@ -78,7 +84,6 @@ export function validateSnapshot(
     active.length > 0 &&
       active.every((q) => q.answers.some((a) => a.archivedAt === null))
   );
-  const questions = new Map(poll.questions.map((q) => [q.id, q]));
   const byUser = new Map(participants.map((p) => [p.userId, p]));
   const ballots = new Map<UserId, Map<QuestionId, number>>();
 

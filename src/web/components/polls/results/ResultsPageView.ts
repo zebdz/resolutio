@@ -96,6 +96,16 @@ export const resultsPageSchema = z.object({
   title: z.string(),
   description: z.string(),
   attachmentIds: z.array(PollAttachmentId),
+  questionFiles: z
+    .array(
+      z.object({
+        id: PollAttachmentId,
+        questionId: QuestionId,
+        fileName: z.string(),
+        mimeType: z.string(),
+      })
+    )
+    .optional(),
   distributionType: z.enum(DistributionType),
   propertyAggregation: z.enum(PropertyAggregation),
   scopedPropertyNames: z.array(z.string()),

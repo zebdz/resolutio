@@ -1,7 +1,7 @@
 /** Typed attachment persistence projections. Metadata never contains content bytes;
  * adapters validate stored scalar values before they cross the port. */
 import { Instant } from '../shared/Instant';
-import { PollAttachmentId, PollId } from '../shared/EntityIds';
+import { PollAttachmentId, PollId, QuestionId } from '../shared/EntityIds';
 import {
   AttachmentFileName,
   AttachmentByteCount,
@@ -14,6 +14,7 @@ import { Result } from '../shared/Result';
 export interface PollAttachmentMetadata {
   id: PollAttachmentId;
   pollId: PollId;
+  questionId: QuestionId | null;
   fileName: AttachmentFileName;
   mimeType: PollAttachmentMimeType;
   sizeBytes: AttachmentByteCount;
@@ -26,11 +27,19 @@ export interface PollAttachmentBytes {
   bytes: Buffer;
 }
 
+export type AttachmentWriteFailure =
+  | 'common.errors.unexpected'
+  | 'domain.poll.attachmentLimitReached'
+  | 'domain.poll.questionAttachmentLimitReached'
+  | 'domain.poll.cannotChangeAttachmentsActive'
+  | 'domain.poll.questionNotFound'
+  | 'domain.poll.attachmentNotFound';
+
 export interface PollAttachmentRepository {
   save(
     attachment: PollAttachment,
     bytes: Buffer
-  ): Promise<Result<PollAttachmentMetadata, 'common.errors.unexpected'>>;
+  ): Promise<Result<PollAttachmentMetadata, AttachmentWriteFailure>>;
   findByPollId(
     pollId: PollId
   ): Promise<Result<PollAttachmentMetadata[], 'common.errors.unexpected'>>;
@@ -41,9 +50,10 @@ export interface PollAttachmentRepository {
     id: PollAttachmentId
   ): Promise<Result<PollAttachmentMetadata | null, 'common.errors.unexpected'>>;
   countByPollId(
-    pollId: PollId
+    pollId: PollId,
+    questionId?: QuestionId | null
   ): Promise<Result<AttachmentCount, 'common.errors.unexpected'>>;
   deleteById(
     id: PollAttachmentId
-  ): Promise<Result<void, 'common.errors.unexpected'>>;
+  ): Promise<Result<void, AttachmentWriteFailure>>;
 }

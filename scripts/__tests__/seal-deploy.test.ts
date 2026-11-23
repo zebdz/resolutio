@@ -31,6 +31,22 @@ it('ships runtime config and operator entry points and preserves the development
     'build/backfill-receipt-secrets.cjs',
     'scripts/seal-ops/worker.mjs',
     'scripts/seal-ops/rollout.mjs',
+    ...[
+      'import',
+      'preflight',
+      'matching',
+      'apply',
+      'project',
+      'meeting-import',
+      'meeting-evidence',
+      'native-import',
+      'verify',
+      'verify-access',
+      'content',
+    ].map((module) => `scripts/berezka/${module}.mjs`),
+    'scripts/berezka/staging.sql',
+    'scripts/berezka/evidence-access.sql',
+    '.berezka-private/package/manifest.json',
     'package.json',
     'next.config.ts',
     'prisma.config.ts',
@@ -57,6 +73,11 @@ it('ships runtime config and operator entry points and preserves the development
     expect(members).toContain('src/i18n/request.ts');
     expect(members).toContain('build/backfill-receipt-secrets.cjs');
     expect(members).toContain('scripts/seal-ops/worker.mjs');
+    expect(members).toContain('scripts/berezka/import.mjs');
+    expect(members).toContain('scripts/berezka/native-import.mjs');
+    expect(members).toContain('scripts/berezka/staging.sql');
+    expect(members).toContain('scripts/berezka/evidence-access.sql');
+    expect(members).not.toContain('.berezka-private/package/manifest.json');
     expect(members).not.toContain('.next/dev/private');
     expect(members).not.toContain('.next/cache/private');
     expect(statSync(join(root, 'deploy.tar.gz')).mode & 0o777).toBe(0o600);

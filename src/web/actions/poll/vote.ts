@@ -2,6 +2,7 @@
 
 /** Authenticated voting entry points. Receipt output belongs only to the session
  * user; result projections strip unauthorized voter/contact data before returning. */
+import { questionAttachmentFiles } from '@/web/lib/questionAttachmentFiles';
 import { createEvidenceMail } from '@/infrastructure/email/createEvidenceMail';
 import { PollId, BoardId, OrganizationId } from '@/domain/shared/EntityIds';
 import {
@@ -223,7 +224,10 @@ export async function getUserVotingProgressAction(
 
     return {
       success: true,
-      data: serializeVotingProgress(result.value),
+      data: serializeVotingProgress(
+        result.value,
+        await questionAttachmentFiles(pollId, user.id)
+      ),
     };
   } catch (error) {
     console.error('Get voting progress error:', error);

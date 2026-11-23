@@ -1,6 +1,8 @@
 /** Reads the current audience, membership and poll lifecycle before disclosing
  * a frozen record. Authorization queries select no ballot contents or identities of other voters. */
 import { PrismaClient } from '@/generated/prisma/client';
+import { canReadPollFiles } from './pollFileVisibility';
+import { PollId as ApplicationPollId } from '@/domain/shared/EntityIds';
 import { SealPermissions } from '@/application/seal/SealExports';
 import { ProtocolViewerReader } from '@/application/seal/GetSealedProtocolUseCase';
 import { PollResultsPolicy } from '@/domain/poll/PollResultsPolicy';
@@ -30,7 +32,12 @@ export class PrismaSealPermissions
     }
 
     if (!viewer.value) {
-      return success({ results: false, names: false, signers: false });
+      return success({
+        results: false,
+        names: false,
+        signers: false,
+        attachments: false,
+      });
     }
 
     const { facts, anonymous, isOpen } = viewer.value;
@@ -40,11 +47,26 @@ export class PrismaSealPermissions
       isActive: () => false,
     };
 
-    return success({
-      results: PollResultsPolicy.canViewResults(state, facts).success,
-      names: PollResultsPolicy.canViewVoterNames(state, facts),
-      signers: PollResultsPolicy.canViewSignWillingness(facts),
-    });
+    const results = PollResultsPolicy.canViewResults(state, facts).success;
+
+    try {
+      const attachments =
+        results &&
+        (await canReadPollFiles(
+          this.db,
+          ApplicationPollId.parse(pollId),
+          UserId.parse(userId)
+        ));
+
+      return success({
+        results,
+        attachments,
+        names: PollResultsPolicy.canViewVoterNames(state, facts),
+        signers: PollResultsPolicy.canViewSignWillingness(facts),
+      });
+    } catch {
+      return failure('common.errors.unexpected');
+    }
   }
 
   private async readViewer(

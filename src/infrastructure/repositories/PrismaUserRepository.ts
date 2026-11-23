@@ -6,7 +6,7 @@ import type { UserRepository } from '@/domain/user/UserRepository';
 import { User } from '@/domain/user/User';
 import { PhoneNumber } from '@/domain/user/PhoneNumber';
 import { Nickname } from '@/domain/user/Nickname';
-import { Address } from '@/domain/user/Address';
+import { Address, PartialAddress } from '@/domain/user/Address';
 import { EmailAddress } from '@/domain/user/EmailAddress';
 import type { PrismaClient } from '@/generated/prisma/client';
 import { AddressIntegrityLogger } from '@/infrastructure/address/AddressIntegrityLogger';
@@ -73,10 +73,10 @@ type UserRow = {
     region: string | null;
     city: string;
     street: string;
-    building: string;
+    building: string | null;
     apartment: string | null;
     postalCode: string | null;
-    isPrivateHouse: boolean;
+    isPrivateHouse: boolean | null;
     oneLine: string | null;
     houseFiasId: string | null;
     flatFiasId: string | null;
@@ -437,19 +437,21 @@ export class PrismaUserRepository implements UserRepository {
       email: user.email ? EmailAddress.create(user.email) : undefined,
       emailConfirmedAt: user.emailConfirmedAt ?? undefined,
       address: user.address
-        ? Address.create({
-            country: user.address.country,
-            region: user.address.region ?? undefined,
-            city: user.address.city,
-            street: user.address.street,
-            building: user.address.building,
-            apartment: user.address.apartment ?? undefined,
-            postalCode: user.address.postalCode ?? undefined,
-            isPrivateHouse: user.address.isPrivateHouse,
-            oneLine: user.address.oneLine ?? undefined,
-            houseFiasId: user.address.houseFiasId ?? undefined,
-            flatFiasId: user.address.flatFiasId ?? undefined,
-          })
+        ? user.address.isPrivateHouse === null
+          ? PartialAddress.fromStorage(user.address)
+          : Address.create({
+              country: user.address.country,
+              region: user.address.region ?? undefined,
+              city: user.address.city,
+              street: user.address.street,
+              building: user.address.building ?? '',
+              apartment: user.address.apartment ?? undefined,
+              postalCode: user.address.postalCode ?? undefined,
+              isPrivateHouse: user.address.isPrivateHouse,
+              oneLine: user.address.oneLine ?? undefined,
+              houseFiasId: user.address.houseFiasId ?? undefined,
+              flatFiasId: user.address.flatFiasId ?? undefined,
+            })
         : undefined,
     });
   }

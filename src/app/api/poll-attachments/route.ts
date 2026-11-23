@@ -1,8 +1,5 @@
-// Upload route for poll description attachments. Receives multipart/form-data
-// with a pollId string and a file blob, converts the bytes to a Buffer, and
-// delegates to AddPollAttachmentUseCase which enforces authorization, the
-// DRAFT/READY-only guard, the 20-attachment count cap, and the magic-byte /
-// mime / size validations.
+// Upload poll description or question files. The optional questionId selects the owner.
+// The use case validates permissions, poll state, count, file type and size.
 //
 // Rate-limited because each call accepts up to 10 MB. The matching GET route
 // deliberately is not: a description with 20 images issues 20 GETs per page
@@ -55,9 +52,11 @@ export async function POST(request: NextRequest) {
   const form = await request.formData();
   const pollId = form.get('pollId');
   const file = form.get('file');
+  const questionId = form.get('questionId');
 
   if (
     typeof pollId !== 'string' ||
+    (questionId !== null && typeof questionId !== 'string') ||
     !(file instanceof File) ||
     file.size === 0
   ) {
@@ -70,6 +69,7 @@ export async function POST(request: NextRequest) {
   const result = await uc.execute({
     pollId,
     callerId: user.id,
+    questionId: questionId ?? undefined,
     fileName: file.name,
     mimeType: file.type,
     bytes,

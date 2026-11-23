@@ -9,7 +9,7 @@ import {
 } from './OrganizationDirectory';
 import { OrganizationRepository } from '../../domain/organization/OrganizationRepository';
 import { UserRepository } from '../../domain/user/UserRepository';
-import { Result, failure } from '../../domain/shared/Result';
+import { Result, failure, success } from '../../domain/shared/Result';
 import {
   OrganizationErrors,
   OrganizationUseCaseFailure,
@@ -91,26 +91,40 @@ export class GetOrgMembersUseCase {
     const isSuperAdmin =
       await this.deps.userRepository.isSuperAdmin(actorUserId);
 
-    if (!isSuperAdmin) {
+    const isAdmin =
+      isSuperAdmin ||
+      (await this.deps.organizationRepository.isUserAdmin(
+        actorUserId,
+        organizationId
+      ));
+
+    if (!isAdmin) {
       const isMember = await this.deps.organizationRepository.isUserMember(
         actorUserId,
         organizationId
       );
-      const isAdmin = await this.deps.organizationRepository.isUserAdmin(
-        actorUserId,
-        organizationId
-      );
 
-      if (!isMember && !isAdmin) {
+      if (!isMember) {
         return failure(OrganizationErrors.NOT_ADMIN);
       }
     }
 
-    return this.deps.directory.members({
+    const result = await this.deps.directory.members({
       organizationId,
       page,
       pageSize,
       query,
+    });
+
+    if (!result.success || isAdmin) {
+      return result;
+    }
+
+    return success({
+      ...result.value,
+      members: result.value.members.map(({ votingEligible, ...member }) =>
+        member.id === actorUserId ? { ...member, votingEligible } : member
+      ),
     });
   }
 }

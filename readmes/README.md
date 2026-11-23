@@ -12,6 +12,12 @@ Implemented on `blockchain` and rehearsed locally on 2026-11-20. [Approved desig
 - [Visual walkthrough](poll-seal-and-anchor-flow.html)
 - Voter guides in [English](how-your-vote-is-protected.html) and [Russian](how-your-vote-is-protected-ru.html)
 
+## Berezka historical import
+
+Native meetings with question files, organization reports, linked protocols and member access rehearsed on PostgreSQL 17. Production execution belongs to the operator. [Runbook](Berezka-Import.md) · [Approved mappings, verification and exceptions](../plans/archive/2026-11-22-berezka-import.md)
+
+Members can view their voting eligibility. Organization administrators and superadmins manage it through an audited change in the member directory. [Voting eligibility](Berezka-Import.md#voting-eligibility)
+
 ## Reference documents
 
 Current migration evidence: [Domain type completion audit](2026-11-10-domain-type-completion-audit.md).

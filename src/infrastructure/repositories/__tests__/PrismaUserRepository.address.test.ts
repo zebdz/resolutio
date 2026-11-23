@@ -331,3 +331,31 @@ describe('PrismaUserRepository address persistence — save()', () => {
     }
   });
 });
+
+it('retains an imported street-only address for the owner and privacy-aware directory', async () => {
+  const { serializeDirectoryUserSearch } =
+    await import('@/web/actions/organization/serializeDirectory');
+  const row = userRow({
+    ...baseAddress,
+    street: 'Лесная',
+    oneLine: 'Лесная',
+    building: null,
+    isPrivateHouse: null,
+  });
+  const user = await repoReturning(row).findById(UserId.parse('user-1'));
+  expect(user?.addressForDisplay).toMatchObject({
+    country: 'Россия',
+    city: 'Ростов-на-Дону',
+    oneLine: 'Лесная',
+  });
+  expect(user?.address).toBeUndefined();
+  expect(serializeDirectoryUserSearch(user!).address).toEqual({
+    city: 'Ростов-на-Дону',
+    street: 'Лесная',
+  });
+  const hidden = await repoReturning({
+    ...row,
+    allowFindByAddress: false,
+  }).findById(UserId.parse('user-1'));
+  expect(serializeDirectoryUserSearch(hidden!).address).toBeUndefined();
+});

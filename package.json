@@ -36,7 +36,8 @@
     "db:superadmin:add": "npx tsx prisma/superadmin-add.ts",
     "db:superadmin:remove": "npx tsx prisma/superadmin-remove.ts",
     "db:user-confirm": "npx tsx prisma/user-confirm.ts",
-    "db:org:add-join-requests": "npx tsx prisma/org-add-join-requests.ts"
+    "db:org:add-join-requests": "npx tsx prisma/org-add-join-requests.ts",
+    "db:berezka": "node scripts/berezka/import.mjs"
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^2.0.27",
@@ -62,6 +63,7 @@
     "ai": "^6.0.146",
     "archiver": "^7.0.1",
     "arctic": "^3.7.0",
+    "bcryptjs": "3.0.3",
     "clsx": "^2.1.1",
     "d3-hierarchy": "^3.1.2",
     "d3-selection": "^3.0.0",
@@ -73,6 +75,7 @@
     "next-intl": "^4.5.8",
     "nodemailer": "^9.1.0",
     "opentimestamps": "0.4.9",
+    "pdfjs-dist": "6.5.438",
     "pdfmake": "^0.3.5",
     "pg": "^8.16.3",
     "react": "19.2.0",

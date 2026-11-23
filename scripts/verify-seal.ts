@@ -1,5 +1,6 @@
 /** Standalone offline verifier. This adapter reads local files and reports the shared
  * verifier's checks. The packaged entry point runs using Node alone. */
+import { AttachmentId } from '../src/domain/seal/SealValues';
 import { readFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import {
@@ -9,7 +10,7 @@ import {
 import { success, failure, Result } from '../src/domain/shared/Result';
 
 const help =
-  'Usage: node verify-seal.mjs [--manifest manifest.json] [--bundle bundle.json] [--receipt receipt.json | --code-file code.txt] [--sections sections.json] [--poll poll.json] [--proof manifest.json.ots]';
+  'Usage: node verify-seal.mjs [--manifest manifest.json] [--bundle bundle.json] [--receipt receipt.json | --code-file code.txt] [--sections sections.json] [--poll poll.json] [--proof manifest.json.ots] [--attachment-id ID --attachment FILE]';
 const textKeys = [
   'manifest',
   'bundle',
@@ -34,6 +35,8 @@ function argumentsFor(args: string[]) {
         sections: fileOption,
         poll: fileOption,
         proof: fileOption,
+        attachment: fileOption,
+        'attachment-id': fileOption,
         'code-file': fileOption,
         help: { type: 'boolean' },
       },
@@ -52,6 +55,9 @@ function argumentsFor(args: string[]) {
 
     if (
       !args.length ||
+      options.values.attachment === '' ||
+      (options.values.attachment === undefined) !==
+        (options.values['attachment-id'] === undefined) ||
       (options.values.receipt !== undefined &&
         options.values['code-file'] !== undefined)
     ) {
@@ -64,7 +70,12 @@ function argumentsFor(args: string[]) {
   }
 }
 
-type FileOptions = Partial<Record<(typeof textKeys)[number] | 'proof', string>>;
+type FileOptions = Partial<
+  Record<
+    (typeof textKeys)[number] | 'proof' | 'attachment' | 'attachment-id',
+    string
+  >
+>;
 
 async function loadFiles(
   options: FileOptions
@@ -97,6 +108,23 @@ async function loadFiles(
       }
     } catch {
       return failure('Cannot read ' + key + ' file');
+    }
+  }
+
+  if (options.attachment !== undefined) {
+    const id = AttachmentId.schema.safeParse(options['attachment-id']);
+
+    if (!id.success) {
+      return failure(help);
+    }
+
+    try {
+      files.attachment = {
+        id: id.data,
+        bytes: await readFile(options.attachment),
+      };
+    } catch {
+      return failure('Cannot read attachment file');
     }
   }
 

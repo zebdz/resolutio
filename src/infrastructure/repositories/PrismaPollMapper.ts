@@ -37,7 +37,11 @@ export const editablePollInclude = {
   // Ids only — never `bytes`. The description renderer needs the id
   // allowlist so it can refuse refs to other polls' files; file
   // content is served solely by the download route.
-  attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
+  attachments: {
+    where: { questionId: null },
+    select: { id: true },
+    orderBy: { createdAt: 'asc' },
+  },
 } satisfies Prisma.PollInclude;
 
 export function pollUpdateData(poll: Poll): Prisma.PollUpdateInput {

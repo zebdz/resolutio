@@ -1,3 +1,5 @@
+import { listHistory } from '@/infrastructure/history/history';
+import { HistoricalEntries } from '@/web/components/history/HistoricalEntries';
 /** Server report view resolves validated references and serializes only authorized content. */
 import { OrganizationId, UserId } from '@/domain/shared/EntityIds';
 import { PageSize } from '@/domain/shared/Pagination';
@@ -28,19 +30,33 @@ interface ReportsPageProps {
 export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const currentUser = await getCurrentUser();
 
-  if (!currentUser) {
-    redirectLocalized(await getLocale(), '/login');
-  }
-
-  const t = await getTranslations('report.pages');
   const sp = await searchParams;
-
+  const t = await getTranslations('report.pages');
   const rawPage = parseInt(sp.page ?? '1', 10);
   const page = rawPage > 0 ? rawPage : 1;
 
   const organizationIds = sp.organizationIds
     ? sp.organizationIds.split(',').filter(Boolean)
     : undefined;
+
+  const history =
+    page === 1
+      ? await listHistory(currentUser?.id ?? null, 'report', {
+          orgIds: organizationIds,
+        })
+      : [];
+
+  if (!currentUser) {
+    if (!history.length) {
+      redirectLocalized(await getLocale(), '/login');
+    }
+
+    return (
+      <main className="mx-auto max-w-4xl px-4 py-8">
+        <HistoricalEntries kind="report" items={history} />
+      </main>
+    );
+  }
 
   const result = await listReportsAction({
     organizationIds,
@@ -81,7 +97,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           </Link>
         </div>
 
-        {reports.length === 0 ? (
+        {reports.length === 0 && history.length === 0 ? (
           <Text className="text-zinc-500 dark:text-zinc-400">
             {t('feedEmpty')}
           </Text>
@@ -145,6 +161,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             </Link>
           </div>
         )}
+        <HistoricalEntries kind="report" items={history} />
       </div>
     </AuthenticatedLayout>
   );

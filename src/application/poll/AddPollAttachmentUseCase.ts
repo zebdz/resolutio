@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import {
   PollId,
+  QuestionId,
   UserId,
   OrganizationId,
   PollAttachmentId,
@@ -14,6 +15,7 @@ import {
   PollAttachment,
   parsePollAttachmentMetadata,
   POLL_ATTACHMENT_COUNT_LIMIT,
+  QUESTION_ATTACHMENT_COUNT_LIMIT,
 } from '../../domain/poll/PollAttachment';
 import { PollAttachmentRepository } from '../../domain/poll/PollAttachmentRepository';
 import { PollDomainCodes } from '../../domain/poll/PollDomainCodes';
@@ -34,6 +36,7 @@ export interface UserRepoForAddPollAttachment {
 export interface AddPollAttachmentInput {
   pollId: string;
   callerId: string;
+  questionId?: string;
   fileName: string;
   mimeType: string;
   bytes: Buffer;
@@ -57,7 +60,11 @@ export class AddPollAttachmentUseCase {
     input: AddPollAttachmentInput
   ): Promise<Result<AddPollAttachmentOutput, PollUseCaseFailure>> {
     const decoded = z
-      .object({ pollId: PollId, callerId: UserId })
+      .object({
+        pollId: PollId,
+        callerId: UserId,
+        questionId: QuestionId.optional(),
+      })
       .safeParse(input);
 
     if (!decoded.success) {
@@ -95,7 +102,19 @@ export class AddPollAttachmentUseCase {
       return failure(PollDomainCodes.POLL_CANNOT_CHANGE_ATTACHMENTS_ACTIVE);
     }
 
-    const countResult = await this.attachments.countByPollId(command.pollId);
+    const questionId = decoded.data.questionId ?? null;
+
+    if (
+      questionId &&
+      !poll.questions.some((q) => q.id === questionId && !q.isArchived())
+    ) {
+      return failure(PollDomainCodes.QUESTION_NOT_FOUND);
+    }
+
+    const countResult = await this.attachments.countByPollId(
+      command.pollId,
+      questionId
+    );
 
     if (!countResult.success) {
       return failure(countResult.error);
@@ -103,8 +122,17 @@ export class AddPollAttachmentUseCase {
 
     // Checked before byte validation so an over-limit upload is rejected
     // without inspecting the file.
-    if (countResult.value >= POLL_ATTACHMENT_COUNT_LIMIT) {
-      return failure(PollDomainCodes.POLL_ATTACHMENT_LIMIT_REACHED);
+    if (
+      countResult.value >=
+      (questionId
+        ? QUESTION_ATTACHMENT_COUNT_LIMIT
+        : POLL_ATTACHMENT_COUNT_LIMIT)
+    ) {
+      return failure(
+        questionId
+          ? PollDomainCodes.QUESTION_ATTACHMENT_LIMIT_REACHED
+          : PollDomainCodes.POLL_ATTACHMENT_LIMIT_REACHED
+      );
     }
 
     const metadata = parsePollAttachmentMetadata({
@@ -120,6 +148,7 @@ export class AddPollAttachmentUseCase {
     const attachmentResult = PollAttachment.createWithBytes(
       {
         pollId: command.pollId,
+        questionId,
         fileName: metadata.value.fileName,
         mimeType: metadata.value.mimeType,
         bytes: command.bytes,

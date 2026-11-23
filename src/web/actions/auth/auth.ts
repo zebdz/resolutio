@@ -101,7 +101,16 @@ const userRepository = new PrismaUserRepository(prisma);
 const sessionRepository = new PrismaSessionRepository(prisma);
 const otpRepository = new PrismaOtpRepository(prisma);
 const passwordHasher = new Argon2PasswordHasher();
-const passwordVerifier = new Argon2PasswordVerifier();
+const passwordVerifier = new Argon2PasswordVerifier(
+  async (id, expected, replacement) => {
+    const updated = await prisma.user.updateMany({
+      where: { id, password: expected },
+      data: { password: replacement },
+    });
+
+    return updated.count === 1;
+  }
+);
 const otpCodeHasher = new OtpCodeHasherImpl(
   process.env.OTP_CODE_SECRET || 'dev-otp-secret'
 );

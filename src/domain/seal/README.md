@@ -64,7 +64,7 @@ contains all five sections and an original receipt; changing a published wire sh
 
 Sections:
 
-- `poll`: flat metadata, questions with nested answers, attachments. Archived content remains present.
+- `poll`: flat metadata, questions with nested answers, attachments with their byte length, SHA-256 digest and owning question ID (null for description files). Archived content remains present.
 - `tallies`: `{questions, totalParticipants, totalParticipantWeight}`. Each question has `questionId`,
   `answers`, `totalVotes`, `totalWeight`, `participantWeight`; each answer has `answerId`, `voteCount`,
   `totalWeight`. Participation deduplicates users; answer totals count selections.

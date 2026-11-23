@@ -15,7 +15,7 @@ import {
   Language,
 } from './UserValues';
 import { Nickname } from './Nickname';
-import { Address } from './Address';
+import { Address, PartialAddress } from './Address';
 import { EmailAddress } from './EmailAddress';
 import { UserDomainCodes } from './UserDomainCodes';
 import { SharedDomainCodes } from '../shared/SharedDomainCodes';
@@ -43,7 +43,7 @@ export interface UserProps {
   readonly allowFindByName: boolean;
   readonly allowFindByPhone: boolean;
   readonly allowFindByAddress: boolean;
-  readonly address?: Address;
+  readonly address?: Address | PartialAddress;
   readonly privacySetupCompleted: boolean;
   readonly confirmedAt?: Instant;
   readonly emailState: UserEmail;
@@ -77,7 +77,7 @@ export interface RawUserProps {
   allowFindByName?: boolean;
   allowFindByPhone?: boolean;
   allowFindByAddress?: boolean;
-  address?: Address;
+  address?: Address | PartialAddress;
   privacySetupCompleted?: boolean;
   confirmedAt?: string | Date;
   email?: EmailAddress;
@@ -170,7 +170,11 @@ export class User {
       throw new Error(UserDomainCodes.NICKNAME_INVALID);
     }
 
-    if (props.address !== undefined && !(props.address instanceof Address)) {
+    if (
+      props.address !== undefined &&
+      !(props.address instanceof Address) &&
+      !(props.address instanceof PartialAddress)
+    ) {
       throw new Error('common.errors.validationFailed');
     }
 
@@ -338,6 +342,12 @@ export class User {
   }
 
   get address(): Address | undefined {
+    return this.props.address instanceof Address
+      ? this.props.address
+      : undefined;
+  }
+
+  get addressForDisplay() {
     return this.props.address;
   }
 

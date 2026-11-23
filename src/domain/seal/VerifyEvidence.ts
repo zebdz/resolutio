@@ -2,8 +2,8 @@
  * The output distinguishes original-ballot comparison, selective inclusion, labels and OTS binding. */
 import { z } from 'zod';
 import { canonical, parseCanonical } from './Canonical';
-import { Digest, ReceiptSecret } from './SealValues';
-import { hashText } from './Hash';
+import { Digest, ReceiptSecret, AttachmentId } from './SealValues';
+import { hashText, hashBytes } from './Hash';
 import { MerkleTree } from './MerkleTree';
 import {
   pollSchema,
@@ -46,7 +46,7 @@ const sectionsSchema = z.strictObject({
   ...envelope,
   sections: z
     .strictObject({
-      poll: z.string(),
+      poll: z.string().optional(),
       tallies: z.string(),
       register: z.string().optional(),
       signers: z.string().optional(),
@@ -68,6 +68,7 @@ type SectionName = keyof typeof sectionCodecs;
 const names = ['poll', 'tallies', 'register', 'signers'] as const;
 
 export interface EvidenceFiles {
+  attachment?: { id: AttachmentId; bytes: Uint8Array };
   manifest?: string;
   bundle?: string;
   sections?: string;
@@ -148,10 +149,7 @@ function checkSections(
         tree.leaves.every((h, i) => h === hashes[i]),
       codes.SEAL_SECTION_MISMATCH
     );
-    requireSeal(
-      poll && disclosure.register !== undefined,
-      codes.SEAL_INVALID_BUNDLE
-    );
+    requireSeal(disclosure.register !== undefined, codes.SEAL_INVALID_BUNDLE);
     validateNamedSections(
       manifest,
       poll,
@@ -310,6 +308,19 @@ function checkEvidence(files: EvidenceFiles) {
     );
   }
 
+  const file =
+    files.attachment &&
+    poll?.attachments.find((a) => a.id === files.attachment?.id);
+
+  if (files.attachment) {
+    requireSeal(
+      file &&
+        file.size === files.attachment.bytes.length &&
+        file.sha256 === hashBytes(files.attachment.bytes),
+      codes.SEAL_SECTION_MISMATCH
+    );
+  }
+
   const ballot = checkBallot(manifest, bundle, files, poll);
   const proof =
     files.proof === undefined
@@ -324,6 +335,18 @@ function checkEvidence(files: EvidenceFiles) {
     pollId: manifest.pollId,
     rootDigest,
     verifiedSections,
+    ...(disclosure?.sections.votes
+      ? { talliesRecomputed: poll !== undefined }
+      : {}),
+    ...(file
+      ? {
+          verifiedAttachment: {
+            id: file.id,
+            questionId: file.questionId,
+            sha256: file.sha256,
+          },
+        }
+      : {}),
     ballot: ballot.kind,
     labels: poll ? ('verified' as const) : ('unavailable' as const),
     timestamp: proof?.value ?? ('notProvided' as const),

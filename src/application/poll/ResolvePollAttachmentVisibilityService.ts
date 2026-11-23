@@ -40,7 +40,18 @@ export class ResolvePollAttachmentVisibilityService {
     private users: UserRepoForPollVisibility
   ) {}
 
-  async canRead(poll: Poll, viewerId: UserId | null): Promise<boolean> {
+  async canRead(
+    poll: Pick<
+      Poll,
+      | 'createdBy'
+      | 'organizationId'
+      | 'boardId'
+      | 'isDraft'
+      | 'isArchived'
+      | 'isOpen'
+    >,
+    viewerId: UserId | null
+  ): Promise<boolean> {
     // Overrides, logged-in only: creator, superadmin, and org admin always
     // read, including drafts and archived polls.
     if (viewerId) {

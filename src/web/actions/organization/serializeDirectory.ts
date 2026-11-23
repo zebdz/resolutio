@@ -41,8 +41,11 @@ export function serializeDirectoryUserSearch(user: User) {
     middleName: user.middleName,
     nickname: user.nickname.getValue(),
     address:
-      user.allowFindByAddress && user.address
-        ? { city: user.address.city, street: user.address.street }
+      user.allowFindByAddress && user.addressForDisplay
+        ? {
+            city: user.addressForDisplay.city,
+            street: user.addressForDisplay.street,
+          }
         : undefined,
   };
 }
@@ -125,6 +128,9 @@ export function serializeDirectoryAdmin(admin: DirectoryAdmin) {
 export function serializeDirectoryMember(member: DirectoryMember) {
   return {
     ...personFields(member),
+    ...(member.votingEligible !== undefined && {
+      votingEligible: member.votingEligible,
+    }),
     nickname: member.nickname.getValue(),
     joinedAt: member.joinedAt === null ? null : Instant.toDate(member.joinedAt),
   };

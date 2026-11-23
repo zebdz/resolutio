@@ -33,6 +33,11 @@ vi.mock('@/infrastructure/index', () => ({
   PrismaBoardRepository: class {},
   PrismaUserRepository: class {},
 }));
+vi.mock('@/web/lib/questionAttachmentFiles', () => ({
+  questionAttachmentFiles: async () => [
+    { id: 'file-q1', questionId: 'question-1', fileName: 'Question.pdf' },
+  ],
+}));
 vi.mock('@/web/lib/session', () => ({ getCurrentUser: currentUser }));
 vi.mock('@/web/actions/rateLimit', () => ({ checkRateLimit: rateLimit }));
 vi.mock('next-intl/server', () => ({
@@ -136,6 +141,9 @@ it('returns a minimal plain poll, nested answers and the session user’s drafts
   ).toBe(true);
   expect(result.data.drafts).toEqual([
     { id: 'draft-1', questionId: 'question-1', answerId: 'answer-1' },
+  ]);
+  expect(result.data.poll.questions[0].files).toEqual([
+    { id: 'file-q1', questionId: 'question-1', fileName: 'Question.pdf' },
   ]);
   expect(result.data.poll).not.toHaveProperty('createdBy');
   expect(result.data.poll).toMatchObject({

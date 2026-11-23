@@ -65,8 +65,8 @@ poll = {'id': 'poll1', 'title': 'Café', 'description': '**Decision**', 'pollTyp
         'finishedAt': finished, 'distributionType': 'OWNERSHIP_SIZE_WEIGHTED', 'propertyAggregation': 'RAW_SUM',
         'weightCriteria': None, 'propertyIds': ['property2', 'property1'], 'createdBy': 'admin',
         'createdAt': '2026-09-09T00:00:00.000Z', 'questions': questions,
-        'attachments': [{'id': 'file2', 'fileName': 'appendix.pdf', 'size': 200, 'mimeType': 'application/pdf'},
-                        {'id': 'file1', 'fileName': 'agenda.pdf', 'size': 100, 'mimeType': 'application/pdf'}]}
+        'attachments': [{'id': 'file2', 'fileName': 'appendix.pdf', 'size': 200, 'questionId': 'q2', 'sha256': digest(bytes(200)), 'mimeType': 'application/pdf'},
+                        {'id': 'file1', 'fileName': 'agenda.pdf', 'size': 100, 'questionId': None, 'sha256': digest(bytes(100)), 'mimeType': 'application/pdf'}]}
 holding = {'propertyId': 'property1', 'propertyName': 'House', 'assetId': 'asset1', 'assetName': 'Flat', 'size': '80.123456', 'sizeUnit': 'SQUARE_METERS', 'share': '0.12345678'}
 def participant(i, weight, willingness, phone, receipt):
     return {'userId': f'user{i}', 'lastName': f'Last{i}', 'firstName': f'First{i}', 'middleName': None, 'weight': weight,
@@ -105,3 +105,17 @@ receipt = {'version':1,'algorithm':'sha256','pollId':'poll1','userId':'user1','r
            'leaves':[leaf | {'questionText': next(q['text'] for q in questions if q['id']==leaf['preimage']['questionId']),
                              'answerText': next(a['text'] for q in questions for a in q['answers'] if a['id']==leaf['preimage']['answerId'])} for leaf in record_leaves if leaf['preimage']['userId']=='user1']}
 Path(__file__).with_name('record-v1.json').write_text(json.dumps({'input':input_data,'sealedAt':sealed,'record':expected,'receipt':canonical(receipt)}, ensure_ascii=False, indent=2)+'\n')
+
+# Export envelopes share the manifest, frozen poll section and original voter paths.
+export = Path(__file__).with_name('export-v1')
+common = {'manifest': manifest_bytes, 'rootDigest': expected['rootDigest']}
+paths = tree([leaf['hash'] for leaf in record_leaves])['paths']
+bundle = common | {
+    'leaves': [leaf | {'path': paths[leaf['hash']]} for leaf in record_leaves
+               if leaf['preimage']['userId'] == receipt['userId']],
+    'poll': sections['poll'],
+}
+disclosure = common | {'sections': {name: sections[name] for name in ('poll', 'tallies')}}
+for filename, document in [('bundle.json', bundle), ('sections.json', disclosure), ('receipt.json', receipt)]:
+    (export / filename).write_text(canonical(document))
+(export / 'manifest.json').write_text(manifest_bytes)

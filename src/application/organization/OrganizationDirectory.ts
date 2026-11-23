@@ -27,6 +27,7 @@ export interface DirectoryPerson {
   readonly middleName: MiddleName | null;
 }
 export type DirectoryMember = DirectoryPerson & {
+  readonly votingEligible?: boolean;
   readonly nickname: Nickname;
   readonly joinedAt: Instant | null;
 };

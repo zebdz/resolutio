@@ -192,6 +192,9 @@ it('captures late metadata, archived definitions, exact weights and historical h
     {
       id: f.poll.attachments?.[0]?.id,
       fileName: 'rules.pdf',
+      questionId: null,
+      sha256:
+        '039058c6f2c0cb492c533b0a4d14ef77cc0f78abccced5287d84a1a2011cfb81',
       size: 3,
       mimeType: 'application/pdf',
     },

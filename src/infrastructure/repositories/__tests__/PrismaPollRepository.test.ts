@@ -439,7 +439,11 @@ describe('PrismaPollRepository', () => {
         },
         include: {
           properties: true,
-          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
+          attachments: {
+            where: { questionId: null },
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          },
           questions: {
             include: {
               answers: {
@@ -490,7 +494,11 @@ describe('PrismaPollRepository', () => {
         where: { id: 'poll-1' },
         include: {
           properties: true,
-          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
+          attachments: {
+            where: { questionId: null },
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          },
           questions: {
             where: { archivedAt: null },
             include: {
@@ -550,7 +558,11 @@ describe('PrismaPollRepository', () => {
         },
         include: {
           properties: true,
-          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
+          attachments: {
+            where: { questionId: null },
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          },
           questions: {
             where: { archivedAt: null },
             include: {
@@ -646,7 +658,11 @@ describe('PrismaPollRepository', () => {
         },
         include: {
           properties: true,
-          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
+          attachments: {
+            where: { questionId: null },
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          },
           questions: {
             where: { archivedAt: null },
             include: {
@@ -731,7 +747,11 @@ describe('PrismaPollRepository', () => {
         },
         include: {
           properties: true,
-          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
+          attachments: {
+            where: { questionId: null },
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          },
           questions: {
             where: { archivedAt: null },
             include: {

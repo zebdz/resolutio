@@ -3,6 +3,8 @@
 /** Render the current viewer’s results. Frozen tallies retain exact weight strings
  * and the winner determined from the sealed record before display rounding. */
 
+import { QuestionFiles } from '../QuestionFiles';
+import type { QuestionFile } from '@/web/lib/questionAttachmentFiles';
 import { useState } from 'react';
 import { printWeight, leadingAnswer } from '@/web/lib/protocolWeight';
 import { useTranslations } from 'next-intl';
@@ -23,6 +25,7 @@ function displayWeight(value: number, exact?: string) {
 }
 
 interface PollResultsProps {
+  questionFiles?: QuestionFile[];
   results: PollResultsData;
   pollState: PollState;
   isPollCreator: boolean;
@@ -44,6 +47,7 @@ interface PollResultsProps {
 
 export default function PollResults({
   results,
+  questionFiles = [],
   pollState,
   isPollCreator,
   canViewVoterNames,
@@ -164,12 +168,18 @@ export default function PollResults({
           return (
             <div
               key={question.questionId}
+              id={`question-${question.questionId}`}
               className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-6 bg-white dark:bg-zinc-900"
             >
               <div className="mb-4">
                 <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">
                   {question.questionText}
                 </h3>
+                <QuestionFiles
+                  files={questionFiles.filter(
+                    (f) => f.questionId === question.questionId
+                  )}
+                />
                 <div className="mt-2 flex items-center gap-4 text-sm text-zinc-600 dark:text-zinc-400">
                   <span>
                     {t('votes')}: {question.totalVotes}

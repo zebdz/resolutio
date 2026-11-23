@@ -335,7 +335,8 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   }
 
   async findAcceptedMemberUserIdsIncludingDescendants(
-    organizationId: OrganizationId
+    organizationId: OrganizationId,
+    options?: { votingEligibleOnly: boolean }
   ): Promise<UserId[]> {
     // Get all descendant org IDs
     const descendantIds = await this.getDescendantIds(organizationId);
@@ -346,6 +347,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       where: {
         organizationId: { in: allOrgIds },
         status: 'accepted',
+        ...(options?.votingEligibleOnly ? { votingEligible: true } : {}),
       },
       select: { userId: true },
     });

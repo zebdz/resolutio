@@ -1,3 +1,4 @@
+/** Account settings and owner-only imported address evidence. */
 import { Instant } from '@/domain/shared/Instant';
 import { SystemClock } from '@/infrastructure/shared/SystemEntityCreation';
 import { getTranslations } from 'next-intl/server';
@@ -102,6 +103,15 @@ export default async function AccountPage() {
                 {t('addressSection')}
               </summary>
               <div className="mt-4">
+                {!user.address && user.addressForDisplay && (
+                  <Text>
+                    {[
+                      user.addressForDisplay.country,
+                      user.addressForDisplay.city,
+                      user.addressForDisplay.oneLine,
+                    ].join(', ')}
+                  </Text>
+                )}
                 <AddressForm
                   address={
                     user.address
@@ -118,7 +128,15 @@ export default async function AccountPage() {
                           houseFiasId: user.address.houseFiasId,
                           flatFiasId: user.address.flatFiasId,
                         }
-                      : null
+                      : user.addressForDisplay
+                        ? {
+                            country: user.addressForDisplay.country,
+                            city: user.addressForDisplay.city,
+                            street: user.addressForDisplay.street,
+                            building: user.addressForDisplay.building,
+                            oneLine: user.addressForDisplay.oneLine,
+                          }
+                        : null
                   }
                 />
               </div>

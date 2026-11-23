@@ -121,7 +121,15 @@ it('returns the frozen signed-in page including own ballot flag without hidden n
       data: {
         title: 'Café',
         description: '**Decision**',
-        attachmentIds: ['file1', 'file2'],
+        attachmentIds: ['file1'],
+        questionFiles: [
+          {
+            id: 'file2',
+            questionId: 'q2',
+            fileName: 'appendix.pdf',
+            mimeType: 'application/pdf',
+          },
+        ],
         scopedPropertyNames: [],
         showAggregation: true,
         isOpenPoll: false,
@@ -276,6 +284,7 @@ it('preserves millionths and the winner when two totals round to the same JS num
   const question = input.poll.questions.find((q) => q.id === 'q1')!;
   question.questionType = 'single-choice';
   input.poll.questions = [question];
+  input.poll.attachments = [];
   input.poll.anonymous = false;
   const person = input.participants[0];
   const ballot = input.votes[0];

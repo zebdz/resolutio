@@ -45,13 +45,15 @@ export async function pollDatabase() {
       .sort();
 
     for (const folder of folders) {
-      await pool.query(
-        await readFile(`prisma/migrations/${folder}/migration.sql`, 'utf8')
+      const sql = await readFile(
+        `prisma/migrations/${folder}/migration.sql`,
+        'utf8'
       );
+      await pool.query(sql);
     }
   } catch (error) {
     await pool.end();
-    await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+    await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
     await admin.end();
     throw error;
   }
@@ -82,7 +84,7 @@ export async function pollDatabase() {
     async close() {
       await prisma.$disconnect();
       await pool.end();
-      await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
+      await admin.query(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
       await admin.end();
     },
   };

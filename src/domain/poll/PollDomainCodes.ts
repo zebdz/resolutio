@@ -101,6 +101,8 @@ export const PollDomainCodes = {
   POLL_ATTACHMENT_TYPE_NOT_ALLOWED: 'domain.poll.attachmentTypeNotAllowed',
   POLL_ATTACHMENT_TOO_LARGE: 'domain.poll.attachmentTooLarge',
   POLL_ATTACHMENT_MAGIC_MISMATCH: 'domain.poll.attachmentMagicMismatch',
+  QUESTION_ATTACHMENT_LIMIT_REACHED:
+    'domain.poll.questionAttachmentLimitReached',
   POLL_ATTACHMENT_LIMIT_REACHED: 'domain.poll.attachmentLimitReached',
   POLL_ATTACHMENT_NOT_FOUND: 'domain.poll.attachmentNotFound',
   POLL_DESCRIPTION_INVALID_ATTACHMENT_REF:

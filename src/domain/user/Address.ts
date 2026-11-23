@@ -217,3 +217,32 @@ export class Address {
     };
   }
 }
+
+/** Read-only address recovered from incomplete records. Profile updates accept only Address. */
+export class PartialAddress {
+  private constructor(
+    readonly country: CountryName,
+    readonly city: CityName,
+    readonly street: StreetName,
+    readonly oneLine: AddressLine,
+    readonly building: BuildingNumber | undefined
+  ) {
+    Object.freeze(this);
+  }
+
+  static fromStorage(row: {
+    country: string;
+    city: string;
+    street: string;
+    oneLine: string | null;
+    building: string | null;
+  }) {
+    return new PartialAddress(
+      CountryName.parse(row.country),
+      CityName.parse(row.city),
+      StreetName.parse(row.street),
+      AddressLine.parse(row.oneLine),
+      row.building === null ? undefined : BuildingNumber.parse(row.building)
+    );
+  }
+}

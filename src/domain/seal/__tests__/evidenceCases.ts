@@ -18,7 +18,17 @@ export const evidence = {
   receipt: bytes('receipt.json').toString(),
   sections: bytes('sections.json').toString(),
   manifest: bytes('manifest.json').toString(),
-  proof: Uint8Array.from(bytes('manifest.json.ots')),
+  // Local pending test vector. The independently anchored manifest and real
+  // provider proofs are preserved separately in fixtures/bitcoin-example.
+  proof: Buffer.concat([
+    Buffer.from(
+      '004f70656e54696d657374616d7073000050726f6f6600bf89e2e884e892940108',
+      'hex'
+    ),
+    Buffer.from(fixture.record.rootDigest, 'hex'),
+    Buffer.from('0083dfe30d2ef90c8e0d0c', 'hex'),
+    Buffer.from('test.invalid'),
+  ]),
 };
 const original = JSON.parse(evidence.receipt);
 export const code = original.receiptSecret as string;

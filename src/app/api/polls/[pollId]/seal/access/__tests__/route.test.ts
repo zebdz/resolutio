@@ -35,7 +35,12 @@ it('responds to revoked voters with a private capability only', async () => {
     email: 'private@example.test',
   });
   mocks.permissions.mockResolvedValue(
-    success({ results: false, names: false, signers: false })
+    success({
+      results: false,
+      names: false,
+      signers: false,
+      attachments: false,
+    })
   );
   const result = await GET(request, context);
   expect(await result.json()).toEqual({ viewer: 'signedIn' });

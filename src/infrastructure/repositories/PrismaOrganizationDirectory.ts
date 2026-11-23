@@ -339,6 +339,7 @@ export class PrismaOrganizationDirectory implements OrganizationDirectory {
       return success({
         members: rows.map((row) => ({
           ...person(row.user),
+          votingEligible: row.votingEligible,
           nickname: Nickname.create(row.user.nickname),
           joinedAt:
             row.acceptedAt === null ? null : Instant.fromDate(row.acceptedAt),

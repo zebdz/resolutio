@@ -147,8 +147,7 @@ whose root replaces a flat hash, so one leaf can be proven without disclosing th
 organization name, boardId and board name, metadataCapturedAt, startDate, endDate, finishedAt,
 distributionType, propertyAggregation, weightCriteria, propertyIds, createdBy, createdAt; every question
 with id, order, text, details, questionType, archivedAt and its answers with id, order, text,
-archivedAt; attachment metadata (id, file name, size, mime type). Attachment contents are not hashed in
-this version.
+archivedAt; attachment id, file name, byte length, MIME type, owning question id (null for poll description files), and SHA-256 of the original stored bytes.
 
 **`tallies`** — per non-archived question: per non-archived answer `{ answerId, voteCount, totalWeight }`,
 plus `totalVotes`, `totalWeight`, `participantWeight` (unique-voter dedupe, same arithmetic as
@@ -824,7 +823,6 @@ that mocks cannot establish. No application/framework types enter domain tests.
 
 - Voter-signed ballots (passkeys). The only design that prevents pre-seal forgery.
 - Interim anchoring while a poll runs.
-- Attachment content hashing.
 - Exact PDF-byte authentication or canonical PDF artifact storage.
 - Downloadable browser verifier in this version; standalone CLI and hosted checks are in scope.
 - Retroactive sealing of polls finished before deploy.

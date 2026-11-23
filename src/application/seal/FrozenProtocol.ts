@@ -165,7 +165,17 @@ export class FrozenProtocol {
     return {
       title: this.poll.title,
       description: this.poll.description,
-      attachmentIds: this.poll.attachments.map((a) => a.id),
+      questionFiles: this.poll.attachments
+        .filter((a) => a.questionId !== null)
+        .map(({ id, questionId, fileName, mimeType }) => ({
+          id,
+          questionId,
+          fileName,
+          mimeType,
+        })),
+      attachmentIds: this.poll.attachments
+        .filter((a) => a.questionId === null)
+        .map((a) => a.id),
       distributionType: this.poll.distributionType,
       propertyAggregation: this.poll.propertyAggregation,
       scopedPropertyNames: scope.every((id) => names.has(id))

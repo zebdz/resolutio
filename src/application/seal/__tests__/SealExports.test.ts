@@ -12,6 +12,8 @@ import {
   UtcTimestamp,
 } from '@/domain/seal/SealValues';
 import { success } from '@/domain/shared/Result';
+import { canonical } from '@/domain/seal/Canonical';
+import { verifyEvidence } from '@/domain/seal/VerifyEvidence';
 import { SealExports } from '../SealExports';
 
 const seal = PollSeal.fromRecord(fixture.record);
@@ -22,7 +24,8 @@ const exportsFor = (
   results: boolean,
   names: boolean,
   signers: boolean,
-  stored = seal
+  stored = seal,
+  attachments = results
 ) =>
   new SealExports(
     {
@@ -34,7 +37,7 @@ const exportsFor = (
           anchor: stored.activeAnchor(),
         }),
     },
-    { forViewer: async () => success({ results, names, signers }) }
+    { forViewer: async () => success({ results, names, signers, attachments }) }
   );
 it('returns only sealed own leaves after loss of results access', async () => {
   const api = exportsFor(false, false, false);
@@ -101,5 +104,28 @@ it('serves upgraded bytes and public block metadata after the provider confirms'
   expect(await api.publicRecord(pollId)).toMatchObject({
     success: true,
     value: { status: { kind: 'bitcoin', height, time: at } },
+  });
+});
+
+it('withholds file metadata from a results viewer outside the file audience', async () => {
+  const api = exportsFor(true, true, false, seal, false);
+  const sections = await api.sections(pollId, userId);
+  const bundle = await api.myProof(pollId, userId);
+
+  if (!sections.success || !bundle.success) {
+    throw Error('missing evidence');
+  }
+
+  expect(sections.value.sections).toHaveProperty('votes');
+  expect(sections.value.sections).not.toHaveProperty('poll');
+  expect(bundle.value).not.toHaveProperty('poll');
+  expect(
+    verifyEvidence({
+      sections: canonical(sections.value),
+      bundle: canonical(bundle.value),
+    })
+  ).toMatchObject({
+    success: true,
+    value: { labels: 'unavailable', talliesRecomputed: false },
   });
 });

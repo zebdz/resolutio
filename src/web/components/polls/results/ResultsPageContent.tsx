@@ -47,6 +47,7 @@ export function ResultsPageContent({ view }: { view: ResultsPageView }) {
       <ResultsSeal pollId={view.results.pollId} coverage={view.coverage} />
       <PollResults
         results={view.results}
+        questionFiles={view.questionFiles}
         pollState={view.pollState}
         isPollCreator={view.isPollCreator}
         canViewVoterNames={view.canViewVoterNames}

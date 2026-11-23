@@ -1,5 +1,6 @@
 /** Add current navigation and permission-filtered report cards to a results view.
  * Only unsealed polls consult live property names and the building denominator. */
+import { questionAttachmentFiles } from './questionAttachmentFiles';
 import type { Poll } from '@/domain/poll/Poll';
 import { PollState } from '@/domain/poll/PollState';
 import { isOwnershipMode } from '@/domain/poll/DistributionType';
@@ -121,29 +122,35 @@ export async function resultsPageDetails(
   user: User,
   source: Source
 ): Promise<Result<ResultsPageView, NotificationFailure>> {
-  const [isSuperAdmin, unreadCount, reports, heading] = await Promise.all([
-    users.isSuperAdmin(user.id),
-    unread.execute({ userId: user.id }),
-    reportsForViewer(pollId),
-    source.kind === 'live'
-      ? liveHeading(source.poll, user)
-      : {
-          title: source.data.title,
-          description: source.data.description,
-          attachmentIds: source.data.attachmentIds.map((id) =>
-            PollAttachmentId.parse(id)
-          ),
-          distributionType: source.data.distributionType,
-          propertyAggregation: source.data.propertyAggregation,
-          scopedPropertyNames: source.data.scopedPropertyNames,
-          showAggregation: source.data.showAggregation,
-          isPollCreator: source.data.isPollCreator,
-          isAnonymous: source.data.isAnonymous,
-          isOpenPoll: source.data.isOpenPoll,
-          buildingTotal: 0,
-          pollState: PollState.FINISHED,
-        },
-  ]);
+  const [isSuperAdmin, unreadCount, reports, questionFiles, heading] =
+    await Promise.all([
+      users.isSuperAdmin(user.id),
+      unread.execute({ userId: user.id }),
+      reportsForViewer(pollId),
+      questionAttachmentFiles(
+        pollId,
+        user.id,
+        source.kind === 'sealed' ? source.data.questionFiles : undefined
+      ),
+      source.kind === 'live'
+        ? liveHeading(source.poll, user)
+        : {
+            title: source.data.title,
+            description: source.data.description,
+            attachmentIds: source.data.attachmentIds.map((id) =>
+              PollAttachmentId.parse(id)
+            ),
+            distributionType: source.data.distributionType,
+            propertyAggregation: source.data.propertyAggregation,
+            scopedPropertyNames: source.data.scopedPropertyNames,
+            showAggregation: source.data.showAggregation,
+            isPollCreator: source.data.isPollCreator,
+            isAnonymous: source.data.isAnonymous,
+            isOpenPoll: source.data.isOpenPoll,
+            buildingTotal: 0,
+            pollState: PollState.FINISHED,
+          },
+    ]);
 
   if (!unreadCount.success) {
     return unreadCount;
@@ -151,6 +158,7 @@ export async function resultsPageDetails(
 
   return success({
     ...heading,
+    questionFiles,
     results: source.data.results,
     canViewVoterNames: source.data.canViewVoterNames,
     canViewSignWillingness: source.data.canViewSignWillingness,

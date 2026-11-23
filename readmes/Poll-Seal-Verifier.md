@@ -4,12 +4,12 @@ Save the original receipt when casting the ballot. Its secret and original selec
 After the poll finishes and seals, download the evidence you can access. Keep the JSON files byte
 for byte, including the embedded canonical strings. Formatting them changes their commitments.
 
-| GET under `/api/polls/<pollId>/seal/` | File            | Who can download it                                                                                                                                              |
-| ------------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `manifest`                            | `manifest.json` | Anyone. Contains the five section commitments.                                                                                                                   |
-| `proof`                               | `<pollId>.ots`  | Anyone once proof bytes exist. The server serves its latest confirmed proof when available.                                                                      |
-| `sections`                            | `sections.json` | Viewers with current results access receive the poll and tallies. Named-voter access adds the register and salted vote list. Only admins receive signer details. |
-| `my-proof`                            | `bundle.json`   | Each authenticated voter with sealed votes receives their own leaves and inclusion paths. Current results access also permits the poll labels.                   |
+| GET under `/api/polls/<pollId>/seal/` | File            | Who can download it                                                                                                                                                                                       |
+| ------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `manifest`                            | `manifest.json` | Anyone. Contains the five section commitments.                                                                                                                                                            |
+| `proof`                               | `<pollId>.ots`  | Anyone once proof bytes exist. The server serves its latest confirmed proof when available.                                                                                                               |
+| `sections`                            | `sections.json` | Viewers with results access receive tallies. A poll section containing files requires current file access. Named-voter access adds the register and salted vote list. Only admins receive signer details. |
+| `my-proof`                            | `bundle.json`   | Each authenticated voter with sealed votes receives their own leaves and inclusion paths. Poll labels follow the same section permission.                                                                 |
 
 A former member can still verify their original ballot using their bundle. Without permission to
 see current results, they can authenticate labels using a previously saved canonical poll section.
@@ -62,14 +62,13 @@ cp build/verify-seal.mjs "$verify_dir/"
 cp src/domain/seal/__tests__/fixtures/export-v1/* "$verify_dir/"
 cd "$verify_dir"
 node verify-seal.mjs --manifest manifest.json --bundle bundle.json \
-  --receipt receipt.json --sections sections.json --proof manifest.json.ots
+  --receipt receipt.json --sections sections.json
 ```
 
 Use Node 22 or newer. The single bundled module reads local files. It needs no package installation,
 app login, database, environment variables or network at verification time. Use the downloaded
 `<pollId>.ots` filename for a real poll. The example reports `originalReceiptMatches`, verified
-labels and a `pending` timestamp. Its manifest SHA-256 is
-`753cc468ecefe2f8cbf567cf13a03d10df97aa58aaa78da979619dddcfdb0822`.
+labels and a `notProvided` timestamp. Add `--proof <pollId>.ots` to check a real poll’s timestamp proof.
 
 - **Original receipt.** `--bundle` and `--receipt` compare the complete saved leaf set, including
   the original choices, weights and cast times. They check every salted leaf and its path to the
@@ -80,10 +79,12 @@ labels and a `pending` timestamp. Its manifest SHA-256 is
 - **Labels.** A committed poll section in the bundle, the section export or a separate `--poll` file
   authenticates the poll and answer text. `labels: unavailable` means the verifier could compare
   the ballot hashes but had no independently committed labels to compare with the receipt.
-- **Sections.** Every disclosed section must match its manifest commitment. When the register and
+- **Sections.** Every disclosed section must match its manifest commitment. When the poll section, register and
   complete vote list are present, the verifier also recomputes weighted tallies and checks the
   disclosed ballots against the register. An anonymous member can check the tally commitment
   while individual ballots stay private.
+- **Question files.** Supply `--sections sections.json --attachment-id ID --attachment path/to/file` to check a download’s byte length and digest. The output identifies the owning question. A null owner identifies a poll description file. File verification requires the canonical poll section.
+- **Board results.** When the file audience is narrower than the results audience, a member can still check the tally commitment and permitted ballots. The verifier reports `talliesRecomputed: false` if it lacks the poll section needed to recompute totals.
 - **Timestamp.** The offline verifier checks proof framing and its SHA-256 file digest. It reports
   `pending`, `simulated`, `bitcoinAttestationUnverified` or `notProvided`. An attestation
   requires a separate Bitcoin chain check. A consistent manifest by itself says nothing about
@@ -104,7 +105,7 @@ may create a backup. [OpenTimestamps client instructions](https://github.com/ope
 ots --no-cache info manifest.json.ots
 ots --no-cache upgrade manifest.json.ots
 ots --no-cache verify -f manifest.json manifest.json.ots
-ots --no-cache verify -d 753cc468ecefe2f8cbf567cf13a03d10df97aa58aaa78da979619dddcfdb0822 manifest.json.ots
+ots --no-cache verify -d "$(sha256sum manifest.json | cut -d' ' -f1)" manifest.json.ots
 ```
 
 `-f` hashes the exact manifest bytes. `-d` takes the already computed 32-byte digest expressed as
@@ -125,13 +126,12 @@ fixture at block **976744** (15:25:27 UTC) through Blockstream Esplora. The Pyth
 independently verified both blocks through PublicNode. Both exact-file and raw-digest verification passed. The
 hex-text negative control failed as expected. Both live checks used remote chain data.
 
-The weighted fixture includes the upgraded proof as `manifest.bitcoin.ots`. From the example
-directory above, run these commands to repeat the local check and the Bitcoin check:
+The original timestamped manifest and its proofs are preserved under `fixtures/bitcoin-example`. The current attachment fixture has a different digest. From the repository root, use the original pair to reproduce the Bitcoin check.
 
 ```sh
-node verify-seal.mjs --manifest manifest.json --bundle bundle.json \
-  --receipt receipt.json --sections sections.json --proof manifest.bitcoin.ots
-ots --no-cache verify -f manifest.json manifest.bitcoin.ots
+example=src/domain/seal/__tests__/fixtures/bitcoin-example
+node build/verify-seal.mjs --manifest "$example/manifest.json" --proof "$example/manifest.bitcoin.ots"
+ots --no-cache verify -f "$example/manifest.json" "$example/manifest.bitcoin.ots"
 ```
 
 The offline command reports `bitcoinAttestationUnverified`. The second command uses your

@@ -1,5 +1,6 @@
 'use client';
 
+import { QuestionFiles } from '../QuestionFiles';
 import {
   Radio,
   RadioGroup,
@@ -23,6 +24,7 @@ interface Question {
   text: string;
   details: string | null;
   questionType: QuestionType;
+  files?: { id: string; fileName: string; mimeType: string }[];
   answers: Answer[];
 }
 
@@ -48,6 +50,7 @@ export default function VotingQuestion({
           <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">
             {question.text}
           </h3>
+          <QuestionFiles files={question.files} />
           {question.details && (
             <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
               {question.details}
@@ -82,6 +85,7 @@ export default function VotingQuestion({
         <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">
           {question.text}
         </h3>
+        <QuestionFiles files={question.files} />
         {question.details && (
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
             {question.details}

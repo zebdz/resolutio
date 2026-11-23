@@ -8,6 +8,7 @@ import { MembersListContent, OrgMember } from './MembersListContent';
 
 type Props = {
   organizationId: string;
+  canManageEligibility?: boolean;
   isUserMember: boolean;
   showMemberRequests: boolean;
   pendingMemberRequestCount?: number;
@@ -19,6 +20,7 @@ type Props = {
 
 export async function MembershipSection({
   organizationId,
+  canManageEligibility = false,
   isUserMember,
   showMemberRequests,
   pendingMemberRequestCount = 0,
@@ -83,6 +85,7 @@ export async function MembershipSection({
 
           {/* Members list with search/pagination */}
           <MembersListContent
+            canManageEligibility={canManageEligibility}
             organizationId={organizationId}
             initialMembers={initialMembers}
             initialTotalCount={initialMembersTotalCount}

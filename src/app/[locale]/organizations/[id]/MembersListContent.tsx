@@ -1,6 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+/** Search the authorized roster and expose member controls for the viewer's role. */
+import {
+  VotingEligibilityToggle,
+  VotingEligibilityHistory,
+} from './VotingEligibilityControls';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/src/web/components/catalyst/button';
@@ -24,12 +29,14 @@ export type OrgMember = {
   middleName: string | null;
   nickname: string;
   joinedAt: Date | null;
+  votingEligible?: boolean;
 };
 
 type Props = {
   organizationId: string;
   initialMembers: OrgMember[];
   initialTotalCount: number;
+  canManageEligibility?: boolean;
   canRemoveMembers?: boolean;
   currentUserId?: string | null;
 };
@@ -40,6 +47,7 @@ export function MembersListContent({
   organizationId,
   initialMembers,
   initialTotalCount,
+  canManageEligibility = false,
   canRemoveMembers = false,
   currentUserId = null,
 }: Props) {
@@ -60,8 +68,11 @@ export function MembersListContent({
   const from = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
   const to = Math.min(page * PAGE_SIZE, totalCount);
 
+  const lastSearch = useRef('');
+  const latestRequest = useRef(0);
   const fetchMembers = useCallback(
     async (p: number, q: string) => {
+      const request = ++latestRequest.current;
       setIsLoading(true);
       const result = await getOrgMembersAction(
         organizationId,
@@ -69,6 +80,10 @@ export function MembersListContent({
         PAGE_SIZE,
         q || undefined
       );
+
+      if (request !== latestRequest.current) {
+        return;
+      }
 
       if (result.success) {
         setMembers(result.data.members);
@@ -80,9 +95,14 @@ export function MembersListContent({
     [organizationId]
   );
 
-  // Debounced search
+  // The initial server page already contains the unfiltered roster.
   useEffect(() => {
+    if (query === lastSearch.current) {
+      return;
+    }
+
     const timer = setTimeout(() => {
+      lastSearch.current = query;
       setPage(1);
       fetchMembers(1, query);
     }, 300);
@@ -141,6 +161,11 @@ export function MembersListContent({
         />
       </div>
 
+      {canManageEligibility && (
+        <div className="mb-2">
+          <VotingEligibilityHistory organizationId={organizationId} />
+        </div>
+      )}
       {/* Members list */}
       {isLoading ? (
         <div className="py-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
@@ -155,9 +180,9 @@ export function MembersListContent({
           {members.map((member) => (
             <li
               key={member.id}
-              className="flex items-center justify-between gap-3 py-2 text-sm text-zinc-700 dark:text-zinc-300"
+              className="flex flex-wrap items-center gap-3 py-2 text-sm text-zinc-700 dark:text-zinc-300"
             >
-              <span>
+              <span className="min-w-0 flex-1 basis-48 break-words">
                 {User.formatFullName(
                   member.firstName,
                   member.lastName,
@@ -165,6 +190,28 @@ export function MembersListContent({
                 )}{' '}
                 <span className="text-zinc-400">(@{member.nickname})</span>
               </span>
+              {canManageEligibility && member.votingEligible !== undefined && (
+                <VotingEligibilityToggle
+                  organizationId={organizationId}
+                  memberId={member.id}
+                  name={User.formatFullName(
+                    member.firstName,
+                    member.lastName,
+                    member.middleName
+                  )}
+                  eligible={member.votingEligible}
+                  onChanged={(value) => {
+                    setMembers((rows) =>
+                      rows.map((row) =>
+                        row.id === member.id
+                          ? { ...row, votingEligible: value }
+                          : row
+                      )
+                    );
+                    router.refresh();
+                  }}
+                />
+              )}
               {canRemoveMembers && member.id !== currentUserId && (
                 <Button color="red" onClick={() => handleRemoveClick(member)}>
                   {t('removeMember')}

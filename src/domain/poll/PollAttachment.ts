@@ -2,7 +2,7 @@
  * Content bytes remain separate, so metadata never leaks file content across boundaries. */
 import { z } from 'zod';
 import { EntityCreation } from '../shared/EntityCreation';
-import { PollAttachmentId, PollId } from '../shared/EntityIds';
+import { PollAttachmentId, PollId, QuestionId } from '../shared/EntityIds';
 import { Instant } from '../shared/Instant';
 import {
   AttachmentFileName,
@@ -26,7 +26,8 @@ export const POLL_ATTACHMENT_PDF_MAX_BYTES = AttachmentByteCount.parse(
   10 * 1024 * 1024
 );
 
-// Per-poll attachment cap. Enforced in the use case, not in this entity.
+// New uploads have independent limits for each question and for the description.
+export const QUESTION_ATTACHMENT_COUNT_LIMIT = AttachmentCount.parse(3);
 export const POLL_ATTACHMENT_COUNT_LIMIT = AttachmentCount.parse(20);
 
 // Deliberately narrower than the report whitelist: a poll description takes
@@ -106,6 +107,7 @@ function magicMatches(mimeType: PollAttachmentMimeType, head: Buffer): boolean {
 
 interface CreateInput {
   pollId: PollId;
+  questionId?: QuestionId | null;
   fileName: AttachmentFileName;
   mimeType: PollAttachmentMimeType;
   sizeBytes: AttachmentByteCount;
@@ -113,6 +115,7 @@ interface CreateInput {
 
 interface CreateWithBytesInput {
   pollId: PollId;
+  questionId?: QuestionId | null;
   fileName: AttachmentFileName;
   mimeType: PollAttachmentMimeType;
   bytes: Buffer;
@@ -121,6 +124,7 @@ interface CreateWithBytesInput {
 interface ReconstituteInput {
   id: string;
   pollId: string;
+  questionId?: string | null;
   fileName: string;
   mimeType: string;
   sizeBytes: number;
@@ -133,7 +137,7 @@ export function parsePollAttachmentMetadata(input: {
   fileName: unknown;
   mimeType: unknown;
   sizeBytes: unknown;
-}): Result<Omit<CreateInput, 'pollId'>, PollAttachmentFailure> {
+}): Result<Omit<CreateInput, 'pollId' | 'questionId'>, PollAttachmentFailure> {
   const fileName = AttachmentFileName.safeParse(input.fileName);
 
   if (!fileName.success) {
@@ -170,6 +174,7 @@ export class PollAttachment {
   private constructor(
     public readonly id: PollAttachmentId,
     public readonly pollId: PollId,
+    public readonly questionId: QuestionId | null,
     public readonly fileName: AttachmentFileName,
     public readonly mimeType: PollAttachmentMimeType,
     public readonly sizeBytes: AttachmentByteCount,
@@ -194,9 +199,15 @@ export class PollAttachment {
 
     const identity = PollAttachmentId.safeParse(creation?.id);
     const parent = PollId.safeParse(input.pollId);
+    const question = QuestionId.nullable().safeParse(input.questionId ?? null);
     const time = Instant.safeParse(creation?.now);
 
-    if (!identity.success || !parent.success || !time.success) {
+    if (
+      !identity.success ||
+      !parent.success ||
+      !question.success ||
+      !time.success
+    ) {
       return failure(SharedDomainCodes.INVALID_ATTACHMENT_METADATA);
     }
 
@@ -204,6 +215,7 @@ export class PollAttachment {
       new PollAttachment(
         identity.data,
         parent.data,
+        question.data,
         metadata.value.fileName,
         metadata.value.mimeType,
         metadata.value.sizeBytes,
@@ -224,6 +236,7 @@ export class PollAttachment {
     const meta = PollAttachment.create(
       {
         pollId: input.pollId,
+        questionId: input.questionId,
         fileName: input.fileName,
         mimeType: input.mimeType,
         sizeBytes: AttachmentByteCount.parse(input.bytes.length),
@@ -254,6 +267,8 @@ export class PollAttachment {
     const result = PollAttachment.create(
       {
         pollId: PollId.parse(input.pollId),
+        questionId:
+          input.questionId == null ? null : QuestionId.parse(input.questionId),
         fileName: metadata.value.fileName,
         mimeType: metadata.value.mimeType,
         sizeBytes: metadata.value.sizeBytes,

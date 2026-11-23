@@ -87,3 +87,32 @@ describe('Argon2PasswordVerifier', () => {
     expect(isValid).toBe(true);
   });
 });
+
+it('upgrades a tagged Laravel credential only when the account still owns that hash', async () => {
+  const { UserId } = await import('@/domain/shared/EntityIds');
+  const id = UserId.parse('legacy-fixture');
+  const password = PlaintextPassword.parse('Legacy-demo-42');
+  const legacy = PasswordHash.parse(
+    'bcrypt:$2y$04$Ay.KDWajH.pDJkC.WFn.KeOlN7b/NxY3XGFvPeRBGWEF9B8rSmfk2'
+  );
+  let stored = legacy;
+  const verifier = new Argon2PasswordVerifier(
+    async (userId, expected, replacement) => {
+      if (userId !== id || stored !== expected) {
+        return false;
+      }
+
+      stored = replacement;
+
+      return true;
+    }
+  );
+  expect(
+    await verifier.verify(PlaintextPassword.parse('incorrect'), legacy, id)
+  ).toBe(false);
+  expect(stored).toBe(legacy);
+  expect(await verifier.verify(password, legacy, id)).toBe(true);
+  expect(stored.startsWith('$argon2id$')).toBe(true);
+  expect(await verifier.verify(password, stored, id)).toBe(true);
+  expect(await verifier.verify(password, legacy, id)).toBe(false);
+});

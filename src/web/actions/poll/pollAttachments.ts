@@ -40,7 +40,7 @@ const removeUseCase = new RemovePollAttachmentUseCase(
 /** Metadata only — file bytes never cross to a Client Component. */
 export type PollAttachmentSummary = Pick<
   PollAttachmentMetadata,
-  'id' | 'fileName' | 'mimeType' | 'sizeBytes'
+  'id' | 'questionId' | 'fileName' | 'mimeType' | 'sizeBytes'
 >;
 
 type ActionResult<T> =
@@ -100,6 +100,7 @@ export async function listPollAttachmentsAction(
     success: true,
     data: result.value.map((a) => ({
       id: a.id,
+      questionId: a.questionId,
       fileName: a.fileName,
       mimeType: a.mimeType,
       sizeBytes: a.sizeBytes,

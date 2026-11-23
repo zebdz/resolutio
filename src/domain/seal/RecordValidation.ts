@@ -84,13 +84,17 @@ export function validateRecord(record: SealedRecord) {
  * same participant and ballot invariants as record rehydration. Only admins get signers. */
 export function validateNamedSections(
   manifest: SealManifest,
-  poll: PollSection,
+  poll: PollSection | undefined,
   sections: { register: string; tallies: string; signers?: string },
   votes: VotePreimage[]
 ) {
   const register = decode(z.array(registerEntrySchema), sections.register);
-  validateSnapshot(poll, register, votes, manifest.sealedAt);
-  requireSeal(canonical(tally(poll, register, votes)) === sections.tallies);
+
+  if (poll) {
+    validateSnapshot(poll, register, votes, manifest.sealedAt);
+    requireSeal(canonical(tally(poll, register, votes)) === sections.tallies);
+  }
+
   requireSeal(
     canonical(
       [...register]

@@ -7,7 +7,7 @@ import { PasswordHash, PlaintextPassword } from '@/domain/user/UserValues';
 import { Instant } from '@/domain/shared/Instant';
 import { Clock, IdGenerator } from '@/application/shared/EntityCreation';
 import { OtpCodeGenerator } from './OtpCodeGenerator';
-import { OtpVerificationId } from '@/domain/shared/EntityIds';
+import { UserId, OtpVerificationId } from '@/domain/shared/EntityIds';
 import { OtpSmsDestination } from '@/domain/otp/OtpValues';
 import {
   ClientIp,
@@ -31,7 +31,11 @@ import { AuthErrors } from './AuthErrors';
 import { readOtpStatus, shouldIssueCode } from './OtpStatus';
 
 export interface PasswordVerifier {
-  verify(password: PlaintextPassword, hash: PasswordHash): Promise<boolean>;
+  verify(
+    password: PlaintextPassword,
+    hash: PasswordHash,
+    userId?: UserId
+  ): Promise<boolean>;
 }
 
 export interface LoginUserInput {
@@ -117,7 +121,8 @@ export class LoginUserUseCase {
     // Verify password
     const isPasswordValid = await this.passwordVerifier.verify(
       PlaintextPassword.parse(input.password),
-      user.password
+      user.password,
+      user.id
     );
 
     if (!isPasswordValid) {

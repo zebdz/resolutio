@@ -111,6 +111,8 @@ model User {
   propertyClaimsDecided       PropertyClaim[]                 @relation("PropertyClaimDecidedBy")
   reportsAuthored             Report[]                        @relation("ReportAuthor")
   reportsPublished            Report[]                        @relation("ReportPublisher")
+  eligibilityChangesReceived MembershipEligibilityChange[] @relation("EligibilityMember")
+  eligibilityChangesMade MembershipEligibilityChange[] @relation("EligibilityActor")
   orgMemberRemovals           OrganizationMemberRemoval[]     @relation("RemovedOrgMember")
   orgMemberRemovalsActed      OrganizationMemberRemoval[]     @relation("RemovedOrgMemberBy")
 
@@ -124,10 +126,10 @@ model Address {
   region         String?
   city           String
   street         String
-  building       String
+  building       String?
   apartment      String?
   postalCode     String?  @map("postal_code")
-  isPrivateHouse Boolean  @default(false) @map("is_private_house")
+  isPrivateHouse Boolean? @default(false) @map("is_private_house")
   oneLine        String?  @map("one_line")
   houseFiasId    String?  @map("house_fias_id")
   flatFiasId     String?  @map("flat_fias_id")
@@ -188,6 +190,7 @@ model Organization {
   properties         OrganizationProperty[]
   propertyClaims     PropertyClaim[]
   reports            Report[]
+  eligibilityChanges MembershipEligibilityChange[]
   memberRemovals     OrganizationMemberRemoval[]
 
   @@index([parentId])
@@ -195,7 +198,27 @@ model Organization {
   @@map("organizations")
 }
 
+/// Voting eligibility decisions survive removal of the membership link.
+model MembershipEligibilityChange {
+  id BigInt @id @default(autoincrement())
+  organizationId String @map("organization_id")
+  memberId String @map("member_id")
+  actorId String @map("actor_id")
+  wasEligible Boolean @map("was_eligible")
+  eligible Boolean
+  reason String @db.VarChar(500)
+  changedAt DateTime @default(now()) @map("changed_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  member User @relation("EligibilityMember", fields: [memberId], references: [id], onDelete: Restrict)
+  actor User @relation("EligibilityActor", fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, id])
+  @@map("membership_eligibility_changes")
+}
+
 model OrganizationUser {
+  votingEligible   Boolean   @default(true) @map("voting_eligible")
   id               String    @id @default(cuid())
   organizationId   String    @map("organization_id")
   userId           String    @map("user_id")
@@ -372,8 +395,11 @@ model PollAttachment {
   bytes     Bytes
   createdAt DateTime @default(now()) @map("created_at")
 
-  poll Poll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  questionId String?   @map("question_id")
+  question   Question? @relation(fields: [questionId, pollId], references: [id, pollId], onDelete: NoAction, onUpdate: NoAction)
+  poll       Poll      @relation(fields: [pollId], references: [id], onDelete: Cascade)
 
+  @@index([pollId, questionId])
   @@index([pollId])
   @@map("poll_attachments")
 }
@@ -394,6 +420,9 @@ model Question {
   votes      Vote[]
   voteDrafts VoteDraft[]
 
+  attachments PollAttachment[]
+
+  @@unique([id, pollId])
   @@index([pollId])
   @@index([pollId, page, order])
   @@map("questions")

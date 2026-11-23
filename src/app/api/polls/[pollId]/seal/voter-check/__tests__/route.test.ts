@@ -56,7 +56,12 @@ beforeEach(() => {
     },
     {
       forViewer: async () =>
-        success({ results: false, names: false, signers: false }),
+        success({
+          results: false,
+          names: false,
+          signers: false,
+          attachments: false,
+        }),
     }
   );
   mocks.myProof.mockImplementation(reader.myProof.bind(reader));

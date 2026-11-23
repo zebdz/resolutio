@@ -88,3 +88,43 @@ it.each(['outsider', 'member', 'admin', 'superadmin'] as const)(
     }
   }
 );
+
+it.each(['member', 'admin', 'superadmin'])(
+  'filters other members’ eligibility before returning the roster to a %s',
+  async (role) => {
+    const directory = {
+      members: vi.fn().mockResolvedValue(
+        success({
+          members: [
+            { id: 'self', votingEligible: false },
+            { id: 'other', votingEligible: true },
+          ],
+          totalCount: ResultCount.parse(2),
+        })
+      ),
+    };
+    const service = new GetOrgMembersUseCase({
+      directory,
+      organizationRepository: {
+        findById: vi.fn().mockResolvedValue(organization),
+        isUserMember: vi.fn().mockResolvedValue(true),
+        isUserAdmin: vi.fn().mockResolvedValue(role === 'admin'),
+      },
+      userRepository: {
+        isSuperAdmin: vi.fn().mockResolvedValue(role === 'superadmin'),
+      },
+    });
+    const result = await service.execute({
+      organizationId: 'root',
+      actorUserId: 'self',
+      page: 1,
+      pageSize: 20,
+    });
+    expect(result.success && result.value.members).toEqual([
+      { id: 'self', votingEligible: false },
+      role === 'member'
+        ? { id: 'other' }
+        : { id: 'other', votingEligible: true },
+    ]);
+  }
+);

@@ -24,14 +24,19 @@ it('keeps the ID and time assigned to an uploaded attachment', async () => {
     throw new Error(result.error);
   }
 
-  const prisma = {
+  const tx = {
+    $queryRaw: async () => [{ state: 'DRAFT', archived_at: null }],
     pollAttachment: {
-      create: vi.fn(async ({ data }) => ({
+      count: async () => 0,
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({
         id: 'db-generated',
         createdAt: new Date('2030-01-01'),
         ...data,
       })),
     },
+  };
+  const prisma = {
+    $transaction: (run: (client: typeof tx) => unknown) => run(tx),
   } as unknown as PrismaClient;
   const saved = await new PrismaPollAttachmentRepository(prisma).save(
     result.value,

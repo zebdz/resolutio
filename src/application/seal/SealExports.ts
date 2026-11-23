@@ -9,6 +9,7 @@ import { MerkleTree } from '@/domain/seal/MerkleTree';
 import { Result, success, failure } from '@/domain/shared/Result';
 
 export interface SectionPermissions {
+  readonly attachments: boolean;
   readonly results: boolean;
   readonly names: boolean;
   readonly signers: boolean;
@@ -31,6 +32,14 @@ export interface SealExportReader extends Pick<
   findPublishedByPollId(
     pollId: PollId
   ): Promise<Result<PublishedSeal | null, SealPersistenceFailureCode>>;
+}
+
+// Canonical section bytes cannot be redacted without changing their hash.
+function canDisclosePoll(permissions: SectionPermissions, poll: string) {
+  return (
+    permissions.results &&
+    (permissions.attachments || JSON.parse(poll).attachments.length === 0)
+  );
 }
 
 export class SealExports {
@@ -121,7 +130,9 @@ export class SealExports {
       manifest,
       rootDigest,
       sections: {
-        poll: sections.poll,
+        ...(canDisclosePoll(allowed.value, sections.poll)
+          ? { poll: sections.poll }
+          : {}),
         tallies: sections.tallies,
         ...(allowed.value.names ? { register: sections.register, votes } : {}),
         ...(allowed.value.signers ? { signers: sections.signers } : {}),
@@ -158,7 +169,9 @@ export class SealExports {
         hash: v.hash,
         path: tree.pathFor(Digest.parse(v.hash)),
       })),
-      ...(allowed.value.results ? { poll: sections.poll } : {}),
+      ...(canDisclosePoll(allowed.value, sections.poll)
+        ? { poll: sections.poll }
+        : {}),
     });
   }
 }

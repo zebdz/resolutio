@@ -11,7 +11,7 @@ install -m 600 "$runtime_env" "$stage/.env"
 tar --exclude=.next/dev --exclude=.next/cache --exclude=.next/trace -czf "$archive" \
   .next node_modules generated prisma public messages \
   src/infrastructure/anchor/ots-worker.mjs src/i18n build/version-helper.ts \
-  build/backfill-receipt-secrets.cjs build/verify-seal.mjs scripts/seal-ops \
+  build/backfill-receipt-secrets.cjs build/verify-seal.mjs scripts/seal-ops scripts/berezka/{import,preflight,matching,apply,project,verify,verify-access,content,native-import,meeting-import,meeting-evidence}.mjs scripts/berezka/{staging,evidence-access}.sql \
   package.json next.config.ts prisma.config.ts migrate-production.sh \
   deploy-on-server.sh start-production.sh -C "$stage" .env
 chmod 600 "$archive"

@@ -244,3 +244,18 @@ describe('AddPollAttachmentUseCase', () => {
     );
   });
 });
+
+it('limits each persisted question to three attachments independently of the poll description', async () => {
+  const poll = draftPoll();
+  poll.addQuestion(questionWithAnswer(poll.id));
+  const d = buildDeps({ poll, count: 3 });
+  const result = await d.uc.execute({
+    ...validInput(),
+    questionId: 'question-1',
+  });
+  expect(result).toEqual({
+    success: false,
+    error: 'domain.poll.questionAttachmentLimitReached',
+  });
+  expect(d.attachments.save).not.toHaveBeenCalled();
+});

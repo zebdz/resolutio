@@ -1,4 +1,7 @@
 /** Server report view resolves validated references and serializes only authorized content. */
+import { HistoricalRecord } from '@/web/components/history/HistoricalRecord';
+import { HistoricalQuestionId } from '@/domain/history/HistoryIds';
+import { readQuestion } from '@/infrastructure/history/history';
 import { SITE_ORIGIN } from '@/infrastructure/shared/siteOrigin';
 import { OrganizationId, UserId } from '@/domain/shared/EntityIds';
 import { PageSize } from '@/domain/shared/Pagination';
@@ -50,6 +53,16 @@ export async function generateMetadata({
   params,
 }: ReportDetailPageProps): Promise<import('next').Metadata> {
   const { id, locale } = await params;
+  const history = HistoricalQuestionId.safeParse(id);
+
+  if (history.success) {
+    const item = await readQuestion(null, history.data, true);
+
+    return {
+      title: item?.title ?? (await getTranslations('history'))('reports'),
+    };
+  }
+
   // Anonymous metadata fetch — keeps OG generation working for crawlers
   // that won't have a session cookie.
   const result = await reportUC.execute({ reportId: id, viewerId: null });
@@ -88,7 +101,12 @@ export async function generateMetadata({
 export default async function ReportDetailPage({
   params,
 }: ReportDetailPageProps) {
-  const { id } = await params;
+  const { id, locale } = await params;
+
+  if (HistoricalQuestionId.safeParse(id).success) {
+    return <HistoricalRecord kind="report" id={id} locale={locale} />;
+  }
+
   const currentUser = await getCurrentUser();
   const t = await getTranslations('report');
 

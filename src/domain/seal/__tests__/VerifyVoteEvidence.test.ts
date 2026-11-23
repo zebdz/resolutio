@@ -1,7 +1,7 @@
 /** Keep the hosted ballot display aligned with offline verification and label provenance. */
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { verifyVoteEvidence } from '../VerifyEvidence';
+import { verifyEvidence, verifyVoteEvidence } from '../VerifyEvidence';
 import { evidence } from './evidenceCases';
 
 it('reports original choices with their sealed label, exact weight and pending anchor', () => {
@@ -57,15 +57,16 @@ it('without results access exposes IDs and marks imported labels as receipt clai
   ).toEqual({ success: false, error: 'domain.seal.sectionMismatch' });
 });
 
-it('compares the saved weighted ballot while leaving independent Bitcoin block verification to the caller', () => {
+it('binds a previously timestamped manifest to its original Bitcoin attestation', () => {
   const proof = readFileSync(
-    new URL('./fixtures/export-v1/manifest.bitcoin.ots', import.meta.url)
+    new URL('./fixtures/bitcoin-example/manifest.bitcoin.ots', import.meta.url)
   );
-  expect(verifyVoteEvidence({ ...evidence, proof })).toMatchObject({
+  const manifest = readFileSync(
+    new URL('./fixtures/bitcoin-example/manifest.json', import.meta.url),
+    'utf8'
+  );
+  expect(verifyEvidence({ manifest, proof })).toMatchObject({
     success: true,
-    value: {
-      ballot: 'originalReceiptMatches',
-      timestamp: 'bitcoinAttestationUnverified',
-    },
+    value: { timestamp: 'bitcoinAttestationUnverified' },
   });
 });

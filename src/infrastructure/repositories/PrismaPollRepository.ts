@@ -70,7 +70,11 @@ export class PrismaPollRepository implements PollRepository {
           // Ids only — never `bytes`. The description renderer needs the id
           // allowlist so it can refuse refs to other polls' files; file
           // content is served solely by the download route.
-          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
+          attachments: {
+            where: { questionId: null },
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          },
         },
       });
 
@@ -127,7 +131,11 @@ export class PrismaPollRepository implements PollRepository {
           // Ids only — never `bytes`. The description renderer needs the id
           // allowlist so it can refuse refs to other polls' files; file
           // content is served solely by the download route.
-          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
+          attachments: {
+            where: { questionId: null },
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -164,7 +172,11 @@ export class PrismaPollRepository implements PollRepository {
           // Ids only — never `bytes`. The description renderer needs the id
           // allowlist so it can refuse refs to other polls' files; file
           // content is served solely by the download route.
-          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
+          attachments: {
+            where: { questionId: null },
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -229,7 +241,11 @@ export class PrismaPollRepository implements PollRepository {
           // Ids only — never `bytes`. The description renderer needs the id
           // allowlist so it can refuse refs to other polls' files; file
           // content is served solely by the download route.
-          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
+          attachments: {
+            where: { questionId: null },
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          },
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -351,7 +367,11 @@ export class PrismaPollRepository implements PollRepository {
           // Ids only — never `bytes`. The description renderer needs the id
           // allowlist so it can refuse refs to other polls' files; file
           // content is served solely by the download route.
-          attachments: { select: { id: true }, orderBy: { createdAt: 'asc' } },
+          attachments: {
+            where: { questionId: null },
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          },
         },
         orderBy: { createdAt: 'desc' },
         ...(filters.page && filters.pageSize
