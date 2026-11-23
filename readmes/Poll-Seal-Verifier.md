@@ -28,6 +28,9 @@ also lets you reopen the receipt later. For a cast-time comparison, use the file
 attachment you received when you voted.
 
 Open `/{locale}/verify/{pollId}` to inspect the public digest, five commitments and timestamp.
+Guests can return to the homepage, sign in or switch languages from the header. Both verification
+pages load the signed-in navigation through a separate private request so account details stay
+out of the verification page's HTML and React Server Component payload.
 **Check available evidence** checks the manifest and available proof. If you have results access,
 it also checks your permitted sections. You can select your own saved sections file instead.
 

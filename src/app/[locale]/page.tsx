@@ -1,5 +1,7 @@
+/** Localized public landing page introducing the platform and its voting safeguards. */
 import { getTranslations } from 'next-intl/server';
 import Image from 'next/image';
+import ShieldCheckIcon from '@heroicons/react/24/outline/ShieldCheckIcon';
 import { Button } from '@/src/web/components/catalyst/button';
 import { Link } from '@/src/i18n/routing';
 import { LocaleSwitcher } from '@/src/web/components/layout/LocaleSwitcher';
@@ -148,8 +150,12 @@ export default async function HomePage() {
               <div className="flex items-center justify-center rounded-2xl bg-white/20 px-4 py-5 text-center text-sm font-semibold uppercase tracking-wide text-white sm:text-base">
                 {t('features.publicQuestions')}
               </div>
-              <div className="flex items-center justify-center rounded-2xl bg-white/20 px-4 py-5 text-center text-sm font-semibold uppercase tracking-wide text-white sm:text-base">
-                {t('features.users')}
+              <div className="flex items-center justify-center gap-3 rounded-2xl bg-white/20 px-4 py-5 text-center text-sm font-semibold uppercase tracking-wide text-white sm:flex-col sm:text-base lg:flex-row">
+                <ShieldCheckIcon
+                  aria-hidden="true"
+                  className="size-8 shrink-0 text-brand-yellow"
+                />
+                <span className="text-balance">{t('features.voteProof')}</span>
               </div>
             </div>
 
@@ -169,8 +175,23 @@ export default async function HomePage() {
               <div className="flex items-center justify-center rounded-2xl bg-white/20 px-4 py-5 text-center text-sm font-semibold uppercase tracking-wide text-white sm:text-base">
                 {t('features.governance')}
               </div>
-              <div className="flex items-center justify-center rounded-2xl bg-white/20 px-4 py-5 text-center text-sm font-semibold uppercase tracking-wide text-white sm:text-base">
-                {t('features.documents')}
+              <div className="flex items-center justify-center gap-3 rounded-2xl bg-white/20 px-4 py-5 text-center text-sm font-semibold uppercase tracking-wide text-white sm:flex-col sm:text-base lg:flex-row">
+                <svg
+                  aria-hidden="true"
+                  className="size-8 shrink-0 text-brand-yellow"
+                  viewBox="0 0 32 32"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="m8 3 6 3.5v7L8 17l-6-3.5v-7L8 3Zm-6 3.5L8 10l6-3.5M8 10v7" />
+                  <path d="m24 15 6 3.5v7L24 29l-6-3.5v-7l6-3.5Zm-6 3.5 6 3.5 6-3.5M24 22v7M14 13.5l7 4" />
+                </svg>
+                <span className="text-balance">
+                  {t('features.resultProtection')}
+                </span>
               </div>
             </div>
           </div>

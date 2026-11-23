@@ -7,7 +7,7 @@ this index does not require loading every reference or historical plan.
 
 Implemented on `blockchain` and rehearsed locally on 2026-11-20. [Approved design](2026-09-11-poll-seal-and-anchor-design.md) · [Completed phases and evidence](../plans/archive/2026-09-15-poll-seal-and-anchor.md)
 
-- [Standalone verifier and Bitcoin checks](Poll-Seal-Verifier.md)
+- [Browser verification, standalone verifier and Bitcoin checks](Poll-Seal-Verifier.md)
 - [Rollout, monitoring and rollback](Poll-Seal-Rollout.md)
 - [Visual walkthrough](poll-seal-and-anchor-flow.html)
 - Voter guides in [English](how-your-vote-is-protected.html) and [Russian](how-your-vote-is-protected-ru.html)

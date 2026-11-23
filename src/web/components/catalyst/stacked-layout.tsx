@@ -1,5 +1,6 @@
 'use client';
 
+/** Responsive site shell. Only pages with a sidebar expose the mobile menu. */
 import * as Headless from '@headlessui/react';
 import React, { useState } from 'react';
 import { NavbarItem } from './navbar';
@@ -55,27 +56,31 @@ export function StackedLayout({
   children,
 }: React.PropsWithChildren<{
   navbar: React.ReactNode;
-  sidebar: React.ReactNode;
+  sidebar?: React.ReactNode;
 }>) {
   const [showSidebar, setShowSidebar] = useState(false);
 
   return (
     <div className="relative isolate flex min-h-svh w-full flex-col bg-white dark:bg-zinc-900">
       {/* Sidebar on mobile */}
-      <MobileSidebar open={showSidebar} close={() => setShowSidebar(false)}>
-        {sidebar}
-      </MobileSidebar>
+      {sidebar && (
+        <MobileSidebar open={showSidebar} close={() => setShowSidebar(false)}>
+          {sidebar}
+        </MobileSidebar>
+      )}
 
       {/* Navbar */}
       <header className="flex items-center bg-brand-green px-4">
-        <div className="py-2.5 lg:hidden">
-          <NavbarItem
-            onClick={() => setShowSidebar(true)}
-            aria-label="Open navigation"
-          >
-            <OpenMenuIcon />
-          </NavbarItem>
-        </div>
+        {sidebar && (
+          <div className="py-2.5 lg:hidden">
+            <NavbarItem
+              onClick={() => setShowSidebar(true)}
+              aria-label="Open navigation"
+            >
+              <OpenMenuIcon />
+            </NavbarItem>
+          </div>
+        )}
         <div className="min-w-0 flex-1">{navbar}</div>
       </header>
 
