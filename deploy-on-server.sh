@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Production server deployment script
-# This script is run on the production server after files are uploaded
+# Install a production release, granting nginx access to browser assets while
+# keeping the runtime configuration, server code and backups private.
 
 set -eo pipefail
 umask 077
@@ -53,7 +53,13 @@ fi
 
 # Extract new deployment
 log "Extracting deployment package..."
-tar -xzf "$archive"
+# nginx reads these two trees directly, including while the previous app is live.
+mkdir -p .next
+chmod a+x .next
+(umask 022; tar -xzf "$archive" .next/static public)
+find .next/static public -type d -exec chmod a+rx {} +
+find .next/static public -type f -exec chmod a+r {} +
+tar --no-overwrite-dir --exclude='.next/static' --exclude='public' -xzf "$archive"
 
 PORT=$(sed -n 's/^PORT=//p' .env)
 [[ "$PORT" =~ ^[0-9]+$ ]] || exit 1
